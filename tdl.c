@@ -128,12 +128,12 @@ int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), vo
 
 		if(buffer[0])strcat(buffer, " ");
 		strcat(buffer, lp);
+		if(!buffer[0])continue;
 		if(strlen(buffer) > 9000)
 		{
 			fprintf(stderr, "tdl statement too long: `%s'\n", buffer);
 			return -1;
 		}
-		if(!buffer[0])continue;
 		end = buffer + strlen(buffer)-1;
 		if(*end != '.')
 		{
