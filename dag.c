@@ -293,8 +293,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		{
 			if(SUBS_IGNORE(barcs[i].label))
 				continue;
-			while(SUBS_IGNORE(aarcs[j].label))
+			while(j<a->narcs && SUBS_IGNORE(aarcs[j].label))
 				j++;
+			if(j>=a->narcs)break;
 			if(aarcs[j].label == barcs[i].label)
 			{
 				if(!subsume_dg1(aarcs[j].dest, barcs[i].dest))return 0;
@@ -309,8 +310,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		{
 			if(SUBS_IGNORE(aarcs[i].label))
 				continue;
-			if(SUBS_IGNORE(barcs[j].label))
+			while(j<b->narcs && SUBS_IGNORE(barcs[j].label))
 				j++;
+			if(n>=b->narcs)break;
 			if(aarcs[i].label == barcs[j].label)
 			{
 				if(!subsume_dg1(aarcs[i].dest, barcs[j].dest))return 0;
