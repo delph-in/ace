@@ -70,21 +70,22 @@ void	add_edge_to_chart(struct edge	*edge)
 
 int	trace = 0, gen_qc = 0;
 
-static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
+static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 {
-	struct edge	*e, *a = 0, *b = 0;
+	struct edge	*e;//, *a = 0, *b = 0;
 	struct dg	*u;
 	struct qc	*qc, *hqc;
 	int	remain, arg, nhave, nneed;
 	extern int	__qc_use_heap;
 
-	if(A->have==A->need)b = A;
+	/*if(A->have==A->need)b = A;
 	else a = A;
 	if(B->have==B->need)b = B;
 	else a = B;
 
 	// need one active and one passive edge
-	if(!a || !b)return 0;
+	if(!a || !b)return 0;*/
+
 	remain = a->need - a->have;
 
 	//printf("FR: [%d-%d] + [%d-%d]?\n", a->from, a->to, b->from, b->to);
@@ -285,17 +286,55 @@ static int	process_edge(struct edge	*e)
 	add_edge_to_chart(e);
 
 	// try to combine with edges on either side
-	for(i=0;i<=e->from;i++)
+	if(e->have == e->need)
 	{
-		c = cells + e->from + i*chart_size;
-		for(j=0;j<c->nedges;j++)
-			if(fundamental_rule(c->edges[j], e) == -1)return -1;
+		// passive edge
+		for(i=0;i<=e->from;i++)
+		{
+			c = cells + e->from + i*chart_size;
+			for(j=0;j<c->nedges;j++)
+			{
+				if(c->edges[j]->need != c->edges[j]->have && !c->edges[j]->rtl)
+					if(fundamental_rule(c->edges[j], e) == -1)return -1;
+			}
+		}
+		for(i=e->to;i<chart_size;i++)
+		{
+			c = cells + i + e->to*chart_size;
+			for(j=0;j<c->nedges;j++)
+			{
+				if(c->edges[j]->need != c->edges[j]->have && c->edges[j]->rtl)
+					if(fundamental_rule(c->edges[j], e) == -1)return -1;
+			}
+		}
 	}
-	for(i=e->to;i<chart_size;i++)
+	else
 	{
-		c = cells + i + e->to*chart_size;
-		for(j=0;j<c->nedges;j++)
-			if(fundamental_rule(e, c->edges[j]) == -1)return -1;
+		// active edge
+		if(e->rtl)
+		{
+			for(i=0;i<=e->from;i++)
+			{
+				c = cells + e->from + i*chart_size;
+				for(j=0;j<c->nedges;j++)
+				{
+					if(c->edges[j]->need == c->edges[j]->have)
+						if(fundamental_rule(e, c->edges[j]) == -1)return -1;
+				}
+			}
+		}
+		else
+		{
+			for(i=e->to;i<chart_size;i++)
+			{
+				c = cells + i + e->to*chart_size;
+				for(j=0;j<c->nedges;j++)
+				{
+					if(c->edges[j]->need == c->edges[j]->have)
+						if(fundamental_rule(e, c->edges[j]) == -1)return -1;
+				}
+			}
+		}
 	}
 	return 0;
 }
