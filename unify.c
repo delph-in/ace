@@ -398,14 +398,17 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 	}
 
 	// add remaining dg2 arcs to dg1
-	dg1->arcs = slab_realloc(dg1->arcs, sizeof(struct darc) * dg1->narcs,
-				sizeof(struct darc) * (dg1->narcs + nn));
-
-	for(k=0;k<nn;k++)
+	if(nn > 0)
 	{
-		i = news[k];
-		// add dg2->arcs[i] to dg1->arcs
-		dg1->arcs[dg1->narcs++] = dg2->arcs[i];
+		dg1->arcs = slab_realloc(dg1->arcs, sizeof(struct darc) * dg1->narcs,
+					sizeof(struct darc) * (dg1->narcs + nn));
+
+		for(k=0;k<nn;k++)
+		{
+			i = news[k];
+			// add dg2->arcs[i] to dg1->arcs
+			dg1->arcs[dg1->narcs++] = dg2->arcs[i];
+		}
 	}
 
 	if(extra && unify_dg_infrom(dg1, extra))
@@ -533,30 +536,24 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	// otherwise, they sit uselessly on the slab forever
 
 	if(nn+nc > 0)
+	{
 		dg1->carcs = slab_realloc(dg1->carcs, sizeof(struct darc) * dg1->ncarcs,
 				sizeof(struct darc) * (dg1->ncarcs + nn + nc));
 
-	//dg1->carcs = realloc(dg1->carcs, sizeof(struct darc) * (dg1->ncarcs + nn + nc));
+		//dg1->carcs = realloc(dg1->carcs, sizeof(struct darc) * (dg1->ncarcs + nn + nc));
 
-	//dg1->arcs = slab_realloc(dg1->arcs, sizeof(struct darc) * dg1->narcs,
-	//			sizeof(struct darc) * (dg1->narcs + nn + nc));
-
-	for(k=0;k<nn;k++)
-	{
-		i = news[k];
-		// add dg2->arcs[i] to dg1->carcs
-		dg1->carcs[dg1->ncarcs++] = dg2->arcs[i];
-		//dg1->arcs[dg1->narcs++] = dg2->arcs[i];
-		//fflush(stdout);
-		//fprintf(stderr, "complink `%s -[%s]> %p' ", dg1->type->name, fnames[dg2->arcs[i].label], dg2->arcs[i].dest); unify_backtrace();
-	}
-	for(k=0;k<nc;k++)
-	{
-		i = newcs[k];
-		// add dg2->carcs[i] to dg1->carcs
-		dg1->carcs[dg1->ncarcs++] = dg2->carcs[i];
-		//fflush(stdout);
-		//fprintf(stderr, "ccomplink `%s -[%s]> %p' ", dg1->type->name, fnames[dg2->carcs[i].label], dg2->carcs[i].dest); unify_backtrace();
+		for(k=0;k<nn;k++)
+		{
+			i = news[k];
+			// add dg2->arcs[i] to dg1->carcs
+			dg1->carcs[dg1->ncarcs++] = dg2->arcs[i];
+		}
+		for(k=0;k<nc;k++)
+		{
+			i = newcs[k];
+			// add dg2->carcs[i] to dg1->carcs
+			dg1->carcs[dg1->ncarcs++] = dg2->carcs[i];
+		}
 	}
 
 	if(t != t1 && t!= t2 && t->dg && t->dg->narcs)

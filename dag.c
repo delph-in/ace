@@ -89,17 +89,21 @@ void	next_slab()
 	last = slab;
 }
 
+int	bigfish;
+
 void	*slab_realloc(void	*ptr, int	oldlen, int	newlen)
 {
-	/* // XXX this is horribly buggy for an unknown reason!
 	if(ptr == last && slabu -oldlen +newlen < currslabsize)
 	{
 		slabu += newlen - oldlen;
 		return ptr;
 	}
-	else*/
+	else
 	{
 		slab_alloc(newlen);
+		// XXX without the bigfish, instruction scheduling on (ppc only?) gcc mangles this, unknown how.
+		// Seems to work fine without on x86 and on Sparc.
+		bigfish++;
 		memcpy(last, ptr, oldlen);
 		return last;
 	}
