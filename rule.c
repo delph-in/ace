@@ -217,7 +217,7 @@ void	agenda_rules(int	count)
 			}
 		}
 	}
-	fprintf(stderr, "NOTE: lex-filtered %d epsilon-edges\n", nlf);
+	//fprintf(stderr, "NOTE: lex-filtered %d epsilon-edges\n", nlf);
 }
 
 void	add_rule(char	*name, struct dg	*dg, int	num)
