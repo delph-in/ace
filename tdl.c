@@ -120,7 +120,8 @@ int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), vo
 		if(line[0]==0)break;
 		lnum++;
 		if(line[0]=='\n')continue;
-		line[strlen(line)-1] = 0;
+		if(line[strlen(line)-1]=='\n')	// make sure we don't kill noeol files' last char
+			line[strlen(line)-1] = 0;
 		in_comment = process_comments(line, in_comment);
 		if(line[0]==0)continue;
 		if(line[0]=='%')
@@ -538,15 +539,21 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 	{
 		// handle one feature
 		label = ptr;
-		while(*ptr && (*ptr!=' ' && *ptr!='\t'))ptr++;
+		while(*ptr && (*ptr!=' ' && *ptr!='\t' && *ptr!='[' && *ptr!='<'))ptr++;
 		if(!*ptr)
 		{
 			novalue:
 			fprintf(stderr, "tdl: label `%s' had no value\n", label);
 			return 0;
 		}
-		*ptr = 0;
-		ptr = trim_string(ptr+1);
+
+		// make a null-terminated copy of the label
+		label = memcpy(calloc(ptr-label+1,1), label, ptr-label);
+		//printf("label `%s'\n", label);
+		// *ptr = 0;
+		//ptr = trim_string(ptr+1);
+
+		ptr = trim_string(ptr);
 		if(!*ptr)goto novalue;
 		// find the length of its value
 		vptr = ptr;

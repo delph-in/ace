@@ -175,6 +175,12 @@ char		**fnames;
 
 int	subsume_forward, subsume_backward;
 
+#ifdef	ERG_JULY
+#define	SUBS_IGNORE(label)	(label>=16 && label<=19)
+#else
+#define	SUBS_IGNORE(label)	(label>=16 && label<=20)
+#endif
+
 // make sure 'copy' is either null or self-referential all the way through 'a's arcs
 int	subsume_same_dg(struct dg	*a)
 {
@@ -208,7 +214,7 @@ int	subsume_same_dg(struct dg	*a)
 	arcs = DARCS(a);
 	for(i=0;i<a->narcs;i++)
 	{
-		if(arcs[i].label>=16 && arcs[i].label<=19)	// STEM, RELS, HCONS, RULE-NAME
+		if(SUBS_IGNORE(arcs[i].label))
 			continue;
 		if(!subsume_same_dg(arcs[i].dest))return 0;
 	}
@@ -276,7 +282,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		// types match exactly, arc labels match exactly...
 		for(i=0;i<a->narcs;i++)
 		{
-			if(aarcs[i].label>=16 && aarcs[i].label<=19)	// STEM, RELS, HCONS, RULE-NAME
+			if(SUBS_IGNORE(aarcs[i].label))
 				continue;
 			if(!subsume_dg1(aarcs[i].dest, barcs[i].dest))return 0;
 		}
@@ -285,9 +291,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	{
 		for(i=j=0;i<b->narcs;i++)
 		{
-			if(barcs[i].label>=16 && barcs[i].label<=19)	// STEM, RELS, HCONS, RULE-NAME
+			if(SUBS_IGNORE(barcs[i].label))
 				continue;
-			while(aarcs[j].label>=16 && aarcs[j].label<=19)	// STEM, RELS, HCONS, RULE-NAME
+			while(SUBS_IGNORE(aarcs[j].label))
 				j++;
 			if(aarcs[j].label == barcs[i].label)
 			{
@@ -301,9 +307,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	{
 		for(i=j=0;i<a->narcs;i++)
 		{
-			if(aarcs[i].label>=16 && aarcs[i].label<=19)	// STEM, RELS, HCONS, RULE-NAME
+			if(SUBS_IGNORE(aarcs[i].label))
 				continue;
-			while(barcs[j].label>=16 && barcs[j].label<=19)	// STEM, RELS, HCONS, RULE-NAME
+			if(SUBS_IGNORE(barcs[j].label))
 				j++;
 			if(aarcs[i].label == barcs[j].label)
 			{
@@ -432,7 +438,7 @@ struct dg	*add_dg_feature(struct dg	*d, char	*label, struct dg	*value)
 
 int	init_fnames()
 {
-	nfnames = 20;
+	nfnames = 21;
 	fnames = malloc(sizeof(char*)*nfnames);
 	introduce = malloc(sizeof(int)*nfnames);
 	memset(introduce, -1, sizeof(int)*nfnames);
@@ -443,8 +449,13 @@ int	init_fnames()
 	fnames[3] = strdup("SEM");
 	fnames[4] = strdup("HEAD");
 
+#ifdef	ERG_JULY
 	fnames[5] = strdup("HEAD-DTR");
 	fnames[6] = strdup("NON-HEAD-DTR");
+#else
+	fnames[5] = strdup("HD-DTR");
+	fnames[6] = strdup("NH-DTR");
+#endif
 	fnames[7] = strdup("LCONJ-DTR");
 	fnames[8] = strdup("RCONJ-DTR");
 	fnames[9] = strdup("DTR");
@@ -458,7 +469,8 @@ int	init_fnames()
 	fnames[16] = strdup("STEM");
 	fnames[17] = strdup("RELS");
 	fnames[18] = strdup("HCONS");
-	fnames[19] = strdup("RULE-NAME");
+	fnames[19] = strdup("RNAME");
+	fnames[20] = strdup("RPUNCT");
 
 	return 0;
 }
