@@ -281,11 +281,12 @@ static int	pack_edge(struct edge	*edge)
 
 	// since we're taking first-parse-only, this is ok perhaps.
 	for(i=0;i<c->nedges;i++)
-		if(c->edges[i]->need==c->edges[i]->have &&
-			!c->edges[i]->lex &&
-			c->edges[i]->dg->xtype == edge->dg->xtype &&
-			//!equiv_quickcheck(c->edges[i]->qc, edge->qc) &&
-			!memcmp(c->edges[i]->qc, edge->qc, qcbytes))
+		if(c->edges[i]->need==c->edges[i]->have
+			&& !c->edges[i]->lex
+			&& c->edges[i]->dg->xtype == edge->dg->xtype
+			&& !equiv_quickcheck(c->edges[i]->qc, edge->qc)
+			//&& !memcmp(c->edges[i]->qc, edge->qc, qcbytes)
+			)
 		{
 			if(equivalent_dg(c->edges[i]->dg, edge->dg))
 			{

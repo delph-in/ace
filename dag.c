@@ -1,6 +1,7 @@
 #include	<stdlib.h>
 #include	<stdio.h>
 #include	<string.h>
+#include	<assert.h>
 #include	<sys/types.h>
 #include	<unistd.h>
 #include	<sys/mman.h>
@@ -153,8 +154,10 @@ void	add_dg_hop(struct dg	*d, int	label, struct dg	*value)
 int		nfnames;
 char		**fnames;
 
+int	subsume_forward, subsume_backward;
+
 // make sure 'copy' is either null or self-referential all the way through 'a's arcs
-int	equiv_same_dg(struct dg	*a)
+int	subsume_same_dg(struct dg	*a)
 {
 	int	i;
 	extern unsigned int	generation;
@@ -168,21 +171,24 @@ int	equiv_same_dg(struct dg	*a)
 		a->gen = generation;
 	}
 	if(a->copy==a && a->forward==a)return 1;
-	if(a->copy || a->forward)return 0;
+	if(a->copy)subsume_forward = 0;
+	if(a->forward)subsume_backward = 0;
+	if(!subsume_forward && !subsume_backward)return 0;
+	//if(a->copy || a->forward)return 0;
 	a->copy = a;
 	a->forward = a;
 	for(i=0;i<a->narcs;i++)
 	{
 		if(a->arcs[i].label>=14 && a->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
 			continue;
-		if(!equiv_same_dg(a->arcs[i].dest))return 0;
+		if(!subsume_same_dg(a->arcs[i].dest))return 0;
 	}
 	return 1;
 }
 
 // on input, assume a and b both have noncurrent generation
 // on output, 'copy' pointers are used, so don't try to copy them until next generation
-int	equivalent_dg1(struct dg	*a, struct dg	*b)
+int	subsume_dg1(struct dg	*a, struct dg	*b)
 {
 	int	i, j;
 	extern unsigned int	generation;
@@ -190,7 +196,7 @@ int	equivalent_dg1(struct dg	*a, struct dg	*b)
 	//a = dereference_dg(a);
 	//b = dereference_dg(b);
 	//if(!a || !b)return 0;
-	if(a==b)return equiv_same_dg(a);
+	if(a==b)return subsume_same_dg(a);
 	if(a->gen!=generation)
 	{
 		a->forward = a->copy = 0;
@@ -206,26 +212,44 @@ int	equivalent_dg1(struct dg	*a, struct dg	*b)
 		b->gen = generation;
 	}
 
-	if(a->xtype != b->xtype)return 0;
-	if(a->narcs != b->narcs)return 0;
+	//if(a->xtype != b->xtype)return 0;
+	if(!descendent_of(b->xtype->tnum, a->xtype))return 0;
+	//if(a->narcs != b->narcs)return 0;
 
 	if(a->copy == b && b->forward == a)return 1;
-	if(a->copy || b->forward)return 0;
+	if(a->copy)subsume_forward = 0;
+	if(b->forward)subsume_backward = 0;
+	if(!subsume_forward && !subsume_backward)return 0;
+	//if(a->copy || b->forward)return 0;
 
 	a->copy = b;
 	b->forward = a;
 
 	//printf("maybe %p <=> %p\n", a, b);
 
-	for(i=0;i<a->narcs;i++)
+	if(a->xtype==b->xtype)
 	{
-		for(j=0;j<b->narcs;j++)if(b->arcs[j].label==a->arcs[i].label)break;
-		if(j>=b->narcs)return 0;
-		if(a->arcs[i].label>=14 && a->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
-			continue;
-		//printf("feature %s: host %p pack %p\n", fnames[a->arcs[i].label],
-				//a->arcs[i].dest, b->arcs[j].dest);
-		if(!equivalent_dg1(a->arcs[i].dest, b->arcs[j].dest))return 0;
+		// well-formedness and sortedness conditions guarantee that since
+		// types match exactly, arc labels match exactly...
+		for(i=0;i<a->narcs;i++)
+		{
+			if(a->arcs[i].label>=14 && a->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+				continue;
+			if(!subsume_dg1(a->arcs[i].dest, b->arcs[i].dest))return 0;
+		}
+	}
+	else // b is subtype of a, so has strict superset of features
+	{
+		for(i=j=0;i<b->narcs;i++)
+		{
+			if(b->arcs[i].label>=14 && b->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+				continue;
+			if(a->arcs[j].label == b->arcs[i].label)
+			{
+				if(!subsume_dg1(a->arcs[j].dest, b->arcs[i].dest))return 0;
+				j++;
+			}
+		}
 	}
 	return 1;
 }
@@ -241,14 +265,18 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 		fprintf(stderr, "generation counter overflowed!\n");
 		exit(-1);
 	}*/
-	res = equivalent_dg1(a, b);
+	subsume_forward = subsume_backward = 1;
+	res = subsume_dg1(a, b);
 	generation++;
 	if(generation==0xffffffff)
 	{
 		fprintf(stderr, "generation counter overflowed!\n");
 		exit(-1);
 	}
-	return res;
+	//if(res && subsume_forward && !subsume_backward)printf("would have subsumed forward\n");
+	//else if(res && subsume_backward && !subsume_forward)printf("would have subsumed backward\n");
+	return res && subsume_forward;// && subsume_backward;
+	//return res;
 }
 
 int		*introduce;	// what type introduced this fname?

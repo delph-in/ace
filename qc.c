@@ -283,9 +283,16 @@ int	quickcheck(struct qc	*a, struct qc	*b)
 int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 {
 	int	i;
+	struct type	*ta, *tb;
 
 	for(i=0;i<QC_SIZE;i++)
-		if(a->entries[i]!=b->entries[i])return -1;
+	{
+		ta = a->entries[i];
+		tb = b->entries[i];
+		//if(ta!=tb)return -1;
+		if((ta&&!tb)||(tb&&!ta))return -1;
+		if(ta && tb && !descendent_of(tb->tnum, ta))return -1;
+	}
 	return 0;
 }
 
