@@ -456,14 +456,16 @@ check_for_glb(struct type	*a, struct type	*b)
 				if(resort_key != g->ndescendents-1)
 				{
 					fprintf(stderr, "WRONG: resort_key = %d / %d\n", resort_key, g->ndescendents);
+					qsort(g->descendents, g->ndescendents, sizeof(int), intcomp);
 				}
-				// find out where 'mi' belongs and put it there
-				for(ia=0;ia<g->ndescendents-1;ia++)
-					if(mi < g->descendents[ia])break;
-				memmove(g->descendents+ia+1, g->descendents+ia, sizeof(int)*(g->ndescendents-1-ia));
-				g->descendents[ia] = mi;
-				
-				//qsort(g->descendents, g->ndescendents, sizeof(int), intcomp);
+				else
+				{
+					// find out where 'mi' belongs and put it there
+					for(ia=0;ia<g->ndescendents-1;ia++)
+						if(mi < g->descendents[ia])break;
+					memmove(g->descendents+ia+1, g->descendents+ia, sizeof(int)*(g->ndescendents-1-ia));
+					g->descendents[ia] = mi;
+				}
 			}
 		}
 	}
@@ -545,6 +547,7 @@ int	load_types()
 	char	*files[] = {	"../smallgrammars/esslli2k-grammar9/types.tdl" };
 #endif
 	int	i, j;
+	struct timeval	tv1, tv2;
 
 	types = calloc(sizeof(struct type*), 1);
 
@@ -560,8 +563,14 @@ int	load_types()
 			exit(-1);
 		}
 	}
-	fprintf(stderr, "checking for glbs...\n");
+	fprintf(stderr, "checking for glbs... ");
+	gettimeofday(&tv1, 0);
 	make_glbs();
+	gettimeofday(&tv2, 0);
+	tv2.tv_sec -= tv1.tv_sec;
+	tv2.tv_usec -= tv1.tv_usec;
+	fprintf(stderr, "%.2fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec / 1000000);
+
 	for(i=0;i<sizeof(files)/sizeof(char*);i++)
 	{
 		fprintf(stderr, "constraining types from `%s'\n", files[i]);
