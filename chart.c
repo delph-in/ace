@@ -102,7 +102,6 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg)
 		if(!u)return -1;	// cycles might happen, check for them.
 		e = slab_alloc(sizeof(struct edge));
 		e->qc = extract_qc_arg(u, -1);
-		e->prio = 0;
 		e->dg = u;
 	}
 	else
@@ -130,13 +129,14 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg)
 		}
 		e = slab_alloc(sizeof(struct edge));
 		e->dg = u;
-		e->prio = a->prio;
 		e->ha_par = a->dg;
 		e->ha_dg = b->dg;
 		e->ha_arg = arg;
 		e->qc = qc;
 		//printf("active qc %p (copy of %p)\n", e->qc, qc);
 	}
+	e->prio = a->prio;
+	if(nneed==nhave)e->prio = 0;
 	e->need = nneed;
 	e->have = nhave;
 	e->rule = a->rule;
@@ -238,7 +238,8 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 		{
 			// latent cycle detection
 			// this doesn't seem to happen... not sure why?
-			fprintf(stderr, "hyperactive: latent cycle\n");
+			// update: it has happened at least once
+			fprintf(stderr, "NOTE: hyperactive: latent cycle\n");
 			a->have = -1;
 			return 0;
 			//fprintf(stderr, "hyperactive: rescheduled unify failed!\n");
