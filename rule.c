@@ -155,7 +155,10 @@ load_rules_conf()
 		for(i=0;i<nrules;i++)
 			if(!strcmp(rules[i]->name, name))break;
 		if(i==nrules)
+		{
 			fprintf(stderr, "rules.conf: `%s': no such rule!\n", name);
+			exit(-1);
+		}
 		if(dir=='r')
 		{
 			//printf("rule `%s' should go RTL\n", name);

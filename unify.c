@@ -48,8 +48,11 @@ int	check_cycles(struct dg	*dg)
 	int	i;
 
 	if(!dg)return -1;
-	dg = dereference_dg(dg);
-	if(!dg)return -1;
+	if(dg->forward)
+	{
+		dg = dereference_dg(dg);
+		if(!dg)return -1;
+	}
 
 	if(dg->gen != generation)
 	{
@@ -110,14 +113,22 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 	return newcopy;
 }
 
-static struct dg	*subcopy_dg_ss(struct dg	*dg, int	*chret, int	forwarded);
-
 static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
 {
 	struct dg	*dg;
+	int		forwarded;
+	struct darc	*aptr;
+	int		i, ch = 0, st = 0;
+	struct dg	*newcopy;
+	struct slab_state	state;
 
-	dg = dereference_dg(dg_underef);
-	if(!dg)return 0;
+	if(dg_underef->forward)
+	{
+		dg = dereference_dg(dg_underef);
+		if(!dg)return 0;
+	}
+	else dg = dg_underef;
+
 	// ignore mark left by check_cycles()
 	if((unsigned int)dg->copy<=2)dg->copy = 0;
 
@@ -140,15 +151,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
 			return dg->copy;
 		}
 	}
-	return subcopy_dg_ss(dg, chret, dg != dg_underef);
-}
-
-static struct dg	*subcopy_dg_ss(struct dg	*dg, int	*chret, int	forwarded)
-{
-	struct darc	*aptr;
-	int		i, ch = 0, st = 0;
-	struct dg	*newcopy;
-	struct slab_state	state;
+	forwarded = (dg != dg_underef);
 
 	if(!dg->narcs && !dg->ncarcs && dg->type==dg->xtype &&
 		!((unsigned int)dg>=0x60000000 && (unsigned int)dg<0x70000000))goto share;
@@ -425,8 +428,8 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	struct type	*t, *t1, *t2;
 	struct dg	*extra=0;
 
-	dg1 = dereference_dg(dg1);
-	dg2 = dereference_dg(dg2);
+	if(dg1->forward)dg1 = dereference_dg(dg1);
+	if(dg2->forward)dg2 = dereference_dg(dg2);
 	if(!dg1 || !dg2)return -1;
 
 	t1 = (dg1->gen==generation)?dg1->type:dg1->xtype;
@@ -528,7 +531,8 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	// since we want to free them *every* time after unify
 	// otherwise, they sit uselessly on the slab forever
 
-	dg1->carcs = slab_realloc(dg1->carcs, sizeof(struct darc) * dg1->ncarcs,
+	if(nn+nc > 0)
+		dg1->carcs = slab_realloc(dg1->carcs, sizeof(struct darc) * dg1->ncarcs,
 				sizeof(struct darc) * (dg1->ncarcs + nn + nc));
 
 	//dg1->carcs = realloc(dg1->carcs, sizeof(struct darc) * (dg1->ncarcs + nn + nc));

@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -fschedule-insns -DERG
+CFLAGS=-O6 -fomit-frame-pointer -funsigned-char -fschedule-insns -DERG -march=athlon-xp -mcpu=athlon-xp
 #CFLAGS=-g -pg -O2 -funsigned-char -DERG
 #CFLAGS=-g -funsigned-char -DERG
 

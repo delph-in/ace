@@ -124,6 +124,11 @@ int	parse_line(char	*line)
 		return -1;
 	}
 	if(!strcmp(line, "All rights reserved.\n"))return -1;	// not interesting.
+	if(!strcmp(line, "@reloadrules@\n"))
+	{
+		load_rules_conf();
+		return -1;
+	}
 
 	strcpy(copy, line);
 	// break up into words, normalize capitalization
