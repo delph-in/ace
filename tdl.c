@@ -133,6 +133,7 @@ int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), vo
 			fprintf(stderr, "tdl statement too long: `%s'\n", buffer);
 			return -1;
 		}
+		if(!buffer[0])continue;
 		end = buffer + strlen(buffer)-1;
 		if(*end != '.')
 		{
@@ -721,6 +722,7 @@ int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 	struct type	**parents = 0;
 	int		nparents = 0, done = 0;
 	int		depth = 0, quote = 0;
+	int		res;
 
 	for(p=rhs;!done;p++)
 	{
@@ -738,7 +740,11 @@ int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 				nparents++;
 				parents = realloc(parents, sizeof(struct type*)*nparents);
 				parents[nparents-1] = find_type(trim_string(chunk), 0);
-				if(!parents[nparents-1])return -1;
+				if(!parents[nparents-1])
+				{
+					free(parents);
+					return -1;
+				}
 			}
 			if(!done)chunk = trim_string(p+1);
 		}
@@ -747,7 +753,9 @@ int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 		else if(*p == '"')quote = !quote;
 		else if(*p == '\\' && p[1])p++;
 	}
-	return add_type_only(lhs, nparents, parents);
+	res = add_type_only(lhs, nparents, parents);
+	if(parents)free(parents);
+	return res;
 }
 
 int	iterate_tdl_dgs(char	*path, int	(*callback)(char	*rhs, struct dg	*dg))
