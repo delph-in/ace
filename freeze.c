@@ -329,8 +329,6 @@ static int	load_freeze()
 		//if(lgroups[i])printf("lgroup[%c] = %s\n", i, lgroups[i]);
 	}
 
-	setup_glb_lut();
-
 	if(debug_level)
 		fprintf(stderr, "NOTE: %d types, %d lexemes, %d rules, %d irules, %d roots, %d strings, %d features\n",
 				ntypes, nlexemes, nrules, nirules, nroots, nstrings, nfnames);

@@ -27,46 +27,14 @@ int	add_type_only(char	*name, int	npar, struct type	**par);
 void	number_strings();
 int		load_types();
 void	wellform(struct dg	*d, char	*typename);
+void	print_glb_stats();
 
-static inline struct type	*glb(struct type	*a, struct type	*b) __attribute__ ((pure));
 
-static inline struct type	*glb(struct type	*a, struct type	*b)
-{
-	int					x=0, y=0;
-	extern struct type	*full_glb_calc(struct type	*a, struct type	*b, int	x, int	y);
-	extern short		**glb_lut;
-	extern struct type	*strtype, **types;
-	extern int	g_loaded;
 
-	if(a==b)return a;
 
-	if(a->name[0]=='"')
-	{
-		if(b->name[0]=='"')return 0;
-		else if(strtype && descendent_of(strtype->tnum, b))return a;
-		else return 0;
-	}
-	if(b->name[0]=='"')
-	{
-		if(strtype && descendent_of(strtype->tnum, a))return b;
-		else return 0;
-	}
 
-	if(a->tnum==b->tnum)
-	{
-		fprintf(stderr, "ERROR: type numbers match but pointers do not for `%s', `%s'\n", a->name, b->name);
-		exit(-1);
-	}
 
-	if(g_loaded)
-	{
-		if(a->tnum > b->tnum)y = a->tnum, x = b->tnum;
-		else y = b->tnum, x = a->tnum;
-		if(glb_lut[y][x] != -1)
-			return types[glb_lut[y][x]];
-	}
 
-	return full_glb_calc(a, b, x, y);
-}
+struct type	*glb(struct type	*a, struct type	*b);
 
 #endif

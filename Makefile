@@ -4,7 +4,7 @@ CFLAGS=-Wall -O6 -fomit-frame-pointer -funsigned-char -DERG
 #CFLAGS=-g -pg -O2 -funsigned-char -DERG
 #CFLAGS=-g -funsigned-char -DERG
 
-OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o ppdfa.o transducer.o lrfilt.o
+OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o ppdfa.o transducer.o lrfilt.o glb.o
 all: ${OBJ}
 	gcc ${CFLAGS} main.c ${OBJ} -o parser
 

@@ -228,44 +228,7 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 	return 0;
 }
 
-short		**glb_lut;
 extern int		g_loaded;
-
-void	setup_glb_lut()
-{
-	int	i, ind = 0;
-	short	*data;
-
-	glb_lut = calloc(sizeof(short*), ntypes);
-	data = malloc(sizeof(short) * ntypes*(ntypes-1)/2);
-	memset(data, -1, sizeof(short) * ntypes*(ntypes-1)/2);
-	for(i=0;i<ntypes;i++)
-	{
-		glb_lut[i] = data + ind;
-		ind += i;
-	}
-}
-
-struct type	*full_glb_calc(struct type	*a, struct type	*b, int	x, int	y)
-{
-	int	ia, ib;
-
-	//fprintf(stderr, "glb %s, %s?\n", a->name, b->name);
-	ia = ib = 0;
-	while(ia < a->ndescendents && ib < b->ndescendents)
-	{
-		if(a->descendents[ia] == b->descendents[ib])
-		{
-			// must be the glb, since types are in descending order
-			if(g_loaded)glb_lut[y][x] = a->descendents[ia];
-			return types[a->descendents[ia]];
-		}
-		else if(a->descendents[ia] < b->descendents[ib])ia++;
-		else ib++;
-	}
-	//fprintf(stderr, "no glb for %s, %s\n", a->name, b->name);
-	return 0;
-}
 
 int	intcomp(const void	*a, const void	*b) { return *(int*)a - *(int*)b; }
 
@@ -529,6 +492,7 @@ int	load_types()
 #endif
 	int	i, j;
 	struct timeval	tv1, tv2;
+	struct type	*block;
 
 	types = calloc(sizeof(struct type*), 1);
 
@@ -551,6 +515,25 @@ int	load_types()
 	tv2.tv_sec -= tv1.tv_sec;
 	tv2.tv_usec -= tv1.tv_usec;
 	fprintf(stderr, "%.2fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec / 1000000);
+
+/*
+	// fix types to be correctly offset relative to types[0].
+	// this allows a tnum calculation without dereferencing a type*,
+	// which in turn speeds up glb calculation (hopefully)
+	// 
+	// on second thought, it perhaps isn't necessary;
+	// we can make the glb computation a hash on the pointers directly.
+	block = malloc(sizeof(struct type) * ntypes);
+	inval_thash();
+	for(i=0;i<ntypes;i++)
+	{
+		block[i] = *types[i];
+		free(types[i]);
+		if(types[i] == strtype)strtype = block + i;
+		types[i] = block + i;
+		th_add(types[i]->name, types[i]);
+	}
+*/
 
 	for(i=0;i<sizeof(files)/sizeof(char*);i++)
 	{

@@ -802,7 +802,6 @@ int	load_grammar()
 	if(load_inflr())exit(-1);
 	if(load_lexicon())exit(-1);
 	number_strings();
-	setup_glb_lut();
 	g_loaded = 1;	// make unify shut up about failures
 	setup_rule_filter();
 	g_loaded = 0;
