@@ -23,6 +23,7 @@ void	setup_glb_lut();
 int	add_type_only(char	*name, int	npar, struct type	**par);
 void	number_strings();
 int		load_types();
+void	wellform(struct dg	*d, char	*typename);
 
 static inline struct type	*glb(struct type	*a, struct type	*b)
 {

@@ -37,7 +37,9 @@ void	add_edge_to_chart(struct edge	*edge);
 void	clear_chart(int	size);
 void	free_edge(struct edge	*edge);
 int		next_eid();
-int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to);
+int		lexeme_in_agenda(struct lexeme	*lex, int	from, int	to);
+int		reduce_chart();
+void	output_lui(char	*words[]);
 
 void	clear_agenda();
 void	add_agenda(struct edge	*e);

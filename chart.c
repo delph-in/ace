@@ -2,6 +2,7 @@
 #include	<stdio.h>
 #include	<string.h>
 #include	<signal.h>
+#include	<unistd.h>
 
 #include	"chart.h"
 #include	"rule.h"
@@ -566,7 +567,7 @@ void	print_rel(struct dg	*rel)
 	else printf("\n");
 }
 
-output_lui(char	*words[])
+void	output_lui(char	*words[])
 {
 	int	i, j, k, l;
 	struct edge	*e;

@@ -702,7 +702,11 @@ static void	rprint_dg(struct dg	*d)
 
 	if(d->copy)
 	{
+#ifdef	LP64
 		printf("<%lld>", (long)d->copy);
+#else
+		printf("<%ld>", (long)d->copy);
+#endif
 		return;
 	}
 
@@ -710,7 +714,11 @@ static void	rprint_dg(struct dg	*d)
 	if(d->ncarcs>1)
 	{
 		d->copy = (struct dg*)(marker++);
+#ifdef	LP64
 		printf("<%lld>= ", (long)d->copy);
+#else
+		printf("<%ld>= ", (long)d->copy);
+#endif
 	}
 
 	//printf("(%p) ", d);

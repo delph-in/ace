@@ -313,7 +313,7 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 	fulldg = unify_dg(dg, t->dg, -1);
 	if(!fulldg)
 	{
-		fprintf(stderr, "study_lexeme `%s': dag incompatible with type `%s'\n", t->name);
+		fprintf(stderr, "study_lexeme `%s': dag incompatible with type `%s'\n", name, t->name);
 		return -1;
 	}
 	wellform(fulldg, name);
