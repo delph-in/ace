@@ -136,7 +136,12 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg)
 		//printf("active qc %p (copy of %p)\n", e->qc, qc);
 	}
 	e->prio = a->prio;
-	if(nneed==nhave)e->prio = 0;
+	if(nneed==nhave)
+	{
+		e->prio = 0;
+		//e->prio = (e->to-e->from - 1)/2;
+		//if(e->prio>10)e->prio = 10;
+	}
 	e->need = nneed;
 	e->have = nhave;
 	e->rule = a->rule;
@@ -509,7 +514,7 @@ void	print_rel(struct dg	*rel)
 {
 	int		i, idx, narg;
 	char		afeat[32];
-	struct dg	*pred;
+	struct dg	*pred, *carg;
 	struct dg	*arg;
 	char		relstr[1024];
 	static int	predf, cargf, argf[10], init = 0;
@@ -527,20 +532,22 @@ void	print_rel(struct dg	*rel)
 	}
 
 	pred = dg_hop(rel, predf);
-	if(!pred)pred = dg_hop(rel, cargf);
 	if(!pred)
 	{
-		fprintf(stderr, "REL had no PRED or CARG\n");
+		fprintf(stderr, "REL had no PRED\n");
 		return;
 	}
+	if(!strcmp(pred->xtype->name, "named_rel"))
+		carg = dg_hop(rel, cargf);
+	else carg = 0;
 
-	if(pred->type->name[0]=='"')
+	if(pred->xtype->name[0]=='"')
 	{
-		strcpy(relstr, pred->type->name+1);
+		strcpy(relstr, pred->xtype->name+1);
 		if(relstr[0] && relstr[strlen(relstr)-1]=='"')
 			relstr[strlen(relstr)-1] = 0;
 	}
-	else strcpy(relstr, pred->type->name);
+	else strcpy(relstr, pred->xtype->name);
 
 	narg = 0;
 	for(i=0;i<10;i++)
@@ -563,6 +570,11 @@ void	print_rel(struct dg	*rel)
 			printf("	+%s", relstr);
 		else if(i==0)printf("	%s", relstr);
 		printf(" %d", idx);
+	}
+	if(carg)
+	{
+		printf(" %s", carg->xtype->name);
+		narg++;
 	}
 	if(narg==0)
 	{
