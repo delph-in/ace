@@ -29,7 +29,7 @@ int	upathl;
 
 void	print_slab_stats()
 {
-	fprintf(stderr, "%d complete slabs, %dkbytes in working slab\n", noldslabs-1, slabu/1024);
+	fprintf(stderr, "RAM: %dk\n", (noldslabs-1)*1024 + slabu/1024);
 }
 
 void	next_slab();
