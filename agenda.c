@@ -61,30 +61,37 @@ void	add_agenda(struct edge	*e)
 	if(e->prio > highest)highest = e->prio;
 }
 
-struct edge	*next_agenda()
+struct edge	*next_agenda(int	from_start)
 {
 	struct task	*best;
 	int		i;
 
 	for(i=highest;i>=0;i--) if(agenda[i].start)
 	{
-		/*// pop least recent edge from this queue
-		best = agenda[i].start;
-		agenda[i].start = best->next;
-		if(best==agenda[i].end)
+		if(from_start)
 		{
-			agenda[i].end = 0;
-			highest = best->edge->prio - 1;
-		}*/
-		// pop most recent edge from this queue
-		best = agenda[i].end;
-		agenda[i].end = best->prev;
-		if(best==agenda[i].start)
-		{
-			agenda[i].start = 0;
-			highest = best->edge->prio - 1;
+			// pop least recent edge from this queue
+			best = agenda[i].start;
+			agenda[i].start = best->next;
+			if(best==agenda[i].end)
+			{
+				agenda[i].end = 0;
+				highest = best->edge->prio - 1;
+			}
+			else highest = best->edge->prio;
 		}
-		else highest = best->edge->prio;
+		else
+		{
+			// pop most recent edge from this queue
+			best = agenda[i].end;
+			agenda[i].end = best->prev;
+			if(best==agenda[i].start)
+			{
+				agenda[i].start = 0;
+				highest = best->edge->prio - 1;
+			}
+			else highest = best->edge->prio;
+		}
 		if(best->next)best->next->prev=best->prev;
 		if(best->prev)best->prev->next=best->next;
 		return best->edge;

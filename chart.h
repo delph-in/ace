@@ -55,6 +55,6 @@ void	final_chart_stats();
 
 void	clear_agenda();
 void	add_agenda(struct edge	*e);
-struct edge	*next_agenda();
+struct edge	*next_agenda(int	from_start);
 
 #endif

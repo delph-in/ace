@@ -17,6 +17,7 @@ smarter ordering of agenda
 hyperactive excursion?
 
 key vs. head driven = "KEY-ARG" inside rule daughters
-compile quickcheck?
 
 pick cleverly between dg1 and dg2 as target in unify1
+
+optimize lexicon storage -- probably get down by several times in size

@@ -16,13 +16,15 @@ struct chart_cell	*cells;
 int	total_edges, real_edges, passive_edges, used_edges, pused_edges;
 
 extern int	debug_level;
-extern int	question, exhaustive;
+extern int	question, exhaustive, lui_chart;
 
 int		edge_id;
 
 extern int	*nused, *nhactive, *nactive, *npassive, *nrecomb, used_total, pused_total;
 extern int noldslabs;
 extern int	rnohyper[1000];
+
+//int	*rtried;
 
 struct edge	*sentential = 0;
 
@@ -296,6 +298,8 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 	if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter rejected this combination
 	if(!gen_qc && quickcheck(a->qc, b->qc))return 0;	// quickcheck rejected this combination
 
+	//rtried[a->rule->rnum]++;
+
 	if(!a->dg)
 	{
 		// hyperactive parsing: we don't save active edges' dg's until they're actually used
@@ -403,7 +407,8 @@ static int	process_edge(struct edge	*e)
 	//printf("processing [%d-%d] edge;    ", e->from, e->to);
 	//printf("  status: %d/%d\n", e->have, e->need);
 
-	if(e->have == e->need && !e->lex && pack_edge(e))return 0;	// big savings! woohoo!
+	if(!lui_chart && e->have == e->need && !e->lex && pack_edge(e))
+		return 0;	// big savings! woohoo!
 	add_edge_to_chart(e);
 
 	// try to combine with edges on either side
@@ -471,17 +476,29 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	if(add_lexemes_to_chart(nwords, words))return -1;
 	if(reduce_chart(nwords))return -1;
 
+	//if(rtried)free(rtried);
+	//rtried = calloc(sizeof(int),nrules);
+
 	agenda_rules(nwords+1);
 
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
 	alarm(10);
 	//ualarm(100000);
+
 	// do the actual parsing
-	while( !cancel_parse && (edge = next_agenda()) )
+	while( !cancel_parse && (edge = next_agenda(0)) )
 		if(process_edge(edge))break;
 
 	alarm(0);
+
+	/*num_entries = 0;
+	for(i=0;i<nrules;i++)if(rtried[i])
+	{
+		num_entries++;
+		printf("rule %32s: %8d tries\n", rules[i]->name, rtried[i]);
+	}
+	printf(" -- %d / %d were tried\n", num_entries, nrules);*/
 
 	// show analyses
 //#ifdef	FIRST_ONLY
@@ -525,7 +542,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		fprintf(stderr, "NOTE: %d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
 					num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
 		print_slab_stats();
-		//output_lui(words);
+		if(lui_chart)output_lui(words);
 	}
 	used_total += used_edges;
 	pused_total += pused_edges;
@@ -774,7 +791,7 @@ void	output_lui(char	*words[])
 	struct edge	*e;
 	extern char	*current_sentence;
 
-	printf("chart 1 #R[%d", chart_size-1);
+	printf("chart 1 %d", chart_size-1);
 	for(i=0;i<chart_size-1;i++)
 		printf(" #E[%d -1 %d \"%s\" orth]", -i-1, i, words[i]);
 
@@ -795,5 +812,5 @@ void	output_lui(char	*words[])
 					printf(" #E[%d %d %d %s %s %d]", e->id, j, j, e->lex->word, e->lex->word, -1-j);
 				}
 			}
-	printf("] \"%s\"\n", current_sentence);
+	printf(" \"%s\"\n", current_sentence);
 }

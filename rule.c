@@ -58,8 +58,8 @@ int	rule_is_rtl(struct rule	*r)
 	afkey = dg_hop(asec, lookup_fname("KEY-ARG"));
 	// ARGS REST FIRST KEY-ARG
 
-	//if(afkey && afkey->xtype == plus)
-	if(asec==hd)
+	if(afkey && afkey->xtype == plus)
+	//if(asec==hd)
 	{
 		//fprintf(stderr, "rule `%s' is right-to-left\n", r->name);
 		return 1;
