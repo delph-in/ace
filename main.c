@@ -1,6 +1,7 @@
 #include	<stdio.h>
 #include	<signal.h>
 #include	<sys/time.h>
+#include	<getopt.h>
 #include	<unistd.h>
 #include	<string.h>
 #include	<ctype.h>
@@ -146,6 +147,8 @@ int	main(int	argc, char	*argv[])
 	else return 0;
 }
 
+int	wcap[1024];
+
 int	parse_line(char	*line)
 {
 	char	copy[10240];
@@ -204,8 +207,13 @@ int	parse_line(char	*line)
 
 	//printf("%d words\n", nwords);
 	for(j=0;j<nwords;j++)
+	{
+		wcap[j] = isupper(words[j][0]);
 		for(i=0;words[j][i];i++)
+		{
 			words[j][i] = tolower(words[j][i]);
+		}
+	}
 	current_sentence = line;//(char*)trim_string(line);
 	nparse = parse(nwords, words, current_sentence);
 	clear_slab();

@@ -1,6 +1,8 @@
 #include	<stdlib.h>
 #include	<string.h>
 #include	<stdio.h>
+#include	<assert.h>
+#include	<ctype.h>
 
 #include	"tdl.h"
 #include	"lexicon.h"
@@ -50,6 +52,64 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	}
 
 	return edge;
+}
+
+struct lexeme	*proper_noun_lex(char	*name)
+{
+	char			*p = name;
+	struct lexeme	*lex;
+	struct dg		*extra, *stem, *ss, *lk, *kr;
+	struct type	*ty = slab_alloc(sizeof(struct type));
+	char			*ncopy;
+	int				nlen;
+
+	/* prototype:
+	 * 	george_n1 := n_proper_le &
+	 * 	 [ STEM < "george" >,
+	 * 	    SYNSEM.LKEYS.KEYREL.CARG "george" ].
+	 */
+
+	// make a safe copy of 'name'
+	nlen = strlen(name);
+	nlen += 32;
+	nlen -= (nlen % 32);
+	ncopy = slab_alloc(nlen);
+	strcpy(ncopy, name);
+	name = ncopy;
+
+	// make a type representing 'name'
+	bzero(ty, sizeof(*ty));
+	ty->name = name;
+	ty->dg = atomic_dg("*top*");
+	ty->dg->type = ty->dg->xtype = ty;
+	ty->tnum = 999999;
+
+	// make a skeletal dag for our lexeme
+	extra = atomic_dg("n_proper_le");
+	assert(extra);
+	add_dg_feature(extra, "STEM", stem = atomic_dg("*cons*"));
+	add_dg_feature(stem, "FIRST", ty->dg);
+	add_dg_feature(stem, "REST", atomic_dg("*null*"));
+	add_dg_feature(extra, "SYNSEM", ss = atomic_dg("*top*"));
+	add_dg_feature(ss, "LKEYS", lk = atomic_dg("*top*"));
+	add_dg_feature(lk, "KEYREL", kr = atomic_dg("*top*"));
+	add_dg_feature(kr, "CARG", ty->dg);
+
+	// define the lexeme
+	lex = slab_alloc(sizeof(struct lexeme));
+	bzero(lex, sizeof(*lex));
+	lex->word = name;
+	lex->stemlen = 1;
+	lex->stem = slab_alloc(sizeof(struct type*)*1);
+	lex->stem[0] = ty;
+	lex->lextype = extra->type;
+	lex->dg = extra;
+
+#ifdef	FULL_LEXICON
+#error	fix proper_noun_lex() to support FULL_LEXICON, please
+#endif
+
+	return lex;
 }
 
 int	wstrcmp(char	*a, char	*b)

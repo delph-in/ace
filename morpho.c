@@ -1,9 +1,14 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
+#include	<ctype.h>
 
 int	add_lexemes_to_chart_for_form(int	x, char	*form);
 int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem);
+struct lexeme	*proper_noun_lex(char	*name);
+struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len);
+
+extern int	wcap[1024];
 
 #include	"rule.h"
 #include	"chart.h"
@@ -40,6 +45,7 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 	char	stem[1024];
 	struct irule	*ir;
 	struct irreg	*irr;
+	struct lexeme	*lex;
 
 	// get any non-inflecting lexemes
 	n = add_lexemes_to_chart_for_stem(x, form, 0);
@@ -86,6 +92,24 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 				}
 			}
 		}
+	}
+
+	if(!count && wcap[x]/* && x!=0*/)	// unknown uppercase word not at start of sentence; proper noun?
+	{
+		sprintf(stem, "\"%s\"", form);
+		//add_lexemes_to_chart_for_stem(x, "george", 0);
+		lex = proper_noun_lex(stem);
+		add_agenda(lexical_edge(lex, x, 1));
+		allow_inflr(x, lex, 0);
+		count++;
+		for(i=0;i<nirules;i++)
+			if(irules[i]->nsub==0)
+			{
+				add_agenda(epsilon_edge(irules[i]->rule, x, 0));
+				allow_inflr(x, lex, irules[i]);
+				count++;
+			}
+		return 1;
 	}
 
 	//if(count)printf("** found %d lexeme/rules for `%s'\n", count, form);
