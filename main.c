@@ -105,6 +105,10 @@ int	main(int	argc, char	*argv[])
 	//print_type("v_np*_trans_le");
 	//print_type("np_trans_subst");
 
+#ifdef	GENERATION
+	generate();
+#endif
+
 	if(!sentence_path)return 0;
 	if(!strcmp(sentence_path, "-"))fin = stdin;
 	else

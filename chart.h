@@ -4,6 +4,8 @@
 #include	"dag.h"
 #include	"morpho.h"
 
+#define	GENERATION
+
 struct edge
 {
 	struct dg	*dg;
@@ -27,6 +29,9 @@ struct edge
 	// 1 for allowed inflr's, 0 for disallowed
 	char		*inflr_allow;
 	int		allow_no_inflr;
+#ifdef	GENERATION
+	unsigned int	ep_span;
+#endif
 };
 
 struct chart_cell

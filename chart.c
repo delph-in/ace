@@ -4,6 +4,7 @@
 #include	<signal.h>
 #include	<unistd.h>
 #include	<sys/time.h>
+#include	<assert.h>
 
 #include	"chart.h"
 #include	"rule.h"
@@ -255,21 +256,23 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	}
 	else nactive[e->rule->rnum]++;
 
+#ifdef	GENERATION
+	e->ep_span = a->ep_span | b->ep_span;
+#endif
+
 	add_agenda(e);
 	return 0;
 }
 
-static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
+static inline int	combine(struct edge	*a, struct edge	*b)
 {
-	int	remain, arg, force_noha = 0, res;
+	int	arg, force_noha = 0, res;
 	struct dg	*rdg;
 #ifdef	TIM
 	struct timeval	tv1, tv2;
 #endif
 
-	if(a->have==-1)return 0;
-
-	remain = a->need - a->have;
+	if(a->have==-1)return 0;	// ghosted hyperactive edge -- got kicked out of the chart for a latent cycle
 
 	//printf("FR: [%d-%d] + [%d-%d]?\n", a->from, a->to, b->from, b->to);
 	//printf("    <%d/%d> + <%d/%d>\n", a->have, a->need, b->have, b->need);
@@ -282,18 +285,8 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 	}
 	else if(b->lex && !b->allow_no_inflr)return 0;
 
-	if(a->rtl)
-	{
-		if(b->to != a->from)return 0;
-		if(b->from-(remain-1) < 0)return 0;	// don't produce active edges that can't possibly finish
-		arg = a->need - a->have - 1;
-	}
-	else
-	{
-		if(a->to != b->from)return 0;
-		if(b->to+(remain-1) >= chart_size)return 0;	// don't produce active edges that can't possibly finish
-		arg = a->have;
-	}
+	if(a->rtl)arg = a->need - a->have - 1;
+	else arg = a->have;
 
 	if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter rejected this combination
 	if(!gen_qc && quickcheck(a->qc, b->qc))return 0;	// quickcheck rejected this combination
@@ -399,9 +392,36 @@ static int	pack_edge(struct edge	*edge)
 	return 0;
 }
 
-static int	process_edge(struct edge	*e)
+static int	gen_process_edge(struct edge	*e)
 {
-	int			i, j;
+	struct chart_cell	*c = cells;
+	int	i;
+
+	add_edge_to_chart(e);
+
+	// try to combine against any other edge with disjoint ep_span
+	if(e->have == e->need)
+	{
+		// passive edge
+		for(i=0;i<c->al_nedges;i++)
+			if(! (e->ep_span & c->al_edges[i]->ep_span))
+				if(combine(c->al_edges[i], e) == -1)return -1;
+		for(i=0;i<c->ar_nedges;i++)
+			if(! (e->ep_span & c->ar_edges[i]->ep_span))
+				if(combine(c->ar_edges[i], e) == -1)return -1;
+	}
+	else
+	{
+		// active edge
+		for(i=0;i<c->p_nedges;i++)
+			if(! (e->ep_span & c->p_edges[i]->ep_span))
+				if(combine(c->p_edges[i], e) == -1)return -1;
+	}
+}
+
+static int	parse_process_edge(struct edge	*e)
+{
+	int			i, j, remain;
 	struct chart_cell	*c;
 
 	//printf("processing [%d-%d] edge;    ", e->from, e->to);
@@ -419,25 +439,35 @@ static int	process_edge(struct edge	*e)
 		{
 			c = cells + e->from + i*chart_size;
 			for(j=0;j<c->al_nedges;j++)
-				if(fundamental_rule(c->al_edges[j], e) == -1)return -1;
+			{
+				remain = c->al_edges[j]->need - c->al_edges[j]->have;
+				if(e->to + (remain-1) < chart_size)
+					if(combine(c->al_edges[j], e) == -1)return -1;
+			}
 		}
 		for(i=e->to;i<chart_size;i++)
 		{
 			c = cells + i + e->to*chart_size;
 			for(j=0;j<c->ar_nedges;j++)
-				if(fundamental_rule(c->ar_edges[j], e) == -1)return -1;
+			{
+				remain = c->ar_edges[j]->need - c->ar_edges[j]->have;
+				if(e->from - (remain-1) >= 0)
+					if(combine(c->ar_edges[j], e) == -1)return -1;
+			}
 		}
 	}
 	else
 	{
 		// active edge
+		remain = e->need - e->have;
 		if(e->rtl)
 		{
 			for(i=0;i<=e->from;i++)
 			{
 				c = cells + e->from + i*chart_size;
 				for(j=0;j<c->p_nedges;j++)
-					if(fundamental_rule(e, c->p_edges[j]) == -1)return -1;
+					if(c->p_edges[j]->from - (remain-1) >= 0)
+						if(combine(e, c->p_edges[j]) == -1)return -1;
 			}
 		}
 		else
@@ -446,7 +476,8 @@ static int	process_edge(struct edge	*e)
 			{
 				c = cells + i + e->to*chart_size;
 				for(j=0;j<c->p_nedges;j++)
-					if(fundamental_rule(e, c->p_edges[j]) == -1)return -1;
+					if(c->p_edges[j]->to + (remain-1) < chart_size)
+						if(combine(e, c->p_edges[j]) == -1)return -1;
 			}
 		}
 	}
@@ -459,6 +490,32 @@ void	alarm_handler(int	sig)
 {
 	fprintf(stderr, "NOTE: cancelling parse, too long\n");
 	cancel_parse = 1;
+}
+
+int	generate()
+{
+	struct edge	*edge;
+
+	clear_chart(1);
+	// set up some lexemes for the generator to play with
+	add_lexemes_to_chart_for_form(0, "the");
+	add_lexemes_to_chart_for_form(0, "dogs");
+	add_lexemes_to_chart_for_form(0, "barked");
+
+	agenda_rules(1);
+	sentential = 0;
+
+	while( (edge = next_agenda(0)) )
+		if(gen_process_edge(edge))break;
+
+	if(sentential)
+	{
+		printf("NOTE: found a sentential analysis:\n");
+		print_dg(sentential->dg);
+		return 1;
+	}
+
+	return 0;
 }
 
 int	nfinal;
@@ -488,7 +545,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	// do the actual parsing
 	while( !cancel_parse && (edge = next_agenda(0)) )
-		if(process_edge(edge))break;
+		if(parse_process_edge(edge))break;
 
 	alarm(0);
 

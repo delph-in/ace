@@ -3,7 +3,6 @@
 #include	<string.h>
 #include	<ctype.h>
 
-int	add_lexemes_to_chart_for_form(int	x, char	*form);
 int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem);
 struct lexeme	*proper_noun_lex(char	*name);
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len);
