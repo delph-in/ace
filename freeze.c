@@ -113,7 +113,7 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 	struct lexeme	*lout = slab_alloc(sizeof(struct lexeme));
 	int		i;
 
-	lout->dg = lin->dg;	// XXX this is frozen *later*, for file layout reasons
+	lout->dg = lin->dg;	// NOTE: this is frozen *later*, for file layout reasons
 	lout->word = freeze_string(lin->word);
 
 	lout->stemlen = lin->stemlen;

@@ -151,11 +151,6 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 			e->qc = copy_qc(qc);
 			//printf("active qc %p (copy of %p)\n", e->qc, qc);
 			free(qc);
-
-			// XXX the point is we don't want to do this:
-			//u = finalize_tmp(a->dg);
-			//if(!u){fprintf(stderr, "tmp-finalize unexpectedly failed!\n");exit(-1);}
-			//e->dg = u;
 		}
 		e->need = nneed;
 		e->have = nhave;
