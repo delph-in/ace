@@ -63,7 +63,7 @@ void	clear_slab()
 	}
 	else
 	{
-		accum_ram_usage += SLAB_SIZE*(noldslabs-1) + slabu;
+		if(noldslabs)accum_ram_usage += SLAB_SIZE*(noldslabs-1) + slabu;
 		// leave up to 64 allocated slabs around for next parse!
 		if(aoldslabs>64)
 		{
