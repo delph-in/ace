@@ -15,13 +15,14 @@ parse_args(int	argc, char	*argv[])
 {
 	char	*prog = argv[0], ch;
 
-	while((ch=getopt(argc, argv, "hvlg:G:"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvlg:G:m:"))!=255)switch(ch)
 	{
-		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
+		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
 		case	'G':	save_grammar_path = optarg;	break;
 		case	'l':	export_parts = 1;		break;
+		case	'm':	connect_to_master(optarg);	break;
 		case	'?':	goto usage;
 	}
 	if(optind<argc-1)goto usage;
@@ -50,7 +51,7 @@ main(int	argc, char	*argv[])
 	gettimeofday(&tv2, 0);
 	tv2.tv_sec -= tv1.tv_sec;
 	tv2.tv_usec -= tv1.tv_usec;
-	fprintf(stderr, "loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+	fprintf(stderr, "NOTE: loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
 
 	if(save_grammar_path)
 		setup_save_frozen_grammar(save_grammar_path);
@@ -60,12 +61,14 @@ main(int	argc, char	*argv[])
 		fprintf(stderr, "freezing grammar...\n");
 		freeze_grammar();
 	}
-	else fprintf(stderr, "(not freezing)\n");
+	//else fprintf(stderr, "(not freezing)\n");
 	load_rules_conf();
 
 	if(save_grammar_path)
 		exit(0);
 
+	//dot_rf("/tmp/rules.dot");
+	//lex_filter_rules();
 	//dump_grammar();
 
 	g_loaded = 1;
@@ -95,7 +98,8 @@ main(int	argc, char	*argv[])
 	while(!feof(fin) && fgets(line, 10240, fin))
 	{
 		num_parses = parse_line(line);
-		if(num_parses>0)success++;
+		if(num_parses==-1)fprintf(stderr, "NOTE: ignore\n");
+		else if(num_parses>0)success++;
 		else if(num_parses==0)fail++;
 		if(num_parses>=0)count++;
 	}
@@ -103,8 +107,11 @@ main(int	argc, char	*argv[])
 
 	tv2.tv_sec -= tv1.tv_sec;
 	tv2.tv_usec -= tv1.tv_usec;
-	fprintf(stderr, "parsed %d / %d sentences, avg %dk, time %.5fs\n", success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
-	rule_stats();
+	if(count)
+	{
+		fprintf(stderr, "NOTE: parsed %d / %d sentences, avg %dk, time %.5fs\n", success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+		rule_stats();
+	}
 
 	if(num_parses<=0)return -1;
 	else return 0;
@@ -140,7 +147,7 @@ int	parse_line(char	*line)
 		{
 			case	' ': case '\t': case '.': case '\n':
 			case	',': case '?': case '!':
-				if(nwords>=100) { fprintf(stderr, "Too many words (100+)\n"); return 0; }
+				if(nwords>=100) { fprintf(stderr, "NOTE: 0 readings. Too many words (100+)\n"); return 0; }
 				*p = 0;
 				if(w != p)words[nwords++] = w;
 				w = p+1;
@@ -149,7 +156,11 @@ int	parse_line(char	*line)
 		p++;
 	}
 	if(nwords<=2)return -1;	// experience shows short "sentences" to not usually be interesting
-	if(nwords>50)return 0;	// trying to parse long sentences is a waste of time. we have lots of short ones.
+	if(nwords>50)
+	{
+		fprintf(stderr, "NOTE: 0 readings. Too many words (50+)\n");
+		return 0;	// trying to parse long sentences is a waste of time. we have lots of short ones.
+	}
 
 	//printf("%d words\n", nwords);
 	return parse(nwords, words, trim_string(line));

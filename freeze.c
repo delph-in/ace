@@ -307,7 +307,7 @@ int	load_freeze()
 	setup_glb_lut();
 
 	if(debug_level)
-		fprintf(stderr, "%d types, %d lexemes, %d rules, %d irules, %d roots, %d strings, %d features\n",
+		fprintf(stderr, "NOTE: %d types, %d lexemes, %d rules, %d irules, %d roots, %d strings, %d features\n",
 				ntypes, nlexemes, nrules, nirules, nroots, nstrings, nfnames);
 
 	//printf("root symbol:\n"); print_dg(roots[0]); printf("\n\n");

@@ -283,3 +283,53 @@ int	load_rules()
 	}
 	return 0;
 }
+
+// output rule filter left daughter graph as a .dot file
+dot_rf(char	*fname)
+{
+	int	i, j;
+	FILE	*f = fopen(fname, "w");
+
+	for(i=0;i<nrules;i++)
+	{
+		for(j=0;j<nrules;j++)
+		{
+			if(check_rf(rules[i], rules[j], 0))
+				fprintf(f, "%s -> %s\n", rules[i]->name, rules[j]->name);
+		}
+	}
+	fclose(f);
+}
+
+lex_filter_rules()
+{
+	lex_filter_rule(rules[5]);
+}
+
+// compute the set of rules which can appear as the first constituent of this rule, somewhere down the left edge of the subtree
+lex_filter_rule(struct rule	*r)
+{
+	char	*table;
+	int	i, j, n, tot = 1;
+
+	table = calloc(sizeof(char), nrules);
+	table[r->rnum] = 1;
+	do
+	{
+		n = 0;
+		for(i=0;i<nrules;i++) if(table[i])
+		{
+			for(j=0;j<nrules;j++) if(!table[j] && check_rf(rules[i], rules[j], 0))
+			{
+				table[j] = 1;
+				n++;
+				tot++;
+			}
+		}
+	} while(n);
+
+	printf("FIRST(%s) = %d / %d\n", r->name, tot, nrules);
+	for(i=0;i<nrules;i++) if(table[i]) printf("%s\n", rules[i]->name);
+
+	free(table);
+}

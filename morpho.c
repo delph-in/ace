@@ -22,7 +22,7 @@ int	add_lexemes_to_chart(int	nwords, char	**words)
 		if(compound>max)max = compound;
 		if(!simple && !max)
 		{
-			fprintf(stderr, "No lexeme found for `%s'\n", words[i]);
+			fprintf(stderr, "NOTE: No lexeme found for `%s'\n", words[i]);
 			return -1;
 		}
 		if(max>0)max--;

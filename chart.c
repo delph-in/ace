@@ -408,7 +408,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	if(debug_level)
 	{
-		fprintf(stderr, "%d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t", num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
+		fprintf(stderr, "NOTE: %d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
+					num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
 		print_slab_stats();
 	}
 	used_total += used_edges;
