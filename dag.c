@@ -305,23 +305,28 @@ int		*introduce;	// what type introduced this fname?
 struct type	*most_general_type_for_dg(struct dg	*d)
 {
 	int	i, intro = -1, k;
+	struct type	*up = 0, *th;
 
-	d = dereference_dg(d);
 	for(i=0;i<d->narcs;i++)
 	{
 		k = introduce[d->arcs[i].label];
-		if(k>intro)
+		th = types[k];
+		/*if(k>intro)
 		{
 			//printf("dag `%s' uses `%s', introduced by %s\n",
 					//d->type->name, fnames[d->arcs[i].label],
 					//types[introduce[d->arcs[i].label]]->name);
 			intro = k;
-		}
+		}*/
+		if(!up)up = th;
+		else up = glb(up, th);
 	}
-	if(intro==-1)return d->type;
+	//if(intro==-1)return d->type;
+	if(!up)return d->type;
 	else
 	{
-		return glb(d->type, types[intro]);
+		return glb(d->type, up);
+		//return glb(d->type, types[intro]);
 		//if(descendent_of(d->type->tnum, types[intro]))return d->type;
 		//return types[intro];
 	}
