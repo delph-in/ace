@@ -442,7 +442,7 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	if(dg1->copy)dg1->copy = 0;
 	if(dg2->copy)dg2->copy = 0;
 	if(dg1 == dg2)return 0;
-	else if(dg1->class == _bottom)	// _bottom is precisely when the dg's type is *top*, confusingly :) this means no arcs, too.
+	/*else if(dg1->class == _bottom)	// _bottom is precisely when the dg's type is *top*, confusingly :) this means no arcs, too.
 	{
 		forward_dg(dg1, dg2);
 		return 0;
@@ -462,7 +462,7 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 		else return -1;
 	}
 	else if(dg1->class == _atomic || dg2->class == _atomic)
-		return -1;
+		return -1;*/
 
 	// quasi-destructively unify the four sets of arcs together!
 
