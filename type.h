@@ -14,6 +14,9 @@ struct type
 	int		tnum;	// my type number
 };
 
+extern int		ntypes;
+extern struct type	**types;
+
 struct type	*get_top();
 struct type	*lookup_type(char	*name);
 char	*trim_string(char	*str);

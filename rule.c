@@ -4,6 +4,7 @@
 
 #include	"tdl.h"
 #include	"dag.h"
+#include	"type.h"
 #include	"rule.h"
 #include	"chart.h"
 
@@ -16,6 +17,9 @@ int	used_total = 0, pused_total = 0;
 extern int nfinal;
 
 int	rprio[1000], rnohyper[1000];
+
+int	lexrulefilt_l(int	x, int	rule);
+int	lexrulefilt_f(int	x, int	rule);
 
 struct qc	**ruleqc;
 
@@ -175,7 +179,7 @@ int	load_rules_conf()
 
 void	agenda_rules(int	count)
 {
-	int	i, j, rtl;
+	int	i, j, rtl, nlf = 0;
 
 	if(!nactive)
 	{
@@ -186,6 +190,7 @@ void	agenda_rules(int	count)
 	}
 
 	for(i=0;i<count;i++)
+	{
 		for(j=0;j<nrules;j++)
 		{
 			rtl = rules[j]->rtl;
@@ -193,9 +198,25 @@ void	agenda_rules(int	count)
 			{
 				if(	(!rtl && i+rules[j]->ndaughters <= count) ||
 					(rtl && i-rules[j]->ndaughters >= 0)	)
+				{
+					if(!rtl && lexrulefilt_f(i, j))
+					{
+						//printf(" rule %s filtered for position %d\n", rules[j]->name, i);
+						nlf++;
+						continue;
+					}
+					if(rtl && lexrulefilt_l(i-1, j))
+					{
+						//printf(" rule %s filtered for position %d\n", rules[j]->name, i);
+						nlf++;
+						continue;
+					}
 					add_agenda(epsilon_edge(rules[j], i, rtl));
+				}
 			}
 		}
+	}
+	fprintf(stderr, "NOTE: lex-filtered %d epsilon-edges\n", nlf);
 }
 
 void	add_rule(char	*name, struct dg	*dg, int	num)
@@ -302,8 +323,10 @@ void	dot_rf(char	*fname)
 	fclose(f);
 }
 
+char	**rf_tc, **rl_tc;
+
 // compute the set of rules which can appear as the first constituent of this rule, somewhere down the left edge of the subtree
-void	lex_filter_rule(struct rule	*r)
+char	*lex_filter_rule(struct rule	*r, int arg)
 {
 	char	*table;
 	int	i, j, n, tot = 1;
@@ -315,7 +338,7 @@ void	lex_filter_rule(struct rule	*r)
 		n = 0;
 		for(i=0;i<nrules;i++) if(table[i])
 		{
-			for(j=0;j<nrules;j++) if(!table[j] && check_rf(rules[i], rules[j], 0))
+			for(j=0;j<nrules;j++) if(!table[j] && check_rf(rules[i], rules[j], arg))
 			{
 				table[j] = 1;
 				n++;
@@ -324,13 +347,83 @@ void	lex_filter_rule(struct rule	*r)
 		}
 	} while(n);
 
-	printf("FIRST(%s) = %d / %d\n", r->name, tot, nrules);
-	for(i=0;i<nrules;i++) if(table[i]) printf("%s\n", rules[i]->name);
+	//printf("FIRST(%s) = %d / %d\n", r->name, tot, nrules);
+	//for(i=0;i<nrules;i++) if(table[i]) printf("%s\n", rules[i]->name);
 
-	free(table);
+	return table;
+}
+
+char	**type_rf, **type_rl;
+
+char	*type_filter_rule(struct rule	*r, int arg)
+{
+	char	*table;
+	int	i, count = 0;
+	struct slab_state	slab;
+
+	clear_slab();
+	table = calloc(sizeof(char), ntypes);
+	for(i=0;i<ntypes;i++)
+	{
+		get_slabstate(&slab);
+		if(types[i]->dg && unify_dg(types[i]->dg, r->dg, arg))
+		{
+			table[i] = 1;
+			count++;
+		}
+		set_slabstate(&slab);
+	}
+	//printf("FIRST-TYPE(%s) = %d / %d\n", r->name, count, ntypes);
+	return table;
 }
 
 void	lex_filter_rules()
 {
-	lex_filter_rule(rules[5]);
+	int	i;
+
+	fprintf(stderr, "NOTE: building rf-transitive closure\n");
+	rf_tc = malloc(sizeof(char*) * nrules);
+	rl_tc = malloc(sizeof(char*) * nrules);
+	for(i=0;i<nrules;i++)
+	{
+		rf_tc[i] = lex_filter_rule(rules[i], 0);
+		rl_tc[i] = lex_filter_rule(rules[i], rules[i]->ndaughters-1);
+	}
+
+	fprintf(stderr, "NOTE: building type-rule filter\n");
+	type_rf = malloc(sizeof(char*) * nrules);
+	type_rl = malloc(sizeof(char*) * nrules);
+	for(i=0;i<nrules;i++)
+	{
+		type_rf[i] = type_filter_rule(rules[i], 0);
+		type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1);
+	}
+}
+
+// can 'lt' fit in first position of rule?
+int	lexfirst(struct type	*lt, int	rule)
+{
+	int	i;
+
+	// see if it fits directly
+	if(type_rf[rule][lt->tnum])return 1;
+	// for each rule in first(rule), see if lt fits
+	for(i=0;i<nrules;i++)
+		if(rf_tc[rule][i] && type_rf[i][lt->tnum])
+			return 1;
+	return 0;
+}
+
+// can 'lt' fit in last position of rule?
+int	lexlast(struct type	*lt, int	rule)
+{
+	int	i;
+
+	// see if it fits directly
+	if(type_rl[rule][lt->tnum])return 1;
+	// for each rule in last(rule), see if lt fits
+	for(i=0;i<nrules;i++)
+		if(rl_tc[rule][i] && type_rl[i][lt->tnum])
+			return 1;
+	return 0;
 }

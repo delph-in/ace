@@ -1,4 +1,5 @@
 #include	<stdlib.h>
+#include	<string.h>
 #include	<assert.h>
 #include	<stdio.h>
 
@@ -133,4 +134,27 @@ int	reduce_chart(int	length)
 		}
 
 	return 0;
+}
+
+int	lexfirst(struct type	*lt, int	rule);
+int	lexlast(struct type	*lt, int	rule);
+
+int	lexrulefilt_f(int	x, int	rule)
+{
+	struct task	*t;
+
+	for(t=agenda[LEX_PRIO].start;t;t=t->next)
+		if(t->edge->from==x && t->edge->to==x+1)
+			if(lexfirst(t->edge->dg->type, rule))return 0;
+	return 1;
+}
+
+int	lexrulefilt_l(int	x, int	rule)
+{
+	struct task	*t;
+
+	for(t=agenda[LEX_PRIO].start;t;t=t->next)
+		if(t->edge->from==x && t->edge->to==x+1)
+			if(lexlast(t->edge->dg->type, rule))return 0;
+	return 1;
 }

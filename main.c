@@ -79,11 +79,11 @@ int	main(int	argc, char	*argv[])
 	if(save_grammar_path)
 		exit(0);
 
+	g_loaded = 1;
 	//dot_rf("/tmp/rules.dot");
-	//lex_filter_rules();
+	lex_filter_rules();
 	//dump_grammar();
 
-	g_loaded = 1;
 	if(export_parts)
 	{
 		dump_parts_of_speech();
