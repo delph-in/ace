@@ -7,6 +7,7 @@
  * and performs *tree*-unification on that skeleton before
  * the full dag-unifier is allowed to run */
 
+/*
 typedef enum
 {
 	_RECORD,
@@ -71,6 +72,7 @@ PUSH("SYNSEM"), REC(5),
 			PUSH("LAST"), REC(24), POP, 
 			PUSH("LIST"), REC(31), 
 				PUSH("FIRST"), PUSH("CAT"), PUSH("HEAD"), REC(45), 
+*/
 
 /*
 REC(16),
@@ -179,12 +181,12 @@ PUSH("KEYS"), PUSH("KEY"), REC(22), POP, POP, POP, POP, POP, POP,
 PUSH("ROOT"), REC(86),
 */
 
-};
+//};
 
 #define	QC_SIZE	46
 //#define	QC_SIZE	103
 
-#define	nqcprog	(sizeof(qcprog)/(sizeof(struct qcinst)))
+//#define	nqcprog	(sizeof(qcprog)/(sizeof(struct qcinst)))
 
 struct qc
 {
@@ -202,15 +204,25 @@ struct qc	*extract_qc(struct dg	*d)
 	static int	init = 0;
 	struct qc	*q;
 	long		i, sp = 0, dst;
+	int			*lp;
 	extern unsigned int	generation;
 	struct dg	*stack[64];
+	static int	labels[1024];
 
 	if(!init)
 	{
 		init = 1;
-		for(i=0;i<nqcprog;i++)
+		lp = labels;
+#define	REC(dst)
+#define	POP
+#define	PUSH(fstr)			*lp++ = lookup_fname(#fstr);
+#include	"qccode.c"
+#undef	PUSH
+#undef	POP
+#undef	REC
+		/*for(i=0;i<nqcprog;i++)
 			if(qcprog[i].com==_PUSH)
-				qcprog[i].fnum = lookup_fname(qcprog[i].arg);
+				qcprog[i].fnum = lookup_fname(qcprog[i].arg);*/
 		olist = lookup_type("*olist*");
 		assert(olist);
 		minus = lookup_type("-");
@@ -222,13 +234,26 @@ struct qc	*extract_qc(struct dg	*d)
 		null = lookup_type("*null*");
 		assert(null);
 	}
+	lp = labels;
 
 	if(!__qc_use_heap)
 		q = slab_alloc(sizeof(struct qc));
 	else q = malloc(sizeof(struct qc));
 
 	stack[sp] = d;
-	for(i=0;i<nqcprog;i++)
+
+#define	REC(dst)	if(stack[sp]) \
+						q->entries[dst] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype; \
+					else q->entries[dst] = 0;
+
+#define	POP			--sp;
+
+#define	PUSH(fname)	if(stack[sp])stack[sp+1] = dg_hop(stack[sp], *lp);	\
+					else stack[sp+1] = 0;	\
+					sp++; lp++;
+
+#include	"qccode.c"
+/*	for(i=0;i<nqcprog;i++)
 	{
 		switch(qcprog[i].com)
 		{
@@ -247,7 +272,7 @@ struct qc	*extract_qc(struct dg	*d)
 				else q->entries[dst] = 0;
 				break;
 		}
-	}
+	}	*/
 
 	return q;
 }
