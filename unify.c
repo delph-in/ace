@@ -446,101 +446,6 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	return 0;
 }
 
-int	dg_quickcheck(struct dg	*a, struct dg	*b, int	arg)
-{
-	struct dg	*to;
-	static int	synsemf, localf, catf, headf, valf, compsf, phf, modf, firstf, init=0;
-	struct dg	*synsema, *synsemb, *locala, *localb, *cata, *catb;
-	struct dg	*heada, *headb, *vala, *valb, *compsa, *compsb;
-	struct dg	*moda, *modb, *modfa, *modfb, *pha, *phb;
-	int		i = 0;
-
-	if(!init)
-	{
-		init = 1;
-		synsemf = lookup_fname("SYNSEM");
-		localf = lookup_fname("LOCAL");
-		catf = lookup_fname("CAT");
-		headf = lookup_fname("HEAD");
-		valf = lookup_fname("VAL");
-		compsf = lookup_fname("COMPS");
-		modf = lookup_fname("MOD");
-		firstf = lookup_fname("FIRST");
-		phf = lookup_fname("POSTHEAD");
-	}
-
-	// check types before copying
-	if(arg>=0)
-	{
-		to = dg_hop(b, 0);	// 0 is guaranteed to be args
-		while(to && i<arg)
-		{
-			to = dg_hop(to, 2);	// REST
-			i++;
-		}
-		if(to)to = dg_hop(to, 1);	// FIRST
-		if(!to)
-		{
-			fprintf(stderr, "quickcheck: couldn't get arg %d position in %s\n", arg, b->xtype->name);
-			exit(-1);
-		}
-	}
-	else to = b;
-
-	if(!glb(a->xtype, to->xtype))return -1;
-
-	synsema = dg_hop(a, synsemf);
-	synsemb = dg_hop(to, synsemf);
-	if(synsema && synsemb)
-	{
-		if(!glb(synsema->xtype, synsemb->xtype))return -1;
-		locala = dg_hop(synsema, localf);
-		localb = dg_hop(synsemb, localf);
-		if(locala && localb)
-		{
-			cata = dg_hop(locala, catf);
-			catb = dg_hop(localb, catf);
-			if(cata && catb)
-			{
-				heada = dg_hop(cata, headf);
-				headb = dg_hop(catb, headf);
-				if(heada && headb)
-				{
-					if(!glb(heada->xtype, headb->xtype))return -1;
-
-					moda = dg_hop(heada, modf);
-					modb = dg_hop(headb, modf);
-					if(moda && modb)
-					{
-						if(!glb(moda->xtype, modb->xtype))return -1;
-						modfa = dg_hop(moda, firstf);
-						modfb = dg_hop(modb, firstf);
-						if(modfa && modfb)
-							if(!glb(modfa->xtype, modfb->xtype))return -1;
-					}
-				}
-
-				vala = dg_hop(cata, valf);
-				valb = dg_hop(catb, valf);
-				if(vala && valb)
-				{
-					compsa = dg_hop(vala, compsf);
-					compsb = dg_hop(valb, compsf);
-					if(compsa && compsb)
-						if(!glb(compsa->xtype, compsb->xtype))return -1;
-				}
-
-				pha = dg_hop(cata, phf);
-				phb = dg_hop(catb, phf);
-				if(pha && phb)
-					if(!glb(pha->xtype, phb->xtype))return -1;
-			}
-		}
-	}
-
-	return 0;
-}
-
 // main entry point
 struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 {
@@ -549,7 +454,6 @@ struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 	struct slab_state	state;
 
 	upathl = 0;
-	if(dg_quickcheck(dg1, dg2, arg))return 0;
 
 	get_slabstate(&state);
 	//dg1 = copy_dg(dg1);
@@ -577,6 +481,8 @@ struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 		}
 	}
 	else to = dg2;
+
+	if(quickcheck(to, dg1))return 0;
 
 	//printf("next unify...\n");
 	if(!unify1(to, dg1))

@@ -1,6 +1,7 @@
 #ifndef	_DAG_H
 #define	_DAG_H
 
+#include	<stdio.h>
 #include	"type.h"
 
 // tomabechi dgs
@@ -36,6 +37,7 @@ int		unify_dg_infrom(struct dg	*dg1, struct dg	*dg2);
 struct dg	*unify_dg(struct dg	*a, struct dg	*b, int	arg);
 struct dg	*atomic_dg(char	*name);
 struct dg	*copy_dg(struct dg	*d);
+int		quickcheck(struct dg	*a, struct dg	*b);
 
 struct slab_state
 {

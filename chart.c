@@ -74,7 +74,7 @@ void	add_agenda(struct edge	*e)
 	agenda[nagenda-1] = e;
 }
 
-int	trace = 0;
+int	trace = 0, gen_qc = 1;
 
 static int	fundamental_rule(struct edge	*A, struct edge	*B)
 {
@@ -185,7 +185,7 @@ static int	fundamental_rule(struct edge	*A, struct edge	*B)
 			return -1;	// give up :(
 		}
 	}
-	else if(trace>1)unify_backtrace();
+	else if(trace>1 || gen_qc)unify_backtrace();
 
 	return 0;
 }
