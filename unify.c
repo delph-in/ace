@@ -159,6 +159,9 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 
 	if(!dg->narcs && dg->type==dg->xtype && !FROZEN(dg) && !dg->ncarcs)goto share;
 
+	// leaf-types can be shared nomatter what
+	//if(dg->xtype->ndescendents==0)goto share;
+
 	// mark that we are inside this node, to detect cycles
 	dg->copy = dg;
 
@@ -507,12 +510,26 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	if(dg2->forward)dg2 = dereference_dg(dg2);
 	if(!dg1 || !dg2)return -1;
 
-	t1 = (dg1->gen==generation)?dg1->type:dg1->xtype;
-	t2 = (dg2->gen==generation)?dg2->type:dg2->xtype;
-
 	if(dg1->copy)dg1->copy = 0;
 	if(dg2->copy)dg2->copy = 0;
 	if(dg1 == dg2)return 0;
+
+	if(!FROZEN(dg2))
+	{
+		if(FROZEN(dg1))// || dg1->narcs < dg2->narcs)
+		{
+			// trick: swap to make dg1 non-frozen if possible
+			// otherwise try to make the more specific dag dg1
+			// to avoid copying info
+			extra = dg1;
+			dg1 = dg2;
+			dg2 = extra;
+			extra = 0;
+		}
+	}
+
+	t1 = (dg1->gen==generation)?dg1->type:dg1->xtype;
+	t2 = (dg2->gen==generation)?dg2->type:dg2->xtype;
 
 	// quasi-destructively unify the four sets of arcs together!
 
