@@ -116,6 +116,7 @@ int	main(int	argc, char	*argv[])
 		if(num_parses>=0)count++;
 	}
 	gettimeofday(&tv2, 0);
+	restore_stderr();
 
 	tv2.tv_sec -= tv1.tv_sec;
 	tv2.tv_usec -= tv1.tv_usec;

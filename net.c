@@ -53,3 +53,10 @@ void	connect_to_master(char	*hostname)
 	dup2(s, 2);
 	close(s);
 }
+
+void	restore_stderr()
+{
+	if(saved_termerr==2)return;
+	close(2);
+	dup2(saved_termerr, 2);
+}
