@@ -6,13 +6,15 @@
 
 //#define	GENERATION
 
+//#define	BIDIR_SS
+
 struct edge
 {
 	struct dg	*dg;
 	struct rule	*rule;
 	signed char		have, need, from, to;
 	struct edge	**daughters;
-	int		id;
+	int		id, age;
 
 	struct lexeme	*lex;		// non-null if this is a lexical edge
 

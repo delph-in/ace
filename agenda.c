@@ -43,6 +43,11 @@ void	add_agenda(struct edge	*e)
 {
 	struct task	*t = slab_alloc(sizeof(struct task));
 
+#ifdef	BIDIR_SS
+	if(e->prio < LEX_PRIO)
+		e->prio = LEX_PRIO-1;
+#endif
+
 	if(e->prio < 0 || e->prio >= NPRIO)
 	{
 		fprintf(stderr, "tried to agendize an edge with priority %d!\n", e->prio);

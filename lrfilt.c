@@ -47,7 +47,7 @@ void	build_one_lr_filter(struct type	*lextype)
 				tqc = extract_qc(res);
 				// see if we already know about this
 				for(k=0;k<ndg;k++)
-					if(!equiv_quickcheck(tqc, qc[k]) && equivalent_dg(res, dg[k]))// && hei==height[i])
+					if(!equiv_quickcheck(tqc, qc[k]) && 1!=equivalent_dg(res, dg[k]))// && hei==height[i])
 						break;
 				if(k<ndg)
 				{

@@ -146,6 +146,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		e = slab_alloc(sizeof(struct edge));
 		e->qc = extract_qc_arg(u, -1);
 		e->dg = u;
+		e->age = (e->have==1)?(a->age+1):0;	// binary passive edges get age 0; unary get daughter.age+1
 	}
 	else
 	{
@@ -184,6 +185,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		e->ha_arg = arg;
 		e->ha_use = 0;
 		e->qc = qc;
+		e->age = 0;	// 'age' is only used on passive edges
 		//printf("active qc %p (copy of %p)\n", e->qc, qc);
 	}
 	//e->prio = a->prio+1;
@@ -387,12 +389,15 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 static int	pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
-	int			i;
+	int			i, ssd;
 	//extern const int	qcbytes;
 
 	// since we're taking first-parse-only, this is ok perhaps.
 	for(i=0;i<c->p_nedges;i++)
 		if(!c->p_edges[i]->lex
+//#ifdef	BIDIR_SS
+		&& c->p_edges[i]->age == edge->age
+//#endif
 #ifdef	GENERATION
 		&& c->p_edges[i]->ep_span == edge->ep_span
 #endif
@@ -401,7 +406,8 @@ static int	pack_edge(struct edge	*edge)
 		//&& !memcmp(c->p_edges[i]->qc, edge->qc, qcbytes)
 			)
 		{
-			if(equivalent_dg(c->p_edges[i]->dg, edge->dg))
+			ssd = equivalent_dg(c->p_edges[i]->dg, edge->dg);
+			if(ssd == 1)
 			{
 				//fprintf(stderr, "packed #%d in #%d!\n", edge->id, c->p_edges[i]->id);
 				//printf("host: "); print_dg(c->p_edges[i]->dg); printf("\n");
@@ -410,6 +416,14 @@ static int	pack_edge(struct edge	*edge)
 				// XXX should record
 				return 1;
 			}
+#ifdef	BIDIR_SS
+			else if(ssd == -1)
+			{
+				// XXX I bet we should do something more here :P
+				c->p_edges[i]->dg = edge->dg;
+				return 1;
+			}
+#endif
 		}
 	return 0;
 }

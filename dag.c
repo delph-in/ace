@@ -238,9 +238,12 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	//if(a->xtype != b->xtype)return 0;
 	//if(a->narcs != b->narcs)return 0;
 
+#ifndef	BIDIR_SS
 	if(!descendent_of(b->xtype->tnum, a->xtype))return 0;
-	//if(!descendent_of(b->xtype->tnum, a->xtype))subsume_forward = 0;
-	//if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
+#else
+	if(!descendent_of(b->xtype->tnum, a->xtype))subsume_forward = 0;
+	if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
+#endif
 
 	if(a->copy == b && b->forward == a)return 1;
 	if(a->copy)subsume_forward = 0;
@@ -279,7 +282,8 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			}
 		}
 	}
-	/*else if(subsume_backward) // a is subtype of b, so has strict superset of features
+#ifdef	BIDIR_SS
+	else if(subsume_backward) // a is subtype of b, so has strict superset of features
 	{
 		for(i=j=0;i<a->narcs;i++)
 		{
@@ -292,7 +296,8 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			}
 		}
 	}
-	else return 0;*/
+	else return 0;
+#endif
 	return 1;
 }
 
@@ -321,7 +326,13 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 			fprintf(stderr, "NOTE: back-subsumption\n");
 	if(res && subsume_forward)
 			fprintf(stderr, "NOTE: >= subsumption\n");*/
-	return res && subsume_forward;// && subsume_backward;
+
+	if(res)
+	{
+		if(subsume_forward)return 1;
+		if(subsume_backward)return -1;
+	}
+	return 0;
 	//return res;
 }
 

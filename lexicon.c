@@ -62,6 +62,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	bzero(edge->inflr_allow, nrules);
 	edge->allow_no_inflr = (len==1)?0:1;
 #endif
+	edge->age = 0;
 
 	if(trace)
 	{
