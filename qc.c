@@ -195,7 +195,7 @@ int	__qc_use_heap = 0;
 
 const int	qcbytes = sizeof(struct type*)*QC_SIZE;
 
-static struct type	*olist, *minus, *_1list, *_0dlist;
+static struct type	*olist, *minus, *_1list, *_0dlist, *null;
 
 struct qc	*extract_qc(struct dg	*d)
 {
@@ -213,9 +213,15 @@ struct qc	*extract_qc(struct dg	*d)
 			if(qcprog[i].com==_PUSH)
 				qcprog[i].fnum = lookup_fname(qcprog[i].arg);
 		olist = lookup_type("*olist*");
+		assert(olist);
 		minus = lookup_type("-");
+		assert(minus);
 		_1list = lookup_type("1-list");
+		assert(_1list);
 		_0dlist = lookup_type("0-dlist");
+		assert(_0dlist);
+		null = lookup_type("*null*");
+		assert(null);
 	}
 
 	if(!__qc_use_heap)
@@ -294,8 +300,8 @@ int	quickcheck(struct qc	*a, struct qc	*b)
 	// XXX shameless hack
 	if(a->entries[20] == olist && b->entries[9]==minus)return -1;
 	if(b->entries[20] == olist && a->entries[9]==minus)return -1;
-	if(a->entries[31] == _1list && b->entries[32]==_0dlist)return -1;
-	if(b->entries[31] == _1list && a->entries[32]==_0dlist)return -1;
+	if(a->entries[31] == _1list && b->entries[32]==_0dlist && b->entries[24]==null)return -1;
+	if(b->entries[31] == _1list && a->entries[32]==_0dlist && a->entries[24]==null)return -1;
 	if(a->entries[10] == olist && b->entries[11]==minus)return -1;
 	if(b->entries[10] == olist && a->entries[11]==minus)return -1;
 	return 0;
