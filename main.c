@@ -16,7 +16,7 @@ int	debug_level = 1, export_parts = 0;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0;
-int	question = 0;
+int	question = 0, exhaustive = 0;
 
 extern int	g_loaded;
 extern long long	accum_ram_usage;
@@ -29,15 +29,16 @@ void	parse_args(int	argc, char	*argv[])
 {
 	char	*prog = argv[0], ch;
 
-	while((ch=getopt(argc, argv, "hvlg:G:m:q"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvlxg:G:m:q"))!=255)switch(ch)
 	{
-		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
+		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-x] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
 		case	'G':	save_grammar_path = optarg;	break;
 		case	'l':	export_parts = 1;		break;
 		case	'm':	connect_to_master(optarg);	break;
 		case	'q':	question = 1;			break;
+		case	'x':	exhaustive = 1;			break;
 		case	'?':	goto usage;
 	}
 	if(optind<argc-1)goto usage;

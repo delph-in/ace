@@ -16,7 +16,7 @@ struct chart_cell	*cells;
 int	total_edges, real_edges, passive_edges, used_edges, pused_edges;
 
 extern int	debug_level;
-extern int	question;
+extern int	question, exhaustive;
 
 int		edge_id;
 
@@ -34,7 +34,7 @@ void	unfold_edge(struct edge	*e);
 
 //#define	MAX_CHUNKS	680	// when to give up on a parse
 #define	MAX_CHUNKS	71	// when to give up on a parse
-#define	FIRST_ONLY
+//#define	FIRST_ONLY
 
 void	clear_chart(int	size)
 {
@@ -240,8 +240,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		//print_dg(u);
 		//printf("\n");
 		npassive[e->rule->rnum]++;
-#ifdef	FIRST_ONLY
-		if(e->from==0 && e->to==chart_size-1 && is_root(e->dg))
+//#ifdef	FIRST_ONLY
+		if(!exhaustive && e->from==0 && e->to==chart_size-1 && is_root(e->dg))
 		{
 			//printf("sentential\n");
 			e->used = 1;pused_edges++;
@@ -249,7 +249,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			sentential = e;	// stop the parser
 			return -2;
 		}
-#endif
+//#endif
 	}
 	else nactive[e->rule->rnum]++;
 
@@ -484,9 +484,9 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	alarm(0);
 
 	// show analyses
-#ifdef	FIRST_ONLY
-	if(sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
-#endif
+//#ifdef	FIRST_ONLY
+	if(!exhaustive && sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
+//#endif
 	num_entries = cells[chart_size-1].p_nedges;
 	for(i=0;i<num_entries;i++)
 	{
@@ -515,9 +515,9 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		print_sem(sem);
 		if(!question)printf("\n\n");
 		fflush(stdout);
-#ifdef	FIRST_ONLY
-		break;
-#endif
+//#ifdef	FIRST_ONLY
+		if(!exhaustive)break;
+//#endif
 	}
 
 	if(debug_level)
@@ -726,6 +726,7 @@ void	print_rel(struct dg	*rel)
 		if(!strcmp(relstr, "ellipsis_rel"))return;
 		if(!strcmp(relstr, "abstr_deg_rel"))return;
 		if(!strcmp(relstr, "number_rel"))return;
+		if(!strcmp(relstr, "person_rel"))return;
 		if(strstr(relstr, "_q_"))return;
 		if(strstr(relstr, "_n_"))break;
 		if(!strcmp(relstr, "pron_rel"))break;
