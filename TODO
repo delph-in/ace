@@ -13,5 +13,3 @@ smarter ordering of agenda
 	- try giving higher priority to "longer" edges, -> form longer analyses more quickly
 		- may bias parser the wrong direction though
 hyperactive excursion?
-
-fix small-lexicon chart reduce parameters
