@@ -1,6 +1,8 @@
 #include	<stdlib.h>
 #include	<stdio.h>
 #include	<string.h>
+#include	<sys/types.h>
+#include	<unistd.h>
 #include	<sys/mman.h>
 #include	"dag.h"
 
@@ -38,7 +40,7 @@ void	commit_slab()
 	{
 		fprintf(stderr, "freezing %.1fM to file map %p\n", (float)slabu/1024/1024, freeze_point);
 		if(ftruncate(freeze_fd, slabu)) { perror("ftruncate to final length"); exit(-1); }
-		if(msync(freeze_point, slabu, MS_ASYNC)) { perror("msync"); exit(-1); }
+		if(msync(freeze_point, slabu, MS_SYNC)) { perror("msync"); exit(-1); }
 		close(freeze_fd);
 		freeze_next = 0;
 	}
@@ -91,12 +93,12 @@ void	next_slab()
 
 void	*slab_realloc(void	*ptr, int	oldlen, int	newlen)
 {
-	if(ptr == last && slabu -oldlen +newlen < currslabsize)
+	/*if(ptr == last && slabu -oldlen +newlen < currslabsize)
 	{
 		slabu += newlen - oldlen;
 		return ptr;
 	}
-	else
+	else*/
 	{
 		slab_alloc(newlen);
 		memcpy(last, ptr, oldlen);
