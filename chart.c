@@ -180,10 +180,7 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 			memcpy(e->daughters, a->daughters, sizeof(struct edge*) * a->have);
 			e->daughters[arg] = b;
 		}
-		//if(a->inflr)e->inflr = a->inflr;	// an active edge maintains its "required inflection"
-		//else if(b->inflr && !a->rule->inflr)
-		//	e->inflr = b->inflr;		// pre-inflectional lexical rules pick up "required inflectioN" from daughter
-		if(e->rule->lexical && !e->rule->inflr)e->lex = b->lex;
+		if(e->rule->lexical)e->lex = b->lex;
 		else e->lex = 0;
 		if(e->need==e->have)
 		{
