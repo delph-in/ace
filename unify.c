@@ -13,14 +13,15 @@ extern char	**fnames;
 extern int	g_loaded;
 
 // global generation counter for invalidating quasi-destructive operations
-static unsigned int	generation = 10;
-static void dagreset_c(struct dg	*d);
+unsigned int	generation = 10;
 
 // when freezing a grammar, start all copy generations at 10
 void	null_generation() { generation = 10; }
 
 extern int	upath[1024];
 extern int	upathl;
+
+static void dagreset_c(struct dg	*d);
 
 static inline void	p_forward_dg(struct dg	*from, struct dg	*to)
 {
@@ -42,26 +43,39 @@ static inline void	forward_dg(struct dg	*from, struct dg	*to)
 	}
 }
 
-struct dg	*dereference_dg(struct dg	*dg)
+static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 {
-	struct dg	*fw = dg;
-	struct dg	*fw2 = dg;
+	struct dg	*newcopy;
+	struct darc	*aptr;
+	int		i;
 
-	while(1)
+	dg = p_dereference_dg(dg);
+	if(!dg)return 0;
+	if(dg->copy)return dg->copy;
+
+	newcopy = slab_alloc(sizeof(struct dg));
+	dg->copy = newcopy;
+	*newcopy = *dg;
+	newcopy->copy = 0;
+	newcopy->type = newcopy->xtype;
+	newcopy->ncarcs = 0;
+	newcopy->carcs = 0;
+	newcopy->aarcs = dg->narcs;
+	newcopy->narcs = 0;
+	newcopy->gen = generation;
+	if(dg->gen==9)newcopy->gen = 9;
+	else newcopy->forward = 0;
+	aptr = newcopy->arcs = slab_alloc(sizeof(struct darc) * newcopy->aarcs);
+
+	for(i=0;i<dg->narcs;i++)
 	{
-		// step 'fw' twice
-		if(fw->gen==generation || fw->gen==9) { if(fw->forward)fw = fw->forward; else return fw; }
-		if(fw->gen==generation || fw->gen==9) { if(fw->forward)fw = fw->forward; else return fw; }
-		else return fw;
-		
-		// step 'dg' once
-		dg = dg->forward;
-		if(dg == fw)
-		{
-			//fprintf(stderr, "XXX cycle\n");
-			return 0;
-		}
+		aptr->label = dg->arcs[i].label;
+		aptr->dest = copy_dg_no_comp_arcs(dg->arcs[i].dest);
+		if(!aptr->dest)return 0;
+		aptr++;
 	}
+	newcopy->narcs = newcopy->aarcs;
+	return newcopy;
 }
 
 static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
@@ -307,17 +321,6 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	t = glb(t1, t2);
 	if(!t)return -1;
 
-	if(t != t1 && t!= t2 && t->dg && t->dg->narcs)
-	{
-		//if(t->dg->gen != generation)
-		//	extra = t->dg;
-		//else
-		{
-			// it's REALLY obnoxious that we have to do this
-			dagreset_c(t->dg);
-			extra = copy_dg_with_comp_arcs(t->dg);
-		}
-	}
 	if(dg1->gen != generation)
 	{
 		dg1->ncarcs = 0;
@@ -410,35 +413,36 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 		//fprintf(stderr, "ccomplink `%s -[%s]> %p' ", dg1->type->name, fnames[dg2->carcs[i].label], dg2->carcs[i].dest); unify_backtrace();
 	}
 
-	if(extra && unify1(dg1, extra))
+	if(t != t1 && t!= t2 && t->dg && t->dg->narcs)
 	{
-		if(!g_loaded)
+		if(t->dg->gen != generation)
 		{
-			fprintf(stderr, "UNIFY: failed additional constraints from glb-type `%s'\n", extra->type->name);
-			print_dg(extra); printf("\n");
+			extra = t->dg;
+			extra->gen = generation;
+			extra->type = extra->xtype;
+			extra->ncarcs = 0;
+			extra->carcs = 0;
+			extra->forward = 0;
+			extra->copy = 0;
 		}
-		return -1;
+		else
+		{
+			// it's REALLY obnoxious that we have to do this
+			dagreset_c(t->dg);
+			extra = copy_dg_no_comp_arcs(t->dg);
+			dagreset_c(t->dg);
+		}
+		if(unify1(dg1, extra))
+		{
+			if(!g_loaded)
+			{
+				fprintf(stderr, "UNIFY: failed additional constraints from glb-type `%s'\n", t->name);
+				print_dg(extra); printf("\n");
+			}
+			return -1;
+		}
 	}
 
-	return 0;
-}
-
-struct dg	*dg_hop(struct dg	*d, int	label)
-{
-	int	i;
-
-	d = dereference_dg(d);
-	if(!d)return 0;
-
-	for(i=0;i<d->narcs;i++)
-		if(d->arcs[i].label==label)
-			return dereference_dg(d->arcs[i].dest);
-	if(d->gen==generation)
-	{
-		for(i=0;i<d->ncarcs;i++)
-			if(d->carcs[i].label==label)
-				return dereference_dg(d->carcs[i].dest);
-	}
 	return 0;
 }
 
@@ -602,7 +606,7 @@ static void dagreset_c(struct dg	*d)
 {
 	int	i;
 
-	d = dereference_dg(d);
+	d = p_dereference_dg(d);
 	if(!d)return;
 
 	d->copy = 0;

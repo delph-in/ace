@@ -6,11 +6,11 @@ struct edge
 	struct rule	*rule;
 	short		have, need;
 	struct edge	**daughters;
-	int		from, to;
+	short		from, to;
 	int		id;
 
-	struct lexeme	*lex;	// non-null if this is a lexical edge
-	int		rtl;	// right-to-left instantiation?
+	struct lexeme	*lex;		// non-null if this is a lexical edge
+	short		rtl,used;	// right-to-left instantiation? active been used?
 };
 
 struct chart_cell

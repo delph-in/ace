@@ -28,7 +28,7 @@ print_slab_stats()
 	fprintf(stderr, "%d complete slabs, %dkbytes in working slab\n", noldslabs-1, slabu/1024);
 }
 
-static void	next_slab();
+void	next_slab();
 
 void	commit_slab()
 {
@@ -66,7 +66,7 @@ void	clear_slab()
 	}
 }
 
-static void	next_slab()
+void	next_slab()
 {
 	if(freeze_next)
 	{
@@ -84,19 +84,6 @@ static void	next_slab()
 	slab = oldslabs[noldslabs-1];
 	slabu = 0;
 	last = slab;
-}
-
-void	*slab_alloc(int	len)
-{
-	if(len>currslabsize)
-	{
-		fprintf(stderr, "allocation request %d too big for slab\n", len);
-		exit(-1);
-	}
-	if(slabu+len > currslabsize)next_slab();
-	last = slab + slabu;
-	slabu += len;
-	return last;
 }
 
 void	*slab_realloc(void	*ptr, int	oldlen, int	newlen)

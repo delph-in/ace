@@ -21,8 +21,6 @@ statistical parse selection?
 
 OPTIMIZATIONS:
 
-find a safe way to not copy types for extra constraints
-
 use different quickchecks for different rules
 
 find a way to force struct dg's to align to 32 bytes,
@@ -30,7 +28,8 @@ find a way to force struct dg's to align to 32 bytes,
 find a way to force struct darcs to align to 8 bytes
 smart ordering of agenda
 
-hyperactive parsing -- for certain rules only
+hyperactive parsing -- for certain rules only?
+	- overall, less than 1/5 *active* edges produced ever combines with anything
 
 FOR Apple SITE:
 make duplicate sentence detector

@@ -12,6 +12,7 @@ int		nrules;
 
 char	*rule_filter;
 int	*nactive, *npassive;
+int	used_total = 0;
 
 rule_stats()
 {
@@ -25,7 +26,7 @@ rule_stats()
 		nact+=nactive[i];
 		npass+=npassive[i];
 	}
-	fprintf(stderr, "%d active / %d passive edges total\n", nact, npass);
+	fprintf(stderr, "%d active / %d passive edges total (%d actives used)\n", nact, npass, used_total);
 }
 
 int	rule_is_rtl(struct rule	*r)
@@ -110,6 +111,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 	}
 	e->lex = 0;
 	e->rtl = rtl;
+	e->used = 0;
 
 	return e;
 }

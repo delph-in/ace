@@ -7,7 +7,7 @@
 
 int			chart_size;
 struct chart_cell	*cells;
-int	total_edges, real_edges, passive_edges;
+int	total_edges, real_edges, passive_edges, used_edges;
 
 extern int	debug_level;
 
@@ -15,8 +15,8 @@ static int		nagenda, aagenda;
 static struct edge	**agenda;
 int		edge_id;
 
-extern int	*nactive, *npassive;
-	extern int noldslabs;
+extern int	*nactive, *npassive, used_total;
+extern int noldslabs;
 
 #define	MAX_CHUNKS	680	// when to give up on a parse
 #define	FIRST_ONLY
@@ -37,7 +37,7 @@ void	clear_chart(int	size)
 
 	clear_slab();
 
-	passive_edges = real_edges = total_edges = 0;
+	passive_edges = real_edges = total_edges = used_edges = 0;
 	chart_size = size;
 	cells = calloc(sizeof(struct chart_cell) , chart_size*chart_size);
 }
@@ -116,6 +116,8 @@ static int	fundamental_rule(struct edge	*A, struct edge	*B)
 	u = unify_dg(b->dg, a->dg, arg);
 	if(u)
 	{
+		if(!a->have && !a->used){a->used = 1;used_edges++;}
+		//if(!b->used){b->used = 1;used_edges++;}
 		if(b->lex && a->rule->inflr)
 		{
 			//printf("promoted lexeme %s to word %s via rule %s\n", b->dg->xtype->name, u->xtype->name, a->rule->name);
@@ -128,6 +130,7 @@ static int	fundamental_rule(struct edge	*A, struct edge	*B)
 		e->have = a->have+1;
 		e->daughters = slab_alloc(sizeof(struct edge*) * e->have);
 		e->rtl = a->rtl;
+		e->used = 0;
 		if(e->rtl)
 		{
 			e->from = b->from;
@@ -161,6 +164,7 @@ static int	fundamental_rule(struct edge	*A, struct edge	*B)
 			if(e->from==0 && e->to==chart_size-1 && is_root(e->dg))
 			{
 				//printf("sentential\n");
+				//e->used = 1;used_edges++;
 				add_edge_to_chart(e);
 				return -1;	// stop the parser
 			}
@@ -285,9 +289,10 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	if(debug_level)
 	{
-		fprintf(stderr, "%d readings. added %d / %d edges to chart (%d fully instantiated)\t", num_parses, total_edges, real_edges, passive_edges);
+		fprintf(stderr, "%d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used)\t", num_parses, total_edges, real_edges, passive_edges, used_edges);
 		print_slab_stats();
 	}
+	used_total += used_edges;
 
 	return num_parses;
 }
