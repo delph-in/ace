@@ -206,12 +206,23 @@ void	dump_parts_of_speech()
 void	add_lexeme(char	*word, struct dg	*dg, struct type	*type)
 {
 	struct lexeme	*l = malloc(sizeof(struct lexeme));
-	struct dg	*stem, *str;
-	static int	sfeat = -1, rfeat = 2, ffeat = 1;
+	struct dg	*stem, *str, *synsem, *lkeys, *keyrel, *pred, *compkey, *ocompkey;
+	static int	sfeat = -1, rfeat = 2, ffeat = 1, synsemfeat, lkeysfeat, keyrelfeat, predfeat, compkeyfeat, ocompkeyfeat;
+	static struct type	*predsort;
 
 	//wellform(dg, word);
 
-	if(sfeat==-1)sfeat = lookup_fname("STEM");
+	if(sfeat==-1)
+	{
+		sfeat = lookup_fname("STEM");
+		synsemfeat = lookup_fname("SYNSEM");
+		lkeysfeat = lookup_fname("LKEYS");
+		keyrelfeat = lookup_fname("KEYREL");
+		predfeat = lookup_fname("PRED");
+		compkeyfeat = lookup_fname("--+COMPKEY");
+		ocompkeyfeat = lookup_fname("--+OCOMPKEY");
+		predsort = lookup_type("predsort");
+	}
 	nlexemes++;
 	lexemes = realloc(lexemes, sizeof(struct lexeme)*nlexemes);
 	lexemes[nlexemes-1] = l;
@@ -220,6 +231,42 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type)
 	l->stemlen = 0;
 	l->stem = 0;
 	l->lextype = type;
+	l->pred = 0;
+	l->select = 0;
+
+	synsem = dg_hop(dg, synsemfeat);
+	if(synsem)
+	{
+		lkeys = dg_hop(synsem, lkeysfeat);
+		if(lkeys)
+		{
+			compkey = dg_hop(lkeys, compkeyfeat);
+			if(compkey && compkey->xtype != predsort)
+			{
+				l->select = compkey->xtype;
+				//printf("lex `%s' selects for `%s'\n", word, l->select->name);
+			}
+			else
+			{
+				ocompkey = dg_hop(lkeys, ocompkeyfeat);
+				if(ocompkey && ocompkey->xtype != predsort)
+				{
+					l->select = ocompkey->xtype;
+					//printf("lex `%s' oselects for `%s'\n", word, l->select->name);
+				}
+			}
+			keyrel = dg_hop(lkeys, keyrelfeat);
+			if(keyrel)
+			{
+				pred = dg_hop(keyrel, predfeat);
+				if(pred)
+				{
+					l->pred = pred->xtype;
+					//printf("lex `%s' provides `%s'\n", word, l->pred->name);
+				}
+			}
+		}
+	}
 
 	for(stem = dg_hop(dg, sfeat);stem;stem = dg_hop(stem, rfeat))
 	{

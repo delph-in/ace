@@ -27,6 +27,7 @@ int	cancel_parse;
 
 void	print_sem(struct dg	*dg);
 void	print_rel(struct dg	*rel);
+void	unfold_edge(struct edge	*e);
 
 #define	MAX_CHUNKS	680	// when to give up on a parse
 #define	FIRST_ONLY
@@ -366,6 +367,8 @@ void	alarm_handler(int	sig)
 	cancel_parse = 1;
 }
 
+int	nfinal;
+
 int	parse(int	nwords, char	*words[], char	*sentence)
 {
 	int		i;
@@ -377,6 +380,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	// setup the chart
 	clear_chart(nwords+1);
 	if(add_lexemes_to_chart(nwords, words))return -1;
+	if(reduce_chart())return 0;
 
 	agenda_rules(nwords+1);
 
@@ -400,9 +404,9 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		root = edge->dg;
 		if(!is_root(root))continue;
 
-		//unfold_edge(edge);
 
 		show:
+		unfold_edge(edge);
 		num_parses++;
 		sem = dg_hop(root, lookup_fname("SYNSEM"));
 		if(sem)sem = dg_hop(sem, lookup_fname("LOCAL"));
@@ -430,6 +434,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		fprintf(stderr, "NOTE: %d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
 					num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
 		print_slab_stats();
+		output_lui(words);
 	}
 	used_total += used_edges;
 	pused_total += pused_edges;
@@ -441,7 +446,8 @@ void	unfold_edge(struct edge	*e)
 {
 	int	i;
 
-	if(e->rule)fprintf(stderr, "%s\n", e->rule->name);
+	nfinal++;
+	//if(e->rule)fprintf(stderr, "%s\n", e->rule->name);
 	for(i=0;i<e->have;i++)
 		unfold_edge(e->daughters[i]);
 }
@@ -558,4 +564,35 @@ void	print_rel(struct dg	*rel)
 		//fprintf(stderr, "REL had no ARGs\n");
 	}
 	else printf("\n");
+}
+
+output_lui(char	*words[])
+{
+	int	i, j, k, l;
+	struct edge	*e;
+	extern char	*current_sentence;
+
+	printf("chart 1 #R[%d", chart_size-1);
+	for(i=0;i<chart_size-1;i++)
+		printf(" #E[%d -1 %d \"%s\" orth]", -i-1, i, words[i]);
+
+	for(i=0;i<chart_size;i++)
+		for(j=0;j<chart_size;j++)
+			for(k=0;k<cells[j*chart_size + i].nedges;k++)
+			{
+				e = cells[j*chart_size + i].edges[k];
+				if(e->have != e->need)continue;
+				if(e->rule)
+				{
+					printf(" #E[%d %d %d %s %s", e->id, j, i, e->rule->name, e->rule->name);
+					for(l=0;l<e->have;l++)
+						printf(" %d", e->daughters[l]->id);
+					printf("]");
+				}
+				else if(e->lex)
+				{
+					printf(" #E[%d %d %d %s %s %d]", e->id, j, j, e->lex->word, e->lex->word, -1-j);
+				}
+			}
+	printf("] \"%s\"\n", current_sentence);
 }

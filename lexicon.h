@@ -12,6 +12,9 @@ struct lexeme
 	int		stemlen;
 	struct type	**stem;
 	struct type	*lextype;
+
+	struct type	*select;	// this lexeme selects a required complement
+	struct type	*pred;		// this lexeme provides relation 'pred'
 };
 
 int	add_lexemes_to_chart_for_stem(int	x, char	*stem);

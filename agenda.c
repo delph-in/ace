@@ -1,7 +1,9 @@
 #include	<stdlib.h>
+#include	<assert.h>
 #include	<stdio.h>
 
 #include	"chart.h"
+#include	"lexicon.h"
 
 extern int	debug_level;
 
@@ -82,5 +84,32 @@ int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to)
 	for(t=agenda[LEX_PRIO].start;t;t=t->next)
 		if(t->edge->lex==lex && t->edge->from==from && t->edge->to==to)
 			return 1;
+	return 0;
+}
+
+int	reduce_chart()
+{
+	struct task	*t1, *t2;
+	struct queue	*lag = &agenda[LEX_PRIO];
+
+	for(t1=lag->start;t1;t1=t1->next)
+	{
+		assert(t1->edge->lex);
+		if(!t1->edge->lex->select)continue;
+		//printf("%s selects %s\n", t1->edge->lex->word, t1->edge->lex->select->name);
+		for(t2=lag->start;t2;t2=t2->next)
+		{
+			assert(t2->edge->lex);
+			if(glb(t2->edge->lex->pred, t1->edge->lex->select))break;
+		}
+		if(!t2)
+		{
+			//printf("edge %d, lexeme %s dropped by reducer\n", t1->edge->id, t1->edge->lex->word);
+			if(t1->next)t1->next->prev = t1->prev;
+			if(t1->prev)t1->prev->next = t1->next;
+			if(t1==lag->start)lag->start = t1->next;
+			if(t1==lag->end)lag->end = t1->prev;
+		}
+	}
 	return 0;
 }

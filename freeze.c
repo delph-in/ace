@@ -66,8 +66,6 @@ struct type	*freeze_type(struct type	*tin)
 	*tout = *tin;
 	tout->dg = tin->dg?copy_dg(tin->dg):0;
 	tout->name = freeze_string(tin->name);
-	//if(tin->par)tout->par = types[tin->par->tnum];
-	//if(tin->parb)tout->parb= types[tin->parb->tnum];
 	tout->descendents = slab_alloc(tin->ndescendents * sizeof(int));
 	memcpy(tout->descendents, tin->descendents, tin->ndescendents * sizeof(int));
 
@@ -111,6 +109,13 @@ struct irule	*freeze_irule(struct irule	*irin)
 	return irout;
 }
 
+static struct type	*FT(struct type	*t)
+{
+	if(!t)return 0;
+	else if(t->name[0]=='"')return strings[t->tnum];
+	else return types[t->tnum];
+}
+
 struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 {
 	struct lexeme	*lout = slab_alloc(sizeof(struct lexeme));
@@ -120,7 +125,9 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 
 	lout->stemlen = lin->stemlen;
 	lout->stem = slab_alloc(sizeof(struct type*) * lout->stemlen);
-	lout->lextype = types[lin->lextype->tnum];
+	lout->lextype = FT(lin->lextype);
+	lout->select = FT(lin->select);
+	lout->pred = FT(lin->pred);
 	memcpy(lout->stem, lin->stem, sizeof(struct type*) * lout->stemlen);
 
 	return lout;
@@ -135,8 +142,7 @@ void	patch_dg(struct dg	*dg)
 	if(!dg)return;
 
 	//printf("type %s -> ", dg->xtype->name);
-	if(dg->xtype->name[0]=='"')dg->xtype = strings[dg->xtype->tnum];
-	else dg->xtype = types[dg->xtype->tnum];
+	dg->xtype = FT(dg->xtype);
 
 	dg->ncarcs = 0;
 	dg->carcs = 0;

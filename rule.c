@@ -13,6 +13,7 @@ int		nrules;
 char	*rule_filter;
 int	*nhactive, *nactive, *npassive, *nrecomb;
 int	used_total = 0, pused_total = 0;
+extern int nfinal;
 
 int	rprio[1000], rnohyper[1000];
 
@@ -32,7 +33,7 @@ void	rule_stats()
 		nrec+=nrecomb[i];
 		nhact+=nhactive[i];
 	}
-	fprintf(stderr, "%d active (%d hyper) / %d passive edges total (%d actives used, %d passives used, %d reformed)\n", nact, nhact, npass, used_total, pused_total, nrec);
+	fprintf(stderr, "NOTE: %d active (%d hyper) / %d passive edges total (%d actives used, %d passives used, %d reformed) ; %d final edges\n", nact, nhact, npass, used_total, pused_total, nrec, nfinal);
 }
 
 int	rule_is_rtl(struct rule	*r)
