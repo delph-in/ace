@@ -9,6 +9,7 @@
 #include	<netinet/in.h>
 #include	<arpa/inet.h>
 #include	<netdb.h>
+#include	"net.h"
 
 #define	PORT	9977
 
@@ -21,7 +22,16 @@ void	print_current_sentence(int	sig)
 	write(saved_termerr, "DEADLY SIGNAL! sent = `", strlen("DEADLY SIGNAL! sent = `"));
 	write(saved_termerr, current_sentence, strlen(current_sentence));
 	write(saved_termerr, "'\n", 2);
+	shutdown_net();
 	exit(-1);
+}
+
+void	shutdown_net()
+{
+	if(saved_termerr == 2)return;
+	close(1); close(2);
+	shutdown(0, SHUT_RDWR);
+	close(0);
 }
 
 void	connect_to_master(char	*hostname)

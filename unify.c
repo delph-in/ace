@@ -791,14 +791,14 @@ struct dg	*trim_args(struct dg	*d)
 	copy = slab_alloc(sizeof(struct dg));
 	*copy = *d;
 	for(i=0;i<d->narcs;i++)
-		if(!(d->arcs[i].label==0 || (d->arcs[i].label>=5 && d->arcs[i].label<=11)))
+		if(!(d->arcs[i].label==0 || (d->arcs[i].label>=5 && d->arcs[i].label<=13)))
 			narc++;
 	copy->narcs = narc;
 	copy->arcs = slab_alloc(sizeof(struct dg) * narc);
 	narc = 0;
 	for(i=0;i<d->narcs;i++)
 	{
-		if(!(d->arcs[i].label==0 || (d->arcs[i].label>=5 && d->arcs[i].label<=11)))
+		if(!(d->arcs[i].label==0 || (d->arcs[i].label>=5 && d->arcs[i].label<=13)))
 			copy->arcs[narc++] = d->arcs[i];
 	}
 	return copy;

@@ -130,6 +130,8 @@ int	main(int	argc, char	*argv[])
 		rule_stats();
 	}
 
+	shutdown_net();
+
 	if(success<=0 && count>0)return -1;
 	else return 0;
 }

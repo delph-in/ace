@@ -179,7 +179,11 @@ int	equiv_same_dg(struct dg	*a)
 	a->copy = a;
 	a->forward = a;
 	for(i=0;i<a->narcs;i++)
+	{
+		if(a->arcs[i].label>=14 && a->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+			continue;
 		if(!equiv_same_dg(a->arcs[i].dest))return 0;
+	}
 	return 1;
 }
 
@@ -224,7 +228,7 @@ int	equivalent_dg1(struct dg	*a, struct dg	*b)
 	{
 		for(j=0;j<b->narcs;j++)if(b->arcs[j].label==a->arcs[i].label)break;
 		if(j>=b->narcs)return 0;
-		if(a->arcs[i].label>=12 && a->arcs[i].label<=15)	// STEM, RELS, HCONS, RULE-NAME
+		if(a->arcs[i].label>=14 && a->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
 			continue;
 		//printf("feature %s: host %p pack %p\n", fnames[a->arcs[i].label],
 				//a->arcs[i].dest, b->arcs[j].dest);
@@ -323,7 +327,7 @@ void	add_dg_feature(struct dg	*d, char	*label, struct dg	*value)
 
 int	init_fnames()
 {
-	nfnames = 16;
+	nfnames = 18;
 	fnames = malloc(sizeof(char*)*nfnames);
 	introduce = malloc(sizeof(int)*nfnames);
 	memset(introduce, -1, sizeof(int)*nfnames);
@@ -341,10 +345,12 @@ int	init_fnames()
 	fnames[9] = strdup("DTR");
 	fnames[10] = strdup("MOD-DTR");
 	fnames[11] = strdup("NONMOD-DTR");
+	fnames[12] = strdup("DTRA");
+	fnames[13] = strdup("DTRB");
 
-	fnames[12] = strdup("STEM");
-	fnames[13] = strdup("RELS");
-	fnames[14] = strdup("HCONS");
-	fnames[15] = strdup("RULE-NAME");
+	fnames[14] = strdup("STEM");
+	fnames[15] = strdup("RELS");
+	fnames[16] = strdup("HCONS");
+	fnames[17] = strdup("RULE-NAME");
 	return 0;
 }

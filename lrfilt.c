@@ -9,7 +9,7 @@ void	build_one_lr_filter(struct type	*lextype)
 {
 	int		ndg = 0, i, j, k, hei;
 	struct dg	**dg = 0, *res;
-	int		*height = 0;
+	int		*height = 0, nfit = 0;
 	struct qc	**qc = 0;
 	struct qc	*tqc, *rqc[nrules];
 	char		fit_rule[nrules];
@@ -33,7 +33,7 @@ void	build_one_lr_filter(struct type	*lextype)
 		for(j=0;j<nrules;j++)
 		{
 			hei = height[i] + 1;//rules[j]->ndaughters-1;
-			if(hei > 5)continue;
+			if(hei > 6)continue;
 			if(!quickcheck(qc[i], rqc[j]))
 			{
 				get_slabstate(&state);
@@ -63,22 +63,24 @@ void	build_one_lr_filter(struct type	*lextype)
 				dg[k] = res;
 				height[k] = hei;
 				qc[k] = tqc;
+				//print_dg(res);printf("\n");
 				if(!fit_rule[j])
 				{
 					fit_rule[j] = 1;
 					fprintf(stderr, "lextype `%s' fits in rule `%s'\n", lextype->name, rules[j]->name);
+					nfit++;
 				}
 			}
 		}
 	}
 	clear_slab();
-	fprintf(stderr, " -- built a total of %d constituents on top of `%s'\n", ndg, lextype->name);
+	fprintf(stderr, " -- built a total of %d constituents for %d/%d rules on top of `%s'\n", ndg, nfit, nrules, lextype->name);
 }
 
 void	build_lr_filter()
 {
-	struct type	*n_proper_le = lookup_type("n_proper_le");
+	struct type	*n_intr_le = lookup_type("n_intr_le");
 
-	if(!n_proper_le) { fprintf(stderr, "NOTE: lr-filter unable to find n_proper_le type\n"); exit(-1); }
-	build_one_lr_filter(n_proper_le);
+	if(!n_intr_le) { fprintf(stderr, "NOTE: lr-filter unable to find n_intr_le type\n"); exit(-1); }
+	build_one_lr_filter(n_intr_le);
 }
