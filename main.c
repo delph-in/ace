@@ -136,7 +136,7 @@ int	parse_line(char	*line)
 	char	*p, *w;
 	char	copy[10240];
 	char	*words[100];
-	int	nwords = 0;
+	int	nwords = 0, nparse = 0;
 
 	current_sentence = "(preparing)";
 	if(!*line)return -1;
@@ -179,5 +179,7 @@ int	parse_line(char	*line)
 
 	//printf("%d words\n", nwords);
 	current_sentence = (char*)trim_string(line);
-	return parse(nwords, words, current_sentence);
+	nparse = parse(nwords, words, current_sentence);
+	clear_slab();
+	return nparse;
 }
