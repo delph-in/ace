@@ -9,7 +9,7 @@ struct type
 	struct dg	*dg;	// indefeasible constraints
 	//struct type	*par, *parb;	// multiple inheritance, binary only
 	int		ndescendents;	// this could get long-ish! :-P
-	int		*descendents;	// we should probably do a bit vector
+	unsigned short	*descendents;	// we should probably do a bit vector
 
 	int		tnum;	// my type number
 };

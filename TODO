@@ -10,14 +10,14 @@ statistical parse selection?
 
 OPTIMIZATIONS:
 
-smarter ordering of agenda
-	- try setting priority of an edge as function(rule, lextype(from), lextype(to)), deal with lexical type ambiguity somehow :-P
-	- try giving higher priority to "longer" edges, -> form longer analyses more quickly
-		- may bias parser the wrong direction though
-hyperactive excursion?
+full subsumption packing
 
-key vs. head driven = "KEY-ARG" inside rule daughters
+hyperactive excursion
 
-pick cleverly between dg1 and dg2 as target in unify1
 
-optimize lexicon storage -- probably get down by several times in size
+
+(considered)
++ pick cleverly between dg1 and dg2 as target in unify1
++ optimize lexicon storage -- probably get down by several times in size
++ key vs. head driven = "KEY-ARG" inside rule daughters
+- smarter ordering of agenda

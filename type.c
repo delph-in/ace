@@ -139,9 +139,9 @@ void	add_descendent(struct type	*anc, int	dec)
 			if(dec < anc->descendents[i])break;
 	}
 	anc->ndescendents++;
-	anc->descendents = realloc(anc->descendents, sizeof(int)*anc->ndescendents);
+	anc->descendents = realloc(anc->descendents, sizeof(short)*anc->ndescendents);
 	if(i!=anc->ndescendents-1)
-		memmove(anc->descendents+i+1, anc->descendents+i, sizeof(int) * (anc->ndescendents-1-i));
+		memmove(anc->descendents+i+1, anc->descendents+i, sizeof(short) * (anc->ndescendents-1-i));
 	anc->descendents[i] = dec;
 }
 
@@ -294,7 +294,7 @@ void	fix_glbs()
 	if(fixes)free(fixes);
 }
 
-int	find_common_subtypes(struct type	*a, struct type	*b, int	*_glb_common)
+int	find_common_subtypes(struct type	*a, struct type	*b, unsigned short	*_glb_common)
 {
 	int	_glb_ncommon = 0, ia, ib;
 
@@ -321,7 +321,8 @@ int	find_common_subtypes(struct type	*a, struct type	*b, int	*_glb_common)
 
 int	check_for_glb(struct type	*a, struct type	*b)
 {
-	int	_glb_common[10000], _glb_ncommon;
+	unsigned short	_glb_common[10000];
+	int				_glb_ncommon;
 	int	ia, i, j, mi, resort, resort_key=-1;
 	struct type	*ar[2] = {a, b};
 	char	name[1024];
@@ -352,8 +353,8 @@ int	check_for_glb(struct type	*a, struct type	*b)
 
 	g = types[ntypes-1];
 	g->ndescendents = _glb_ncommon;
-	g->descendents = realloc(g->descendents, sizeof(int)*_glb_ncommon);
-	memcpy(g->descendents, _glb_common, sizeof(int)*_glb_ncommon);
+	g->descendents = realloc(g->descendents, sizeof(short)*_glb_ncommon);
+	memcpy(g->descendents, _glb_common, sizeof(short)*_glb_ncommon);
 
 	nfixes++;
 	fixes = realloc(fixes, sizeof(struct glb_fix)*nfixes);
@@ -394,14 +395,14 @@ int	check_for_glb(struct type	*a, struct type	*b)
 				if(resort_key != g->ndescendents-1)
 				{
 					fprintf(stderr, "WRONG: resort_key = %d / %d\n", resort_key, g->ndescendents);
-					qsort(g->descendents, g->ndescendents, sizeof(int), intcomp);
+					qsort(g->descendents, g->ndescendents, sizeof(short), intcomp);
 				}
 				else
 				{
 					// find out where 'mi' belongs and put it there
 					for(ia=0;ia<g->ndescendents-1;ia++)
 						if(mi < g->descendents[ia])break;
-					memmove(g->descendents+ia+1, g->descendents+ia, sizeof(int)*(g->ndescendents-1-ia));
+					memmove(g->descendents+ia+1, g->descendents+ia, sizeof(short)*(g->ndescendents-1-ia));
 					g->descendents[ia] = mi;
 				}
 			}
@@ -491,7 +492,7 @@ int	load_types()
 #else
 	char	*files[] = {	"../smallgrammars/esslli2k-grammar9/types.tdl" };
 #endif
-	int	i, j;
+	int	i, j, descbytes = 0;
 	struct timeval	tv1, tv2;
 	struct type	*block;
 
@@ -561,7 +562,9 @@ int	load_types()
 		//printf("well-forming `%s', current dag:\n", types[i]->name);
 		//print_dg(types[i]->dg); printf("\n");
 		wellform(types[i]->dg, types[i]->name);
+		descbytes += types[i]->ndescendents * sizeof(short);
 	}
+	fprintf(stderr, "%d bytes were needed for descendent arrays\n", descbytes);
 
 	return 0;
 }
