@@ -1,18 +1,11 @@
 TODO:
 
-fix lexicon builder to throw out duplicate lexemes
-
 record ersatzing
-improved MRS extractor
+improve MRS extractor
 
-make ambiguity packing work with semantics (and record packing)
-statistical parse selection?
+unpacking + statistical parse selection
 
 OPTIMIZATIONS:
-
-full subsumption packing
-
-hyperactive excursion
 
 
 
