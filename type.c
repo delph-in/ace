@@ -1,6 +1,7 @@
 #include	<stdio.h>
 #include	<string.h>
 #include	<stdlib.h>
+#include	<sys/time.h>
 
 #include	"tdl.h"
 #include	"type.h"

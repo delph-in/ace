@@ -153,25 +153,26 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
 	}
 	forwarded = (dg != dg_underef);
 
-	if(!dg->narcs && !dg->ncarcs && dg->type==dg->xtype &&
-		!((unsigned int)dg>=0x60000000 && (unsigned int)dg<0x70000000))goto share;
+	if(!dg->narcs && dg->type==dg->xtype &&
+		!((unsigned int)dg>=0x60000000 && (unsigned int)dg<0x70000000) && !dg->ncarcs)goto share;
+
+	// mark that we are inside this node, to detect cycles
+	dg->copy = dg;
 
 	get_slabstate(&state);
 
 	newcopy = slab_alloc(sizeof(struct dg));
-	*newcopy = *dg;
+	//*newcopy = *dg;
 	newcopy->xtype = newcopy->type = dg->type;
 	newcopy->class = _complex;
+	newcopy->carcs = 0;
 	newcopy->gen = generation;
 	newcopy->copy = 0;
 	newcopy->ncarcs = 0;
-	newcopy->carcs = 0;
 	newcopy->forward = 0;
 	newcopy->narcs = newcopy->aarcs = dg->narcs + dg->ncarcs;
 	aptr = newcopy->arcs = slab_alloc(sizeof(struct darc) * newcopy->aarcs);
 
-	// mark that we are inside this node, to detect cycles
-	dg->copy = dg;
 	for(i=0;i<dg->narcs;i++)
 	{
 		aptr->label = dg->arcs[i].label;
