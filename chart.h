@@ -31,8 +31,12 @@ struct edge
 
 struct chart_cell
 {
-	int		nedges;
-	struct edge	**edges;
+	int		p_nedges;
+	struct edge	**p_edges;
+	int		al_nedges;
+	struct edge	**al_edges;
+	int		ar_nedges;
+	struct edge	**ar_edges;
 };
 
 #define	LEX_PRIO	10

@@ -47,8 +47,14 @@ void	clear_chart(int	size)
 	if(cells)
 	{
 		for(i=0;i<chart_size*chart_size;i++)
-			if(cells[i].nedges)
-				free(cells[i].edges);
+		{
+			if(cells[i].p_nedges)
+				free(cells[i].p_edges);
+			if(cells[i].al_nedges)
+				free(cells[i].al_edges);
+			if(cells[i].ar_nedges)
+				free(cells[i].ar_edges);
+		}
 		free(cells);
 	}
 	clear_agenda();
@@ -67,13 +73,28 @@ int	next_eid() { return edge_id++; }
 void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge)
 {
 	//printf(" -- edge type %s, %d-%d\n", edge->rule?edge->rule->name:"lex", edge->from, edge->to);
-	cell->nedges++;
-	cell->edges = realloc(cell->edges, sizeof(struct edge*) * cell->nedges);
-	cell->edges[cell->nedges-1] = edge;
+	if(edge->have==edge->need)
+	{
+		cell->p_nedges++;
+		cell->p_edges = realloc(cell->p_edges, sizeof(struct edge*) * cell->p_nedges);
+		cell->p_edges[cell->p_nedges-1] = edge;
+		passive_edges++;
+	}
+	else if(edge->rtl)
+	{
+		cell->ar_nedges++;
+		cell->ar_edges = realloc(cell->ar_edges, sizeof(struct edge*) * cell->ar_nedges);
+		cell->ar_edges[cell->ar_nedges-1] = edge;
+	}
+	else
+	{
+		cell->al_nedges++;
+		cell->al_edges = realloc(cell->al_edges, sizeof(struct edge*) * cell->al_nedges);
+		cell->al_edges[cell->al_nedges-1] = edge;
+	}
 
 	total_edges++;
 	if(edge->to!=edge->from)real_edges++;
-	if(edge->need==edge->have)passive_edges++;
 }
 
 void	add_edge_to_chart(struct edge	*edge)
@@ -304,23 +325,20 @@ static int	pack_edge(struct edge	*edge)
 	//extern const int	qcbytes;
 
 	// since we're taking first-parse-only, this is ok perhaps.
-	for(i=0;i<c->nedges;i++)
-		if(c->edges[i]->need==c->edges[i]->have
-			&& !c->edges[i]->lex
-			&& c->edges[i]->dg->xtype == edge->dg->xtype
-			&& !equiv_quickcheck(c->edges[i]->qc, edge->qc)
-			//&& !memcmp(c->edges[i]->qc, edge->qc, qcbytes)
+	for(i=0;i<c->p_nedges;i++)
+		if(!c->p_edges[i]->lex
+		&& c->p_edges[i]->dg->xtype == edge->dg->xtype
+		&& !equiv_quickcheck(c->p_edges[i]->qc, edge->qc)
+		//&& !memcmp(c->p_edges[i]->qc, edge->qc, qcbytes)
 			)
 		{
-			if(equivalent_dg(c->edges[i]->dg, edge->dg))
+			if(equivalent_dg(c->p_edges[i]->dg, edge->dg))
 			{
-				//fprintf(stderr, "packed #%d in #%d!\n", edge->id, c->edges[i]->id);
-				//printf("host: "); print_dg(c->edges[i]->dg); printf("\n");
+				//fprintf(stderr, "packed #%d in #%d!\n", edge->id, c->p_edges[i]->id);
+				//printf("host: "); print_dg(c->p_edges[i]->dg); printf("\n");
 				//printf("pack: "); print_dg(edge->dg); printf("\n");
-				//printf("EQUIV = %d\n", equivalent_dg(c->edges[i]->dg, edge->dg));
+				//printf("EQUIV = %d\n", equivalent_dg(c->p_edges[i]->dg, edge->dg));
 				// XXX should record
-				if(edge->lex)printf("HUH? packed a lexical edge!\n");
-				if(c->edges[i]->lex)printf("HUH? packed into a lexical edge!\n");
 				return 1;
 			}
 		}
@@ -345,20 +363,14 @@ static int	process_edge(struct edge	*e)
 		for(i=0;i<=e->from;i++)
 		{
 			c = cells + e->from + i*chart_size;
-			for(j=0;j<c->nedges;j++)
-			{
-				if(c->edges[j]->need != c->edges[j]->have && !c->edges[j]->rtl)
-					if(fundamental_rule(c->edges[j], e) == -1)return -1;
-			}
+			for(j=0;j<c->al_nedges;j++)
+				if(fundamental_rule(c->al_edges[j], e) == -1)return -1;
 		}
 		for(i=e->to;i<chart_size;i++)
 		{
 			c = cells + i + e->to*chart_size;
-			for(j=0;j<c->nedges;j++)
-			{
-				if(c->edges[j]->need != c->edges[j]->have && c->edges[j]->rtl)
-					if(fundamental_rule(c->edges[j], e) == -1)return -1;
-			}
+			for(j=0;j<c->ar_nedges;j++)
+				if(fundamental_rule(c->ar_edges[j], e) == -1)return -1;
 		}
 	}
 	else
@@ -369,11 +381,8 @@ static int	process_edge(struct edge	*e)
 			for(i=0;i<=e->from;i++)
 			{
 				c = cells + e->from + i*chart_size;
-				for(j=0;j<c->nedges;j++)
-				{
-					if(c->edges[j]->need == c->edges[j]->have)
-						if(fundamental_rule(e, c->edges[j]) == -1)return -1;
-				}
+				for(j=0;j<c->p_nedges;j++)
+					if(fundamental_rule(e, c->p_edges[j]) == -1)return -1;
 			}
 		}
 		else
@@ -381,11 +390,8 @@ static int	process_edge(struct edge	*e)
 			for(i=e->to;i<chart_size;i++)
 			{
 				c = cells + i + e->to*chart_size;
-				for(j=0;j<c->nedges;j++)
-				{
-					if(c->edges[j]->need == c->edges[j]->have)
-						if(fundamental_rule(e, c->edges[j]) == -1)return -1;
-				}
+				for(j=0;j<c->p_nedges;j++)
+					if(fundamental_rule(e, c->p_edges[j]) == -1)return -1;
 			}
 		}
 	}
@@ -431,10 +437,10 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 #ifdef	FIRST_ONLY
 	if(sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
 #endif
-	num_entries = cells[chart_size-1].nedges;
+	num_entries = cells[chart_size-1].p_nedges;
 	for(i=0;i<num_entries;i++)
 	{
-		edge = cells[chart_size-1].edges[i];
+		edge = cells[chart_size-1].p_edges[i];
 		if(edge->have != edge->need)continue;	// only passive edges, please!
 		root = edge->dg;
 		if(!is_root(root))continue;
@@ -620,10 +626,9 @@ void	output_lui(char	*words[])
 
 	for(i=0;i<chart_size;i++)
 		for(j=0;j<chart_size;j++)
-			for(k=0;k<cells[j*chart_size + i].nedges;k++)
+			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
 			{
-				e = cells[j*chart_size + i].edges[k];
-				if(e->have != e->need)continue;
+				e = cells[j*chart_size + i].p_edges[k];
 				if(e->rule)
 				{
 					printf(" #E[%d %d %d %s %s", e->id, j, i, e->rule->name, e->rule->name);
