@@ -44,15 +44,22 @@ void	rule_stats()
 int	rule_is_rtl(struct rule	*r)
 {
 	struct dg	*hd = dg_hop(r->dg, lookup_fname("HEAD-DTR"));
-	struct dg	*args, *afirst;
+	struct type	*plus = lookup_type("+");
+	struct dg	*args, *asec, *afkey;
 
-	if(!hd)return 0;
+	if(!plus)return 0;
+	//if(!hd)return 0;
 	args = dg_hop(r->dg, lookup_fname("ARGS"));
 	if(!args)return 0;
-	afirst = dg_hop(args, lookup_fname("FIRST"));
-	if(!afirst)return 0;
+	args = dg_hop(args, lookup_fname("REST"));
+	if(!args)return 0;
+	asec = dg_hop(args, lookup_fname("FIRST"));
+	if(!asec)return 0;
+	afkey = dg_hop(asec, lookup_fname("KEY-ARG"));
+	// ARGS REST FIRST KEY-ARG
 
-	if(afirst!=hd)
+	//if(afkey && afkey->xtype == plus)
+	if(asec==hd)
 	{
 		//fprintf(stderr, "rule `%s' is right-to-left\n", r->name);
 		return 1;
@@ -169,7 +176,7 @@ int	load_rules_conf()
 		if(dir=='r')
 		{
 			//printf("rule `%s' should go RTL\n", name);
-			rules[i]->rtl = 1;
+			//rules[i]->rtl = 1;
 		}
 		if(hyper=='a')rnohyper[i] = 1;
 		rprio[i] = prio;
