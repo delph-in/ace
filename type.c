@@ -358,44 +358,51 @@ fix_glbs()
 	if(fixes)free(fixes);
 }
 
-check_for_glb(struct type	*a, struct type	*b)
+int	find_common_subtypes(struct type	*a, struct type	*b, int	*_glb_common)
 {
-	int	common[100000], nc = 0;
-	int	ia, ib, i, j, mi, resort;
-	struct type	*ar[2] = {a, b};
-	char	name[1024];
-	struct type	*g;
+	int	_glb_ncommon = 0, ia, ib;
 
 	ia = ib = 0;
 	while(ia < a->ndescendents && ib < b->ndescendents)
 	{
 		if(a->descendents[ia] == b->descendents[ib])
 		{
-			if((nc+1)*sizeof(int) >= sizeof(common))
+			if((_glb_ncommon+1) >= 10000)
 			{
 				fprintf(stderr, "too many common types for our buffer!\n");
 				exit(-1);
 			}
-			common[nc++] = a->descendents[ia];
+			_glb_common[_glb_ncommon++] = a->descendents[ia];
 			ia++;
 			ib++;
 		}
 		else if(a->descendents[ia] < b->descendents[ib])ia++;
 		else ib++;
 	}
+	return _glb_ncommon;
+}
 
-	if(nc==0)return 0;	// no types in common, no glb
-	if(nc==1)return 0;	// one type in common, it is the glb
+check_for_glb(struct type	*a, struct type	*b)
+{
+	int	_glb_common[10000], _glb_ncommon;
+	int	ia, ib, i, j, mi, resort, resort_key;
+	struct type	*ar[2] = {a, b};
+	char	name[1024];
+	struct type	*g;
 
-	// check each common descendent to see if it's the glb
-	for(i=0;i<nc;i++)
+	_glb_ncommon = find_common_subtypes(a, b, _glb_common);
+
+	if(_glb_ncommon==0)return 0;	// no types in common, no glb
+	if(_glb_ncommon==1)return 0;	// one type in common, it must be the glb
+
+	// check first common descendent to see if it's the glb
+	g = types[_glb_common[0]];
+	if(g->ndescendents == _glb_ncommon)
 	{
-		g = types[common[i]];
-		if(g->ndescendents != nc)continue;
-		for(j=0;j<nc;j++)
-			if(g->descendents[j] != common[j])
+		for(j=0;j<_glb_ncommon;j++)
+			if(g->descendents[j] != _glb_common[j])
 				break;
-		if(j==nc)return 0;	// this is the glb
+		if(j==_glb_ncommon)return 0;	// this is the glb
 	}
 
 	// no glb existed; make one!
@@ -403,12 +410,12 @@ check_for_glb(struct type	*a, struct type	*b)
 	add_type_only(name, 2, ar);
 	//printf("add `%s'\n", name);
 
-	common[nc++] = ntypes-1;	// a,b have a new common descendent
+	_glb_common[_glb_ncommon++] = ntypes-1;	// a,b have a new common descendent
 
 	g = types[ntypes-1];
-	g->ndescendents = nc;
-	g->descendents = realloc(g->descendents, sizeof(int)*nc);
-	memcpy(g->descendents, common, sizeof(int)*nc);
+	g->ndescendents = _glb_ncommon;
+	g->descendents = realloc(g->descendents, sizeof(int)*_glb_ncommon);
+	memcpy(g->descendents, _glb_common, sizeof(int)*_glb_ncommon);
 
 	nfixes++;
 	fixes = realloc(fixes, sizeof(struct glb_fix)*nfixes);
@@ -440,10 +447,24 @@ check_for_glb(struct type	*a, struct type	*b)
 			resort = 0;
 			for(ia=0;ia<g->ndescendents;ia++)
 			{
-				if(g->descendents[ia]==ntypes-1){resort=1;g->descendents[ia]=mi;}
+				if(g->descendents[ia]==ntypes-1){resort=1;resort_key = ia;g->descendents[ia]=mi;}
 				else if(g->descendents[ia]>=mi)g->descendents[ia]++;
 			}
-			if(resort)qsort(g->descendents, g->ndescendents, sizeof(int), intcomp);
+			if(resort && g->ndescendents>1)
+			{
+				// item "resort_key" is in the wrong place; fix it!
+				if(resort_key != g->ndescendents-1)
+				{
+					fprintf(stderr, "WRONG: resort_key = %d / %d\n", resort_key, g->ndescendents);
+				}
+				// find out where 'mi' belongs and put it there
+				for(ia=0;ia<g->ndescendents-1;ia++)
+					if(mi < g->descendents[ia])break;
+				memmove(g->descendents+ia+1, g->descendents+ia, sizeof(int)*(g->ndescendents-1-ia));
+				g->descendents[ia] = mi;
+				
+				//qsort(g->descendents, g->ndescendents, sizeof(int), intcomp);
+			}
 		}
 	}
 	glb_type_count++;
