@@ -170,7 +170,7 @@ int	load_rules_conf()
 			//printf("rule `%s' should go RTL\n", name);
 			rules[i]->rtl = 1;
 		}
-		if(hyper=='a')rnohyper[i] = 1;
+		//if(hyper=='a')rnohyper[i] = 1;
 		rprio[i] = prio;
 	}
 

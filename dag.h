@@ -41,6 +41,7 @@ void		add_dg_feature(struct dg	*d, char	*label, struct dg	*value);
 int		init_fnames();
 int		equivalent_dg(struct dg	*a, struct dg	*b);
 void		setup_extra_type_dgs();
+void		setup_carcs_stack();
 
 // for hyperactive parsing
 int		unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg);

@@ -85,7 +85,7 @@ void	add_edge_to_chart(struct edge	*edge)
 
 int	trace = 0, gen_qc = 0;
 
-int	build_edge(struct edge	*a, struct edge	*b, int	arg)
+int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force_noha)
 {
 	struct edge	*e;
 	struct dg	*u;
@@ -98,7 +98,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg)
 	if(nhave == nneed)
 	{
 		// building passive
-		u = finalize_tmp(a->dg);
+		u = finalize_tmp(dg);
 		if(!u)return -1;	// cycles might happen, check for them.
 		e = slab_alloc(sizeof(struct edge));
 		e->qc = extract_qc_arg(u, -1);
@@ -107,12 +107,12 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg)
 	else
 	{
 		// building active
-		if(!rnohyper[a->rule->rnum])
+		if(!rnohyper[a->rule->rnum] && !force_noha)
 		{
 			// hyperactive
-			//if(check_cycles(a->dg))return -1;
+			//if(check_cycles(dg))return -1;
 			__qc_use_heap = 1;
-			hqc = extract_qc_arg(a->dg, a->rtl?(nneed-nhave-1):nhave);
+			hqc = extract_qc_arg(dg, a->rtl?(nneed-nhave-1):nhave);
 			__qc_use_heap = 0;
 			forget_tmp();
 			qc = copy_qc(hqc);
@@ -123,15 +123,16 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg)
 		else
 		{
 			// standard active
-			u = finalize_tmp(a->dg);
+			u = finalize_tmp(dg);
 			if(!u)return -1;	// cycles might happen, check for them.
 			qc = extract_qc_arg(u, a->rtl?(nneed-nhave-1):nhave);
 		}
 		e = slab_alloc(sizeof(struct edge));
 		e->dg = u;
-		e->ha_par = a->dg;
+		e->ha_par = dg;
 		e->ha_dg = b->dg;
 		e->ha_arg = arg;
+		e->ha_use = 0;
 		e->qc = qc;
 		//printf("active qc %p (copy of %p)\n", e->qc, qc);
 	}
@@ -207,7 +208,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg)
 
 static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 {
-	int	remain, arg;
+	int	remain, arg, force_noha = 0;
+	struct dg	*rdg;
 
 	if(a->have==-1)return 0;
 
@@ -238,26 +240,38 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 	if(!a->dg)
 	{
 		// hyperactive parsing: we don't save active edges' dg's until they're actually used
-		a->dg = unify_dg(a->ha_dg, a->ha_par, a->ha_arg);
-		if(!a->dg)
-		{
-			// latent cycle detection
-			// this doesn't seem to happen... not sure why?
-			// update: it has happened at least once
-			fprintf(stderr, "NOTE: hyperactive: latent cycle\n");
-			a->have = -1;
-			return 0;
-			//fprintf(stderr, "hyperactive: rescheduled unify failed!\n");
-			//exit(-1);
-		}
 		nrecomb[a->rule->rnum]++;
+		if(a->ha_use > 2)
+		{
+			a->dg = unify_dg(a->ha_dg, a->ha_par, a->ha_arg);
+			if(!a->dg)
+			{
+				// latent cycle detection
+				// this doesn't seem to happen... not sure why?
+				// update: it has happened at least once
+				fprintf(stderr, "NOTE: hyperactive: latent cycle\n");
+				a->have = -1;
+				return 0;
+				//fprintf(stderr, "hyperactive: rescheduled unify failed!\n");
+				//exit(-1);
+			}
+			rdg = a->dg;
+		}
+		else
+		{
+			unify_dg_tmp(a->ha_dg, a->ha_par, a->ha_arg);
+			rdg = a->ha_par;
+			force_noha = 1;
+			a->ha_use++;
+		}
 	}
+	else rdg = a->dg;
 	//printf("recombine %s\n", a->rule->name);
 
-	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, a->dg->xtype->name, arg);
-	if(!unify_dg_tmp(b->dg, a->dg, arg))
+	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, rdg->xtype->name, arg);
+	if(!unify_dg_tmp(b->dg, rdg, arg))
 	{
-		if(build_edge(a, b, arg) == -2)return -1;
+		if(build_edge(a, b, arg, rdg, force_noha) == -2)return -1;
 		if(noldslabs >= MAX_CHUNKS)
 		{
 			fprintf(stderr, "NOTE: terminating search, too much RAM\n");
@@ -277,7 +291,7 @@ static int	pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	int			i;
-	extern const int	qcbytes;
+	//extern const int	qcbytes;
 
 	// since we're taking first-parse-only, this is ok perhaps.
 	for(i=0;i<c->nedges;i++)

@@ -445,6 +445,11 @@ struct darc	*realloc_carcs(struct darc	*ptr, int	old, int	new)
 	}
 }
 
+void	setup_carcs_stack()
+{
+	carcstack = malloc(sizeof(struct darc)*CSDEPTH);
+}
+
 void	setup_extra_type_dgs()
 {
 	clear_slab();
@@ -454,7 +459,6 @@ void	setup_extra_type_dgs()
 	extra_substcons = copy_dg(substcons->dg);
 	anti_synsem = lookup_type("anti_synsem");
 	extra_anti_synsem = copy_dg(anti_synsem->dg);
-	carcstack = slab_alloc(sizeof(struct darc)*CSDEPTH);
 	commit_slab();
 }
 

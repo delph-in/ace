@@ -56,6 +56,7 @@ int	main(int	argc, char	*argv[])
 	FILE	*fin;
 
 	parse_args(argc, argv);
+	setup_carcs_stack();
 
 	gettimeofday(&tv1, 0);
 	if(load_grammar_path)load_frozen_grammar(load_grammar_path);

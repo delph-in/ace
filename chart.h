@@ -18,8 +18,9 @@ struct edge
 
 	unsigned	rtl:1,used:1;	// right-to-left instantiation? active been used?
 	unsigned	prio:4;
+	unsigned	ha_use:4;	// how many times have we beensummoned?
 	// what dg to unify in to reconstruct this active edge's dg
-	char		ha_arg;
+	char		ha_arg:4;
 	struct dg	*ha_dg, *ha_par;
 };
 
