@@ -90,6 +90,7 @@ int	main(int	argc, char	*argv[])
 		return 0;
 	}
 
+	//build_lr_filter();
 	//print_rule("nadj_rr_nt");
 	//print_type("v_np*_trans_le");
 	//print_type("np_trans_subst");

@@ -87,15 +87,18 @@ int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to)
 	return 0;
 }
 
-int	reduce_chart()
+int	reduce_chart(int	length)
 {
 	struct task	*t1, *t2;
 	struct queue	*lag = &agenda[LEX_PRIO];
+	char		cover[length];
+	int		i;
 
+	bzero(cover, length);
 	for(t1=lag->start;t1;t1=t1->next)
 	{
 		assert(t1->edge->lex);
-		if(!t1->edge->lex->select)continue;
+		if(!t1->edge->lex->select)goto kept;
 		//printf("%s selects %s\n", t1->edge->lex->word, t1->edge->lex->select->name);
 		for(t2=lag->start;t2;t2=t2->next)
 		{
@@ -111,7 +114,23 @@ int	reduce_chart()
 			if(t1==lag->start)lag->start = t1->next;
 			if(t1==lag->end)lag->end = t1->prev;
 		}
-		//else printf("provided by %s with pred %s\n", t2->edge->lex->word, t2->edge->lex->pred->name);
+		else
+		{
+			//printf("provided by %s with pred %s\n", t2->edge->lex->word, t2->edge->lex->pred->name);
+			kept:
+			for(i=t1->edge->from;i<t1->edge->to;i++)
+				cover[i] = 1;
+		}
 	}
+
+	// check that lexemes cover the whole span;
+	// if not we have no chance of building a spanning analysis.
+	for(i=0;i<length;i++)
+		if(!cover[i])
+		{
+			fprintf(stderr, "NOTE: lexemes do not span!\n");
+			return -1;
+		}
+
 	return 0;
 }

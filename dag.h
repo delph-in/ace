@@ -95,6 +95,8 @@ static inline void	set_slabstate(struct slab_state	*s)
 	slabu = s->slabu;
 }
 
+static inline	void	*slab_alloc(int	len) __attribute__ ((malloc));
+
 static inline	void	*slab_alloc(int	len)
 {
 	extern void	*last, *slab;

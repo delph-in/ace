@@ -25,6 +25,8 @@ void	number_strings();
 int		load_types();
 void	wellform(struct dg	*d, char	*typename);
 
+static inline struct type	*glb(struct type	*a, struct type	*b) __attribute__ ((pure));
+
 static inline struct type	*glb(struct type	*a, struct type	*b)
 {
 	int					x=0, y=0;

@@ -25,10 +25,12 @@ int			load_rules();
 int			load_roots();
 int			is_root(struct dg	*dg);
 
+extern int		nrules;
+extern struct rule	**rules;
+
 static inline int	check_rf(struct rule	*m, struct rule	*d, int	arg)
 {
 	char	byte;
-	extern int	nrules;
 	extern char	*rule_filter;
 
 	byte = rule_filter[m->rnum*nrules + d->rnum];

@@ -31,6 +31,7 @@ void	print_rel(struct dg	*rel);
 void	unfold_edge(struct edge	*e);
 
 #define	MAX_CHUNKS	680	// when to give up on a parse
+//#define	MAX_CHUNKS	64	// when to give up on a parse
 #define	FIRST_ONLY
 
 void	clear_chart(int	size)
@@ -381,7 +382,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	// setup the chart
 	clear_chart(nwords+1);
 	if(add_lexemes_to_chart(nwords, words))return -1;
-	if(reduce_chart())return 0;
+	if(reduce_chart(nwords))return 0;
 
 	agenda_rules(nwords+1);
 

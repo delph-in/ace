@@ -13,6 +13,10 @@ make duplicate sentence detector
 OPTIMIZATIONS:
 
 smarter ordering of agenda
+	- try setting priority of an edge as function(rule, lextype(from), lextype(to)), deal with lexical type ambiguity somehow :-P
+	- try giving higher priority to "longer" edges, -> form longer analyses more quickly
+		- may bias parser the wrong direction though
 hyperactive excursion?
 filter for "first" and "last" of each rule by lexical type
-when chart reduction leaves gaps, kill the parse (rare?)
+
+fix small-lexicon chart reduce parameters
