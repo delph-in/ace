@@ -18,7 +18,7 @@ int	rprio[1000], rnohyper[1000];
 
 struct qc	**ruleqc;
 
-rule_stats()
+void	rule_stats()
 {
 	int	i;
 	int	nact = 0, npass = 0, nrec = 0, nhact = 0;
@@ -58,7 +58,7 @@ int	rule_is_rtl(struct rule	*r)
 	}
 }
 
-setup_rule_filter()
+void	setup_rule_filter()
 {
 	int	i, j, k;
 	struct rule	*m, *d;
@@ -74,7 +74,7 @@ setup_rule_filter()
 		m = rules[i];
 		if(m->ndaughters>8)
 		{
-			fprintf(stderr, "ERROR: rule `%s' takes %d daughters!\n", m->name);
+			fprintf(stderr, "ERROR: rule `%s' takes %d daughters!\n", m->name, m->ndaughters);
 			exit(-1);
 		}
 		mdg = copy_dg(m->dg);	// necessary for the case when we try to unify a rule into itself!
@@ -133,7 +133,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 	return e;
 }
 
-load_rules_conf()
+int	load_rules_conf()
 {
 	FILE	*f = fopen("rules.conf", "r");
 	char	dir, hyper;
@@ -169,6 +169,7 @@ load_rules_conf()
 	}
 
 	fclose(f);
+	return 0;
 }
 
 void	agenda_rules(int	count)
@@ -219,7 +220,7 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 
 int	study_rule(char	*name, struct dg	*dg)
 {
-	int	i, num = 0;
+	int	num = 0;
 	struct dg	*p;
 
 	p = dg_hop(dg, 0);	// ARGS
@@ -233,13 +234,12 @@ int	study_rule(char	*name, struct dg	*dg)
 	return 0;
 }
 
-print_rule(char	*name)
+void	print_rule(char	*name)
 {
-	struct rule	*rule;
 	int	i;
 
 	for(i=0;i<nrules;i++)if(!strcasecmp(rules[i]->name, name))break;
-	if(i>=nrules)return -1;
+	if(i>=nrules)return;
 
 	printf("rule `%s':\n", name);
 	print_dg(rules[i]->dg);printf("\n");
@@ -247,7 +247,7 @@ print_rule(char	*name)
 
 int	study_lrule(char	*name, struct dg	*dg)
 {
-	int	i, num = 0;
+	int	num = 0;
 	struct dg	*p;
 
 	p = dg_hop(dg, 0);	// ARGS
@@ -285,7 +285,7 @@ int	load_rules()
 }
 
 // output rule filter left daughter graph as a .dot file
-dot_rf(char	*fname)
+void	dot_rf(char	*fname)
 {
 	int	i, j;
 	FILE	*f = fopen(fname, "w");
@@ -301,13 +301,8 @@ dot_rf(char	*fname)
 	fclose(f);
 }
 
-lex_filter_rules()
-{
-	lex_filter_rule(rules[5]);
-}
-
 // compute the set of rules which can appear as the first constituent of this rule, somewhere down the left edge of the subtree
-lex_filter_rule(struct rule	*r)
+void	lex_filter_rule(struct rule	*r)
 {
 	char	*table;
 	int	i, j, n, tot = 1;
@@ -332,4 +327,9 @@ lex_filter_rule(struct rule	*r)
 	for(i=0;i<nrules;i++) if(table[i]) printf("%s\n", rules[i]->name);
 
 	free(table);
+}
+
+void	lex_filter_rules()
+{
+	lex_filter_rule(rules[5]);
 }

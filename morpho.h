@@ -17,6 +17,8 @@ struct irule
 	}	*irregs;
 };
 
-int	add_lexemes_to_chart(int	nwords, char	**words);
+int		add_lexemes_to_chart(int	nwords, char	**words);
+void	setup_morpho(char	*line);
+int		load_inflr();
 
 #endif

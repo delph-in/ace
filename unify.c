@@ -4,11 +4,6 @@
 #include	<stdlib.h>
 #include	"dag.h"
 
-void		*slab_alloc(int	size);
-void		*slab_realloc(void	*ptr, int	old, int	new);
-struct type	*glb(struct type	*a, struct type	*b);
-void	print_dg(struct dg	*d);
-
 extern char	**fnames;
 extern int	g_loaded;
 
@@ -175,22 +170,22 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	st = 0;
 	for(i=0;i<dg->narcs;i++)
 	{
-		aptr->label = dg->arcs[i].label;
+		aptr->label = dg->arcs[(int)i].label;
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
 		//		fnames[aptr->label], newcopy->type->name, dg->arcs[i].dest);
 		ch = 0;
-		aptr->dest = copy_dg_with_comp_arcs_ss(dg->arcs[i].dest, &ch);
+		aptr->dest = copy_dg_with_comp_arcs_ss(dg->arcs[(int)i].dest, &ch);
 		if(ch)st = 1;
 		if(!aptr->dest)return 0;
 		aptr++;
 	}
 	for(i=0;i<dg->ncarcs;i++)
 	{
-		aptr->label = dg->carcs[i].label;
+		aptr->label = dg->carcs[(int)i].label;
 		//fprintf(stderr, "copying comp `%s' arc from %s to %p\n",
 		//	fnames[aptr->label], newcopy->type->name, dg->carcs[i].dest);
 		ch = 0;
-		aptr->dest = copy_dg_with_comp_arcs_ss(dg->carcs[i].dest, &ch);
+		aptr->dest = copy_dg_with_comp_arcs_ss(dg->carcs[(int)i].dest, &ch);
 		if(ch)st = 1;
 		if(!aptr->dest)return 0;
 		aptr++;
@@ -219,7 +214,7 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
 	struct darc	*aptr;
-	int		i, ch = 0;
+	int		i;
 
 	dg = dereference_dg(dg);
 	if(!dg)return 0;
@@ -427,8 +422,8 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 static int	unify1(struct dg	*dg1, struct dg	*dg2)
 {
 	int	i, j, k;
-	unsigned char	news[256], nn=0, nn2=0;
-	unsigned char	newcs[256], nc=0, nc2=0;
+	unsigned char	news[256], nn=0;
+	unsigned char	newcs[256], nc=0;
 	struct type	*t, *t1, *t2;
 	struct dg	*extra=0;
 

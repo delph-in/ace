@@ -1,7 +1,12 @@
 #include	<stdio.h>
 #include	<sys/time.h>
-#include	<getopt.h>
+#include	<unistd.h>
+#include	<string.h>
 #include	"chart.h"
+#include	"net.h"
+#include	"freeze.h"
+#include	"rule.h"
+#include	"lexicon.h"
 
 int	debug_level = 1, export_parts = 0;
 char	*save_grammar_path = 0;
@@ -11,7 +16,11 @@ char	*sentence_path = 0;
 extern int	g_loaded;
 extern long long	accum_ram_usage;
 
-parse_args(int	argc, char	*argv[])
+char	*current_sentence = "(not initialized)";
+
+int	parse_line(char	*line);
+
+void	parse_args(int	argc, char	*argv[])
 {
 	char	*prog = argv[0], ch;
 
@@ -36,9 +45,9 @@ parse_args(int	argc, char	*argv[])
 	}
 }
 
-main(int	argc, char	*argv[])
+int	main(int	argc, char	*argv[])
 {
-	int	num_parses, i, success = 0, fail = 0, count = 0;
+	int	num_parses, success = 0, fail = 0, count = 0;
 	struct timeval	tv1, tv2;
 	char	line[10240];
 	FILE	*fin;
@@ -94,6 +103,8 @@ main(int	argc, char	*argv[])
 		}
 	}
 
+	signal(SIGSEGV, print_current_sentence);
+	signal(SIGBUS, print_current_sentence);
 	gettimeofday(&tv1, 0);
 	while(!feof(fin) && fgets(line, 10240, fin))
 	{
@@ -109,11 +120,12 @@ main(int	argc, char	*argv[])
 	tv2.tv_usec -= tv1.tv_usec;
 	if(count)
 	{
-		fprintf(stderr, "NOTE: parsed %d / %d sentences, avg %dk, time %.5fs\n", success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+		fprintf(stderr, "NOTE: parsed %d / %d sentences, avg %dk, time %.5fs\n",
+			success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
 		rule_stats();
 	}
 
-	if(num_parses<=0)return -1;
+	if(success<=0 && count>0)return -1;
 	else return 0;
 }
 
@@ -124,6 +136,7 @@ int	parse_line(char	*line)
 	char	*words[100];
 	int	nwords = 0;
 
+	current_sentence = "(preparing)";
 	if(!*line)return -1;
 	if(!strncmp(line, "<DOC", 4))
 	{
@@ -163,5 +176,6 @@ int	parse_line(char	*line)
 	}
 
 	//printf("%d words\n", nwords);
-	return parse(nwords, words, trim_string(line));
+	current_sentence = (char*)trim_string(line);
+	return parse(nwords, words, current_sentence);
 }

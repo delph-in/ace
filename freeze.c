@@ -1,5 +1,7 @@
 #include	<stdio.h>
+#include	<string.h>
 #include	<sys/fcntl.h>
+#include	<sys/types.h>
 #include	<sys/mman.h>
 #include	<unistd.h>
 #include	<stdlib.h>
@@ -8,6 +10,7 @@
 #include	"rule.h"
 #include	"morpho.h"
 #include	"lexicon.h"
+#include	"freeze.h"
 
 void		**oldslabs;
 int		noldslabs, aoldslabs, currslabsize;
@@ -111,7 +114,6 @@ struct irule	*freeze_irule(struct irule	*irin)
 struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 {
 	struct lexeme	*lout = slab_alloc(sizeof(struct lexeme));
-	int		i;
 
 	lout->dg = lin->dg;	// NOTE: this is frozen *later*, for file layout reasons
 	lout->word = freeze_string(lin->word);
@@ -123,7 +125,7 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 	return lout;
 }
 
-int	patch_dg(struct dg	*dg)
+void	patch_dg(struct dg	*dg)
 {
 	int	i;
 
@@ -234,38 +236,12 @@ int	freeze_grammar()
 	strcat(G->message, "english resource grammar (erg)\n");
 
 	commit_slab();
+	return 0;
 }
 
 int	loaded_freeze_fd = -1, loaded_freeze_size;
 
-void	reload_frozen_grammar()
-{
-	if(loaded_freeze_fd==-1)
-	{
-		fprintf(stderr, "can't reload_frozen_grammar(), since no freeze is currently loaded!\n");
-		exit(-1);
-	}
-	munmap((void*)0x60000000, loaded_freeze_size);
-	null_generation();
-	load_freeze();
-}
-
-// load flat blocks grammar file
-int	load_frozen_grammar(char	*path)
-{
-	int	freeze_fd = open(path, O_RDONLY);
-	int	len;
-
-	if(freeze_fd<0) { perror(path); exit(-1); }
-
-	len = lseek(freeze_fd, 0, SEEK_END);
-	lseek(freeze_fd, 0, SEEK_SET);
-	loaded_freeze_fd = freeze_fd;
-	loaded_freeze_size = len;
-	return load_freeze();
-}
-
-int	load_freeze()
+static int	load_freeze()
 {
 	struct grammar	*G;
 	int		i;
@@ -317,6 +293,33 @@ int	load_freeze()
 	return 0;
 }
 
+void	reload_frozen_grammar()
+{
+	if(loaded_freeze_fd==-1)
+	{
+		fprintf(stderr, "can't reload_frozen_grammar(), since no freeze is currently loaded!\n");
+		exit(-1);
+	}
+	munmap((void*)0x60000000, loaded_freeze_size);
+	null_generation();
+	load_freeze();
+}
+
+// load flat blocks grammar file
+int	load_frozen_grammar(char	*path)
+{
+	int	freeze_fd = open(path, O_RDONLY);
+	int	len;
+
+	if(freeze_fd<0) { perror(path); exit(-1); }
+
+	len = lseek(freeze_fd, 0, SEEK_END);
+	lseek(freeze_fd, 0, SEEK_SET);
+	loaded_freeze_fd = freeze_fd;
+	loaded_freeze_size = len;
+	return load_freeze();
+}
+
 void	*freeze_point = 0, *freeze_next;
 int	freeze_fd;
 
@@ -337,9 +340,10 @@ int	setup_save_frozen_grammar(char	*path)
 	//fprintf(stderr, "we got %p\n", freeze_point);
 	freeze_next = freeze_point;
 	currslabsize = 0x10000000;
+	return 0;
 }
 
-dump_grammar()
+void	dump_grammar()
 {
 	int	i;
 

@@ -1,9 +1,12 @@
 #include	<stdlib.h>
 #include	<stdio.h>
+#include	<string.h>
 
 #include	"chart.h"
 #include	"rule.h"
 #include	"lexicon.h"
+#include	"freeze.h"
+#include	"morpho.h"
 
 int			chart_size;
 struct chart_cell	*cells;
@@ -19,12 +22,15 @@ extern int	rnohyper[1000];
 
 struct edge	*sentential = 0;
 
+void	print_sem(struct dg	*dg);
+void	print_rel(struct dg	*rel);
+
 #define	MAX_CHUNKS	680	// when to give up on a parse
 #define	FIRST_ONLY
 
 void	clear_chart(int	size)
 {
-	int	i, j;
+	int	i;
 	extern unsigned int	generation;
 
 	// guard against generation overflow;
@@ -353,7 +359,7 @@ int	is_root(struct dg	*d);
 
 int	parse(int	nwords, char	*words[], char	*sentence)
 {
-	int		i, j, k;
+	int		i;
 	int		num_parses = 0, num_entries;
 	struct dg	*root;
 	struct dg	*sem;
@@ -371,7 +377,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	// show analyses
 #ifdef	FIRST_ONLY
-	if(sentential) { edge = sentential; root = edge->dg; goto show; }
+	if(sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
 #endif
 	num_entries = cells[chart_size-1].nedges;
 	for(i=0;i<num_entries;i++)
@@ -418,7 +424,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	return num_parses;
 }
 
-unfold_edge(struct edge	*e)
+void	unfold_edge(struct edge	*e)
 {
 	int	i;
 
@@ -441,7 +447,7 @@ int	skolemize(struct dg	*index)
 	return index->ncarcs;
 }
 
-print_sem(struct dg	*dg)
+void	print_sem(struct dg	*dg)
 {
 	int	idx;
 	struct dg	*list, *rel, *hook;
@@ -475,7 +481,7 @@ print_sem(struct dg	*dg)
 	}
 }
 
-print_rel(struct dg	*rel)
+void	print_rel(struct dg	*rel)
 {
 	int		i, idx, narg;
 	char		afeat[32];

@@ -2,10 +2,13 @@
 #include	<stdlib.h>
 #include	<string.h>
 
-extern char	*trim_string(char	*str);
+int	add_lexemes_to_chart_for_form(int	x, char	*form);
+int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem);
 
 #include	"rule.h"
+#include	"chart.h"
 #include	"morpho.h"
+#include	"tdl.h"
 
 int		nirules;
 struct irule	**irules;
@@ -96,7 +99,7 @@ void	set_lgroup(int	group, char	*letters)
 	}
 	lgroups[group] = calloc(256, sizeof(char));
 	while(*letters)
-		lgroups[group][*letters++] = 1;
+		lgroups[group][(int)*letters++] = 1;
 }
 
 void	setup_morpho(char	*line)
@@ -152,7 +155,7 @@ int	appropriate_letter(int	let, int	group)
 
 int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem)
 {
-	int	i, let;
+	int	let;
 	int	len = strlen(form)-1, len2 = strlen(rep)-1;
 	char	letters[256];
 
@@ -163,7 +166,7 @@ int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem)
 		{
 			if(appropriate_letter(let, rep[len2]))
 			{
-				letters[rep[len2]] = let;
+				letters[(int)rep[len2]] = let;
 				len2-=2;
 			}
 			else break;
@@ -183,7 +186,7 @@ int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem)
 				*stem++ = *pat++;
 			else
 			{
-				*stem++ = letters[pat[1]];
+				*stem++ = letters[(int)pat[1]];
 				pat+=2;
 			}
 		}
@@ -297,8 +300,7 @@ int	load_irregulars(char	*path)
 {
 	FILE	*f = fopen(path, "r");
 	char	line[1024], copy[1024];
-	char	*form, *rule, *stem;
-	char	*p;
+	char	*form =0 , *rule =0 , *stem =0 ;
 	struct irule	*ir;
 
 	if(!f) { perror(path); return -1; }

@@ -44,10 +44,9 @@ int	wstrcmp(char	*a, char	*b)
 
 int	add_multilexemes_to_chart(int	x, int	nwords, char	**words)
 {
-	struct lexeme	*lex;
-	int		num=0, let = 0;
-	char		stemcmp[1024], extracmp[1024];
-	int		i, j, k, r;
+	int		num=0;
+	char	stemcmp[1024], extracmp[1024];
+	int		i, j, k, r = -1;
 	int		max = 0;
 
 	if(nwords<2)return 0;
@@ -100,10 +99,9 @@ int	add_multilexemes_to_chart(int	x, int	nwords, char	**words)
 
 int	add_lexemes_to_chart_for_stem(int	x, char	*stem)
 {
-	struct lexeme	*lex;
-	int		num=0, let = 0;
+	int		num=0;
 	char		stemcmp[1024];
-	int		i, j, k, r;
+	int		i, j, k, r = -1;
 
 	sprintf(stemcmp, "\"%s\"", stem);
 
@@ -140,7 +138,7 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem)
 void	dump_parts_of_speech()
 {
 	FILE	*f = popen("uniq", "w");
-	struct dg	*synsem, *lkeys, *keyrel;
+	struct dg	*synsem, *lkeys, *keyrel = 0;
 	struct dg	*pred, *carg;
 	int		synsemf = lookup_fname("SYNSEM");
 	int		lkeysf = lookup_fname("LKEYS");
@@ -194,7 +192,6 @@ void	dump_parts_of_speech()
 void	add_lexeme(char	*word, struct dg	*dg)
 {
 	struct lexeme	*l = malloc(sizeof(struct lexeme));
-	int	i;
 	struct dg	*stem, *str;
 	static int	sfeat = -1, rfeat = 2, ffeat = 1;
 

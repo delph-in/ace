@@ -1,5 +1,9 @@
 #include	<sys/types.h>
 #include	<sys/socket.h>
+#include	<unistd.h>
+#include	<stdlib.h>
+#include	<string.h>
+#include	<stdio.h>
 #define		BSD_COMP	1
 #include	<sys/ioctl.h>
 #include	<netinet/in.h>
@@ -8,7 +12,19 @@
 
 #define	PORT	9977
 
-connect_to_master(char	*hostname)
+int	saved_termerr = 2;
+
+void	print_current_sentence(int	sig)
+{
+	extern	char	*current_sentence;
+
+	write(saved_termerr, "DEADLY SIGNAL! sent = `", strlen("DEADLY SIGNAL! sent = `"));
+	write(saved_termerr, current_sentence, strlen(current_sentence));
+	write(saved_termerr, "'\n", 2);
+	exit(-1);
+}
+
+void	connect_to_master(char	*hostname)
 {
 	int	s = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	struct hostent	*he;
@@ -30,6 +46,7 @@ connect_to_master(char	*hostname)
 
 	//printf("connected.\n");
 
+	saved_termerr = dup(2);
 	close(0); close(1); close(2);
 	dup2(s, 0);
 	dup2(s, 1);

@@ -27,7 +27,7 @@ long long	accum_ram_usage = 0;
 int	upath[1024];
 int	upathl;
 
-print_slab_stats()
+void	print_slab_stats()
 {
 	fprintf(stderr, "%d complete slabs, %dkbytes in working slab\n", noldslabs-1, slabu/1024);
 }
@@ -53,8 +53,6 @@ void	commit_slab()
 
 void	clear_slab()
 {
-	int	i;
-
 	if(freeze_next)
 	{
 		noldslabs = 0;
@@ -273,9 +271,8 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 	}
 }
 
-introduce_feature(int	label, int	type)
+void	introduce_feature(int	label, int	type)
 {
-
 	if(introduce[label]==-1 || introduce[label] > type)
 	{
 		introduce[label] = type;
@@ -297,7 +294,7 @@ int	lookup_fname(char	*label)
 	return i;
 }
 
-int	unify_backtrace()
+void	unify_backtrace()
 {
 	int	i;
 

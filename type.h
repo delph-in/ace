@@ -1,6 +1,8 @@
 #ifndef	_TYPE_H
 #define	_TYPE_H
 
+#include	<stdlib.h>
+
 struct type
 {
 	char		*name;
@@ -14,10 +16,17 @@ struct type
 
 struct type	*get_top();
 struct type	*lookup_type(char	*name);
+char	*trim_string(char	*str);
+int	descendent_of(int	dec, struct type	*of);
+void	inval_thash();
+void	setup_glb_lut();
+int	add_type_only(char	*name, int	npar, struct type	**par);
+void	number_strings();
+int		load_types();
 
 static inline struct type	*glb(struct type	*a, struct type	*b)
 {
-	int		x, y;
+	int					x=0, y=0;
 	extern struct type	*full_glb_calc(struct type	*a, struct type	*b, int	x, int	y);
 	extern short		**glb_lut;
 	extern struct type	*strtype, **types;

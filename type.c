@@ -96,14 +96,14 @@ struct type	*lookup_type(char	*name)
 	return 0;
 }
 
-print_type(char	*name)
+void	print_type(char	*name)
 {
 	struct type	*t = lookup_type(name);
 
 	if(!t)
 	{
 		fprintf(stderr, "print_type: `%s' doesn't exist\n", name);
-		return -1;
+		return;
 	}
 	printf("type `%s': ", name);
 	print_dg(t->dg);
@@ -128,7 +128,7 @@ int	descendent_of(int	dec, struct type	*of)
 	return dec == of->descendents[i];
 }
 
-int	add_descendent(struct type	*anc, int	dec)
+void	add_descendent(struct type	*anc, int	dec)
 {
 	int	i;
 
@@ -178,7 +178,7 @@ struct type	*add_string(char	*name)
 	return t;
 }
 
-number_strings()
+void	number_strings()
 {
 	int	i;
 
@@ -187,7 +187,7 @@ number_strings()
 
 int	add_type_only(char	*name, int	npar, struct type	**par)
 {
-	struct type	*t, *g;
+	struct type	*t;
 	int		i, pari;
 
 	for(i=0;i<ntypes;i++)
@@ -231,9 +231,9 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 short		**glb_lut;
 extern int		g_loaded;
 
-setup_glb_lut()
+void	setup_glb_lut()
 {
-	int	i, j, ind = 0;
+	int	i, ind = 0;
 	short	*data;
 
 	glb_lut = calloc(sizeof(short*), ntypes);
@@ -272,7 +272,6 @@ int	intcomp(const void	*a, const void	*b) { return *(int*)a - *(int*)b; }
 int	constrain_type(char	*name, struct dg	*dg)
 {
 	struct type	*type = lookup_type(name);
-	int		i;
 
 	if(!type)
 	{
@@ -295,7 +294,7 @@ static struct glb_fix
 }		*fixes;
 static int	nfixes;
 
-constrain_glb_type(struct type	*g)
+int	constrain_glb_type(struct type	*g)
 {
 	int		i;
 	struct glb_fix	*f;
@@ -319,9 +318,10 @@ constrain_glb_type(struct type	*g)
 		unify_backtrace();
 		exit(-1);
 	}
+	return 0;
 }
 
-fix_glbs()
+void	fix_glbs()
 {
 	int	i;
 
@@ -356,10 +356,10 @@ int	find_common_subtypes(struct type	*a, struct type	*b, int	*_glb_common)
 	return _glb_ncommon;
 }
 
-check_for_glb(struct type	*a, struct type	*b)
+int	check_for_glb(struct type	*a, struct type	*b)
 {
 	int	_glb_common[10000], _glb_ncommon;
-	int	ia, ib, i, j, mi, resort, resort_key;
+	int	ia, i, j, mi, resort, resort_key=-1;
 	struct type	*ar[2] = {a, b};
 	char	name[1024];
 	struct type	*g;
@@ -448,9 +448,9 @@ check_for_glb(struct type	*a, struct type	*b)
 	return 1;
 }
 
-make_glbs()
+void	make_glbs()
 {
-	int	i, j, k;
+	int	i, j;
 
 	// don't do 0; finding glb's of *top* with things is a big waste of time!
 	for(i=ntypes-1;i>0;i--)
@@ -476,11 +476,11 @@ struct type	*most_general_type_for_dg(struct dg	*d);
 int		wfpath[1024], wfpl = 0;
 
 // make children well-formed
-wellform(struct dg	*d, char	*typename)
+void	wellform(struct dg	*d, char	*typename)
 {
-	int		i, j;
+	int		i;
 	struct type	*t;
-	extern char	**fnames;
+	//extern char	**fnames;
 
 	for(i=0;i<d->narcs;i++)
 	{

@@ -3,6 +3,10 @@
 #include	<stdlib.h>
 
 #include	"dag.h"
+#include	"morpho.h"
+
+int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
+int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 
 char	*trim_string(char	*str)
 {
@@ -49,7 +53,7 @@ char	*g_inflr_def;
 
 int	process_comments(char	*line, int	in_comment)
 {
-	char	*ptr, *oline, *osemi;
+	char	*ptr, *oline;
 	int	inquote = 0;
 
 	// handle block-comments first
@@ -70,7 +74,7 @@ int	process_comments(char	*line, int	in_comment)
 
 int	unbalanced(char	*line)
 {
-	int	inquote = 0, bal = 0, wascolon = 0;
+	int	inquote = 0, bal = 0;
 	int	escape = 0;
 
 	while(*line)
@@ -251,7 +255,6 @@ struct type	*find_type(char	*name, int	constrain)
 struct dg	*type_dg(char		*name)
 {
 	struct type	*type = find_type(name, 1);
-	struct dg	*dg;
 
 	if(!type)return 0;
 	if(!type->dg)return atomic_dg(name);
@@ -480,7 +483,7 @@ static struct dg	*dlistify(struct dagify_record	*R, char	*str)
 
 static struct dg	*structify(struct dagify_record	*R, char	*str)
 {
-	char	*type, *ptr, *dot;
+	char	*ptr, *dot;
 	char	*label, *vptr;
 	struct dg	*dg, *value;
 	int	bracket, len, depth;
@@ -580,7 +583,6 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 {
 	int	bracket = 0, inquote = 0;
 	char	*ptr;
-	struct type	*g;
 	struct dg	*lhs, *rhs, *res;
 
 	str = trim_string(str);
@@ -748,8 +750,8 @@ int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 			}
 			if(!done)chunk = trim_string(p+1);
 		}
-		else if(!quote && *p == '[' || *p=='<')depth++;
-		else if(!quote && *p == ']' || *p=='>')depth--;
+		else if(!quote && (*p == '[' || *p=='<'))depth++;
+		else if(!quote && (*p == ']' || *p=='>'))depth--;
 		else if(*p == '"')quote = !quote;
 		else if(*p == '\\' && p[1])p++;
 	}
@@ -776,7 +778,7 @@ int	iterate_tdl_types(char	*path)
 int	g_loaded = 0;
 extern int	ntypes, nlexemes, nrules, nirules, nroots, glb_type_count, debug_level, nfnames, nstrings;
 
-int	/*__attribute__ ((constructor))*/ load_grammar()
+int	load_grammar()
 {
 	clear_slab();
 
@@ -798,4 +800,5 @@ int	/*__attribute__ ((constructor))*/ load_grammar()
 
 	// make sure none of the grammar is auto-freed when parse is over
 	commit_slab();
+	return 0;
 }

@@ -15,5 +15,7 @@ struct lexeme
 
 int	add_lexemes_to_chart_for_stem(int	x, char	*stem);
 int	add_multilexemes_to_chart(int	x, int	nwords, char	**words);
+void	dump_parts_of_speech();
+int		load_lexicon();
 
 #endif

@@ -39,6 +39,15 @@ struct dg	*unify_dg(struct dg	*a, struct dg	*b, int	arg);
 struct dg	*atomic_dg(char	*name);
 struct dg	*copy_dg(struct dg	*d);
 struct dg	*trim_args(struct dg	*d);
+int			lookup_fname(char	*label);
+void		null_generation();
+void		print_dg(struct dg	*d);
+void		unify_backtrace();
+void		introduce_feature(int	label, int	type);
+void		add_dg_hop(struct dg	*d, int	label, struct dg	*value);
+void		add_dg_feature(struct dg	*d, char	*label, struct dg	*value);
+int			init_fnames();
+int			equivalent_dg(struct dg	*a, struct dg	*b);
 
 // for hyperactive parsing
 int		unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg);
@@ -52,6 +61,12 @@ struct qc	*extract_qc_arg(struct dg	*d, int	arg);
 int		quickcheck(struct qc	*a, struct qc	*b);
 int		equiv_quickcheck(struct qc	*a, struct qc	*b);
 struct qc	*copy_qc(struct qc	*in);
+
+// slab operations
+void	clear_slab();
+void	commit_slab();
+void	*slab_realloc(void	*ptr, int	oldlen, int	newlen);
+void	print_slab_stats();
 
 struct slab_state
 {
@@ -124,7 +139,6 @@ static inline struct dg	*p_dereference_dg(struct dg	*dg)
 static inline struct dg	*dereference_dg(struct dg	*dg)
 {
 	struct dg	*fw = dg;
-	struct dg	*fw2 = dg;
 	extern int	generation;
 
 	while(1)
