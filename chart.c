@@ -78,6 +78,7 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 	int	remain, arg, nhave, nneed;
 	extern int	__qc_use_heap;
 
+	if(a->have==-1)return 0;
 	/*if(A->have==A->need)b = A;
 	else a = A;
 	if(B->have==B->need)b = B;
@@ -116,8 +117,13 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 		a->dg = unify_dg(a->ha_dg, a->ha_par, a->ha_arg);
 		if(!a->dg)
 		{
-			fprintf(stderr, "hyperactive: rescheduled unify failed!\n");
-			exit(-1);
+			// latent cycle detection
+			// this doesn't seem to happen... not sure why?
+			fprintf(stderr, "hyperactive: latent cycle\n");
+			a->have = -1;
+			return 0;
+			//fprintf(stderr, "hyperactive: rescheduled unify failed!\n");
+			//exit(-1);
 		}
 		nrecomb[a->rule->rnum]++;
 	}
@@ -144,7 +150,7 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 			if(!rnohyper[a->rule->rnum])
 			{
 				// hyperactive
-				if(check_cycles(a->dg))goto fail;
+				//if(check_cycles(a->dg)) goto fail;
 				__qc_use_heap = 1;
 				hqc = extract_qc_arg(a->dg, a->rtl?(nneed-nhave-1):nhave);
 				__qc_use_heap = 0;

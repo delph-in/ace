@@ -149,17 +149,25 @@ static inline struct dg	*dg_hop(struct dg	*d, int	label)
 	int	i;
 	extern int	generation;
 
-	d = dereference_dg(d);
+	if(d->forward)d = dereference_dg(d);
 	if(!d)return 0;
 
 	for(i=0;i<d->narcs;i++)
 		if(d->arcs[i].label==label)
-			return dereference_dg(d->arcs[i].dest);
+		{
+			d = d->arcs[i].dest;
+			if(d->forward)return dereference_dg(d);
+			else return d;
+		}
 	if(d->gen==generation)
 	{
 		for(i=0;i<d->ncarcs;i++)
 			if(d->carcs[i].label==label)
-				return dereference_dg(d->carcs[i].dest);
+			{
+				d = d->carcs[i].dest;
+				if(d->forward)return dereference_dg(d);
+				else return d;
+			}
 	}
 	return 0;
 }

@@ -504,31 +504,29 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 		upathl--;
 	}
 
-	if(dg2->ncarcs)
+	// unify dg2's comps arcs into dg1's arcs
+	for(i=0;i<dg2->ncarcs;i++)
 	{
-		// unify dg2's comps arcs into dg1's arcs
-		for(i=0;i<dg2->ncarcs;i++)
+		upath[upathl++] = dg2->carcs[i].label;
+		for(j=0;j<dg1->narcs;j++)
+			if(dg2->carcs[i].label == dg1->arcs[j].label)break;
+		if(j<dg1->narcs)
 		{
-			upath[upathl++] = dg2->carcs[i].label;
-			for(j=0;j<dg1->narcs;j++)
-				if(dg2->carcs[i].label == dg1->arcs[j].label)break;
-			if(j<dg1->narcs)
-			{
-				if(unify1(dg1->arcs[j].dest, dg2->carcs[i].dest))return -1;
-			}
-			else
-			{
-				for(j=0;j<dg1->ncarcs;j++)
-					if(dg2->carcs[i].label == dg1->carcs[j].label)break;
-				if(j<dg1->ncarcs)
-				{
-					if(unify1(dg1->carcs[j].dest, dg2->carcs[i].dest))return -1;
-				}
-				else newcs[nc++] = i;
-			}
-			upathl--;
+			if(unify1(dg1->arcs[j].dest, dg2->carcs[i].dest))return -1;
 		}
+		else
+		{
+			for(j=0;j<dg1->ncarcs;j++)
+				if(dg2->carcs[i].label == dg1->carcs[j].label)break;
+			if(j<dg1->ncarcs)
+			{
+				if(unify1(dg1->carcs[j].dest, dg2->carcs[i].dest))return -1;
+			}
+			else newcs[nc++] = i;
+		}
+		upathl--;
 	}
+	
 
 	// add remaining dg2 arcs and comps arcs to dg1's comps arcs
 	// XXX optimization: use a separate slab allocator for comps arcs
