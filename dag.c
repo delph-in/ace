@@ -23,6 +23,8 @@ extern int	freeze_fd;
 int	upath[1024];
 int	upathl;
 
+int	accum_ram_usage = 0;
+
 print_slab_stats()
 {
 	fprintf(stderr, "%d complete slabs, %dkbytes in working slab\n", noldslabs-1, slabu/1024);
@@ -59,6 +61,7 @@ void	clear_slab()
 	}
 	else
 	{
+		accum_ram_usage += SLAB_SIZE * noldslabs + slabu;
 		// leave allocated slabs around for next parse!
 		noldslabs = 0;
 		next_slab();
@@ -144,14 +147,19 @@ void	add_dg_hop(struct dg	*d, int	label, struct dg	*value)
 	d->arcs[i].dest = value;
 }
 
+int		nfnames;
+char		**fnames;
+
 // on input, assume a and b both have noncurrent generation
 // on output, 'copy' pointers are used, so don't try to copy them until next generation
-int	equivalent_dg(struct dg	*a, struct dg	*b)
+int	equivalent_dg1(struct dg	*a, struct dg	*b)
 {
 	int	i, j;
 	extern int	generation;
 
-	if(a==b)return 1;
+	a = dereference_dg(a);
+	b = dereference_dg(b);
+	if(!a || !b)return 0;
 	if(a->gen!=generation)
 	{
 		a->forward = a->copy = 0;
@@ -172,22 +180,40 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 
 	if(a->copy == b && b->copy == a)return 1;
 	if(a->copy || b->copy)return 0;
+
 	a->copy = b;
 	b->copy = a;
 
+	if(a==b)return 1;
+	//printf("maybe %p <=> %p\n", a, b);
+
 	for(i=0;i<a->narcs;i++)
 	{
-		if(a->arcs[i].label>=12 && a->arcs[i].label<=15)	// STEM, RELS, HCONS, RULE-NAME
-			continue;
 		for(j=0;j<b->narcs;j++)if(b->arcs[j].label==a->arcs[i].label)break;
 		if(j>=b->narcs)return 0;
-		if(!equivalent_dg(a->arcs[i].dest, b->arcs[j].dest))return 0;
+		if(a->arcs[i].label>=12 && a->arcs[i].label<=15)	// STEM, RELS, HCONS, RULE-NAME
+			continue;
+		//printf("feature %s: host %p pack %p\n", fnames[a->arcs[i].label],
+				//a->arcs[i].dest, b->arcs[j].dest);
+		if(!equivalent_dg1(a->arcs[i].dest, b->arcs[j].dest))return 0;
 	}
 	return 1;
 }
 
-int		nfnames;
-char		**fnames;
+int	equivalent_dg(struct dg	*a, struct dg	*b)
+{
+	int	res = equivalent_dg1(a, b);
+	extern unsigned int	generation;
+
+	generation++;
+	if(generation==0xffffffff)
+	{
+		fprintf(stderr, "generation counter overflowed!\n");
+		exit(-1);
+	}
+	return res;
+}
+
 int		*introduce;	// what type introduced this fname?
 extern struct type	**types;
 

@@ -258,7 +258,7 @@ static int	pack_edge(struct edge	*edge)
 			!memcmp(c->edges[i]->qc, edge->qc, qcbytes) &&
 			equivalent_dg(c->edges[i]->dg, edge->dg))
 		{
-			//fprintf(stderr, "packed %p in %p!\n", edge, c->edges[i]);
+			//fprintf(stderr, "packed #%d in #%d!\n", edge->id, c->edges[i]->id);
 			//printf("host: "); print_dg(c->edges[i]->dg); printf("\n");
 			//printf("pack: "); print_dg(edge->dg); printf("\n");
 			// XXX should record
