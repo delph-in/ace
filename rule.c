@@ -55,6 +55,7 @@ setup_rule_filter()
 {
 	int	i, j, k;
 	struct rule	*m, *d;
+	struct dg	*mdg;
 	int	yes = 0, count = 0;
 	char	byte;
 
@@ -69,16 +70,19 @@ setup_rule_filter()
 			fprintf(stderr, "ERROR: rule `%s' takes %d daughters!\n", m->name);
 			exit(-1);
 		}
+		mdg = copy_dg(m->dg);	// necessary for the case when we try to unify a rule into itself!
 		for(j=0;j<nrules;j++)
 		{
 			d = rules[j];
 			byte = 0;
 			for(k=0;k<m->ndaughters;k++)
-				if(unify_dg(d->dg, m->dg, k))
+			{
+				if(unify_dg(d->dg, mdg, k))
 				{
 					byte |= (1<<k);
 					yes++;
 				}
+			}
 			count += m->ndaughters;
 			rule_filter[i*nrules + j] = byte;
 		}

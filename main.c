@@ -116,6 +116,7 @@ int	parse_line(char	*line)
 		printf("%s", line);
 		return -1;
 	}
+	if(!strcmp(line, "All rights reserved."))return -1;	// not interesting.
 
 	strcpy(copy, line);
 	// break up into words, normalize capitalization
@@ -134,7 +135,7 @@ int	parse_line(char	*line)
 		}
 		p++;
 	}
-	//if(nwords<=2)return -1;	// experience shows short "sentences" to not usually be interesting
+	if(nwords<=2)return -1;	// experience shows short "sentences" to not usually be interesting
 
 	//printf("%d words\n", nwords);
 	return parse(nwords, words, trim_string(copy));

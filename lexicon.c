@@ -160,6 +160,13 @@ int	load_lexicon()
 		fprintf(stderr, "lexicon: unable to load, bailing out.\n");
 		exit(-1);
 	}
+#ifdef	ERG
+	if(iterate_tdl_dgs("special-lex.tdl", study_lexicon))
+	{
+		fprintf(stderr, "lexicon: unable to load special-lex, bailing out.\n");
+		exit(-1);
+	}
+#endif
 	qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
 	return 0;
 }

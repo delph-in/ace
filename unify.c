@@ -58,7 +58,7 @@ struct dg	*dereference_dg(struct dg	*dg)
 		dg = dg->forward;
 		if(dg == fw)
 		{
-			fprintf(stderr, "XXX cycle\n");
+			//fprintf(stderr, "XXX cycle\n");
 			return 0;
 		}
 	}
@@ -88,7 +88,7 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 		// this lets us detect a cycle
 		if(dg->copy->forward)
 		{
-			fprintf(stderr, "XXX cycle\n");
+			//fprintf(stderr, "XXX cycle\n");
 			return 0;
 		}
 		return dg->copy;
