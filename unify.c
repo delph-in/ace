@@ -3,6 +3,7 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	"dag.h"
+#include	"freeze.h"
 
 extern char	**fnames;
 extern int	g_loaded;
@@ -147,8 +148,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 		}
 	}
 
-	if(!dg->narcs && dg->type==dg->xtype &&
-		!(dg>=(struct dg*)0x60000000 && dg<(struct dg*)0x78000000) && !dg->ncarcs)goto share;
+	if(!dg->narcs && dg->type==dg->xtype && !FROZEN(dg) && !dg->ncarcs)goto share;
 
 	// mark that we are inside this node, to detect cycles
 	dg->copy = dg;
@@ -192,8 +192,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	}
 	dg->copy = newcopy;
 
-	if(dg->ncarcs || dg->type!=dg->xtype || st ||
-		(dg>=(struct dg*)0x60000000 && dg<(struct dg*)0x78000000))	// don't share dg's from the grammar
+	if(dg->ncarcs || dg->type!=dg->xtype || st || FROZEN(dg))
 	{
 		*chret = 1;
 		return newcopy;

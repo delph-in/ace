@@ -4,3 +4,9 @@ int	load_grammar();
 int	freeze_grammar();
 void	dump_grammar();
 void	reload_frozen_grammar();
+
+extern long	loaded_freeze_size;
+
+#define	FREEZER_MMAP_BASE	0x60000000
+#define	FREEZER_MMAP_SIZE	0x10000000
+#define	FROZEN(x)		((long)x>=FREEZER_MMAP_BASE && (long)x<(FREEZER_MMAP_BASE+loaded_freeze_size))

@@ -246,17 +246,18 @@ int	freeze_grammar()
 	return 0;
 }
 
-int	loaded_freeze_fd = -1, loaded_freeze_size;
+int	loaded_freeze_fd = -1;
+long	loaded_freeze_size;
 
 static int	load_freeze()
 {
 	struct grammar	*G;
 	int		i;
 
-	G = (struct grammar*)mmap((void*)0x60000000, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, loaded_freeze_fd, 0);
+	G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, loaded_freeze_fd, 0);
 	if(!G || G==(struct grammar*)0xffffffff)
 	{
-		perror("mmap fixed 0x60000000");
+		perror("mmap fixed");
 		exit(-1);
 	}
 
@@ -307,7 +308,7 @@ void	reload_frozen_grammar()
 		fprintf(stderr, "can't reload_frozen_grammar(), since no freeze is currently loaded!\n");
 		exit(-1);
 	}
-	munmap((void*)0x60000000, loaded_freeze_size);
+	munmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size);
 	null_generation();
 	load_freeze();
 }
@@ -337,16 +338,16 @@ int	setup_save_frozen_grammar(char	*path)
 
 	if(freeze_fd<0) { perror(path); exit(-1); }
 
-	if(ftruncate(freeze_fd, 0x18000000)) { perror("ftruncate 0x18000000"); exit(-1); }
-	freeze_point = mmap((void*)0x60000000, 0x18000000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, freeze_fd, 0);
+	if(ftruncate(freeze_fd, FREEZER_MMAP_SIZE)) { perror("ftruncate FREEZER_MMAP_SIZE"); exit(-1); }
+	freeze_point = mmap((void*)FREEZER_MMAP_BASE, FREEZER_MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, freeze_fd, 0);
 	if(!freeze_point || freeze_point==(void*)0xffffffff)
 	{
-		perror("mmap fixed 0x60000000");
+		perror("mmap fixed");
 		exit(-1);
 	}
 	//fprintf(stderr, "we got %p\n", freeze_point);
 	freeze_next = freeze_point;
-	currslabsize = 0x18000000;
+	currslabsize = FREEZER_MMAP_SIZE;
 	return 0;
 }
 
