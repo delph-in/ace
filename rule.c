@@ -25,7 +25,7 @@ rule_stats()
 		nact+=nactive[i];
 		npass+=npassive[i];
 	}
-	printf("%d active / %d passive edges total\n", nact, npass);
+	fprintf(stderr, "%d active / %d passive edges total\n", nact, npass);
 }
 
 int	rule_is_rtl(struct rule	*r)
