@@ -457,7 +457,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 			//fprintf(stderr, "parse had no semantics!\n");
 			continue;
 		}
-		if(sentence)puts(sentence);
+		if(sentence)printf("SENT: %s\n", sentence);
 
 		//print_dg(sem);
 		//printf("\n\n");
