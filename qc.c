@@ -1,4 +1,5 @@
 #include	<stdlib.h>
+#include	<assert.h>
 
 #include	"dag.h"
 
@@ -23,29 +24,6 @@ struct qcinst
 	char	*arg;
 	int	fnum;
 }	qcprog[] = { 
-
-/*
-REC(6), 
-PUSH("SYNSEM"), REC(4), 
-	PUSH("LOCAL"), PUSH("CAT"),
-		PUSH("HEAD"), REC(0),
-			PUSH("INV"), REC(15), POP, 
-			PUSH("KEYS"), PUSH("KEY"), REC(7), POP, POP, 
-			PUSH("MOD"), REC(5), 
-				PUSH("FIRST"), REC(2), 
-					PUSH("LOCAL"), REC(13), POP, POP, POP, 
-			PUSH("PRD"), REC(14), POP, 
-			PUSH("VFORM"), REC(10), POP, POP, 
-		PUSH("POSTHEAD"), REC(3), POP, 
-		PUSH("VAL"),
-			PUSH("COMPS"), REC(1), POP, 
-			PUSH("SPR"), PUSH("FIRST"), REC(12), 
-				PUSH("OPT"), REC(8), POP, POP, POP, 
-			PUSH("SUBJ"), REC(9), 
-				PUSH("FIRST"), REC(16), 
-					PUSH("OPT"), REC(11), 
-*/
-
 
 REC(6), 
 PUSH("INFLECTED"), REC(25), POP, 
@@ -94,11 +72,117 @@ PUSH("LAST"), REC(24), POP,
 PUSH("LIST"), REC(31), 
 PUSH("FIRST"), PUSH("CAT"), PUSH("HEAD"), REC(45), 
 
+/*
+REC(16),
+PUSH("C-CONT"), PUSH("HOOK"), PUSH("INDEX"), REC(93), POP, POP, POP, 
+PUSH("INFLECTED"), REC(2), POP, 
+PUSH("SYNSEM"), REC(12), 
+PUSH("--SEMIND"), PUSH("PNG"), PUSH("GEN"), REC(66), POP, 
+PUSH("PN"), REC(79), POP, POP, POP, 
+PUSH("LEX"), REC(56), POP, 
+PUSH("LOCAL"), PUSH("AGR"), PUSH("DIVISIBLE"), REC(38), POP, 
+PUSH("PNG"), PUSH("PN"), REC(32), POP, POP, POP, 
+PUSH("CAT"), REC(62), 
+PUSH("HEAD"), REC(0), 
+//PUSH("AUX"), REC(16), POP, 
+PUSH("CASE"), REC(78), POP, 
+PUSH("INV"), REC(28), POP, 
+PUSH("MOD"), REC(10), 
+PUSH("FIRST"), REC(59), 
+PUSH("LOCAL"), REC(11), 
+PUSH("CAT"), PUSH("HEAD"), REC(33), POP, POP, 
+PUSH("KEYS"), PUSH("KEY"), REC(98), POP, POP, POP, POP, POP, 
+PUSH("POSS"), REC(94), POP, 
+PUSH("PRD"), REC(7), POP, 
+PUSH("TAM"), PUSH("ASPECT"), REC(80), POP, 
+PUSH("MOOD"), REC(27), POP, 
+PUSH("TENSE"), REC(100), POP, POP, 
+PUSH("VFORM"), REC(4), POP, POP, 
+PUSH("MC"), REC(3), POP, 
+PUSH("POSTHEAD"), REC(14), POP, 
+PUSH("VAL"), PUSH("COMPS"), REC(6), 
+PUSH("FIRST"), REC(53), 
+PUSH("--SEMIND"), REC(101), POP, 
+PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), REC(29), POP, POP, 
+PUSH("KEYS"), PUSH("KEY"), REC(35), POP, POP, POP, 
+PUSH("NON-LOCAL"), PUSH("SLASH"), PUSH("LAST"), REC(77), POP, 
+PUSH("LIST"), REC(46), POP, POP, POP, 
+PUSH("OPT"), REC(9), POP, POP, 
+PUSH("REST"), REC(25), 
+PUSH("FIRST"), PUSH("LOCAL"), PUSH("CAT"), REC(49), 
+PUSH("HEAD"), REC(37), 
+PUSH("TAM"), PUSH("TENSE"), REC(65), POP, POP, POP, POP, POP, 
+PUSH("OPT"), REC(55), POP, POP, 
+PUSH("REST"), REC(43), POP, POP, POP, 
+PUSH("SPEC"), PUSH("FIRST"), PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), REC(73), 
+PUSH("PRD"), REC(81), POP, POP, POP, POP, 
+PUSH("MODIFIED"), REC(70), POP, POP, POP, 
+PUSH("SPR"), REC(24), 
+PUSH("FIRST"), REC(13), 
+PUSH("LOCAL"), PUSH("AGR"), PUSH("DIVISIBLE"), REC(71), POP, POP, 
+PUSH("KEYS"), PUSH("KEY"), REC(52), POP, POP, POP, 
+PUSH("OPT"), REC(15), POP, POP, POP, 
+PUSH("SUBJ"), REC(41), 
+PUSH("FIRST"), REC(18), 
+PUSH("--SEMIND"), PUSH("PNG"), PUSH("GEN"), REC(39), POP, POP, POP, 
+PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), PUSH("CASE"), REC(20), POP, POP, POP, POP, 
+PUSH("NON-LOCAL"), PUSH("QUE"), PUSH("LAST"), REC(76), POP, 
+PUSH("LIST"), REC(75), POP, POP, 
+PUSH("REL"), PUSH("LAST"), REC(50), POP, 
+PUSH("LIST"), REC(45), POP, POP, 
+PUSH("SLASH"), PUSH("LAST"), REC(63), POP, 
+PUSH("LIST"), REC(26), POP, POP, POP, 
+PUSH("OPT"), REC(42), POP, POP, POP, POP, POP, 
+PUSH("CONJ"), REC(44), 
+PUSH("CHEAD"), PUSH("LEFT"), PUSH("REST"), REC(72), POP, POP, POP, POP, 
+PUSH("CONT"), PUSH("HOOK"), PUSH("E-INDEX"), PUSH("E"), PUSH("MOOD"), REC(68), POP, POP, POP, 
+PUSH("INDEX"), REC(23), 
+PUSH("E"), PUSH("MOOD"), REC(97), POP, 
+PUSH("TENSE"), REC(89), POP, POP, 
+PUSH("PNG"), PUSH("PN"), REC(64), POP, POP, 
+PUSH("PRONTYPE"), REC(54), POP, 
+PUSH("SORT"), REC(69), POP, POP, 
+PUSH("XARG"), REC(61), POP, POP, 
+PUSH("RELS"), PUSH("LIST"), PUSH("FIRST"), REC(88), POP, POP, POP, POP, 
+PUSH("CTXT"), PUSH("ACTIVATED"), REC(92), POP, POP, 
+PUSH("KEYS"), PUSH("ALT2KEY"), REC(85), POP, 
+PUSH("ALTKEY"), REC(34), POP, 
+PUSH("KEY"), REC(1), 
+PUSH("ARG0"), PUSH("E"), PUSH("TENSE"), REC(102), POP, POP, POP, POP, 
+PUSH("MESSAGE"), REC(47), 
+PUSH("LAST"), REC(36), POP, POP, POP, 
+PUSH("STEMHEAD"), REC(19), POP, POP, 
+PUSH("MODIFIED"), REC(57), 
+PUSH("LPERIPH"), REC(48), POP, 
+PUSH("RPERIPH"), REC(91), POP, POP, 
+PUSH("NON-LOCAL"), PUSH("QUE"), REC(8), 
+PUSH("LAST"), REC(40), POP, 
+PUSH("LIST"), REC(83), POP, POP, 
+PUSH("REL"), REC(17), 
+PUSH("LAST"), REC(51), POP, 
+PUSH("LIST"), REC(60), POP, POP, 
+PUSH("SLASH"), PUSH("LAST"), REC(5), POP, 
+PUSH("LIST"), REC(21), 
+PUSH("FIRST"), PUSH("CAT"), PUSH("HEAD"), REC(31), 
+PUSH("CASE"), REC(82), POP, 
+PUSH("MOD"), REC(30), 
+PUSH("FIRST"), PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), REC(87), POP, 
+PUSH("MC"), REC(95), POP, 
+PUSH("VAL"), PUSH("SUBJ"), PUSH("FIRST"), REC(74), 
+PUSH("LOCAL"), PUSH("CONT"), PUSH("RELS"), PUSH("LIST"), PUSH("REST"), PUSH("FIRST"), PUSH("CARG"), REC(90), POP, POP, POP, POP, POP, POP, POP, POP, POP, POP, POP, POP, POP, POP, 
+PUSH("TAM"), PUSH("TENSE"), REC(84), POP, POP, POP, 
+PUSH("POSTHEAD"), REC(96), POP, 
+PUSH("VAL"), PUSH("COMPS"), REC(58), POP, POP, POP, 
+PUSH("CONT"), PUSH("HOOK"), PUSH("INDEX"), PUSH("SORT"), REC(67), POP, POP, 
+PUSH("XARG"), REC(99), POP, POP, POP, 
+PUSH("KEYS"), PUSH("KEY"), REC(22), POP, POP, POP, POP, POP, POP, 
+PUSH("ROOT"), REC(86),
+*/
 
 };
 
-//#define	QC_SIZE	17
 #define	QC_SIZE	46
+//#define	QC_SIZE	103
 
 #define	nqcprog	(sizeof(qcprog)/(sizeof(struct qcinst)))
 
@@ -117,7 +201,7 @@ struct qc	*extract_qc(struct dg	*d)
 	struct qc	*q;
 	int		i, sp = 0;
 	extern unsigned int	generation;
-	struct dg	*stack[32];
+	struct dg	*stack[64];
 
 	if(!init)
 	{
@@ -140,6 +224,7 @@ struct qc	*extract_qc(struct dg	*d)
 				if(stack[sp])stack[sp+1] = dg_hop(stack[sp], qcprog[i].fnum);
 				else stack[sp+1] = 0;
 				sp++;
+				assert(sp<32);
 				//printf("on push %s have %p\n", qcprog[i].arg, stack[sp]);
 				break;
 			case	_POP:	--sp;	break;
