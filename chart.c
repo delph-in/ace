@@ -7,15 +7,17 @@
 
 int			chart_size;
 struct chart_cell	*cells;
-int	total_edges, real_edges, passive_edges, used_edges;
+int	total_edges, real_edges, passive_edges, used_edges, pused_edges;
 
 extern int	debug_level;
 
 int		edge_id;
 
-extern int	*nhactive, *nactive, *npassive, *nrecomb, used_total;
+extern int	*nhactive, *nactive, *npassive, *nrecomb, used_total, pused_total;
 extern int noldslabs;
 extern int	rnohyper[1000];
+
+struct edge	*sentential = 0;
 
 #define	MAX_CHUNKS	680	// when to give up on a parse
 #define	FIRST_ONLY
@@ -42,9 +44,10 @@ void	clear_chart(int	size)
 
 	clear_slab();
 
-	passive_edges = real_edges = total_edges = used_edges = 0;
+	passive_edges = real_edges = total_edges = used_edges = pused_edges = 0;
 	chart_size = size;
 	cells = calloc(sizeof(struct chart_cell) , chart_size*chart_size);
+	sentential = 0;
 }
 
 int	next_eid() { return edge_id++; }
@@ -70,22 +73,126 @@ void	add_edge_to_chart(struct edge	*edge)
 
 int	trace = 0, gen_qc = 0;
 
-static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
+int	build_edge(struct edge	*a, struct edge	*b, int	arg)
 {
-	struct edge	*e;//, *a = 0, *b = 0;
+	struct edge	*e;
 	struct dg	*u;
 	struct qc	*qc, *hqc;
-	int	remain, arg, nhave, nneed;
+	int		nhave, nneed;
 	extern int	__qc_use_heap;
 
-	if(a->have==-1)return 0;
-	/*if(A->have==A->need)b = A;
-	else a = A;
-	if(B->have==B->need)b = B;
-	else a = B;
+	nhave = a->have+1;
+	nneed = a->need;
+	if(nhave == nneed)
+	{
+		// building passive
+		u = finalize_tmp(a->dg);
+		if(!u)return -1;	// cycles might happen, check for them.
+		e = slab_alloc(sizeof(struct edge));
+		e->qc = extract_qc_arg(u, -1);
+		e->prio = 0;
+		e->dg = u;
+	}
+	else
+	{
+		// building active
+		if(!rnohyper[a->rule->rnum])
+		{
+			// hyperactive
+			//if(check_cycles(a->dg))return -1;
+			__qc_use_heap = 1;
+			hqc = extract_qc_arg(a->dg, a->rtl?(nneed-nhave-1):nhave);
+			__qc_use_heap = 0;
+			forget_tmp();
+			qc = copy_qc(hqc);
+			free(hqc);
+			u = 0;
+			nhactive[a->rule->rnum]++;
+		}
+		else
+		{
+			// standard active
+			u = finalize_tmp(a->dg);
+			if(!u)return -1;	// cycles might happen, check for them.
+			qc = extract_qc_arg(u, a->rtl?(nneed-nhave-1):nhave);
+		}
+		e = slab_alloc(sizeof(struct edge));
+		e->dg = u;
+		e->prio = a->prio;
+		e->ha_par = a->dg;
+		e->ha_dg = b->dg;
+		e->ha_arg = arg;
+		e->qc = qc;
+		//printf("active qc %p (copy of %p)\n", e->qc, qc);
+	}
+	e->need = nneed;
+	e->have = nhave;
+	e->rule = a->rule;
+	//printf("new edge qc %p\n", e->qc);
 
-	// need one active and one passive edge
-	if(!a || !b)return 0;*/
+	if(!a->have && !a->used){a->used = 1;used_edges++;}
+	if(!b->used){b->used=1;pused_edges++;}
+	if(b->lex && a->rule->inflr)
+	{
+		//printf("promoted lexeme %s to word %s via rule %s\n", b->dg->xtype->name, u->xtype->name, a->rule->name);
+	}
+	e->id = next_eid();
+	e->daughters = slab_alloc(sizeof(struct edge*) * e->have);
+	e->rtl = a->rtl;
+	e->used = 0;
+	if(e->rtl)
+	{
+		e->from = b->from;
+		e->to = a->to;
+		memcpy(e->daughters+1, a->daughters, sizeof(struct edge*) * a->have);
+		e->daughters[0] = b;
+	}
+	else
+	{
+		e->from = a->from;
+		e->to = b->to;
+		memcpy(e->daughters, a->daughters, sizeof(struct edge*) * a->have);
+		e->daughters[arg] = b;
+	}
+	if(e->rule->lexical)e->lex = b->lex;
+	else e->lex = 0;
+	if(trace)
+	{
+		printf("generated #%d %d/%d for [%d-%d] with rule %s:\n", e->id, e->have, e->need, e->from, e->to, e->rule->name);
+		if(e->have==e->need && trace>1){print_dg(u); printf("\n\n");}
+	}
+	if(e->need==e->have)
+	{
+		// just finished a constituent
+		// chop off ARGS et al
+		e->dg = trim_args(e->dg);
+
+		//printf("\n generated %d/%d for [%d-%d] %s with rule %s\n", e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
+		//print_dg(u);
+		//printf("\n");
+		npassive[e->rule->rnum]++;
+#ifdef	FIRST_ONLY
+		if(e->from==0 && e->to==chart_size-1 && is_root(e->dg))
+		{
+			//printf("sentential\n");
+			e->used = 1;pused_edges++;
+			add_edge_to_chart(e);
+			sentential = e;	// stop the parser
+			return -2;
+		}
+#endif
+	}
+	else nactive[e->rule->rnum]++;
+
+	add_agenda(e);
+	return 0;
+}
+
+static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
+{
+	int	remain, arg;
+
+	if(a->have==-1)return 0;
 
 	remain = a->need - a->have;
 
@@ -132,109 +239,7 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, a->dg->xtype->name, arg);
 	if(!unify_dg_tmp(b->dg, a->dg, arg))
 	{
-		nhave = a->have+1;
-		nneed = a->need;
-		if(nhave == nneed)
-		{
-			// building passive
-			u = finalize_tmp(a->dg);
-			if(!u)goto fail;	// cycles might happen, check for them.
-			e = slab_alloc(sizeof(struct edge));
-			e->qc = extract_qc_arg(u, -1);
-			e->prio = 0;
-			e->dg = u;
-		}
-		else
-		{
-			// building active
-			if(!rnohyper[a->rule->rnum])
-			{
-				// hyperactive
-				//if(check_cycles(a->dg)) goto fail;
-				__qc_use_heap = 1;
-				hqc = extract_qc_arg(a->dg, a->rtl?(nneed-nhave-1):nhave);
-				__qc_use_heap = 0;
-				forget_tmp();
-				qc = copy_qc(hqc);
-				free(hqc);
-				u = 0;
-				nhactive[a->rule->rnum]++;
-			}
-			else
-			{
-				// standard active
-				u = finalize_tmp(a->dg);
-				if(!u)goto fail;	// cycles might happen, check for them.
-				qc = extract_qc_arg(u, a->rtl?(nneed-nhave-1):nhave);
-			}
-			e = slab_alloc(sizeof(struct edge));
-			e->dg = u;
-			e->prio = a->prio;
-			e->ha_par = a->dg;
-			e->ha_dg = b->dg;
-			e->ha_arg = arg;
-			e->qc = qc;
-			//printf("active qc %p (copy of %p)\n", e->qc, qc);
-		}
-		e->need = nneed;
-		e->have = nhave;
-		e->rule = a->rule;
-		//printf("new edge qc %p\n", e->qc);
-
-		if(!a->have && !a->used){a->used = 1;used_edges++;}
-		//if(!b->used){b->used = 1;used_edges++;}
-		if(b->lex && a->rule->inflr)
-		{
-			//printf("promoted lexeme %s to word %s via rule %s\n", b->dg->xtype->name, u->xtype->name, a->rule->name);
-		}
-		e->id = next_eid();
-		e->daughters = slab_alloc(sizeof(struct edge*) * e->have);
-		e->rtl = a->rtl;
-		e->used = 0;
-		if(e->rtl)
-		{
-			e->from = b->from;
-			e->to = a->to;
-			memcpy(e->daughters+1, a->daughters, sizeof(struct edge*) * a->have);
-			e->daughters[0] = b;
-		}
-		else
-		{
-			e->from = a->from;
-			e->to = b->to;
-			memcpy(e->daughters, a->daughters, sizeof(struct edge*) * a->have);
-			e->daughters[arg] = b;
-		}
-		if(e->rule->lexical)e->lex = b->lex;
-		else e->lex = 0;
-		if(e->need==e->have)
-		{
-			// just finished a constituent
-			// chop off ARGS et al
-			e->dg = trim_args(e->dg);
-
-			//printf("\n generated %d/%d for [%d-%d] %s with rule %s\n", e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
-			//print_dg(u);
-			//printf("\n");
-			npassive[e->rule->rnum]++;
-#ifdef	FIRST_ONLY
-			if(e->from==0 && e->to==chart_size-1 && is_root(e->dg))
-			{
-				//printf("sentential\n");
-				//e->used = 1;used_edges++;
-				add_edge_to_chart(e);
-				return -1;	// stop the parser
-			}
-#endif
-		}
-		else nactive[e->rule->rnum]++;
-		if(trace)
-		{
-			printf("generated #%d %d/%d for [%d-%d] with rule %s:\n", e->id, e->have, e->need, e->from, e->to, e->rule->name);
-			if(e->have==e->need && trace>1){print_dg(u); printf("\n\n");}
-		}
-	
-		add_agenda(e);
+		if(build_edge(a, b, arg) == -2)return -1;
 		if(noldslabs >= MAX_CHUNKS)
 		{
 			fprintf(stderr, "terminating search, too much RAM\n");
@@ -245,7 +250,6 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 	{
 		if(trace>1 || gen_qc)unify_backtrace();
 		forget_tmp();
-		fail:;
 	}
 
 	return 0;
@@ -366,6 +370,9 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		if(process_edge(edge))break;
 
 	// show analyses
+#ifdef	FIRST_ONLY
+	if(sentential) { edge = sentential; root = edge->dg; goto show; }
+#endif
 	num_entries = cells[chart_size-1].nedges;
 	for(i=0;i<num_entries;i++)
 	{
@@ -376,6 +383,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 		//unfold_edge(edge);
 
+		show:
 		num_parses++;
 		sem = dg_hop(root, lookup_fname("SYNSEM"));
 		if(sem)sem = dg_hop(sem, lookup_fname("LOCAL"));
@@ -385,7 +393,6 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 			//fprintf(stderr, "parse had no semantics!\n");
 			continue;
 		}
-		if(num_parses!=1)continue;	// just print one parse
 		if(sentence)puts(sentence);
 
 		//print_dg(sem);
@@ -394,14 +401,18 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		print_sem(sem);
 		printf("\n\n");
 		fflush(stdout);
+#ifdef	FIRST_ONLY
+		break;
+#endif
 	}
 
 	if(debug_level)
 	{
-		fprintf(stderr, "%d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used)\t", num_parses, total_edges, real_edges, passive_edges, used_edges);
+		fprintf(stderr, "%d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t", num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
 		print_slab_stats();
 	}
 	used_total += used_edges;
+	pused_total += pused_edges;
 
 	return num_parses;
 }
