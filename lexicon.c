@@ -253,10 +253,13 @@ int	study_lexicon(char	*lhs, struct dg	*dg)
 int	lexcomp(const void	*a, const void	*b)
 {
 	const struct lexeme	*la = *(const struct lexeme**)a, *lb = *(const struct lexeme**)b;
+	int	res;
 
 	if(la->stemlen==0)return -1;
 	if(lb->stemlen==0)return 1;
-	return strcmp(la->stem[0]->name, lb->stem[0]->name);
+	res = strcmp(la->stem[0]->name, lb->stem[0]->name);
+	if(res)return res;
+	else return strcmp(la->word, lb->word);
 }
 
 int	load_lexicon()
