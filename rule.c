@@ -100,6 +100,7 @@ void	setup_rule_filter()
 		}
 	}
 	fprintf(stderr, "rule filter done (%.1f%%)\n", 100*(float)yes/count);
+	lex_filter_rules();
 }
 
 struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
@@ -354,6 +355,7 @@ char	*lex_filter_rule(struct rule	*r, int arg)
 }
 
 char	**type_rf, **type_rl;
+char	**type_rftc, **type_rltc;
 
 char	*type_filter_rule(struct rule	*r, int arg)
 {
@@ -361,7 +363,6 @@ char	*type_filter_rule(struct rule	*r, int arg)
 	int	i, count = 0;
 	struct slab_state	slab;
 
-	clear_slab();
 	table = calloc(sizeof(char), ntypes);
 	for(i=0;i<ntypes;i++)
 	{
@@ -379,7 +380,7 @@ char	*type_filter_rule(struct rule	*r, int arg)
 
 void	lex_filter_rules()
 {
-	int	i;
+	int	i, j, k;
 
 	fprintf(stderr, "NOTE: building rf-transitive closure\n");
 	rf_tc = malloc(sizeof(char*) * nrules);
@@ -398,32 +399,30 @@ void	lex_filter_rules()
 		type_rf[i] = type_filter_rule(rules[i], 0);
 		type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1);
 	}
-}
 
-// can 'lt' fit in first position of rule?
-int	lexfirst(struct type	*lt, int	rule)
-{
-	int	i;
-
-	// see if it fits directly
-	if(type_rf[rule][lt->tnum])return 1;
-	// for each rule in first(rule), see if lt fits
+	fprintf(stderr, "NOTE: composing  type-rule closured filter\n");
+	type_rftc = malloc(sizeof(char*) * nrules);
+	type_rltc = malloc(sizeof(char*) * nrules);
 	for(i=0;i<nrules;i++)
-		if(rf_tc[rule][i] && type_rf[i][lt->tnum])
-			return 1;
-	return 0;
-}
-
-// can 'lt' fit in last position of rule?
-int	lexlast(struct type	*lt, int	rule)
-{
-	int	i;
-
-	// see if it fits directly
-	if(type_rl[rule][lt->tnum])return 1;
-	// for each rule in last(rule), see if lt fits
-	for(i=0;i<nrules;i++)
-		if(rl_tc[rule][i] && type_rl[i][lt->tnum])
-			return 1;
-	return 0;
+	{
+		type_rftc[i] = calloc(sizeof(char), ntypes);
+		type_rltc[i] = calloc(sizeof(char), ntypes);
+		for(j=0;j<ntypes;j++)
+		{
+			if(type_rf[i][j])type_rftc[i][j] = 1;
+			else for(k=0;k<nrules;k++)
+				if(rf_tc[i][k] && type_rf[k][j])
+				{
+					type_rftc[i][j] = 1;
+					break;
+				}
+			if(type_rl[i][j])type_rltc[i][j] = 1;
+			else for(k=0;k<nrules;k++)
+				if(rl_tc[i][k] && type_rl[k][j])
+				{
+					type_rltc[i][j] = 1;
+					break;
+				}
+		}
+	}
 }

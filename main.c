@@ -81,7 +81,6 @@ int	main(int	argc, char	*argv[])
 
 	g_loaded = 1;
 	//dot_rf("/tmp/rules.dot");
-	lex_filter_rules();
 	//dump_grammar();
 
 	if(export_parts)

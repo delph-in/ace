@@ -20,6 +20,7 @@ void		rule_stats();
 struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl);
 void		print_rule(char	*name);
 void		setup_rule_filter();
+void		lex_filter_rules();
 void		agenda_rules(int	count);
 int			load_rules();
 int			load_roots();

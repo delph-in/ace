@@ -136,8 +136,19 @@ int	reduce_chart(int	length)
 	return 0;
 }
 
-int	lexfirst(struct type	*lt, int	rule);
-int	lexlast(struct type	*lt, int	rule);
+// can 'lt' fit in first position of rule?
+static inline int	lexfirst(struct type	*lt, int	rule)
+{
+	extern char	**type_rftc;
+	return type_rftc[rule][lt->tnum];
+}
+
+// can 'lt' fit in last position of rule?
+static inline int	lexlast(struct type	*lt, int	rule)
+{
+	extern char	**type_rltc;
+	return type_rltc[rule][lt->tnum];
+}
 
 int	lexrulefilt_f(int	x, int	rule)
 {

@@ -7,9 +7,6 @@ improved MRS extractor
 make ambiguity packing work with semantics (and record packing)
 statistical parse selection?
 
-FOR Apple SITE:
-make duplicate sentence detector
-
 OPTIMIZATIONS:
 
 smarter ordering of agenda
@@ -17,6 +14,5 @@ smarter ordering of agenda
 	- try giving higher priority to "longer" edges, -> form longer analyses more quickly
 		- may bias parser the wrong direction though
 hyperactive excursion?
-filter for "first" and "last" of each rule by lexical type
 
 fix small-lexicon chart reduce parameters
