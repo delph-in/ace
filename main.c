@@ -79,6 +79,7 @@ int	main(int	argc, char	*argv[])
 	if(save_grammar_path)
 		exit(0);
 
+	setup_extra_type_dgs();
 	g_loaded = 1;
 	//dot_rf("/tmp/rules.dot");
 	//dump_grammar();
