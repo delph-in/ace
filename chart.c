@@ -242,12 +242,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	struct edge	*edge;
 
 	clear_chart(nwords+1);
-	for(i=0;i<nwords;i++)
-		if(!add_lexemes_to_chart(i, words[i]))
-		{
-			fprintf(stderr, "No lexeme found for `%s'\n", words[i]);
-			return -1;
-		}
+	if(add_lexemes_to_chart(nwords, words))return -1;
 
 	agenda_rules(nwords+1);
 

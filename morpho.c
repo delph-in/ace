@@ -10,9 +10,27 @@ extern char	*trim_string(char	*str);
 int		nirules;
 struct irule	**irules;
 
-// int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct rule	*inflr);
+int	add_lexemes_to_chart(int	nwords, char	**words)
+{
+	int	i, simple, compound;
+	int	max = 0;
 
-int	add_lexemes_to_chart(int	x, char	*form)
+	for(i=0;i<nwords;i++)
+	{
+		simple = add_lexemes_to_chart_for_form(i, words[i]);
+		compound = add_multilexemes_to_chart(i, nwords-i, words+i);
+		if(compound>max)max = compound;
+		if(!simple && !max)
+		{
+			fprintf(stderr, "No lexeme found for `%s'\n", words[i]);
+			return -1;
+		}
+		if(max>0)max--;
+	}
+	return 0;
+}
+
+int	add_lexemes_to_chart_for_form(int	x, char	*form)
 {
 	int	i, j, count = 0, n;
 	char	stem[1024];
@@ -24,7 +42,7 @@ int	add_lexemes_to_chart(int	x, char	*form)
 		ir = irules[i];
 		if(!ir->nsub)
 		{
-			n = add_lexemes_to_chart_for_stem(x, form, ir->rule);
+			n = add_lexemes_to_chart_for_stem(x, form);
 			count += n;
 			if(n)add_agenda(epsilon_edge(ir->rule, x, 0));
 		}
@@ -37,7 +55,7 @@ int	add_lexemes_to_chart(int	x, char	*form)
 				{
 					//fprintf(stderr, "used irreg `%s -> %s' for rule %s\n",
 					//		irr->stem, irr->form, ir->rule->name);
-					n = add_lexemes_to_chart_for_stem(x, irr->stem, ir->rule);
+					n = add_lexemes_to_chart_for_stem(x, irr->stem);
 					count += n;
 					if(n)add_agenda(epsilon_edge(ir->rule, x, 0));
 					break;
@@ -50,7 +68,7 @@ int	add_lexemes_to_chart(int	x, char	*form)
 				{
 					//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d]\n",
 					//		form, stem, ir->rule->name, j);
-					n = add_lexemes_to_chart_for_stem(x, stem, ir->rule);
+					n = add_lexemes_to_chart_for_stem(x, stem);
 					count += n;
 					if(n)
 					{

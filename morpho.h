@@ -17,6 +17,6 @@ struct irule
 	}	*irregs;
 };
 
-int	add_lexemes_to_chart(int	x, char	*word);
+int	add_lexemes_to_chart(int	nwords, char	**words);
 
 #endif

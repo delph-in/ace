@@ -13,6 +13,7 @@ struct lexeme
 	struct type	**stem;
 };
 
-int	add_lexemes_to_chart_for_stem(int	x, char	*form, struct rule	*inflr);
+int	add_lexemes_to_chart_for_stem(int	x, char	*stem);
+int	add_multilexemes_to_chart(int	x, int	nwords, char	**words);
 
 #endif

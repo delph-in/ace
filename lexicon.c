@@ -12,7 +12,7 @@ int		nlexemes;
 
 extern int trace;
 
-struct edge	*lexical_edge(struct lexeme	*lex, int	i)
+struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 {
 	struct edge	*edge = slab_alloc(sizeof(struct edge));
 
@@ -22,7 +22,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i)
 	edge->id = next_eid();
 	edge->have = edge->need = 0;
 	edge->from = i;
-	edge->to = i+1;
+	edge->to = i+len;
 	edge->lex = lex;
 	edge->rtl = 0;
 
@@ -42,7 +42,63 @@ int	wstrcmp(char	*a, char	*b)
 	return 0;
 }
 
-int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct rule	*inflr)
+int	add_multilexemes_to_chart(int	x, int	nwords, char	**words)
+{
+	struct lexeme	*lex;
+	int		num=0, let = 0;
+	char		stemcmp[1024], extracmp[1024];
+	int		i, j, k, r;
+	int		max = 0;
+
+	if(nwords<2)return 0;
+	sprintf(stemcmp, "\"%s\"", words[0]);
+
+	for(i=0,j=nlexemes-1;i<=j;)
+	{
+		k = (i+j)/2;
+		r = wstrcmp(lexemes[k]->stem[0]->name, stemcmp);
+		if(r==0)break;
+		if(r<0)i = k+1;
+		else j = k-1;
+	}
+	if(r==0)
+	{
+		for(i=k;i<nlexemes && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
+		{
+			//printf("lex %s len %d\n", lexemes[i]->word, lexemes[i]->stemlen);
+			if(lexemes[i]->stemlen<=1 || lexemes[i]->stemlen > nwords)continue;
+			for(j=1;j<lexemes[i]->stemlen;j++)
+			{
+				sprintf(extracmp, "\"%s\"", words[j]);
+				if(wstrcmp(lexemes[i]->stem[j]->name, extracmp))break;
+			}
+			if(j<lexemes[i]->stemlen)continue;
+			if(!lexeme_in_agenda(lexemes[i], x, x+lexemes[i]->stemlen))
+				add_agenda(lexical_edge(lexemes[i], x, lexemes[i]->stemlen));
+			if(lexemes[i]->stemlen > max)max = lexemes[i]->stemlen;
+			num++;
+		}
+		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
+		{
+			if(lexemes[i]->stemlen<=1 || lexemes[i]->stemlen > nwords)continue;
+			//printf("lex %s len %d\n", lexemes[i]->word, lexemes[i]->stemlen);
+			for(j=1;j<lexemes[i]->stemlen;j++)
+			{
+				sprintf(extracmp, "\"%s\"", words[j]);
+				if(wstrcmp(lexemes[i]->stem[j]->name, extracmp))break;
+			}
+			if(j<lexemes[i]->stemlen)continue;
+			if(!lexeme_in_agenda(lexemes[i], x, x+lexemes[i]->stemlen))
+				add_agenda(lexical_edge(lexemes[i], x, lexemes[i]->stemlen));
+			if(lexemes[i]->stemlen > max)max = lexemes[i]->stemlen;
+			num++;
+		}
+		return max;
+	}
+	else return 0;
+}
+
+int	add_lexemes_to_chart_for_stem(int	x, char	*stem)
 {
 	struct lexeme	*lex;
 	int		num=0, let = 0;
@@ -66,14 +122,14 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct rule	*inflr)
 		{
 			if(lexemes[i]->stemlen>1)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+1))
-				add_agenda(lexical_edge(lexemes[i], x));
+				add_agenda(lexical_edge(lexemes[i], x, 1));
 			num++;
 		}
 		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
 		{
 			if(lexemes[i]->stemlen>1)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+1))
-				add_agenda(lexical_edge(lexemes[i], x));
+				add_agenda(lexical_edge(lexemes[i], x, 1));
 			num++;
 		}
 		return num;
