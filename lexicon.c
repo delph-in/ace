@@ -137,6 +137,60 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem)
 	else return 0;
 }
 
+void	dump_parts_of_speech()
+{
+	FILE	*f = popen("uniq", "w");
+	struct dg	*synsem, *lkeys, *keyrel;
+	struct dg	*pred, *carg;
+	int		synsemf = lookup_fname("SYNSEM");
+	int		lkeysf = lookup_fname("LKEYS");
+	int		keyrelf = lookup_fname("KEYREL");
+	int		predf = lookup_fname("PRED");
+	int		cargf = lookup_fname("CARG");
+	int	i;
+	char	rel[128], *rptr, *letype, *pos;
+
+	for(i=0;i<nlexemes;i++)
+	{
+		synsem = dg_hop(lexemes[i]->dg, synsemf);
+		if(synsem)lkeys = dg_hop(synsem, lkeysf);
+		if(synsem && lkeys)keyrel = dg_hop(lkeys, keyrelf);
+		if(synsem && keyrel)
+		{
+			pred = dg_hop(keyrel, predf);
+			carg = dg_hop(keyrel, cargf);
+			if(pred)rptr = pred->xtype->name;
+			else if(carg)rptr = carg->xtype->name;
+			else rptr = 0;
+			if(rptr)
+			{
+				if(*rptr == '"')
+				{
+					strcpy(rel, rptr+1);
+					if(*rel)rel[strlen(rel)-1] = 0;
+				}
+				else strcpy(rel, rptr);
+				letype = lexemes[i]->dg->xtype->name;
+				if(!strncmp(letype, "n_", 2))pos = "noun";
+				else if(!strncmp(letype, "v_", 2))pos = "verb";
+				else if(!strncmp(letype, "det_", 4))pos = "det";
+				else if(!strncmp(letype, "adj_", 4))pos = "adj";
+				else if(!strncmp(letype, "adv_", 4))pos = "adv";
+				else if(!strncmp(letype, "p_", 2))pos = "prep";
+				else if(!strncmp(letype, "pp_", 3))pos = "prep";
+				else if(!strncmp(letype, "va_", 3))pos = "auxverb";
+				else if(!strncmp(letype, "vc_", 3))pos = "copverb";
+				else if(!strncmp(letype, "conj_", 5))pos = "conj";
+				else if(!strncmp(letype, "comp_", 5))pos = "comp";
+				else pos = 0;
+				if(pos)fprintf(f, "%s	%s\n", pos, rel);
+			}
+		}
+	}
+
+	pclose(f);
+}
+
 void	add_lexeme(char	*word, struct dg	*dg)
 {
 	struct lexeme	*l = malloc(sizeof(struct lexeme));

@@ -3,7 +3,7 @@
 #include	<getopt.h>
 #include	"chart.h"
 
-int	debug_level = 1;
+int	debug_level = 1, export_parts = 0;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0;
@@ -14,12 +14,13 @@ parse_args(int	argc, char	*argv[])
 {
 	char	*prog = argv[0], ch;
 
-	while((ch=getopt(argc, argv, "hvg:G:"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvlg:G:"))!=255)switch(ch)
 	{
-		case	'h':	usage: printf("usage: %s [-h] [-v] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
+		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
 		case	'G':	save_grammar_path = optarg;	break;
+		case	'l':	export_parts = 1;		break;
 		case	'?':	goto usage;
 	}
 	if(optind<argc-1)goto usage;
@@ -67,6 +68,11 @@ main(int	argc, char	*argv[])
 	//dump_grammar();
 
 	g_loaded = 1;
+	if(export_parts)
+	{
+		dump_parts_of_speech();
+		return 0;
+	}
 
 	//print_rule("nadj_rr_nt");
 	//print_type("v_np*_trans_le");
@@ -120,7 +126,7 @@ int	parse_line(char	*line)
 
 	strcpy(copy, line);
 	// break up into words, normalize capitalization
-	w = p = line;
+	w = p = copy;
 	while(*p)
 	{
 		if(*p>='A' && *p<='Z')(*p) += 32;
@@ -138,5 +144,5 @@ int	parse_line(char	*line)
 	if(nwords<=2)return -1;	// experience shows short "sentences" to not usually be interesting
 
 	//printf("%d words\n", nwords);
-	return parse(nwords, words, trim_string(copy));
+	return parse(nwords, words, trim_string(line));
 }
