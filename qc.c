@@ -6,29 +6,6 @@
  * and performs *tree*-unification on that skeleton before
  * the full dag-unifier is allowed to run */
 
-/*
-  43563 unify failed at path: SYNSEM LOCAL CAT HEAD VFORM 
-  45221 unify failed at path: SYNSEM LOCAL CAT HEAD KEYS KEY 
-  59664 unify failed at path: SYNSEM 
-  75342 unify failed at path: SYNSEM LOCAL CAT HEAD MOD 
- 103161 unify failed at path: SYNSEM LOCAL CAT POSTHEAD 
- 113365 unify failed at path: SYNSEM LOCAL CAT HEAD MOD FIRST 
- 225816 unify failed at path: SYNSEM LOCAL CAT VAL COMPS 
- 624508 unify failed at path: SYNSEM LOCAL CAT HEAD 
- */
-
-/*
-  10549 unify failed at path: SYNSEM NON-LOCAL SLASH LAST 
-  11250 unify failed at path: SYNSEM LOCAL CAT HEAD INV 
-  11268 unify failed at path: SYNSEM LOCAL CONT MSG 
-  12404 unify failed at path: SYNSEM LOCAL CAT VAL SPR FIRST 
-  13457 unify failed at path: SYNSEM LOCAL CAT HEAD MOD FIRST LOCAL 
-  13698 unify failed at path: SYNSEM LOCAL CAT MC 
-  13886 unify failed at path: SYNSEM LOCAL CAT VAL SUBJ FIRST OPT 
-*/
-
-#define	QC_SIZE	16
-
 typedef enum
 {
 	_RECORD,
@@ -38,40 +15,91 @@ typedef enum
 
 #define	PUSH(str)	{_PUSH, str}
 #define	POP		{_POP, 0}
-#define	REC		{_RECORD, 0}
+#define	REC(idx)	{_RECORD, (void*)idx}
 
 struct qcinst
 {
 	qccom	com;
 	char	*arg;
 	int	fnum;
-}	qcprog[] = { REC,
-PUSH("SYNSEM"), REC,
-	PUSH("LOCAL"),
-		PUSH("CAT"),
-			PUSH("HEAD"), REC,
-				PUSH("MOD"), REC,
-					PUSH("FIRST"),REC,
-						PUSH("LOCAL"), REC, POP,
-						POP,
-					POP,
-				PUSH("KEYS"), PUSH("KEY"), REC, POP, POP,
-				PUSH("VFORM"), REC, POP,
-				PUSH("INV"), REC, POP,
-				POP,
-			PUSH("VAL"),
-				PUSH("COMPS"), REC, POP,
-				PUSH("SUBJ"), PUSH("FIRST"), PUSH("OPT"), REC, POP, POP, POP,
-				PUSH("SPR"), PUSH("FIRST"), REC, POP, POP,
-				POP,
-			PUSH("POSTHEAD"), REC, POP,
-			PUSH("MC"), REC, POP,
-			POP,
-		POP,
-		PUSH("CONT"), PUSH("MSG"), REC, POP, POP,
-	POP,
-	PUSH("NON-LOCAL"), PUSH("SLASH"), PUSH("LAST"), REC, POP, POP, POP,
-	};
+}	qcprog[] = { 
+
+/*
+REC(6), 
+PUSH("SYNSEM"), REC(4), 
+	PUSH("LOCAL"), PUSH("CAT"),
+		PUSH("HEAD"), REC(0),
+			PUSH("INV"), REC(15), POP, 
+			PUSH("KEYS"), PUSH("KEY"), REC(7), POP, POP, 
+			PUSH("MOD"), REC(5), 
+				PUSH("FIRST"), REC(2), 
+					PUSH("LOCAL"), REC(13), POP, POP, POP, 
+			PUSH("PRD"), REC(14), POP, 
+			PUSH("VFORM"), REC(10), POP, POP, 
+		PUSH("POSTHEAD"), REC(3), POP, 
+		PUSH("VAL"),
+			PUSH("COMPS"), REC(1), POP, 
+			PUSH("SPR"), PUSH("FIRST"), REC(12), 
+				PUSH("OPT"), REC(8), POP, POP, POP, 
+			PUSH("SUBJ"), REC(9), 
+				PUSH("FIRST"), REC(16), 
+					PUSH("OPT"), REC(11), 
+*/
+
+
+REC(6), 
+PUSH("INFLECTED"), REC(25), POP, 
+PUSH("SYNSEM"), REC(5), 
+PUSH("LKEYS"), PUSH("KEYREL"), PUSH("PRED"), REC(22), POP, POP, POP, 
+PUSH("LOCAL"), REC(38), 
+PUSH("CAT"), PUSH("HEAD"), REC(0), 
+PUSH("AUX"), REC(33), POP, 
+PUSH("INV"), REC(16), POP, 
+PUSH("KEYS"), PUSH("ALTKEY"), REC(42), POP, 
+PUSH("KEY"), REC(7), POP, POP, 
+PUSH("MOD"), REC(4), 
+PUSH("FIRST"), REC(2), 
+PUSH("LOCAL"), REC(13), 
+PUSH("CAT"), PUSH("HEAD"), REC(23), 
+PUSH("KEYS"), PUSH("KEY"), REC(35), POP, POP, POP, POP, POP, POP, POP, 
+PUSH("PRD"), REC(15), POP, 
+PUSH("TAM"), PUSH("TENSE"), REC(28), POP, POP, 
+PUSH("VFORM"), REC(8), POP, POP, 
+PUSH("MC"), REC(18), POP, 
+PUSH("POSTHEAD"), REC(3), POP, 
+PUSH("VAL"), PUSH("COMPS"), REC(1), 
+PUSH("FIRST"), PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), REC(34), POP, POP, POP, 
+PUSH("OPT"), REC(27), POP, POP, POP, 
+PUSH("SPEC"), PUSH("FIRST"), REC(39), POP, POP, 
+PUSH("SPR"), REC(20), 
+PUSH("FIRST"), REC(12), 
+PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), PUSH("KEYS"), PUSH("KEY"), REC(30), POP, POP, POP, POP, POP, 
+PUSH("OPT"), REC(9), POP, POP, POP, 
+PUSH("SUBJ"), REC(10), 
+PUSH("FIRST"), REC(14), 
+PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), PUSH("CASE"), REC(29), POP, POP, POP, POP, 
+PUSH("NON-LOCAL"), PUSH("SLASH"), PUSH("LIST"), REC(36), POP, POP, POP, 
+PUSH("OPT"), REC(11), POP, POP, POP, POP, POP, 
+PUSH("CONJ"), REC(26), POP, 
+PUSH("CONT"), PUSH("HOOK"), PUSH("INDEX"), REC(19), 
+PUSH("E"), PUSH("TENSE"), REC(40), POP, POP, POP, 
+PUSH("XARG"), REC(21), POP, POP, 
+PUSH("MSG"), REC(17), 
+PUSH("PRED"), REC(43), POP, POP, POP, 
+PUSH("STEMHEAD"), REC(41), POP, POP, 
+PUSH("NON-LOCAL"), PUSH("QUE"), REC(44), POP, 
+PUSH("REL"), REC(37), POP, 
+PUSH("SLASH"), REC(32), 
+PUSH("LAST"), REC(24), POP, 
+PUSH("LIST"), REC(31), 
+PUSH("FIRST"), PUSH("CAT"), PUSH("HEAD"), REC(45), 
+
+
+};
+
+//#define	QC_SIZE	17
+#define	QC_SIZE	46
+
 #define	nqcprog	(sizeof(qcprog)/(sizeof(struct qcinst)))
 
 struct qc
@@ -85,7 +113,7 @@ struct qc	*extract_qc(struct dg	*d)
 {
 	static int	init = 0;
 	struct qc	*q;
-	int		i, sp = 0, ne = 0;
+	int		i, sp = 0;
 	extern int	generation;
 	struct dg	*stack[32];
 
@@ -115,11 +143,8 @@ struct qc	*extract_qc(struct dg	*d)
 			case	_POP:	--sp;	break;
 			case	_RECORD:
 				if(stack[sp])
-				{
-					q->entries[ne++] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype;
-					//printf("rec[%d] [sp%d] = %s\n", ne-1, sp, q->entries[ne-1]->name);
-				}
-				else q->entries[ne++] = 0;
+					q->entries[(int)qcprog[i].arg] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype;
+				else q->entries[(int)qcprog[i].arg] = 0;
 				break;
 		}
 	}

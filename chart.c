@@ -13,6 +13,7 @@ extern int	debug_level;
 
 static int		nagenda, aagenda;
 static struct edge	**agenda;
+
 int		edge_id;
 
 extern int	*nactive, *npassive, used_total;
@@ -65,12 +66,22 @@ void	add_edge_to_chart(struct edge	*edge)
 
 void	add_agenda(struct edge	*e)
 {
+	int	i;
+
 	nagenda++;
 	if(nagenda>aagenda)
 	{
 		aagenda += 100;
 		agenda = realloc(agenda, sizeof(struct edge*)*aagenda);
 	}
+
+	/*if(e->prio)
+	{
+		for(i=0;i<nagenda-1;i++)
+			if(e->prio > agenda[i]->prio)break;
+		memmove(agenda+i+1, agenda+i, sizeof(struct edge*)*(nagenda-1-i));
+		agenda[i] = e;
+	}*/
 	agenda[nagenda-1] = e;
 }
 
@@ -111,7 +122,7 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 	}
 
 	if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter rejected this combination
-	if(quickcheck(a->qc, b->qc))return 0;	// quickcheck rejected this combination
+	if(!gen_qc && quickcheck(a->qc, b->qc))return 0;	// quickcheck rejected this combination
 
 	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, a->dg->xtype->name, arg);
 	u = unify_dg(b->dg, a->dg, arg);
@@ -254,9 +265,13 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	while(nagenda)
 	{
-		edge = agenda[0];
+		// find highest priority edge on queue
+		j=nagenda-1, k = 0;
+		for(i=0;i<nagenda;i++)
+			if(agenda[i]->prio > k)j=i, k=agenda[i]->prio;
+		edge = agenda[j];
 		nagenda--;
-		memmove(agenda, agenda+1, sizeof(struct edge*)*nagenda);
+		memmove(agenda+j, agenda+j+1, sizeof(struct edge*)*(nagenda-j));
 		if(process_edge(edge))break;
 	}
 
@@ -268,6 +283,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		if(edge->have != edge->need)continue;	// only passive edges, please!
 		root = edge->dg;
 		if(!is_root(root))continue;
+
+		//unfold_edge(edge);
 
 		num_parses++;
 		sem = dg_hop(root, lookup_fname("SYNSEM"));
@@ -297,6 +314,15 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	used_total += used_edges;
 
 	return num_parses;
+}
+
+unfold_edge(struct edge	*e)
+{
+	int	i;
+
+	if(e->rule)fprintf(stderr, "%s\n", e->rule->name);
+	for(i=0;i<e->have;i++)
+		unfold_edge(e->daughters[i]);
 }
 
 int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to)

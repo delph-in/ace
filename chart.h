@@ -14,6 +14,7 @@ struct edge
 
 	struct qc	*qc;	// for passive edges, qc vector for whole edge;
 				// for active edges, qc vector for next daughter
+	int		prio;
 };
 
 struct chart_cell

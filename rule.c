@@ -14,6 +14,8 @@ char	*rule_filter;
 int	*nactive, *npassive;
 int	used_total = 0;
 
+int	rprio[1000];
+
 struct qc	**ruleqc;
 
 rule_stats()
@@ -122,6 +124,8 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 		__qc_use_heap = 0;
 	}
 	e->qc = ruleqc[r->rnum];
+	e->prio = rprio[r->rnum];
+	if(r->lexical && e->prio==0)e->prio = 10;
 
 	return e;
 }
@@ -130,7 +134,7 @@ load_rules_conf()
 {
 	FILE	*f = fopen("rules.conf", "r");
 	char	dir;
-	int	save, i;
+	int	save, i, prio;
 	char	name[1024];
 
 	if(!f)
@@ -142,17 +146,19 @@ load_rules_conf()
 
 	while(!feof(f))
 	{
-		if(fscanf(f, "%c %d %s\n", &dir, &save, name) != 3)break;
+		prio = 0;
+		if(fscanf(f, "%c %d %s %d\n", &dir, &save, name, &prio) < 3)break;
 		//printf("dir %c save %d name %s\n", dir, save, name);
+		for(i=0;i<nrules;i++)
+			if(!strcmp(rules[i]->name, name))break;
+		if(i==nrules)
+			fprintf(stderr, "rules.conf: `%s': no such rule!\n", name);
 		if(dir=='r')
 		{
 			//printf("rule `%s' should go RTL\n", name);
-			for(i=0;i<nrules;i++)
-				if(!strcmp(rules[i]->name, name))break;
-			if(i==nrules)
-				fprintf(stderr, "rules.conf: `%s' is RTL, but no such rule!\n", name);
-			else rules[i]->rtl = 1;
+			rules[i]->rtl = 1;
 		}
+		rprio[i] = prio;
 	}
 
 	fclose(f);
@@ -214,7 +220,7 @@ int	study_rule(char	*name, struct dg	*dg)
 		p = dg_hop(p, 2);	// REST
 	}
 	add_rule(name, dg, num);
-	rules[nrules-1]->lexical = 1;
+	rules[nrules-1]->lexical = 0;
 	return 0;
 }
 
