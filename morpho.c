@@ -50,6 +50,7 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 	// get any non-inflecting lexemes
 	n = add_lexemes_to_chart_for_stem(x, form, 0);
 	count += n;
+	if(!strcmp(form, "is"))return count;
 
 	for(i=0;i<nirules;i++)
 	{

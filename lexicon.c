@@ -15,17 +15,24 @@ int		nlexemes;
 extern int trace;
 
 //#define	FULL_LEXICON
+#define		SIMPLE_LEXICON
 
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 {
 	struct edge	*edge = slab_alloc(sizeof(struct edge));
+	struct dg	*ldg;
 
 	bzero(edge, sizeof(struct edge));
 
 #ifdef	FULL_LEXICON
 	edge->dg = lex->dg;
 #else
-	edge->dg = unify_dg(lex->dg, lex->lextype->dg, -1);
+#ifdef	SIMPLE_LEXICON
+	ldg = expand_lexeme(lex);
+#else
+	ldg = lex->dg;
+#endif
+	edge->dg = unify_dg(ldg, lex->lextype->dg, -1);
 	if(!edge->dg)
 	{
 		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed delayed unification\n", lex->word);
@@ -269,26 +276,83 @@ void	dump_parts_of_speech()
 	pclose(f);
 }
 
+static int	stemfeat = -1, rfeat = 2, ffeat = 1, synsemfeat, lkeysfeat, keyrelfeat, predfeat, compkeyfeat, ocompkeyfeat;
+static struct type	*predsort;
+
+int	nsimpleform = 0;
+
+void	init_fnums()
+{
+	stemfeat = lookup_fname("STEM");
+	synsemfeat = lookup_fname("SYNSEM");
+	lkeysfeat = lookup_fname("LKEYS");
+	keyrelfeat = lookup_fname("KEYREL");
+	predfeat = lookup_fname("PRED");
+	compkeyfeat = lookup_fname("--+COMPKEY");
+	ocompkeyfeat = lookup_fname("--+OCOMPKEY");
+	predsort = lookup_type("predsort");
+}
+
+void	simplify_lexeme(struct lexeme	*l)
+{
+	struct dg	*dg = l->dg, *ss, *lk, *kr, *pr;
+
+	// check for most common structures and just store parameters for them
+	if(l->stemlen != 1)return;
+	if(dg->narcs != 2)return;
+
+	// we want just 'STEM' and 'SYNSEM' features
+	if(dg->arcs[0].label != stemfeat && dg->arcs[1].label != stemfeat)return;
+	if(dg->arcs[0].label != synsemfeat && dg->arcs[1].label != synsemfeat)return;
+
+	ss = dg_hop(dg, synsemfeat);
+	// we want just 'LKEYS'
+	if(ss->narcs != 1 || ss->arcs[0].label != lkeysfeat)return;
+	lk = dg_hop(ss, lkeysfeat);
+	// we want just 'KEYREL'
+	if(lk->narcs != 1 || lk->arcs[0].label != keyrelfeat)return;
+	kr = dg_hop(lk, keyrelfeat);
+	// we want just 'PRED'
+	if(kr->narcs != 1 || kr->arcs[0].label != predfeat)return;
+	pr = dg_hop(kr, predfeat);
+	// we want l->pred
+	if(pr->narcs != 0 || pr->type != l->pred)return;
+
+	//printf("`%s' has simple form\n", l->word);
+	nsimpleform++;
+	l->dg = 0;
+}
+
+struct dg	*expand_lexeme(struct lexeme	*l)
+{
+	struct dg	*dg, *ss, *lk, *kr, *pr, *st, *f;
+
+	if(stemfeat==-1)init_fnums();
+	if(l->dg)return l->dg;
+	dg = atomic_dg("*top*");
+	add_dg_hop(dg, stemfeat, st = atomic_dg("*top*"));
+	add_dg_hop(st, ffeat, f = atomic_dg("*top*"));
+	f->xtype = f->type = l->stem[0];
+	add_dg_hop(dg, synsemfeat, ss = atomic_dg("*top*"));
+	add_dg_hop(ss, lkeysfeat, lk = atomic_dg("*top*"));
+	add_dg_hop(lk, keyrelfeat, kr = atomic_dg("*top*"));
+	add_dg_hop(kr, predfeat, pr = atomic_dg("*top*"));
+	pr->xtype = pr->type = l->pred;
+
+	//printf("expanded `%s':\n", l->word);
+	//print_dg(dg);printf("\n");
+
+	return dg;
+}
+
 void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 {
 	struct lexeme	*l = malloc(sizeof(struct lexeme));
 	struct dg	*stem, *str, *synsem, *lkeys, *keyrel, *pred, *compkey, *ocompkey;
-	static int	sfeat = -1, rfeat = 2, ffeat = 1, synsemfeat, lkeysfeat, keyrelfeat, predfeat, compkeyfeat, ocompkeyfeat;
-	static struct type	*predsort;
 
 	//wellform(dg, word);
 
-	if(sfeat==-1)
-	{
-		sfeat = lookup_fname("STEM");
-		synsemfeat = lookup_fname("SYNSEM");
-		lkeysfeat = lookup_fname("LKEYS");
-		keyrelfeat = lookup_fname("KEYREL");
-		predfeat = lookup_fname("PRED");
-		compkeyfeat = lookup_fname("--+COMPKEY");
-		ocompkeyfeat = lookup_fname("--+OCOMPKEY");
-		predsort = lookup_type("predsort");
-	}
+	if(stemfeat==-1)init_fnums();
 	nlexemes++;
 	lexemes = realloc(lexemes, sizeof(struct lexeme)*nlexemes);
 	lexemes[nlexemes-1] = l;
@@ -334,7 +398,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 		}
 	}
 
-	for(stem = dg_hop(fulldg, sfeat);stem;stem = dg_hop(stem, rfeat))
+	for(stem = dg_hop(fulldg, stemfeat);stem;stem = dg_hop(stem, rfeat))
 	{
 		if(!strcasecmp(stem->type->name, "*null*"))break;
 		str = dg_hop(stem, ffeat);
@@ -363,6 +427,10 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 		fprintf(stderr, "lexeme `%s' has open ended STEM list!\n", word);
 		exit(-1);
 	}
+
+#ifdef	SIMPLE_LEXICON
+	simplify_lexeme(l);
+#endif
 
 	//printf("lexeme %s has %d-long stem starting %s\n", word, l->stemlen, l->stem[0]->name);
 	if(nlexemes%100 == 0)printf("lexeme %s             \r", word); fflush(stdout);
@@ -428,5 +496,7 @@ int	load_lexicon()
 	}
 #endif
 	qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
+	printf("%d / %d = %.2f%% lexemes were simple\n",
+		nsimpleform, nlexemes, 100*(float)nsimpleform / nlexemes);
 	return 0;
 }

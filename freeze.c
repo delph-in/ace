@@ -223,7 +223,7 @@ int	freeze_grammar()
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->dg);
 	for(i=0;i<nlexemes;i++)
 	{
-		patch_dg(lexemes[i]->dg);
+		if(lexemes[i]->dg)patch_dg(lexemes[i]->dg);
 		for(j=0;j<lexemes[i]->stemlen;j++)
 			lexemes[i]->stem[j] = strings[lexemes[i]->stem[j]->tnum];
 	}
@@ -253,7 +253,8 @@ int	freeze_grammar()
 	// freeze lexicon dgs -- this isn't done earlier so that the
 	// 	'struct lexemes' will all be quickly accessible without
 	// 	having to page in all their dgs
-	for(i=0;i<nlexemes;i++)lexemes[i]->dg = copy_dg(lexemes[i]->dg);
+	for(i=0;i<nlexemes;i++)
+		if(lexemes[i]->dg)lexemes[i]->dg = copy_dg(lexemes[i]->dg);
 
 	G->rule_filter = rule_filter;
 	G->ntypes = ntypes;
