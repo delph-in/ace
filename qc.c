@@ -201,3 +201,10 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 		if(a->entries[i]!=b->entries[i])return -1;
 	return 0;
 }
+
+struct qc	*copy_qc(struct qc	*in)
+{
+	struct qc	*out = slab_alloc(sizeof(struct qc));
+	*out = *in;
+	return out;
+}

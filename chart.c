@@ -91,7 +91,9 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 {
 	struct edge	*e, *a = 0, *b = 0;
 	struct dg	*u;
-	int	remain, arg;
+	struct qc	*qc;
+	int	remain, arg, nhave, nneed;
+	extern int	__qc_use_heap;
 
 	if(A->have==A->need)b = A;
 	else a = A;
@@ -124,26 +126,70 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 	if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter rejected this combination
 	if(!gen_qc && quickcheck(a->qc, b->qc))return 0;	// quickcheck rejected this combination
 
-	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, a->dg->xtype->name, arg);
-	u = unify_dg(b->dg, a->dg, arg);
-	if(u)
+	if(!a->dg)
 	{
+		// hyperactive parsing: we don't save active edges' dg's until they're actually used
+		a->dg = unify_dg(a->ha_dg, a->ha_par, a->ha_arg);
+		if(!a->dg)
+		{
+			fprintf(stderr, "hyperactive: rescheduled unify failed!\n");
+			exit(-1);
+		}
+	}
+
+	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, a->dg->xtype->name, arg);
+	if(!unify_dg_tmp(b->dg, a->dg, arg))
+	{
+		nhave = a->have+1;
+		nneed = a->need;
+		if(nhave == nneed)
+		{
+			// building passive
+			u = finalize_tmp(a->dg);
+			if(!u)goto fail;	// cycles might happen, check for them.
+			e = slab_alloc(sizeof(struct edge));
+			e->qc = extract_qc_arg(u, -1);
+			e->prio = 0;
+			e->dg = u;
+		}
+		else
+		{
+			// building active
+			if(check_cycles(a->dg))goto fail;
+			__qc_use_heap = 1;
+			qc = extract_qc_arg(a->dg, a->rtl?(nneed-nhave-1):nhave);
+			__qc_use_heap = 0;
+			forget_tmp();
+			e = slab_alloc(sizeof(struct edge));
+			e->prio = a->prio;
+			e->ha_par = a->dg;
+			e->ha_dg = b->dg;
+			e->ha_arg = arg;
+			e->dg = 0;
+			e->qc = copy_qc(qc);
+			//printf("active qc %p (copy of %p)\n", e->qc, qc);
+			free(qc);
+
+			// XXX the point is we don't want to do this:
+			//u = finalize_tmp(a->dg);
+			//if(!u){fprintf(stderr, "tmp-finalize unexpectedly failed!\n");exit(-1);}
+			//e->dg = u;
+		}
+		e->need = nneed;
+		e->have = nhave;
+		e->rule = a->rule;
+		//printf("new edge qc %p\n", e->qc);
+
 		if(!a->have && !a->used){a->used = 1;used_edges++;}
 		//if(!b->used){b->used = 1;used_edges++;}
 		if(b->lex && a->rule->inflr)
 		{
 			//printf("promoted lexeme %s to word %s via rule %s\n", b->dg->xtype->name, u->xtype->name, a->rule->name);
 		}
-		e = slab_alloc(sizeof(struct edge));
-		e->rule = a->rule;
-		e->dg = u;
 		e->id = next_eid();
-		e->need = a->need;
-		e->have = a->have+1;
 		e->daughters = slab_alloc(sizeof(struct edge*) * e->have);
 		e->rtl = a->rtl;
 		e->used = 0;
-		e->qc = extract_qc_arg(e->dg, (e->have==e->need)?-1: (e->rtl?(e->need-e->have-1):e->have));
 		if(e->rtl)
 		{
 			e->from = b->from;
@@ -186,7 +232,7 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 		else nactive[e->rule->rnum]++;
 		if(trace)
 		{
-			printf("generated #%d %d/%d for [%d-%d] %s with rule %s:	", e->id, e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
+			printf("generated #%d %d/%d for [%d-%d] %s with rule %s:\n", e->id, e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
 			if(trace>1){print_dg(u); printf("\n\n");}
 		}
 	
@@ -198,7 +244,12 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 			return -1;	// give up :(
 		}
 	}
-	else if(trace>1 || gen_qc)unify_backtrace();
+	else
+	{
+		if(trace>1 || gen_qc)unify_backtrace();
+		forget_tmp();
+		fail:;
+	}
 
 	return 0;
 }
@@ -229,7 +280,7 @@ static int	process_edge(struct edge	*e)
 	//printf("processing [%d-%d] edge;    ", e->from, e->to);
 	//printf("  status: %d/%d\n", e->have, e->need);
 
-	if(pack_edge(e))return 0;	// big savings! woohoo!
+	if(e->have == e->need && pack_edge(e))return 0;	// big savings! woohoo!
 	add_edge_to_chart(e);
 
 	// try to combine with edges on either side
@@ -266,6 +317,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	while(nagenda)
 	{
 		// find highest priority edge on queue
+		//j = 0;
 		j=nagenda-1, k = 0;
 		for(i=0;i<nagenda;i++)
 			if(agenda[i]->prio > k)j=i, k=agenda[i]->prio;

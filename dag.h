@@ -33,15 +33,24 @@ struct dg
 	unsigned int	gen;
 };
 
+// basic dag operations
 int		unify_dg_infrom(struct dg	*dg1, struct dg	*dg2);
 struct dg	*unify_dg(struct dg	*a, struct dg	*b, int	arg);
 struct dg	*atomic_dg(char	*name);
 struct dg	*copy_dg(struct dg	*d);
 
+// for hyperactive parsing
+int		unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg);
+struct dg	*finalize_tmp(struct dg	*d);
+int		check_cycles(struct dg	*dg);
+void		forget_tmp();
+
+// quickcheck operations
 struct qc	*extract_qc(struct dg	*d);
 struct qc	*extract_qc_arg(struct dg	*d, int	arg);
 int		quickcheck(struct qc	*a, struct qc	*b);
 int		equiv_quickcheck(struct qc	*a, struct qc	*b);
+struct qc	*copy_qc(struct qc	*in);
 
 struct slab_state
 {
@@ -110,7 +119,7 @@ static inline struct dg	*dereference_dg(struct dg	*dg)
 		dg = dg->forward;
 		if(dg == fw)
 		{
-			//fprintf(stderr, "XXX cycle\n");
+			fprintf(stderr, "XXX deref cycle\n");
 			return 0;
 		}
 	}

@@ -19,16 +19,16 @@ make ambiguity packing work with semantics (and record packing)
 preprocessing fsr?
 statistical parse selection?
 
+FOR Apple SITE:
+make duplicate sentence detector
+add common missing lexemes
+
 OPTIMIZATIONS:
 
 find a way to force struct dg's to align to 32 bytes,
 	so they fit one per cacheline nicely
 find a way to force struct darcs to align to 8 bytes
-smart ordering of agenda
 
-hyperactive parsing -- for certain rules only?
-	- overall, less than 1/5 *active* edges produced ever combines with anything
-
-FOR Apple SITE:
-make duplicate sentence detector
-add common missing lexemes
+smarter ordering of agenda
+hyperactive parsing for certain rules only?
+hyperactive excursion?

@@ -43,6 +43,34 @@ static inline void	forward_dg(struct dg	*from, struct dg	*to)
 	}
 }
 
+int	check_cycles(struct dg	*dg)
+{
+	int	i;
+
+	if(!dg)return -1;
+	dg = dereference_dg(dg);
+	if(!dg)return -1;
+
+	if(dg->gen != generation)
+	{
+		dg->gen = generation;
+		dg->forward = 0;
+		dg->ncarcs = 0;
+		dg->carcs = 0;
+		dg->type = dg->xtype;
+	}
+	else if(dg->copy == (void*)1)return -1;
+	else if(dg->copy == (void*)2)return 0;
+	dg->copy = (void*)1;
+
+	for(i=0;i<dg->narcs;i++)
+		if(check_cycles(dg->arcs[i].dest))return -1;
+	if(dg->gen == generation)for(i=0;i<dg->ncarcs;i++)
+		if(check_cycles(dg->carcs[i].dest))return -1;
+	dg->copy = (void*)2;
+	return 0;
+}
+
 static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
@@ -51,6 +79,10 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 
 	dg = p_dereference_dg(dg);
 	if(!dg)return 0;
+
+	// ignore mark left by check_cycles()
+	if((unsigned int)dg->copy<=2)dg->copy = 0;
+
 	if(dg->copy)return dg->copy;
 
 	newcopy = slab_alloc(sizeof(struct dg));
@@ -86,6 +118,9 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 
 	dg = dereference_dg(dg);
 	if(!dg)return 0;
+
+	// ignore mark left by check_cycles()
+	if((unsigned int)dg->copy<=2)dg->copy = 0;
 
 	if(dg->gen != generation)
 	{
@@ -446,24 +481,14 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	return 0;
 }
 
-// main entry point
-struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
+static struct slab_state	tmpstate;
+
+int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 {
-	struct dg	*res = 0, *to;
+	struct dg	*to;
 	int		i = 0;
-	struct slab_state	state;
 
-	upathl = 0;
-
-	get_slabstate(&state);
-	//dg1 = copy_dg(dg1);
-	//dg2 = copy_dg(dg2);
-
-	//printf("dg1: ");
-	//print_dg(dg1);printf("\n");
-	//printf("rule: ");
-	//print_dg(dg2);printf("\n");
-	//fflush(stdout);
+	get_slabstate(&tmpstate);
 
 	if(arg>=0)
 	{
@@ -482,26 +507,33 @@ struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 	}
 	else to = dg2;
 
-	//printf("next unify...\n");
-	if(!unify1(to, dg1))
-	//if(!unify_dg_infrom(to, dg1))
-	{
-		//printf("unmodified result: ");
-		//flat_print_dg(to); printf("\n");
+	upathl = 0;
+	return unify1(to, dg1);
+}
 
-		res = copy_dg_with_comp_arcs(dg2);
-		//printf("success!\n");
-		//print_dg(res);
-		//printf("\n");
-	}
-	else
-	{
-		set_slabstate(&state);
-		//unify_backtrace();
-	}
+struct dg	*finalize_tmp(struct dg	*d)
+{
+	struct dg	*res = copy_dg_with_comp_arcs(d);
 
+	if(!res)set_slabstate(&tmpstate);
 	generation++;
 	return res;
+}
+
+void	forget_tmp()
+{
+	set_slabstate(&tmpstate);
+	generation++;
+}
+
+// main entry point
+struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
+{
+	if(!unify_dg_tmp(dg1, dg2, arg))
+		return finalize_tmp(dg2);
+	set_slabstate(&tmpstate);
+	generation++;
+	return 0;
 }
 
 static int	marker;
