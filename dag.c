@@ -277,7 +277,7 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 	extern unsigned int	generation;
 
 	/*generation++;
-	if(generation==0xffffffff)
+	if(generation==MAX_GEN)
 	{
 		fprintf(stderr, "generation counter overflowed!\n");
 		exit(-1);
@@ -285,7 +285,7 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 	subsume_forward = subsume_backward = 1;
 	res = subsume_dg1(a, b);
 	generation++;
-	if(generation==0xffffffff)
+	if(generation==MAX_GEN)
 	{
 		fprintf(stderr, "generation counter overflowed!\n");
 		exit(-1);

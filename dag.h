@@ -6,6 +6,12 @@
 
 // tomabechi dgs
 
+#define	MAX_GEN	0xffffffff
+#define	MAX_GEN_RESET 4000000000UL
+
+//#define	MAX_GEN	0xffff
+//#define	MAX_GEN_RESET 55000
+
 struct darc
 {
 	int		label;
@@ -23,6 +29,8 @@ struct dg
 	struct dg	*copy;
 	unsigned short	narcs, ncarcs;
 	unsigned int	gen;
+	//unsigned char	narcs, ncarcs;
+	//unsigned short	gen;
 };
 
 // basic dag operations

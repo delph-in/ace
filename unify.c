@@ -308,7 +308,7 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 struct dg	*copy_dg(struct dg	*d)
 {
 	generation++;
-	if(generation==0xffffffff)
+	if(generation==MAX_GEN)
 	{
 		fprintf(stderr, "ERROR: generation overflowed!\n");
 		exit(-1);
@@ -696,7 +696,7 @@ struct dg	*finalize_tmp(struct dg	*d)
 
 	if(!res)set_slabstate(&tmpstate);
 	generation++;
-	if(generation==0xffffffff)
+	if(generation==MAX_GEN)
 	{
 		fprintf(stderr, "ERROR: generation overflowed!\n");
 		exit(-1);
@@ -708,7 +708,7 @@ void	forget_tmp()
 {
 	set_slabstate(&tmpstate);
 	generation++;
-	if(generation==0xffffffff)
+	if(generation==MAX_GEN)
 	{
 		fprintf(stderr, "ERROR: generation overflowed!\n");
 		exit(-1);
@@ -842,7 +842,7 @@ static void flat_print_dg(struct dg	*d)
 
 void	print_dg(struct dg	*d)
 {
-	if(generation>=0xfffffff0)
+	if(generation>=(MAX_GEN-15))
 	{
 		fprintf(stderr, "ERROR: generation overflowed!\n");
 		exit(-1);
