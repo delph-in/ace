@@ -469,7 +469,11 @@ int	init_fnames()
 	fnames[16] = strdup("STEM");
 	fnames[17] = strdup("RELS");
 	fnames[18] = strdup("HCONS");
+#ifdef	ERG_JULY
+	fnames[19] = strdup("RULE-NAME");
+#else
 	fnames[19] = strdup("RNAME");
+#endif
 	fnames[20] = strdup("RPUNCT");
 
 	return 0;
