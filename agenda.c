@@ -24,6 +24,8 @@ static struct queue
 
 int	highest = -1;
 
+struct task	*lstart[50];
+
 void	clear_agenda()
 {
 	int	i;
@@ -33,6 +35,7 @@ void	clear_agenda()
 		agenda[i].start = 0;	// stuff is slab-alloc'd, don't worry about freeing
 		agenda[i].end = 0;
 	}
+	bzero(lstart, sizeof(struct task*)*50);
 	highest = -1;
 }
 
@@ -52,6 +55,8 @@ void	add_agenda(struct edge	*e)
 	if(agenda[e->prio].end)agenda[e->prio].end->next = t;
 	else agenda[e->prio].start = t;
 	agenda[e->prio].end = t;
+
+	if(e->lex && !lstart[e->from])lstart[e->from] = t;
 
 	if(e->prio > highest)highest = e->prio;
 }
@@ -107,11 +112,11 @@ void	allow_inflr(int	x, struct lexeme	*lex, struct irule	*ir)
 {
 	struct task	*t;
 
-	for(t=agenda[LEX_PRIO].start;t;t=t->next)
-		if(t->edge->lex==lex && t->edge->from==x && t->edge->to==x+1)
-		{
-			allow_edge_inflr(t->edge, ir);
-		}
+	for(t=lstart[x];t;t=t->next)
+	{
+		if(!(t->edge->from==x && t->edge->to==x+1))break;
+		if(t->edge->lex==lex)allow_edge_inflr(t->edge, ir);
+	}
 }
 
 int	reduce_chart(int	length)
@@ -180,9 +185,11 @@ int	lexrulefilt_f(int	x, int	rule)
 {
 	struct task	*t;
 
-	for(t=agenda[LEX_PRIO].start;t;t=t->next)
-		if(t->edge->from==x && t->edge->to==x+1)
-			if(lexfirst(t->edge->dg->type, rule))return 0;
+	for(t=lstart[x];t;t=t->next)
+	{
+		if(!(t->edge->from==x && t->edge->to==x+1))break;
+		if(lexfirst(t->edge->dg->type, rule))return 0;
+	}
 	return 1;
 }
 
@@ -190,8 +197,10 @@ int	lexrulefilt_l(int	x, int	rule)
 {
 	struct task	*t;
 
-	for(t=agenda[LEX_PRIO].start;t;t=t->next)
-		if(t->edge->from==x && t->edge->to==x+1)
-			if(lexlast(t->edge->dg->type, rule))return 0;
+	for(t=lstart[x];t;t=t->next)
+	{
+		if(!(t->edge->from==x && t->edge->to==x+1))break;
+		if(lexlast(t->edge->dg->type, rule))return 0;
+	}
 	return 1;
 }

@@ -201,10 +201,9 @@ struct qc	*extract_qc(struct dg	*d)
 {
 	static int	init = 0;
 	struct qc	*q;
-	int		i, sp = 0;
+	long		i, sp = 0, dst;
 	extern unsigned int	generation;
 	struct dg	*stack[64];
-	struct dg	*dgs[QC_SIZE];
 
 	if(!init)
 	{
@@ -242,16 +241,10 @@ struct qc	*extract_qc(struct dg	*d)
 				break;
 			case	_POP:	--sp;	break;
 			case	_RECORD:
+				dst = (long)qcprog[i].arg;
 				if(stack[sp])
-				{
-					q->entries[(long)qcprog[i].arg] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype;
-					dgs[(long)qcprog[i].arg] = stack[sp];
-				}
-				else
-				{
-					q->entries[(long)qcprog[i].arg] = 0;
-					dgs[(long)qcprog[i].arg] = 0;
-				}
+					q->entries[dst] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype;
+				else q->entries[dst] = 0;
 				break;
 		}
 	}
