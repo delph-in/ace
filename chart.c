@@ -393,6 +393,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	while( !cancel_parse && (edge = next_agenda()) )
 		if(process_edge(edge))break;
 
+	alarm(0);
+
 	// show analyses
 #ifdef	FIRST_ONLY
 	if(sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
