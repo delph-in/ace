@@ -15,6 +15,7 @@ struct chart_cell	*cells;
 int	total_edges, real_edges, passive_edges, used_edges, pused_edges;
 
 extern int	debug_level;
+extern int	question;
 
 int		edge_id;
 
@@ -30,8 +31,8 @@ void	print_sem(struct dg	*dg);
 void	print_rel(struct dg	*rel);
 void	unfold_edge(struct edge	*e);
 
-#define	MAX_CHUNKS	680	// when to give up on a parse
-//#define	MAX_CHUNKS	64	// when to give up on a parse
+//#define	MAX_CHUNKS	680	// when to give up on a parse
+#define	MAX_CHUNKS	71	// when to give up on a parse
 #define	FIRST_ONLY
 
 void	clear_chart(int	size)
@@ -507,10 +508,12 @@ int	skolemize(struct dg	*index)
 	return index->ncarcs;
 }
 
+void	fix_ellipsis(struct dg	*rel);
+
 void	print_sem(struct dg	*dg)
 {
 	int	idx;
-	struct dg	*list, *rel, *hook;
+	struct dg	*list, *rel, *hook, *savelist;
 
 	base_index = 1;
 	hook = dg_hop(dg, lookup_fname("HOOK"));
@@ -530,6 +533,19 @@ void	print_sem(struct dg	*dg)
 		fprintf(stderr, "SEM had no RELS.LIST\n");
 		return;
 	}
+	if(question)
+	{
+		savelist = list;
+		while(list)
+		{
+			rel = dg_hop(list, 1);	// 1 = FIRST
+			if(rel)fix_ellipsis(rel);
+			//else break;//fprintf(stderr, "list element had no FIRST!\n");
+
+			list = dg_hop(list, 2);	// 2 = REST
+		}
+		list = savelist;
+	}
 
 	while(list)
 	{
@@ -538,6 +554,59 @@ void	print_sem(struct dg	*dg)
 		//else break;//fprintf(stderr, "list element had no FIRST!\n");
 
 		list = dg_hop(list, 2);	// 2 = REST
+	}
+}
+
+void	fix_ellipsis(struct dg	*rel)
+{
+	int		i, narg;
+	char		afeat[32];
+	struct dg	*pred;
+	struct dg	*arg;
+	static int	predf, argf[10], init = 0;
+
+	if(!init)
+	{
+		predf = lookup_fname("PRED");
+		for(i=0;i<10;i++)
+		{
+			sprintf(afeat, "ARG%d", i);
+			argf[i] = lookup_fname(afeat);
+		}
+		init=1;
+	}
+
+	pred = dg_hop(rel, predf);
+	if(!pred)
+	{
+		fprintf(stderr, "REL had no PRED\n");
+		return;
+	}
+	if(strcmp(pred->xtype->name, "ellipsis_rel"))return;
+
+	narg = 0;
+	for(i=0;i<10;i++)
+	{
+		arg = dg_hop(rel, argf[i]);
+		if(arg)narg=i+1;
+	}
+	if(narg!=2)
+	{
+		fprintf(stderr, "ellipsis_rel had %d args\n", narg);
+		return;
+	}
+	arg = dg_hop(rel, argf[0]);
+	i = skolemize(arg);
+	if(i == base_index-1)
+	{
+		base_index--;
+		arg = dg_hop(rel, argf[1]);
+		i = skolemize(arg);
+	}
+	if(i==-1)
+	{
+		fprintf(stderr, "ellipsis's REL not skolemizable\n");
+		return;
 	}
 }
 
@@ -580,6 +649,22 @@ void	print_rel(struct dg	*rel)
 	}
 	else strcpy(relstr, pred->xtype->name);
 
+	if(question) do
+	{
+		if(!strncmp(relstr, "bare_", 5))return;
+		if(!strcmp(relstr, "unspec_rel"))return;
+		if(!strcmp(relstr, "unspec_loc_rel"))return;
+		if(!strcmp(relstr, "time_rel"))return;
+		if(!strcmp(relstr, "ellipsis_rel"))return;
+		if(!strcmp(relstr, "abstr_deg_rel"))return;
+		if(!strcmp(relstr, "number_rel"))return;
+		if(strstr(relstr, "_q_"))return;
+		if(strstr(relstr, "_n_"))break;
+		if(!strcmp(relstr, "pron_rel"))break;
+		if(!strcmp(relstr, "thing_rel"))
+			strcpy(relstr, "nwild");
+	} while(0);
+
 	narg = 0;
 	for(i=0;i<10;i++)
 	{
@@ -597,9 +682,9 @@ void	print_rel(struct dg	*rel)
 			fprintf(stderr, "REL.%s not skolemizable\n", afeat);
 			return;
 		}
-		if(i==0 && idx==1)
+		/*if(i==0 && idx==1)
 			printf("	+%s", relstr);
-		else if(i==0)printf("	%s", relstr);
+		else */if(i==0)printf("	%s", relstr);
 		printf(" %d", idx);
 	}
 	if(carg)

@@ -12,7 +12,7 @@ int		nlexemes;
 
 extern int trace;
 
-#define	FULL_LEXICON
+//#define	FULL_LEXICON
 
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 {
