@@ -9,6 +9,7 @@ int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem);
 #include	"chart.h"
 #include	"morpho.h"
 #include	"tdl.h"
+#include	"lexicon.h"
 
 int		nirules;
 struct irule	**irules;
@@ -40,12 +41,16 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 	struct irule	*ir;
 	struct irreg	*irr;
 
+	// get any non-inflecting lexemes
+	n = add_lexemes_to_chart_for_stem(x, form, 0);
+	count += n;
+
 	for(i=0;i<nirules;i++)
 	{
 		ir = irules[i];
 		if(!ir->nsub)
 		{
-			n = add_lexemes_to_chart_for_stem(x, form);
+			n = add_lexemes_to_chart_for_stem(x, form, ir);
 			count += n;
 			if(n)add_agenda(epsilon_edge(ir->rule, x, 0));
 		}
@@ -58,7 +63,7 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 				{
 					//fprintf(stderr, "used irreg `%s -> %s' for rule %s\n",
 					//		irr->stem, irr->form, ir->rule->name);
-					n = add_lexemes_to_chart_for_stem(x, irr->stem);
+					n = add_lexemes_to_chart_for_stem(x, irr->stem, ir);
 					count += n;
 					if(n)add_agenda(epsilon_edge(ir->rule, x, 0));
 					break;
@@ -71,7 +76,7 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 				{
 					//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d]\n",
 					//		form, stem, ir->rule->name, j);
-					n = add_lexemes_to_chart_for_stem(x, stem);
+					n = add_lexemes_to_chart_for_stem(x, stem, ir);
 					count += n;
 					if(n)
 					{

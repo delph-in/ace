@@ -2,6 +2,7 @@
 #define	CHART_H
 
 #include	"dag.h"
+#include	"morpho.h"
 
 struct edge
 {
@@ -22,6 +23,10 @@ struct edge
 	// what dg to unify in to reconstruct this active edge's dg
 	char		ha_arg:4;
 	struct dg	*ha_dg, *ha_par;
+
+	// 1 for allowed inflr's, 0 for disallowed
+	char		*inflr_allow;
+	int		allow_no_inflr;
 };
 
 struct chart_cell
@@ -39,6 +44,7 @@ void	clear_chart(int	size);
 void	free_edge(struct edge	*edge);
 int	next_eid();
 int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to);
+void	allow_inflr(int	x, struct lexeme	*lex, struct irule	*ir);
 int	reduce_chart(int	length);
 void	output_lui(char	*words[]);
 

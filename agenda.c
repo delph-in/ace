@@ -4,6 +4,7 @@
 #include	<stdio.h>
 
 #include	"chart.h"
+#include	"morpho.h"
 #include	"lexicon.h"
 
 extern int	debug_level;
@@ -86,6 +87,31 @@ int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to)
 		if(t->edge->lex==lex && t->edge->from==from && t->edge->to==to)
 			return 1;
 	return 0;
+}
+
+void	allow_edge_inflr(struct edge	*e, struct irule	*ir)
+{
+	if(!ir)
+	{
+		//printf("allow no irule on edge %d\n", e->id);
+		e->allow_no_inflr = 1;
+	}
+	else
+	{
+		//printf("allow irule %s on edge %d\n", ir->rule->name, e->id);
+		e->inflr_allow[ir->rule->rnum] = 1;
+	}
+}
+
+void	allow_inflr(int	x, struct lexeme	*lex, struct irule	*ir)
+{
+	struct task	*t;
+
+	for(t=agenda[LEX_PRIO].start;t;t=t->next)
+		if(t->edge->lex==lex && t->edge->from==x && t->edge->to==x+1)
+		{
+			allow_edge_inflr(t->edge, ir);
+		}
 }
 
 int	reduce_chart(int	length)

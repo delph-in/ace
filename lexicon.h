@@ -3,6 +3,7 @@
 
 #include	"dag.h"
 #include	"rule.h"
+#include	"morpho.h"
 
 struct lexeme
 {
@@ -17,7 +18,7 @@ struct lexeme
 	struct type	*pred;		// this lexeme provides relation 'pred'
 };
 
-int	add_lexemes_to_chart_for_stem(int	x, char	*stem);
+int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct irule	*ir);
 int	add_multilexemes_to_chart(int	x, int	nwords, char	**words);
 void	dump_parts_of_speech();
 int		load_lexicon();

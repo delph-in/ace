@@ -1,7 +1,5 @@
 #ifndef	_MORPHO_H
 #define	_MORPHO_H
-#include	"lexicon.h"
-#include	"dag.h"
 
 struct irule
 {

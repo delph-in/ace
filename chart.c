@@ -172,7 +172,12 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		memcpy(e->daughters, a->daughters, sizeof(struct edge*) * a->have);
 		e->daughters[arg] = b;
 	}
-	if(e->rule->lexical)e->lex = b->lex;
+	if(e->rule->lexical && !e->rule->inflr)
+	{
+		e->lex = b->lex;
+		e->allow_no_inflr = b->allow_no_inflr;
+		e->inflr_allow = b->inflr_allow;
+	}
 	else e->lex = 0;
 	if(trace)
 	{
@@ -219,7 +224,12 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 	//printf("    <%d/%d> + <%d/%d>\n", a->have, a->need, b->have, b->need);
 	//printf("    %s   + %s\n", a->dg->xtype->name, b->dg->xtype->name);
 
-	if(a->rule->lexical && !b->lex)return 0;	// lexical rules may apply only to lexical edges
+	if(a->rule->lexical)
+	{
+		//if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
+		if(b->lex && a->rule->inflr && !b->inflr_allow[a->rule->rnum])return 0;
+	}
+	else if(b->lex && !b->allow_no_inflr)return 0;
 
 	if(a->rtl)
 	{

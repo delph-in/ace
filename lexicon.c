@@ -39,6 +39,9 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	edge->lex = lex;
 	edge->qc = extract_qc(edge->dg);
 	edge->prio = LEX_PRIO;
+	edge->allow_no_inflr = (len==1)?0:1;
+	edge->inflr_allow = slab_alloc(nrules);
+	bzero(edge->inflr_allow, nrules);
 
 	if(trace)
 	{
@@ -111,7 +114,7 @@ int	add_multilexemes_to_chart(int	x, int	nwords, char	**words)
 	else return 0;
 }
 
-int	add_lexemes_to_chart_for_stem(int	x, char	*stem)
+int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct irule	*ir)
 {
 	int		num=0;
 	char		stemcmp[1024];
@@ -135,6 +138,7 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem)
 			if(lexemes[i]->stemlen>1)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+1))
 				add_agenda(lexical_edge(lexemes[i], x, 1));
+			allow_inflr(x, lexemes[i], ir);
 			num++;
 		}
 		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
@@ -142,6 +146,7 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem)
 			if(lexemes[i]->stemlen>1)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+1))
 				add_agenda(lexical_edge(lexemes[i], x, 1));
+			allow_inflr(x, lexemes[i], ir);
 			num++;
 		}
 		return num;

@@ -2,8 +2,10 @@
 #include	<string.h>
 #include	<stdlib.h>
 
-#include	"dag.h"
 #include	"morpho.h"
+#include	"rule.h"
+#include	"lexicon.h"
+#include	"dag.h"
 
 int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
