@@ -116,7 +116,7 @@ int	parse_line(char	*line)
 		printf("%s", line);
 		return -1;
 	}
-	if(!strcmp(line, "All rights reserved."))return -1;	// not interesting.
+	if(!strcmp(line, "All rights reserved.\n"))return -1;	// not interesting.
 
 	strcpy(copy, line);
 	// break up into words, normalize capitalization
