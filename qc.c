@@ -116,7 +116,7 @@ struct qc	*extract_qc(struct dg	*d)
 	static int	init = 0;
 	struct qc	*q;
 	int		i, sp = 0;
-	extern int	generation;
+	extern unsigned int	generation;
 	struct dg	*stack[32];
 
 	if(!init)

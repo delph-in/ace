@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O6 -fomit-frame-pointer -funsigned-char -DERG -g
+CFLAGS=-Wall -O6 -fomit-frame-pointer -funsigned-char -DERG -g
 #CFLAGS=-O6 -fomit-frame-pointer -funsigned-char -fschedule-insns -DERG -march=pentium3 -mcpu=pentium3 -g
 #CFLAGS=-g -pg -O2 -funsigned-char -DERG
 #CFLAGS=-g -funsigned-char -DERG

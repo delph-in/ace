@@ -139,7 +139,7 @@ static inline struct dg	*p_dereference_dg(struct dg	*dg)
 static inline struct dg	*dereference_dg(struct dg	*dg)
 {
 	struct dg	*fw = dg;
-	extern int	generation;
+	extern unsigned int	generation;
 
 	while(1)
 	{
@@ -161,7 +161,7 @@ static inline struct dg	*dereference_dg(struct dg	*dg)
 static inline struct dg	*dg_hop(struct dg	*d, int	label)
 {
 	int	i;
-	extern int	generation;
+	extern unsigned int	generation;
 
 	if(d->forward)d = dereference_dg(d);
 	if(!d)return 0;

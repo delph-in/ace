@@ -164,7 +164,7 @@ char		**fnames;
 int	equiv_same_dg(struct dg	*a)
 {
 	int	i;
-	extern int	generation;
+	extern unsigned int	generation;
 
 	//a = dereference_dg(a);
 	if(a->gen!=generation)
@@ -188,7 +188,7 @@ int	equiv_same_dg(struct dg	*a)
 int	equivalent_dg1(struct dg	*a, struct dg	*b)
 {
 	int	i, j;
-	extern int	generation;
+	extern unsigned int	generation;
 
 	//a = dereference_dg(a);
 	//b = dereference_dg(b);

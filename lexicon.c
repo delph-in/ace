@@ -152,7 +152,7 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem)
 void	dump_parts_of_speech()
 {
 	FILE	*f = popen("uniq", "w");
-	struct dg	*synsem, *lkeys, *keyrel = 0;
+	struct dg	*synsem, *lkeys, *keyrel;
 	struct dg	*pred, *carg;
 	int		synsemf = lookup_fname("SYNSEM");
 	int		lkeysf = lookup_fname("LKEYS");
@@ -165,6 +165,7 @@ void	dump_parts_of_speech()
 	for(i=0;i<nlexemes;i++)
 	{
 		synsem = dg_hop(lexemes[i]->dg, synsemf);
+		lkeys = keyrel = 0;
 		if(synsem)lkeys = dg_hop(synsem, lkeysf);
 		if(synsem && lkeys)keyrel = dg_hop(lkeys, keyrelf);
 		if(synsem && keyrel)
