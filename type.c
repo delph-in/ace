@@ -444,35 +444,36 @@ void	wellform(struct dg	*d, char	*typename)
 	int		i;
 	struct type	*t;
 	//extern char	**fnames;
+	struct darc	*arcs = DARCS(d);
 
 	for(i=0;i<d->narcs;i++)
 	{
-		d->arcs[i].dest = (struct dg*)dereference_dg(d->arcs[i].dest);
-		wfpath[wfpl++] = d->arcs[i].label;
-		wellform(d->arcs[i].dest, typename);
-		t = most_general_type_for_dg(d->arcs[i].dest);
+		arcs[i].dest = (struct dg*)dereference_dg(arcs[i].dest);
+		wfpath[wfpl++] = arcs[i].label;
+		wellform(arcs[i].dest, typename);
+		t = most_general_type_for_dg(arcs[i].dest);
 		if(!t)
 		{
-			fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", d->arcs[i].dest->type->name);
+			fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", arcs[i].dest->type->name);
 			exit(-1);
 		}
-		if(t != d->arcs[i].dest->type)
+		if(t != arcs[i].dest->type)
 		{
-			//fprintf(stderr, "well-formedness forces dag `%s' -> `%s'  (inside constraint for type %s)\n", d->arcs[i].dest->type->name, t->name, typename);
+			//fprintf(stderr, "well-formedness forces dag `%s' -> `%s'  (inside constraint for type %s)\n", arcs[i].dest->type->name, t->name, typename);
 			//for(j=0;j<wfpl;j++)
 				//fprintf(stderr, "%s ", fnames[wfpath[j]]);
 			//fprintf(stderr, "\n");
-			if(!descendent_of(t->tnum, d->arcs[i].dest->type))
+			if(!descendent_of(t->tnum, arcs[i].dest->type))
 			{
-				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", d->arcs[i].dest->type->name, t->name);
+				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i].dest->type->name, t->name);
 				exit(-1);
 			}
-			if(unify_dg_infrom(d->arcs[i].dest, copy_dg(t->dg)))
+			if(unify_dg_infrom(arcs[i].dest, copy_dg(t->dg)))
 			{
 				fprintf(stderr, "failed well-formedness constraint!\n");
 				exit(-1);
 			}
-			//print_da(d->arcs[i].dest);printf("\n");
+			//print_da(arcs[i].dest);printf("\n");
 		}
 		wfpl--;
 	}
@@ -550,7 +551,7 @@ int	load_types()
 	{
 		// introduce top-level features for this type, it might be the most general type for them
 		for(j=0;j<types[i]->dg->narcs;j++)
-			introduce_feature(types[i]->dg->arcs[j].label, i);
+			introduce_feature(DARCS(types[i]->dg)[j].label, i);
 	}
 	number_strings();	// just in case
 

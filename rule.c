@@ -241,7 +241,7 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 	rnamedg = dg_hop(dg, rnamef);
 	if(rnamedg)
 	{
-		add_dg_hop(dg->xtype->dg, rnamef, rnamedg);
+		dg->xtype->dg = add_dg_hop(dg->xtype->dg, rnamef, rnamedg);
 		//printf("added rule name `%s' to rule type `%s'\n", rnamedg->xtype->name, dg->xtype->name);
 	}
 #endif

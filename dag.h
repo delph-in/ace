@@ -23,7 +23,7 @@ struct dg
 {
 	struct type	*type;
 	struct type	*xtype;
-	struct darc	*arcs;
+#define	DARCS(dg)	((struct darc*)(dg+1))
 	struct dg	*forward;
 	struct darc	*carcs;
 	struct dg	*copy;
@@ -44,8 +44,8 @@ void		null_generation();
 void		print_dg(struct dg	*d);
 void		unify_backtrace();
 void		introduce_feature(int	label, int	type);
-void		add_dg_hop(struct dg	*d, int	label, struct dg	*value);
-void		add_dg_feature(struct dg	*d, char	*label, struct dg	*value);
+struct dg	*add_dg_hop(struct dg	*d, int	label, struct dg	*value);
+struct dg	*add_dg_feature(struct dg	*d, char	*label, struct dg	*value);
 int		init_fnames();
 int		equivalent_dg(struct dg	*a, struct dg	*b);
 void		setup_extra_type_dgs();
@@ -169,16 +169,18 @@ static inline struct dg	*dg_hop(struct dg	*d, int	label)
 {
 	int	i, j, k;
 	extern unsigned int	generation;
+	struct darc	*arcs;
 
 	if(d->forward)d = dereference_dg(d);
 	if(!d)return 0;
+	arcs = (struct darc*)(d+1);
 
 	for(i=0,j=d->narcs;i<j;)
 	{
 		k = (i+j)>>1;
-		//printf("guess %d: %d\n", k, d->arcs[k].label);
-		if(d->arcs[k].label==label){d=d->arcs[k].dest;goto ret;}
-		else if(d->arcs[k].label>label)j = k;
+		//printf("guess %d: %d\n", k, arcs[k].label);
+		if(arcs[k].label==label){d=arcs[k].dest;goto ret;}
+		else if(arcs[k].label>label)j = k;
 		else i = k+1;
 	}
 	if(d->gen==generation)

@@ -290,10 +290,10 @@ static void coreference(struct dagify_record	*R, char	*name)
 	R->corefs[R->ncorefs-1].name = strdup(name);
 }
 
-static void add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
+static struct dg *add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
 {
 	int	i;
-	struct dg *step;
+	struct dg *step, *ret = d;
 
 	for(i=0;i<len-1;i++)
 	{
@@ -301,11 +301,14 @@ static void add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
 		if(!step)
 		{
 			step = atomic_dg("*top*");
-			add_dg_hop(d, path[i], step);
+			d = add_dg_hop(d, path[i], step);
+			if(i==0)ret = d;
 		}
 		d = step;
 	}
-	add_dg_hop(d, path[len-1], target);
+	d = add_dg_hop(d, path[len-1], target);
+	if(i==0)ret = d;
+	return ret;
 }
 
 static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
@@ -338,7 +341,7 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 		for(j=0;j<R->corefs[i].pathlen;j++)printf("%d ", R->corefs[i].path[j]);
 		printf("\n");*/
 
-		add_dg_path(coref_template, R->corefs[i].path, R->corefs[i].pathlen, dg);
+		coref_template = add_dg_path(coref_template, R->corefs[i].path, R->corefs[i].pathlen, dg);
 	}
 	//printf("coref template:\n"); print_dg(coref_template); printf("\n");
 	if(unify_dg_infrom(target, coref_template))
@@ -460,8 +463,8 @@ static struct dg	*listify(struct dagify_record	*R, char	*str, struct dg	**last)
 			R->current_pathlen = iplen;
 			return 0;
 		}
-		add_dg_feature(lp, "FIRST", idg);
-		add_dg_feature(lp, "REST", nlp);
+		lp = add_dg_feature(lp, "FIRST", idg);
+		lp = add_dg_feature(lp, "REST", nlp);
 		lp = nlp;
 		R->current_path[R->current_pathlen++] = 2;	// REST
 	}
@@ -481,8 +484,8 @@ static struct dg	*dlistify(struct dagify_record	*R, char	*str)
 	if(!list)return 0;
 
 	dg = type_dg("*diff-list*");
-	add_dg_feature(dg, "LIST", list);
-	add_dg_feature(dg, "LAST", last);
+	dg = add_dg_feature(dg, "LIST", list);
+	dg = add_dg_feature(dg, "LAST", last);
 	return dg;
 }
 
@@ -578,7 +581,7 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 			fprintf(stderr, "hint: structify -> rdagify failed\n");
 			return 0;
 		}
-		add_dg_path(dg, R->current_path+R->current_pathlen, depth, value);
+		dg = add_dg_path(dg, R->current_path+R->current_pathlen, depth, value);
 	}
 
 	return dg;

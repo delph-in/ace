@@ -134,21 +134,40 @@ struct dg	*atomic_dg(char	*name)
 	return dg;
 }
 
-void	add_dg_hop(struct dg	*d, int	label, struct dg	*value)
+struct dg	*add_dg_hop(struct dg	*d, int	label, struct dg	*value)
 {
-	int	i;
+	int	i, olen, nlen;
+	struct dg	*dn;
+	struct darc	*arcs;
 
 	d = dereference_dg(d);
-	// insert in sorted order
-	for(i=0;i<d->narcs;i++)if(d->arcs[i].label>=label)break;
-	if(i==d->narcs || d->arcs[i].label>label)
+	// find in sorted order
+	arcs = DARCS(d);
+	for(i=0;i<d->narcs;i++)if(arcs[i].label>=label)break;
+
+	if(i==d->narcs || arcs[i].label>label)
 	{
+		// need to grow list of arcs
 		d->narcs++;
-		d->arcs = slab_realloc(d->arcs, sizeof(struct darc) * (d->narcs-1), sizeof(struct darc) * d->narcs);
-		memmove(d->arcs+i+1, d->arcs+i, sizeof(struct darc)*(d->narcs-1-i));
+		olen = sizeof(struct dg) + sizeof(struct darc) * (d->narcs-1);
+		nlen = sizeof(struct dg) + sizeof(struct darc) * d->narcs;
+		dn = slab_realloc(d, olen, nlen);
+		if(dn != d)
+		{
+			// oops! we left the old dg behind, forward it along
+			d->gen = 9;
+			d->forward = dn;
+			d = dn;
+			// arcs go directly after the `struct dg'
+			arcs = DARCS(d);
+		}
+
+		memmove(arcs+i+1, arcs+i, sizeof(struct darc)*(d->narcs-1-i));
 	}
-	d->arcs[i].label = label;
-	d->arcs[i].dest = value;
+	arcs[i].label = label;
+	arcs[i].dest = value;
+
+	return d;
 }
 
 int		nfnames;
@@ -161,6 +180,7 @@ int	subsume_same_dg(struct dg	*a)
 {
 	int	i;
 	extern unsigned int	generation;
+	struct darc	*arcs;
 
 	//a = dereference_dg(a);
 	if(a->gen!=generation)
@@ -177,11 +197,13 @@ int	subsume_same_dg(struct dg	*a)
 	//if(a->copy || a->forward)return 0;
 	a->copy = a;
 	a->forward = a;
+
+	arcs = DARCS(a);
 	for(i=0;i<a->narcs;i++)
 	{
-		if(a->arcs[i].label>=14 && a->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+		if(arcs[i].label>=14 && arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
 			continue;
-		if(!subsume_same_dg(a->arcs[i].dest))return 0;
+		if(!subsume_same_dg(arcs[i].dest))return 0;
 	}
 	return 1;
 }
@@ -192,6 +214,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 {
 	int	i, j;
 	extern unsigned int	generation;
+	struct darc	*aarcs, *barcs;
 
 	//a = dereference_dg(a);
 	//b = dereference_dg(b);
@@ -230,26 +253,28 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 
 	//printf("maybe %p <=> %p\n", a, b);
 
+	aarcs = DARCS(a);
+	barcs = DARCS(b);
 	if(a->xtype==b->xtype)
 	{
 		// well-formedness and sortedness conditions guarantee that since
 		// types match exactly, arc labels match exactly...
 		for(i=0;i<a->narcs;i++)
 		{
-			if(a->arcs[i].label>=14 && a->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+			if(aarcs[i].label>=14 && aarcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
 				continue;
-			if(!subsume_dg1(a->arcs[i].dest, b->arcs[i].dest))return 0;
+			if(!subsume_dg1(aarcs[i].dest, barcs[i].dest))return 0;
 		}
 	}
 	else if(subsume_forward) // b is subtype of a, so has strict superset of features
 	{
 		for(i=j=0;i<b->narcs;i++)
 		{
-			if(b->arcs[i].label>=14 && b->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+			if(barcs[i].label>=14 && barcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
 				continue;
-			if(a->arcs[j].label == b->arcs[i].label)
+			if(aarcs[j].label == barcs[i].label)
 			{
-				if(!subsume_dg1(a->arcs[j].dest, b->arcs[i].dest))return 0;
+				if(!subsume_dg1(aarcs[j].dest, barcs[i].dest))return 0;
 				j++;
 			}
 		}
@@ -258,11 +283,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	{
 		for(i=j=0;i<a->narcs;i++)
 		{
-			if(a->arcs[i].label>=14 && a->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+			if(aarcs[i].label>=14 && aarcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
 				continue;
-			if(a->arcs[i].label == b->arcs[j].label)
+			if(aarcs[i].label == barcs[j].label)
 			{
-				if(!subsume_dg1(a->arcs[i].dest, b->arcs[j].dest))return 0;
+				if(!subsume_dg1(aarcs[i].dest, barcs[j].dest))return 0;
 				j++;
 			}
 		}
@@ -306,16 +331,17 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 {
 	int	i, intro = -1, k;
 	struct type	*up = 0, *th;
+	struct darc	*arcs = DARCS(d);
 
 	for(i=0;i<d->narcs;i++)
 	{
-		k = introduce[d->arcs[i].label];
+		k = introduce[arcs[i].label];
 		th = types[k];
 		/*if(k>intro)
 		{
 			//printf("dag `%s' uses `%s', introduced by %s\n",
-					//d->type->name, fnames[d->arcs[i].label],
-					//types[introduce[d->arcs[i].label]]->name);
+					//d->type->name, fnames[arcs[i].label],
+					//types[introduce[arcs[i].label]]->name);
 			intro = k;
 		}*/
 		if(!up)up = th;
@@ -366,9 +392,9 @@ void	unify_backtrace()
 	fflush(stderr);
 }
 
-void	add_dg_feature(struct dg	*d, char	*label, struct dg	*value)
+struct dg	*add_dg_feature(struct dg	*d, char	*label, struct dg	*value)
 {
-	add_dg_hop(d, lookup_fname(label), value);
+	return add_dg_hop(d, lookup_fname(label), value);
 }
 
 int	init_fnames()

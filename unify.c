@@ -45,6 +45,7 @@ static inline void	forward_dg(struct dg	*from, struct dg	*to)
 int	check_cycles(struct dg	*dg)
 {
 	int	i;
+	struct darc	*arcs;
 
 	if(!dg)return -1;
 	if(dg->forward)
@@ -65,8 +66,9 @@ int	check_cycles(struct dg	*dg)
 	else if(dg->copy == (void*)2)return 0;
 	dg->copy = (void*)1;
 
+	arcs = DARCS(dg);
 	for(i=0;i<dg->narcs;i++)
-		if(check_cycles(dg->arcs[i].dest))return -1;
+		if(check_cycles(arcs[i].dest))return -1;
 	if(dg->gen == generation)for(i=0;i<dg->ncarcs;i++)
 		if(check_cycles(dg->carcs[i].dest))return -1;
 	dg->copy = (void*)2;
@@ -76,7 +78,7 @@ int	check_cycles(struct dg	*dg)
 static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
-	struct darc	*aptr;
+	struct darc	*aptr, *optr;
 	int		i;
 
 	dg = p_dereference_dg(dg);
@@ -87,7 +89,7 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 
 	if(dg->copy)return dg->copy;
 
-	newcopy = slab_alloc(sizeof(struct dg));
+	newcopy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*dg->narcs);
 	dg->copy = newcopy;
 	*newcopy = *dg;
 	newcopy->type = newcopy->xtype;
@@ -101,14 +103,16 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 		newcopy->forward = 0;
 		newcopy->gen = generation;
 	}
-	aptr = newcopy->arcs = slab_alloc(sizeof(struct darc) * dg->narcs);
+	aptr = DARCS(newcopy);//slab_alloc(sizeof(struct darc) * dg->narcs);
+	optr = DARCS(dg);
 
 	for(i=0;i<dg->narcs;i++)
 	{
-		aptr->label = dg->arcs[i].label;
-		aptr->dest = copy_dg_no_comp_arcs(dg->arcs[i].dest);
+		aptr->label = optr->label;
+		aptr->dest = copy_dg_no_comp_arcs(optr->dest);
 		if(!aptr->dest)return 0;
 		aptr++;
+		optr++;
 	}
 	return newcopy;
 }
@@ -121,7 +125,7 @@ static int darc_cmp(const void	*a, const void	*b)
 static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 {
 	struct dg	*dg;
-	struct darc	xarc, *aptr;
+	struct darc	xarc, *aptr, *optr;
 	struct dg	*newcopy;
 	char		forwarded, i, j, ch, st;
 	struct slab_state	state;
@@ -167,7 +171,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 
 	get_slabstate(&state);
 
-	newcopy = slab_alloc(sizeof(struct dg));
+	newcopy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*(dg->narcs+dg->ncarcs));
 	//*newcopy = *dg;
 	newcopy->xtype = newcopy->type = dg->type;
 	newcopy->carcs = 0;
@@ -176,36 +180,38 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	newcopy->ncarcs = 0;
 	newcopy->forward = 0;
 	newcopy->narcs = dg->narcs + dg->ncarcs;
-	aptr = newcopy->arcs = slab_alloc(sizeof(struct darc) * newcopy->narcs);
+	aptr = DARCS(newcopy);//slab_alloc(sizeof(struct darc) * newcopy->narcs);
+	optr = DARCS(dg);
 
 	st = 0;
 	if(!dg->ncarcs)
 	{
 		for(i=0;i<dg->narcs;i++)
 		{
-			aptr->label = dg->arcs[(int)i].label;
+			aptr->label = optr->label;
 			//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
-			//		fnames[aptr->label], newcopy->type->name, dg->arcs[i].dest);
+			//		fnames[aptr->label], newcopy->type->name, optr->dest);
 			ch = 0;
-			aptr->dest = copy_dg_with_comp_arcs_ss(dg->arcs[(int)i].dest, &ch);
+			aptr->dest = copy_dg_with_comp_arcs_ss(optr->dest, &ch);
 			if(ch)st = 1;
 			if(!aptr->dest)return 0;
 			aptr++;
+			optr++;
 		}
 	}
 	else for(j=0,i=0;i<dg->narcs || j<dg->ncarcs;) // mergesort
 	{
 		if(j<dg->ncarcs && i<dg->narcs)
 		{
-			if(dg->arcs[(int)i].label < dg->carcs[(int)j].label)
-				xarc = dg->arcs[(int)i++];
+			if(optr[(int)i].label < dg->carcs[(int)j].label)
+				xarc = optr[(int)i++];
 			else xarc = dg->carcs[(int)j++];
 		}
-		else if(i<dg->narcs)xarc = dg->arcs[(int)i++];
+		else if(i<dg->narcs)xarc = optr[(int)i++];
 		else xarc = dg->carcs[(int)j++];
 		aptr->label = xarc.label;
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
-		//		fnames[aptr->label], newcopy->type->name, dg->arcs[i].dest);
+		//		fnames[aptr->label], newcopy->type->name, xarc.dest);
 		ch = 0;
 		aptr->dest = copy_dg_with_comp_arcs_ss(xarc.dest, &ch);
 		if(ch)st = 1;
@@ -234,8 +240,8 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
-	struct darc	*aptr;
-	int		i;
+	struct darc	*aptr, *optr;
+	int		i, nnar;
 
 	dg = dereference_dg(dg);
 	if(!dg)return 0;
@@ -264,7 +270,10 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 		return dg->copy;
 	}
 
-	newcopy = slab_alloc(sizeof(struct dg));
+	if(dg->gen == generation)
+		nnar = dg->narcs + dg->ncarcs;
+	else nnar = dg->narcs;
+	newcopy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*nnar);
 	dg->copy = newcopy;
 	*newcopy = *dg;
 	newcopy->xtype = newcopy->type = (dg->gen==generation)?dg->type:dg->xtype;
@@ -272,21 +281,21 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 	newcopy->copy = 0;
 	newcopy->ncarcs = 0;
 	newcopy->carcs = 0;
-	if(dg->gen == generation)
-		newcopy->narcs = dg->narcs + dg->ncarcs;
-	else newcopy->narcs = dg->narcs;
-	aptr = newcopy->arcs = slab_alloc(sizeof(struct darc) * newcopy->narcs);
+	newcopy->narcs = nnar;
+	aptr = DARCS(newcopy);//slab_alloc(sizeof(struct darc) * newcopy->narcs);
+	optr = DARCS(dg);
 
 	// mark that we are inside this node, to detect cycles
 	newcopy->forward = (void*)1;
 	for(i=0;i<dg->narcs;i++)
 	{
-		aptr->label = dg->arcs[i].label;
+		aptr->label = optr->label;
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
-		//		fnames[aptr->label], newcopy->type->name, dg->arcs[i].dest);
-		aptr->dest = copy_dg_with_comp_arcs(dg->arcs[i].dest);
+		//		fnames[aptr->label], newcopy->type->name, optr->dest);
+		aptr->dest = copy_dg_with_comp_arcs(optr->dest);
 		if(!aptr->dest)return 0;
 		aptr++;
+		optr++;
 	}
 	if(dg->gen == generation)
 	{
@@ -299,7 +308,7 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 			if(!aptr->dest)return 0;
 			aptr++;
 		}
-		qsort(newcopy->arcs, newcopy->narcs, sizeof(struct darc), darc_cmp);
+		qsort(DARCS(newcopy), newcopy->narcs, sizeof(struct darc), darc_cmp);
 	}
 	newcopy->forward = 0;
 	return newcopy;
@@ -323,6 +332,7 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 	unsigned char	news[256], nn=0;
 	struct type	*t, *t1, *t2;
 	struct dg	*extra=0;
+	struct darc	*arcs1, *arcs2;
 
 	dg1 = dereference_dg(dg1);
 	dg2 = dereference_dg(dg2);
@@ -366,14 +376,16 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 
 	// unify dg2's arcs into dg1's arcs
 	// this version of the unifier ignores carcs... for simplicity
+	arcs1 = DARCS(dg1);
+	arcs2 = DARCS(dg2);
 	for(j=0,i=0;i<dg2->narcs;i++)
 	{
-		for(;j<dg1->narcs && dg2->arcs[i].label>dg1->arcs[j].label;j++){}
-		if(j==dg1->narcs || dg2->arcs[i].label != dg1->arcs[j].label)news[nn++] = i;
+		for(;j<dg1->narcs && arcs2[i].label>arcs1[j].label;j++){}
+		if(j==dg1->narcs || arcs2[i].label != arcs1[j].label)news[nn++] = i;
 		else
 		{
-			upath[upathl++] = dg2->arcs[i].label;
-			if(unify_dg_infrom(dg1->arcs[j].dest, dg2->arcs[i].dest))return -1;
+			upath[upathl++] = arcs2[i].label;
+			if(unify_dg_infrom(arcs1[j].dest, arcs2[i].dest))return -1;
 			upathl--;
 		}
 	}
@@ -381,6 +393,7 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 	// add remaining dg2 arcs to dg1
 	if(nn > 0)
 	{
+		/* XXX quick and dirty replacement for the efficient code below
 		dg1->arcs = slab_realloc(dg1->arcs, sizeof(struct darc) * dg1->narcs,
 					sizeof(struct darc) * (dg1->narcs + nn));
 
@@ -396,6 +409,9 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 			dg1->arcs[j+k] = dg2->arcs[i];
 		}
 		dg1->narcs+=nn;
+		*/
+		for(k=0;k<nn;k++)
+			dg1 = add_dg_hop(dg1, arcs2[news[k]].label, arcs2[news[k]].dest);
 		//qsort(dg1->arcs, dg1->narcs, sizeof(struct darc), darc_cmp);
 	}
 
@@ -505,6 +521,7 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	unsigned char	newcs[32], nc=0;
 	struct type	*t, *t1, *t2;
 	struct dg	*extra=0;
+	struct darc	*arcs1, *arcs2;
 
 	if(dg1->forward)dg1 = dereference_dg(dg1);
 	if(dg2->forward)dg2 = dereference_dg(dg2);
@@ -548,22 +565,24 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 
 	forward_dg(dg2, dg1);
 
+	arcs1 = DARCS(dg1);
+	arcs2 = DARCS(dg2);
 	// unify dg2's arcs into dg1's arcs
 	for(j=0,k=0,i=0;i<dg2->narcs;i++)
 	{
 		if(k>=dg1->narcs && j>=dg1->ncarcs)break;
-		upath[upathl++] = dg2->arcs[i].label;
-		for(;k<dg1->narcs && dg2->arcs[i].label > dg1->arcs[k].label;k++) {}
-		if(k<dg1->narcs && dg2->arcs[i].label == dg1->arcs[k].label)
+		upath[upathl++] = arcs2[i].label;
+		for(;k<dg1->narcs && arcs2[i].label > arcs1[k].label;k++) {}
+		if(k<dg1->narcs && arcs2[i].label == arcs1[k].label)
 		{
-			if(unify1(dg1->arcs[k++].dest, dg2->arcs[i].dest))return -1;
+			if(unify1(arcs1[k++].dest, arcs2[i].dest))return -1;
 		}
 		else
 		{
-			for(;j<dg1->ncarcs && dg2->arcs[i].label > dg1->carcs[j].label;j++) {}
-			if(j<dg1->ncarcs && dg2->arcs[i].label == dg1->carcs[j].label)
+			for(;j<dg1->ncarcs && arcs2[i].label > dg1->carcs[j].label;j++) {}
+			if(j<dg1->ncarcs && arcs2[i].label == dg1->carcs[j].label)
 			{
-				if(unify1(dg1->carcs[j++].dest, dg2->arcs[i].dest))return -1;
+				if(unify1(dg1->carcs[j++].dest, arcs2[i].dest))return -1;
 			}
 			else news[nn++] = i;
 		}
@@ -576,10 +595,10 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	{
 		if(k>=dg1->narcs && j>=dg1->ncarcs)break;
 		upath[upathl++] = dg2->carcs[i].label;
-		for(;k<dg1->narcs && dg2->carcs[i].label > dg1->arcs[k].label;k++) {}
-		if(k<dg1->narcs && dg2->carcs[i].label == dg1->arcs[k].label)
+		for(;k<dg1->narcs && dg2->carcs[i].label > arcs1[k].label;k++) {}
+		if(k<dg1->narcs && dg2->carcs[i].label == arcs1[k].label)
 		{
-			if(unify1(dg1->arcs[k++].dest, dg2->carcs[i].dest))return -1;
+			if(unify1(arcs1[k++].dest, dg2->carcs[i].dest))return -1;
 		}
 		else
 		{
@@ -608,9 +627,9 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 		j=k=0;
 		/*if(nn&&nc)while(1)
 		{
-			if(dg2->arcs[news[j]].label < dg2->carcs[newcs[k]].label)
+			if(arcs2[news[j]].label < dg2->carcs[newcs[k]].label)
 			{
-				dg1->carcs[dg1->ncarcs++] = dg2->arcs[news[j++]];
+				dg1->carcs[dg1->ncarcs++] = arcs2[news[j++]];
 				if(j==nn)break;
 			}
 			else
@@ -619,7 +638,7 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 				if(k==nc)break;
 			}
 		}*/
-		while(j<nn) dg1->carcs[dg1->ncarcs++] = dg2->arcs[news[j++]];
+		while(j<nn) dg1->carcs[dg1->ncarcs++] = arcs2[news[j++]];
 		while(k<nc) dg1->carcs[dg1->ncarcs++] = dg2->carcs[newcs[k++]];
 		if(nn+nc < dg1->ncarcs || (nc&&nn))
 		{
@@ -732,18 +751,21 @@ static long	marker;
 static void dagreset_c(struct dg	*d)
 {
 	int	i;
+	struct darc	*arcs;
 
 	d = p_dereference_dg(d);
 	if(!d)return;
 
 	d->copy = 0;
+	arcs = DARCS(d);
 	for(i=0;i<d->narcs;i++)
-		dagreset_c(d->arcs[i].dest);
+		dagreset_c(arcs[i].dest);
 }
 
 static void dgreset_r(struct dg	*d)
 {
 	int	i;
+	struct darc	*arcs;
 
 	d = dereference_dg(d);
 	if(!d)return;
@@ -757,19 +779,22 @@ static void dgreset_r(struct dg	*d)
 		d->type = d->xtype;
 	d->gen = generation;
 
+	arcs = DARCS(d);
 	for(i=0;i<d->narcs;i++)
-		dgreset_r(d->arcs[i].dest);
+		dgreset_r(arcs[i].dest);
 }
 
 static void dgmark(struct dg	*d)
 {
 	int	i;
+	struct darc	*arcs;
 
 	d->ncarcs++;
 	if(d->ncarcs>1)return;
 
+	arcs = DARCS(d);
 	for(i=0;i<d->narcs;i++)
-		dgmark(d->arcs[i].dest);
+		dgmark(arcs[i].dest);
 }
 
 extern char	**fnames;
@@ -777,6 +802,7 @@ extern char	**fnames;
 static void	rprint_dg(struct dg	*d)
 {
 	int	i;
+	struct darc	*arcs;
 
 	if(d->copy)
 	{
@@ -805,10 +831,11 @@ static void	rprint_dg(struct dg	*d)
 	else
 	{
 		printf("#D[%s", (d->gen==generation?d->type:d->xtype)->name);
+		arcs = DARCS(d);
 		for(i=0;i<d->narcs;i++)
 		{
-			printf(" %s: ", fnames[d->arcs[i].label]);
-			rprint_dg(d->arcs[i].dest);
+			printf(" %s: ", fnames[arcs[i].label]);
+			rprint_dg(arcs[i].dest);
 		}
 		printf("]");
 	}
@@ -817,6 +844,7 @@ static void	rprint_dg(struct dg	*d)
 static void flat_print_dg(struct dg	*d)
 {
 	int	i;
+	struct darc	*arcs;
 
 	d = dereference_dg(d);
 
@@ -826,10 +854,11 @@ static void flat_print_dg(struct dg	*d)
 	else
 	{
 		printf("#D[%s", (d->gen==generation?d->type:d->xtype)->name);
+		arcs = DARCS(d);
 		for(i=0;i<d->narcs;i++)
 		{
-			printf(" %s: ", fnames[d->arcs[i].label]);
-			flat_print_dg(d->arcs[i].dest);
+			printf(" %s: ", fnames[arcs[i].label]);
+			flat_print_dg(arcs[i].dest);
 		}
 		if(d->gen==generation && d->ncarcs)for(i=0;i<d->ncarcs;i++)
 		{
@@ -865,19 +894,20 @@ struct dg	*trim_args(struct dg	*d)
 {
 	int		i, narc = 0;
 	struct dg	*copy;
+	struct darc	*arcs = DARCS(d), *cpy_arcs;
 
-	copy = slab_alloc(sizeof(struct dg));
-	*copy = *d;
 	for(i=0;i<d->narcs;i++)
-		if(!(d->arcs[i].label==0 || (d->arcs[i].label>=5 && d->arcs[i].label<=13)))
+		if(!(arcs[i].label==0 || (arcs[i].label>=5 && arcs[i].label<=13)))
 			narc++;
+	copy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*narc);
+	*copy = *d;
 	copy->narcs = narc;
-	copy->arcs = slab_alloc(sizeof(struct dg) * narc);
+	cpy_arcs = DARCS(copy);//slab_alloc(sizeof(struct dg) * narc);
 	narc = 0;
 	for(i=0;i<d->narcs;i++)
 	{
-		if(!(d->arcs[i].label==0 || (d->arcs[i].label>=5 && d->arcs[i].label<=13)))
-			copy->arcs[narc++] = d->arcs[i];
+		if(!(arcs[i].label==0 || (arcs[i].label>=5 && arcs[i].label<=13)))
+			cpy_arcs[narc++] = arcs[i];
 	}
 	return copy;
 }

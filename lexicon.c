@@ -92,15 +92,19 @@ struct lexeme	*proper_noun_lex(char	*name)
 	ty->tnum = 999999;
 
 	// make a skeletal dag for our lexeme
+
+	stem = atomic_dg("*cons*");
+	stem = add_dg_feature(stem, "FIRST", ty->dg);
+	stem = add_dg_feature(stem, "REST", atomic_dg("*null*"));
+
+	kr = add_dg_feature(atomic_dg("*top*"), "CARG", ty->dg);
+	lk = add_dg_feature(atomic_dg("*top*"), "KEYREL", kr);
+	ss = add_dg_feature(atomic_dg("*top*"), "LKEYS", lk);
+
 	extra = atomic_dg("n_proper_le");
 	assert(extra);
-	add_dg_feature(extra, "STEM", stem = atomic_dg("*cons*"));
-	add_dg_feature(stem, "FIRST", ty->dg);
-	add_dg_feature(stem, "REST", atomic_dg("*null*"));
-	add_dg_feature(extra, "SYNSEM", ss = atomic_dg("*top*"));
-	add_dg_feature(ss, "LKEYS", lk = atomic_dg("*top*"));
-	add_dg_feature(lk, "KEYREL", kr = atomic_dg("*top*"));
-	add_dg_feature(kr, "CARG", ty->dg);
+	extra = add_dg_feature(extra, "STEM", stem);
+	extra = add_dg_feature(extra, "SYNSEM", ss);
 
 	// define the lexeme
 	lex = slab_alloc(sizeof(struct lexeme));
@@ -302,18 +306,18 @@ void	simplify_lexeme(struct lexeme	*l)
 	if(dg->narcs != 2)return;
 
 	// we want just 'STEM' and 'SYNSEM' features
-	if(dg->arcs[0].label != stemfeat && dg->arcs[1].label != stemfeat)return;
-	if(dg->arcs[0].label != synsemfeat && dg->arcs[1].label != synsemfeat)return;
+	if(DARCS(dg)[0].label != stemfeat && DARCS(dg)[1].label != stemfeat)return;
+	if(DARCS(dg)[0].label != synsemfeat && DARCS(dg)[1].label != synsemfeat)return;
 
 	ss = dg_hop(dg, synsemfeat);
 	// we want just 'LKEYS'
-	if(ss->narcs != 1 || ss->arcs[0].label != lkeysfeat)return;
+	if(ss->narcs != 1 || DARCS(ss)[0].label != lkeysfeat)return;
 	lk = dg_hop(ss, lkeysfeat);
 	// we want just 'KEYREL'
-	if(lk->narcs != 1 || lk->arcs[0].label != keyrelfeat)return;
+	if(lk->narcs != 1 || DARCS(lk)[0].label != keyrelfeat)return;
 	kr = dg_hop(lk, keyrelfeat);
 	// we want just 'PRED'
-	if(kr->narcs != 1 || kr->arcs[0].label != predfeat)return;
+	if(kr->narcs != 1 || DARCS(kr)[0].label != predfeat)return;
 	pr = dg_hop(kr, predfeat);
 	// we want l->pred
 	if(pr->narcs != 0 || pr->type != l->pred)return;
@@ -329,15 +333,19 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 
 	if(stemfeat==-1)init_fnums();
 	if(l->dg)return l->dg;
-	dg = atomic_dg("*top*");
-	add_dg_hop(dg, stemfeat, st = atomic_dg("*top*"));
-	add_dg_hop(st, ffeat, f = atomic_dg("*top*"));
-	f->xtype = f->type = l->stem[0];
-	add_dg_hop(dg, synsemfeat, ss = atomic_dg("*top*"));
-	add_dg_hop(ss, lkeysfeat, lk = atomic_dg("*top*"));
-	add_dg_hop(lk, keyrelfeat, kr = atomic_dg("*top*"));
-	add_dg_hop(kr, predfeat, pr = atomic_dg("*top*"));
+
+	pr = atomic_dg("*top*");
 	pr->xtype = pr->type = l->pred;
+	kr = add_dg_hop(atomic_dg("*top*"), predfeat, pr);
+	lk = add_dg_hop(atomic_dg("*top*"), keyrelfeat, kr);
+	ss = add_dg_hop(atomic_dg("*top*"), lkeysfeat, lk);
+
+	f = atomic_dg("*top*");
+	f->xtype = f->type = l->stem[0];
+	st = add_dg_hop(atomic_dg("*top*"), ffeat, f);
+	dg = atomic_dg("*top*");
+	dg = add_dg_hop(dg, stemfeat, st);
+	dg = add_dg_hop(dg, synsemfeat, ss);
 
 	//printf("expanded `%s':\n", l->word);
 	//print_dg(dg);printf("\n");
