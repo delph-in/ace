@@ -28,49 +28,49 @@ struct qcinst
 REC(6), 
 PUSH("INFLECTED"), REC(25), POP, 
 PUSH("SYNSEM"), REC(5), 
-PUSH("LKEYS"), PUSH("KEYREL"), PUSH("PRED"), REC(22), POP, POP, POP, 
-PUSH("LOCAL"), REC(38), 
-PUSH("CAT"), PUSH("HEAD"), REC(0), 
-PUSH("AUX"), REC(33), POP, 
-PUSH("INV"), REC(16), POP, 
-PUSH("KEYS"), PUSH("ALTKEY"), REC(42), POP, 
-PUSH("KEY"), REC(7), POP, POP, 
-PUSH("MOD"), REC(4), 
-PUSH("FIRST"), REC(2), 
-PUSH("LOCAL"), REC(13), 
-PUSH("CAT"), PUSH("HEAD"), REC(23), 
-PUSH("KEYS"), PUSH("KEY"), REC(35), POP, POP, POP, POP, POP, POP, POP, 
-PUSH("PRD"), REC(15), POP, 
-PUSH("TAM"), PUSH("TENSE"), REC(28), POP, POP, 
-PUSH("VFORM"), REC(8), POP, POP, 
-PUSH("MC"), REC(18), POP, 
-PUSH("POSTHEAD"), REC(3), POP, 
-PUSH("VAL"), PUSH("COMPS"), REC(1), 
-PUSH("FIRST"), PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), REC(34), POP, POP, POP, 
-PUSH("OPT"), REC(27), POP, POP, POP, 
-PUSH("SPEC"), PUSH("FIRST"), REC(39), POP, POP, 
-PUSH("SPR"), REC(20), 
-PUSH("FIRST"), REC(12), 
-PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), PUSH("KEYS"), PUSH("KEY"), REC(30), POP, POP, POP, POP, POP, 
-PUSH("OPT"), REC(9), POP, POP, POP, 
-PUSH("SUBJ"), REC(10), 
-PUSH("FIRST"), REC(14), 
-PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), PUSH("CASE"), REC(29), POP, POP, POP, POP, 
-PUSH("NON-LOCAL"), PUSH("SLASH"), PUSH("LIST"), REC(36), POP, POP, POP, 
-PUSH("OPT"), REC(11), POP, POP, POP, POP, POP, 
-PUSH("CONJ"), REC(26), POP, 
-PUSH("CONT"), PUSH("HOOK"), PUSH("INDEX"), REC(19), 
-PUSH("E"), PUSH("TENSE"), REC(40), POP, POP, POP, 
-PUSH("XARG"), REC(21), POP, POP, 
-PUSH("MSG"), REC(17), 
-PUSH("PRED"), REC(43), POP, POP, POP, 
-PUSH("STEMHEAD"), REC(41), POP, POP, 
-PUSH("NON-LOCAL"), PUSH("QUE"), REC(44), POP, 
-PUSH("REL"), REC(37), POP, 
-PUSH("SLASH"), REC(32), 
-PUSH("LAST"), REC(24), POP, 
-PUSH("LIST"), REC(31), 
-PUSH("FIRST"), PUSH("CAT"), PUSH("HEAD"), REC(45), 
+	PUSH("LKEYS"), PUSH("KEYREL"), PUSH("PRED"), REC(22), POP, POP, POP, 
+	PUSH("LOCAL"), REC(38), 
+		PUSH("CAT"), PUSH("HEAD"), REC(0), 
+				PUSH("AUX"), REC(33), POP, 
+				PUSH("INV"), REC(16), POP, 
+				PUSH("KEYS"), PUSH("ALTKEY"), REC(42), POP, 
+					PUSH("KEY"), REC(7), POP, POP, 
+				PUSH("MOD"), REC(4), 
+					PUSH("FIRST"), REC(2), 
+						PUSH("LOCAL"), REC(13), 
+							PUSH("CAT"), PUSH("HEAD"), REC(23), 
+									PUSH("KEYS"), PUSH("KEY"), REC(35), POP, POP, POP, POP, POP, POP, POP, 
+				PUSH("PRD"), REC(15), POP, 
+				PUSH("TAM"), PUSH("TENSE"), REC(28), POP, POP, 
+				PUSH("VFORM"), REC(8), POP, POP, 
+			PUSH("MC"), REC(18), POP, 
+			PUSH("POSTHEAD"), REC(3), POP, 
+			PUSH("VAL"), PUSH("COMPS"), REC(1), 
+					PUSH("FIRST"), PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), REC(34), POP, POP, POP, 
+						PUSH("OPT"), REC(27), POP, POP, POP, 
+				PUSH("SPEC"), PUSH("FIRST"), REC(39), POP, POP, 
+				PUSH("SPR"), REC(20), 
+					PUSH("FIRST"), REC(12), 
+						PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), PUSH("KEYS"), PUSH("KEY"), REC(30), POP, POP, POP, POP, POP, 
+						PUSH("OPT"), REC(9), POP, POP, POP, 
+				PUSH("SUBJ"), REC(10), 
+					PUSH("FIRST"), REC(14), 
+						PUSH("LOCAL"), PUSH("CAT"), PUSH("HEAD"), PUSH("CASE"), REC(29), POP, POP, POP, POP, 
+						PUSH("NON-LOCAL"), PUSH("SLASH"), PUSH("LIST"), REC(36), POP, POP, POP, 
+						PUSH("OPT"), REC(11), POP, POP, POP, POP, POP, 
+		PUSH("CONJ"), REC(26), POP, 
+		PUSH("CONT"), PUSH("HOOK"), PUSH("INDEX"), REC(19), 
+					PUSH("E"), PUSH("TENSE"), REC(40), POP, POP, POP, 
+				PUSH("XARG"), REC(21), POP, POP, 
+			PUSH("MSG"), REC(17), 
+				PUSH("PRED"), REC(43), POP, POP, POP, 
+		PUSH("STEMHEAD"), REC(41), POP, POP, 
+	PUSH("NON-LOCAL"), PUSH("QUE"), REC(44), POP, 
+		PUSH("REL"), REC(37), POP, 
+		PUSH("SLASH"), REC(32), 
+			PUSH("LAST"), REC(24), POP, 
+			PUSH("LIST"), REC(31), 
+				PUSH("FIRST"), PUSH("CAT"), PUSH("HEAD"), REC(45), 
 
 /*
 REC(16),
@@ -195,6 +195,8 @@ int	__qc_use_heap = 0;
 
 const int	qcbytes = sizeof(struct type*)*QC_SIZE;
 
+static struct type	*olist, *minus, *_1list, *_0dlist;
+
 struct qc	*extract_qc(struct dg	*d)
 {
 	static int	init = 0;
@@ -202,6 +204,7 @@ struct qc	*extract_qc(struct dg	*d)
 	int		i, sp = 0;
 	extern unsigned int	generation;
 	struct dg	*stack[64];
+	struct dg	*dgs[QC_SIZE];
 
 	if(!init)
 	{
@@ -209,6 +212,10 @@ struct qc	*extract_qc(struct dg	*d)
 		for(i=0;i<nqcprog;i++)
 			if(qcprog[i].com==_PUSH)
 				qcprog[i].fnum = lookup_fname(qcprog[i].arg);
+		olist = lookup_type("*olist*");
+		minus = lookup_type("-");
+		_1list = lookup_type("1-list");
+		_0dlist = lookup_type("0-dlist");
 	}
 
 	if(!__qc_use_heap)
@@ -230,8 +237,15 @@ struct qc	*extract_qc(struct dg	*d)
 			case	_POP:	--sp;	break;
 			case	_RECORD:
 				if(stack[sp])
+				{
 					q->entries[(long)qcprog[i].arg] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype;
-				else q->entries[(long)qcprog[i].arg] = 0;
+					dgs[(long)qcprog[i].arg] = stack[sp];
+				}
+				else
+				{
+					q->entries[(long)qcprog[i].arg] = 0;
+					dgs[(long)qcprog[i].arg] = 0;
+				}
 				break;
 		}
 	}
@@ -277,6 +291,13 @@ int	quickcheck(struct qc	*a, struct qc	*b)
 			return -1;
 		}
 	}
+	// XXX shameless hack
+	if(a->entries[20] == olist && b->entries[9]==minus)return -1;
+	if(b->entries[20] == olist && a->entries[9]==minus)return -1;
+	if(a->entries[31] == _1list && b->entries[32]==_0dlist)return -1;
+	if(b->entries[31] == _1list && a->entries[32]==_0dlist)return -1;
+	if(a->entries[10] == olist && b->entries[11]==minus)return -1;
+	if(b->entries[10] == olist && a->entries[11]==minus)return -1;
 	return 0;
 }
 
@@ -302,3 +323,10 @@ struct qc	*copy_qc(struct qc	*in)
 	*out = *in;
 	return out;
 }
+
+/*
+   1125 SYNSEM LOCAL CAT VAL SUBJ FIRST OPT 
+   1583 SYNSEM NON-LOCAL QUE LAST 
+   2336 SYNSEM NON-LOCAL SLASH LAST 
+   2895 SYNSEM LOCAL CAT VAL SPR FIRST OPT 
+   */
