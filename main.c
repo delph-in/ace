@@ -140,6 +140,7 @@ int	parse_line(char	*line)
 		{
 			case	' ': case '\t': case '.': case '\n':
 			case	',': case '?': case '!':
+				if(nwords>=100) { fprintf(stderr, "Too many words (100+)\n"); return 0; }
 				*p = 0;
 				if(w != p)words[nwords++] = w;
 				w = p+1;
@@ -148,6 +149,7 @@ int	parse_line(char	*line)
 		p++;
 	}
 	if(nwords<=2)return -1;	// experience shows short "sentences" to not usually be interesting
+	if(nwords>50)return 0;	// trying to parse long sentences is a waste of time. we have lots of short ones.
 
 	//printf("%d words\n", nwords);
 	return parse(nwords, words, trim_string(line));

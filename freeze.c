@@ -135,11 +135,16 @@ int	patch_dg(struct dg	*dg)
 	if(dg->xtype->name[0]=='"')dg->xtype = strings[dg->xtype->tnum];
 	else dg->xtype = types[dg->xtype->tnum];
 
+	if(dg->carcs)
+	{
+		fprintf(stderr, "AH HAH: dg with type `%s' had %d carcs!\n", dg->type->name, dg->ncarcs);
+	}
+	dg->ncarcs = 0;
+	dg->carcs = 0;
 	dg->gen = 0;
 	dg->forward = 0;
 	dg->copy = 0;
 	dg->type = dg->xtype;
-	dg->ncarcs = 0;
 
 	//printf("%s\n", dg->type->name);
 	for(i=0;i<dg->narcs;i++)
