@@ -145,8 +145,8 @@ struct qc	*extract_qc(struct dg	*d)
 			case	_POP:	--sp;	break;
 			case	_RECORD:
 				if(stack[sp])
-					q->entries[(int)qcprog[i].arg] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype;
-				else q->entries[(int)qcprog[i].arg] = 0;
+					q->entries[(long)qcprog[i].arg] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype;
+				else q->entries[(long)qcprog[i].arg] = 0;
 				break;
 		}
 	}

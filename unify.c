@@ -79,7 +79,7 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 	if(!dg)return 0;
 
 	// ignore mark left by check_cycles()
-	if((unsigned int)dg->copy<=2)dg->copy = 0;
+	if((unsigned long)dg->copy<=2)dg->copy = 0;
 
 	if(dg->copy)return dg->copy;
 
@@ -125,7 +125,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	forwarded = (dg != dg_underef);
 
 	// ignore mark left by check_cycles()
-	if((unsigned int)dg->copy<=2)dg->copy = 0;
+	if((unsigned long)dg->copy<=2)dg->copy = 0;
 
 	if(dg->gen != generation)
 	{
@@ -148,7 +148,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	}
 
 	if(!dg->narcs && dg->type==dg->xtype &&
-		!((unsigned int)dg>=0x60000000 && (unsigned int)dg<0x70000000) && !dg->ncarcs)goto share;
+		!(dg>=(struct dg*)0x60000000 && dg<(struct dg*)0x78000000) && !dg->ncarcs)goto share;
 
 	// mark that we are inside this node, to detect cycles
 	dg->copy = dg;
@@ -193,7 +193,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	dg->copy = newcopy;
 
 	if(dg->ncarcs || dg->type!=dg->xtype || st ||
-		((unsigned int)dg>=0x60000000 && (unsigned int)dg<0x70000000))	// don't share dg's from the grammar
+		(dg>=(struct dg*)0x60000000 && dg<(struct dg*)0x78000000))	// don't share dg's from the grammar
 	{
 		*chret = 1;
 		return newcopy;
@@ -220,7 +220,7 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 	if(!dg)return 0;
 
 	// ignore mark left by check_cycles()
-	if((unsigned int)dg->copy<=2)dg->copy = 0;
+	if((unsigned long)dg->copy<=2)dg->copy = 0;
 
 	if(dg->gen != generation)
 	{
@@ -650,7 +650,7 @@ struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 	}
 }
 
-static int	marker;
+static long	marker;
 
 static void dagreset_c(struct dg	*d)
 {
@@ -703,7 +703,7 @@ static void	rprint_dg(struct dg	*d)
 
 	if(d->copy)
 	{
-		printf("<%d>", (int)d->copy);
+		printf("<%lld>", (long)d->copy);
 		return;
 	}
 
@@ -711,7 +711,7 @@ static void	rprint_dg(struct dg	*d)
 	if(d->ncarcs>1)
 	{
 		d->copy = (struct dg*)(marker++);
-		printf("<%d>= ", (int)d->copy);
+		printf("<%lld>= ", (long)d->copy);
 	}
 
 	//printf("(%p) ", d);

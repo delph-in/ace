@@ -337,8 +337,8 @@ int	setup_save_frozen_grammar(char	*path)
 
 	if(freeze_fd<0) { perror(path); exit(-1); }
 
-	if(ftruncate(freeze_fd, 0x10000000)) { perror("ftruncate 0x10000000"); exit(-1); }
-	freeze_point = mmap((void*)0x60000000, 0x10000000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, freeze_fd, 0);
+	if(ftruncate(freeze_fd, 0x18000000)) { perror("ftruncate 0x18000000"); exit(-1); }
+	freeze_point = mmap((void*)0x60000000, 0x18000000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, freeze_fd, 0);
 	if(!freeze_point || freeze_point==(void*)0xffffffff)
 	{
 		perror("mmap fixed 0x60000000");
@@ -346,7 +346,7 @@ int	setup_save_frozen_grammar(char	*path)
 	}
 	//fprintf(stderr, "we got %p\n", freeze_point);
 	freeze_next = freeze_point;
-	currslabsize = 0x10000000;
+	currslabsize = 0x18000000;
 	return 0;
 }
 
