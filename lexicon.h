@@ -20,6 +20,7 @@ struct lexeme
 
 int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct irule	*ir);
 int	add_multilexemes_to_chart(int	x, int	nwords, char	**words);
+int	add_generative_lexeme(char	*stem, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3);
 void	dump_parts_of_speech();
 int		load_lexicon();
 struct dg	*expand_lexeme(struct lexeme	*l);

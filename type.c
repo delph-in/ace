@@ -474,7 +474,7 @@ void	wellform(struct dg	*d, char	*typename)
 				fprintf(stderr, "failed well-formedness constraint!\n");
 				exit(-1);
 			}
-			//print_da(arcs[i].dest);printf("\n");
+			//print_dg(arcs[i].dest);printf("\n");
 		}
 		wfpl--;
 	}

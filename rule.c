@@ -122,6 +122,11 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 	e->rule = r;
 	e->need = r->ndaughters;
 	e->have = 0;
+#ifdef	GENERATION
+	e->ep_span = 0;
+	e->from = e->to = 0;
+	//printf("add rule `%s' as edge #%d\n", r->name, e->id);
+#endif
 	e->dg = r->dg;
 	if(!e->dg)
 	{
@@ -204,6 +209,7 @@ void	agenda_rules(int	count)
 		for(j=0;j<nrules;j++)
 		{
 			rtl = rules[j]->rtl;
+#ifndef	GENERATION
 			if(!rules[j]->inflr)	// i-rules are added separately
 			{
 				if(	(!rtl && i+rules[j]->ndaughters <= count) ||
@@ -224,6 +230,9 @@ void	agenda_rules(int	count)
 					add_agenda(epsilon_edge(rules[j], i, rtl));
 				}
 			}
+#else
+			add_agenda(epsilon_edge(rules[j], i, rtl));
+#endif
 		}
 	}
 	//fprintf(stderr, "NOTE: lex-filtered %d epsilon-edges\n", nlf);

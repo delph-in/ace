@@ -825,6 +825,8 @@ static void	rprint_dg(struct dg	*d)
 #endif
 	}
 
+	d = p_dereference_dg(d);
+
 	//printf("(%p) ", d);
 	if(!d->narcs)
 		printf("%s", (d->gen==generation?d->type:d->xtype)->name);

@@ -25,9 +25,12 @@ extern int	*nused, *nhactive, *nactive, *npassive, *nrecomb, used_total, pused_t
 extern int noldslabs;
 extern int	rnohyper[1000];
 
+char	*show_orth_leaves(struct edge	*e);
+
 //int	*rtried;
 
 struct edge	*sentential = 0;
+unsigned int	require_ep_span = 0;
 
 int	cancel_parse;
 
@@ -35,8 +38,8 @@ void	print_sem(struct dg	*dg);
 void	print_rel(struct dg	*rel);
 void	unfold_edge(struct edge	*e);
 
-//#define	MAX_CHUNKS	680	// when to give up on a parse
-#define	MAX_CHUNKS	71	// when to give up on a parse
+#define	MAX_CHUNKS	680	// when to give up on a parse
+//#define	MAX_CHUNKS	71	// when to give up on a parse
 //#define	FIRST_ONLY
 
 void	clear_chart(int	size)
@@ -64,6 +67,7 @@ void	clear_chart(int	size)
 	}
 	clear_agenda();
 	edge_id = 1;
+	require_ep_span = 0;
 
 	clear_slab();
 
@@ -228,9 +232,19 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		e->inflr_allow = b->inflr_allow;
 	}
 	else e->lex = 0;
+
+#ifdef	GENERATION
+	e->ep_span = a->ep_span | b->ep_span;
+#endif
+
 	if(trace)
 	{
+#ifdef	GENERATION
+		printf("generated #%d %d/%d from #%d, #%d for [%8.8X] with rule %s: ", e->id, e->have, e->need, a->id, b->id, e->ep_span, e->rule->name);
+		printf("%s\n", show_orth_leaves(e));
+#else
 		printf("generated #%d %d/%d for [%d-%d] with rule %s:\n", e->id, e->have, e->need, e->from, e->to, e->rule->name);
+#endif
 		if(e->have==e->need && trace>1){print_dg(u); printf("\n\n");}
 	}
 	if(e->need==e->have)
@@ -244,7 +258,13 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		//printf("\n");
 		npassive[e->rule->rnum]++;
 //#ifdef	FIRST_ONLY
-		if(!exhaustive && e->from==0 && e->to==chart_size-1 && is_root(e->dg))
+		if(!exhaustive &&
+#ifdef	GENERATION
+			e->ep_span == require_ep_span &&
+#else
+			e->from==0 && e->to==chart_size-1 &&
+#endif
+			is_root(e->dg))
 		{
 			//printf("sentential\n");
 			e->used = 1;pused_edges++;
@@ -255,10 +275,6 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 //#endif
 	}
 	else nactive[e->rule->rnum]++;
-
-#ifdef	GENERATION
-	e->ep_span = a->ep_span | b->ep_span;
-#endif
 
 	add_agenda(e);
 	return 0;
@@ -277,6 +293,9 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 	//printf("FR: [%d-%d] + [%d-%d]?\n", a->from, a->to, b->from, b->to);
 	//printf("    <%d/%d> + <%d/%d>\n", a->have, a->need, b->have, b->need);
 	//printf("    %s   + %s\n", a->dg->xtype->name, b->dg->xtype->name);
+
+	//if(trace>1)printf("[%8.8X #%d [lex %d infl %p] + %8.8X #%d [lex %d]] rule %s?\n",
+		//a->ep_span, a->id, a->rule->lexical, a->rule->inflr, b->ep_span, b->id, b->lex, a->rule->name);
 
 	if(a->rule->lexical)
 	{
@@ -374,6 +393,9 @@ static int	pack_edge(struct edge	*edge)
 	// since we're taking first-parse-only, this is ok perhaps.
 	for(i=0;i<c->p_nedges;i++)
 		if(!c->p_edges[i]->lex
+#ifdef	GENERATION
+		&& c->p_edges[i]->ep_span == edge->ep_span
+#endif
 		&& c->p_edges[i]->dg->xtype == edge->dg->xtype
 		&& !equiv_quickcheck(c->p_edges[i]->qc, edge->qc)
 		//&& !memcmp(c->p_edges[i]->qc, edge->qc, qcbytes)
@@ -394,9 +416,12 @@ static int	pack_edge(struct edge	*edge)
 
 static int	gen_process_edge(struct edge	*e)
 {
+#ifdef	GENERATION
 	struct chart_cell	*c = cells;
 	int	i;
 
+	if(!lui_chart && e->have == e->need && !e->lex && pack_edge(e))
+		return 0;	// big savings! woohoo!
 	add_edge_to_chart(e);
 
 	// try to combine against any other edge with disjoint ep_span
@@ -415,8 +440,10 @@ static int	gen_process_edge(struct edge	*e)
 		// active edge
 		for(i=0;i<c->p_nedges;i++)
 			if(! (e->ep_span & c->p_edges[i]->ep_span))
-				if(combine(c->p_edges[i], e) == -1)return -1;
+				if(combine(e, c->p_edges[i]) == -1)return -1;
 	}
+#endif
+	return 0;
 }
 
 static int	parse_process_edge(struct edge	*e)
@@ -492,31 +519,105 @@ void	alarm_handler(int	sig)
 	cancel_parse = 1;
 }
 
+char	*show_orth_leaves(struct edge	*e)
+{
+	int		i;
+	char	*sub, *ret;
+
+	if(!e->have)
+	{
+		if(e->lex)
+		{
+			// XXX fix me
+			ret = strdup(e->lex->stem[0]->name+1);
+			ret[strlen(ret)-1] = 0;
+			return ret;
+		}
+		else return strdup("[null]");
+	}
+	if(e->have==1)
+	{
+		sub = show_orth_leaves(e->daughters[0]);
+		if(e->rule->inflr)
+		{
+			ret = inflect(e->rule->inflr, sub);
+			free(sub);
+			return ret;
+		}
+		else return sub;
+	}
+	else
+	{
+		for(ret=calloc(1,1),i=0;i<e->have;i++)
+		{
+			sub = show_orth_leaves(e->daughters[i]);
+			ret = realloc(ret, strlen(ret) + strlen(sub) + 2);
+			if(i)strcat(ret, " ");
+			strcat(ret, sub);
+			free(sub);
+		}
+		return ret;
+	}
+}
+
+#ifdef	GENERATION
 int	generate()
 {
 	struct edge	*edge;
+	char		*str;
+	struct dg	*sk1, *sk2, *sk3;
+	int			i, count = 0;
+	extern struct type	**strings;
 
 	clear_chart(1);
+	sk1 = atomic_dg("*top*"); sk1->type = sk1->xtype = strings[0];
+	sk2 = atomic_dg("*top*"); sk2->type = sk2->xtype = strings[1];
+	sk3 = atomic_dg("*top*"); sk3->type = sk3->xtype = strings[2];
 	// set up some lexemes for the generator to play with
-	add_lexemes_to_chart_for_form(0, "the");
-	add_lexemes_to_chart_for_form(0, "dogs");
-	add_lexemes_to_chart_for_form(0, "barked");
+	add_generative_lexeme("dog", sk1, 0, 0, 0);
+	add_generative_lexeme("cat", sk2, 0, 0, 0);
+	add_generative_lexeme("sometimes", sk3, 0, 0, 0);
+	add_generative_lexeme("those", sk1, 0, 0, 0);
+	add_generative_lexeme("certain", 0, sk2, 0, 0);
+	add_generative_lexeme("chase", 0, sk1, sk2, 0);
 
 	agenda_rules(1);
 	sentential = 0;
 
 	while( (edge = next_agenda(0)) )
-		if(gen_process_edge(edge))break;
+	{
+		//printf("... process %p = #%d\n", edge, edge->id);
+		if(gen_process_edge(edge)){printf("terminated!\n");break;}
+	}
 
 	if(sentential)
 	{
-		printf("NOTE: found a sentential analysis:\n");
-		print_dg(sentential->dg);
-		return 1;
+		i = cells->p_nedges+1;
+		edge = sentential;
+		goto show;
 	}
+	else
+	{
+		for(i=0;i<cells->p_nedges;i++)
+		{
+			edge = cells->p_edges[i];
+			if(edge->ep_span == require_ep_span && is_root(edge->dg))
+			{
+				show:
+				if(trace>0)printf("edge #%d is sentential\n", edge->id);
+				if(trace>1){print_dg(edge->dg); printf("\n");}
+				printf("%s\n", str = show_orth_leaves(edge));
+				free(str);
+				count++;
+			}
+		}
+	}
+	printf("NOTE: %d passive, %d active edges in final generation chart\n",
+		cells->p_nedges, cells->al_nedges + cells->ar_nedges);
 
-	return 0;
+	return count;
 }
+#endif
 
 int	nfinal;
 
@@ -847,10 +948,11 @@ void	output_lui(char	*words[])
 	int	i, j, k, l;
 	struct edge	*e;
 	extern char	*current_sentence;
+	FILE	*lf = popen("yzlui", "w");
 
-	printf("chart 1 %d \"%s\"", chart_size-1, current_sentence);
+	fprintf(lf, "chart 1 %d \"%s\"", chart_size-1, current_sentence);
 	for(i=0;i<chart_size-1;i++)
-		printf(" #E[%d %d %d %d \"%s\" orth [ ]]", -i-1, -i-1, i, i+1, words[i]);
+		fprintf(lf, " #E[%d %d %d %d \"%s\" orth [ ]]", -i-1, -i-1, i, i+1, words[i]);
 
 	for(i=0;i<chart_size;i++)
 		for(j=0;j<chart_size;j++)
@@ -859,15 +961,17 @@ void	output_lui(char	*words[])
 				e = cells[j*chart_size + i].p_edges[k];
 				if(e->rule)
 				{
-					printf(" #E[%d %d %d %d %s %s []", e->id, e->id, j, i, e->rule->name, e->rule->name);
+					fprintf(lf, " #E[%d %d %d %d %s %s []", e->id, e->id, j, i, e->rule->name, e->rule->name);
 					for(l=0;l<e->have;l++)
-						printf(" %d", e->daughters[l]->id);
-					printf("]");
+						fprintf(lf, " %d", e->daughters[l]->id);
+					fprintf(lf, "]");
 				}
 				else if(e->lex)
 				{
-					printf(" #E[%d %d %d %d %s %s [] %d]", e->id, e->id, j, j, e->lex->word, e->lex->word, -1-j);
+					fprintf(lf, " #E[%d %d %d %d %s %s [] %d]", e->id, e->id, j, j, e->lex->word, e->lex->word, -1-j);
 				}
 			}
-	printf("\n");
+	fprintf(lf, "\n");
+	fflush(lf);
+	pclose(lf);
 }

@@ -13,6 +13,7 @@ struct lexeme	**lexemes;
 int		nlexemes;
 
 extern int trace;
+extern unsigned int require_ep_span;
 
 //#define	FULL_LEXICON
 #define		SIMPLE_LEXICON
@@ -43,14 +44,24 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 
 	//edge->dg = copy_dg(edge->dg);
 	edge->id = next_eid();
+#ifdef	GENERATION
+	edge->from = edge->to = 0;
+	edge->ep_span = 1<<i;
+#else
 	edge->from = i;
 	edge->to = i+len;
+#endif
 	edge->lex = lex;
 	edge->qc = extract_qc(edge->dg);
 	edge->prio = LEX_PRIO;
-	edge->allow_no_inflr = (len==1)?0:1;
 	edge->inflr_allow = slab_alloc(nrules);
+#ifdef	GENERATION
+	memset(edge->inflr_allow, 1, nrules);
+	edge->allow_no_inflr = 1;
+#else
 	bzero(edge->inflr_allow, nrules);
+	edge->allow_no_inflr = (len==1)?0:1;
+#endif
 
 	if(trace)
 	{
@@ -218,6 +229,76 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct irule	*ir)
 			if(!lexeme_in_agenda(lexemes[i], x, x+1))
 				add_agenda(lexical_edge(lexemes[i], x, 1));
 			allow_inflr(x, lexemes[i], ir);
+			num++;
+		}
+		return num;
+	}
+	else return 0;
+}
+
+void	skolemize_arg(struct dg	*dg, char	*arg, struct dg	*inst)
+{
+	dg = dg_hop(dg, lookup_fname(arg));
+	if(dg)add_dg_feature(dg, "INSTLOC", inst);
+}
+
+void	skolemize_as(struct dg	*dg, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3)
+{
+	struct dg	*rel=0;
+
+	if(dg)dg = dg_hop(dg, lookup_fname("SYNSEM"));
+	if(dg)dg = dg_hop(dg, lookup_fname("LOCAL"));
+	if(dg)dg = dg_hop(dg, lookup_fname("CONT"));
+	if(dg)dg = dg_hop(dg, lookup_fname("RELS"));
+	if(dg)dg = dg_hop(dg, lookup_fname("LIST"));
+	if(dg)rel = dg_hop(dg, lookup_fname("FIRST"));
+	if(rel)
+	{
+		if(a0)skolemize_arg(rel, "ARG0", a0);
+		if(a1)skolemize_arg(rel, "ARG1", a1);
+		if(a2)skolemize_arg(rel, "ARG2", a2);
+		if(a3)skolemize_arg(rel, "ARG3", a3);
+	}
+}
+
+int	add_generative_lexeme(char	*stem, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3)
+{
+	int		num=0;
+	char		stemcmp[1024];
+	int		i, j, k, r = -1, x;
+	struct edge	*ed;
+	struct dg	*dg;
+
+	for(x=0;require_ep_span & 1<<x;x++){}
+	require_ep_span += 1<<x;
+
+	sprintf(stemcmp, "\"%s\"", stem);
+
+	for(i=0,j=nlexemes-1;i<=j;)
+	{
+		k = (i+j)/2;
+		r = wstrcmp(lexemes[k]->stem[0]->name, stemcmp);
+		if(r==0)break;
+		if(r<0)i = k+1;
+		else j = k-1;
+	}
+	if(r==0)
+	{
+		i=k;
+		for(i=k;i<nlexemes && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
+		{
+			if(lexemes[i]->stemlen>1)continue;
+			add_agenda(ed = lexical_edge(lexemes[i], x, 1));
+			dg = ed->dg;
+			skolemize_as(dg, a0, a1, a2, a3);
+			num++;
+		}
+		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
+		{
+			if(lexemes[i]->stemlen>1)continue;
+			add_agenda(ed = lexical_edge(lexemes[i], x, 1));
+			dg = ed->dg;
+			skolemize_as(dg, a0, a1, a2, a3);
 			num++;
 		}
 		return num;

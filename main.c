@@ -142,9 +142,9 @@ int	main(int	argc, char	*argv[])
 	{
 		fprintf(stderr, "NOTE: parsed %d / %d sentences, avg %dk, time %.5fs\n",
 			success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
-		rule_stats();
-		print_glb_stats();
 	}
+	rule_stats();
+	print_glb_stats();
 	final_chart_stats();
 
 	shutdown_net();

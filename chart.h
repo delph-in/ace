@@ -4,7 +4,7 @@
 #include	"dag.h"
 #include	"morpho.h"
 
-#define	GENERATION
+//#define	GENERATION
 
 struct edge
 {

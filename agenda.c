@@ -104,7 +104,11 @@ int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to)
 	struct task	*t;
 
 	for(t=agenda[LEX_PRIO].start;t;t=t->next)
+#ifdef	GENERATION
+		if(t->edge->lex==lex && t->edge->ep_span == 1<<from)
+#else
 		if(t->edge->lex==lex && t->edge->from==from && t->edge->to==to)
+#endif
 			return 1;
 	return 0;
 }
@@ -127,9 +131,17 @@ void	allow_inflr(int	x, struct lexeme	*lex, struct irule	*ir)
 {
 	struct task	*t;
 
+#ifdef	GENERATION
+	for(t=lstart[0];t;t=t->next)
+#else
 	for(t=lstart[x];t;t=t->next)
+#endif
 	{
+#ifdef	GENERATION
+		if(t->edge->ep_span != 1<<x)continue;
+#else
 		if(!(t->edge->from==x && t->edge->to==x+1))break;
+#endif
 		if(t->edge->lex==lex)allow_edge_inflr(t->edge, ir);
 	}
 }
@@ -166,7 +178,10 @@ int	reduce_chart(int	length)
 			//printf("provided by %s with pred %s\n", t2->edge->lex->word, t2->edge->lex->pred->name);
 			kept:
 			for(i=t1->edge->from;i<t1->edge->to;i++)
+			{
+				//printf("%s provides %d\n", t1->edge->lex->word, i);
 				cover[i] = 1;
+			}
 		}
 	}
 
@@ -175,7 +190,7 @@ int	reduce_chart(int	length)
 	for(i=0;i<length;i++)
 		if(!cover[i])
 		{
-			fprintf(stderr, "NOTE: lexemes do not span!\n");
+			fprintf(stderr, "NOTE: lexemes do not span position %d!\n", i);
 			return -1;
 		}
 

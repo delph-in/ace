@@ -12,8 +12,8 @@
 #include	"lexicon.h"
 #include	"freeze.h"
 
-void		**oldslabs;
-int		noldslabs, aoldslabs, currslabsize;
+extern void		**oldslabs;
+extern int		noldslabs, aoldslabs, currslabsize;
 
 extern int debug_level;
 

@@ -58,7 +58,9 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 		{
 			n = add_lexemes_to_chart_for_stem(x, form, ir);
 			count += n;
+#ifndef	GENERATION
 			if(n)add_agenda(epsilon_edge(ir->rule, x, 0));
+#endif
 		}
 		else
 		{
@@ -71,7 +73,9 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 					//		irr->stem, irr->form, ir->rule->name);
 					n = add_lexemes_to_chart_for_stem(x, irr->stem, ir);
 					count += n;
+#ifndef	GENERATION
 					if(n)add_agenda(epsilon_edge(ir->rule, x, 0));
+#endif
 					break;
 				}
 			}
@@ -81,12 +85,14 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 				if(!invert_ipat_suffix(ir->subpat[j], ir->subrep[j], form, stem))
 				{
 					//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d]\n",
-					//		form, stem, ir->rule->name, j);
+							//form, stem, ir->rule->name, j);
 					n = add_lexemes_to_chart_for_stem(x, stem, ir);
 					count += n;
 					if(n)
 					{
+#ifndef	GENERATION
 						add_agenda(epsilon_edge(ir->rule, x, 0));
+#endif
 						break;
 					}
 				}
@@ -105,7 +111,9 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 		for(i=0;i<nirules;i++)
 			if(irules[i]->nsub==0)
 			{
+#ifndef	GENERATION
 				add_agenda(epsilon_edge(irules[i]->rule, x, 0));
+#endif
 				allow_inflr(x, lex, irules[i]);
 				count++;
 			}
@@ -180,6 +188,26 @@ int	appropriate_letter(int	let, int	group)
 	}
 	else if(lgroups[group][let])return 1;
 	else return 0;
+}
+
+char	*inflect(struct irule	*ir, char	*str)
+{
+	char	*res=0;
+	int		i;
+
+	for(i=0;i<ir->nirregs;i++)
+		if(!strcmp(str, ir->irregs[i].stem))
+			{res = strdup(ir->irregs[i].form);break;}
+	if(!res)
+	{
+		res = malloc(strlen(str) + 10);
+		strcpy(res, str);
+		for(i=ir->nsub-1;i>=0;i--)
+			if(!invert_ipat_suffix(ir->subrep[i], ir->subpat[i], str, res))
+				break;
+	}
+	//printf("inflected[%s] `%s' to `%s'\n", ir->rule->name, str, res);
+	return res;
 }
 
 int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem)
