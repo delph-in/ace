@@ -791,9 +791,9 @@ void	output_lui(char	*words[])
 	struct edge	*e;
 	extern char	*current_sentence;
 
-	printf("chart 1 %d", chart_size-1);
+	printf("chart 1 %d \"%s\"", chart_size-1, current_sentence);
 	for(i=0;i<chart_size-1;i++)
-		printf(" #E[%d -1 %d \"%s\" orth]", -i-1, i, words[i]);
+		printf(" #E[%d %d %d %d \"%s\" orth [ ]]", -i-1, -i-1, i, i+1, words[i]);
 
 	for(i=0;i<chart_size;i++)
 		for(j=0;j<chart_size;j++)
@@ -802,15 +802,15 @@ void	output_lui(char	*words[])
 				e = cells[j*chart_size + i].p_edges[k];
 				if(e->rule)
 				{
-					printf(" #E[%d %d %d %s %s", e->id, j, i, e->rule->name, e->rule->name);
+					printf(" #E[%d %d %d %d %s %s []", e->id, e->id, j, i, e->rule->name, e->rule->name);
 					for(l=0;l<e->have;l++)
 						printf(" %d", e->daughters[l]->id);
 					printf("]");
 				}
 				else if(e->lex)
 				{
-					printf(" #E[%d %d %d %s %s %d]", e->id, j, j, e->lex->word, e->lex->word, -1-j);
+					printf(" #E[%d %d %d %d %s %s [] %d]", e->id, e->id, j, j, e->lex->word, e->lex->word, -1-j);
 				}
 			}
-	printf(" \"%s\"\n", current_sentence);
+	printf("\n");
 }

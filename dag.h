@@ -145,6 +145,9 @@ static inline struct dg	*dereference_dg(struct dg	*dg)
 	struct dg	*fw = dg;
 	extern unsigned int	generation;
 
+	if(dg->gen != generation && dg->gen!=9)return dg;
+	if((dg->gen==generation || dg->gen==9) && dg->forward && !dg->forward->forward)return dg->forward;
+
 	while(1)
 	{
 		// step 'fw' twice
