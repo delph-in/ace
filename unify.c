@@ -110,11 +110,90 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 	return newcopy;
 }
 
+static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
+{
+	struct dg	*newcopy, *dg;
+	struct darc	*aptr;
+	int		i, ch = 0;
+
+	dg = dereference_dg(dg_underef);
+	if(!dg)return 0;
+	if(dg != dg_underef)ch=1;
+
+	// ignore mark left by check_cycles()
+	if((unsigned int)dg->copy<=2)dg->copy = 0;
+
+	if(dg->gen != generation)
+	{
+		dg->copy = 0;
+		dg->forward = 0;
+		dg->ncarcs = 0;
+		dg->carcs = 0;
+		dg->type = dg->xtype;
+		dg->gen = generation;
+	}
+	else if(dg->copy && dg->copy->gen == generation)
+	{
+		// we set the copy's 'forward' to be nonnull while this node is still copying
+		// this lets us detect a cycle
+		if(dg->copy->forward)
+		{
+			//fprintf(stderr, "XXX cycle\n");
+			return 0;
+		}
+		return dg->copy;
+	}
+	if(dg->ncarcs || dg->type!=dg->xtype)ch = 1;
+
+	newcopy = slab_alloc(sizeof(struct dg));
+	dg->copy = newcopy;
+	*newcopy = *dg;
+	newcopy->xtype = newcopy->type = (dg->gen==generation)?dg->type:dg->xtype;
+	newcopy->class = _complex;
+	newcopy->gen = generation;
+	newcopy->copy = 0;
+	newcopy->ncarcs = 0;
+	newcopy->carcs = 0;
+	if(dg->gen == generation)
+		newcopy->aarcs = dg->narcs + dg->ncarcs;
+	else newcopy->aarcs = dg->narcs;
+	newcopy->narcs = 0;
+	aptr = newcopy->arcs = slab_alloc(sizeof(struct darc) * newcopy->aarcs);
+
+	// mark that we are inside this node, to detect cycles
+	newcopy->forward = (void*)1;
+	for(i=0;i<dg->narcs;i++)
+	{
+		aptr->label = dg->arcs[i].label;
+		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
+		//		fnames[aptr->label], newcopy->type->name, dg->arcs[i].dest);
+		aptr->dest = copy_dg_with_comp_arcs_ss(dg->arcs[i].dest, &ch);
+		if(!aptr->dest)return 0;
+		aptr++;
+	}
+	if(dg->gen == generation)
+	{
+		for(i=0;i<dg->ncarcs;i++)
+		{
+			aptr->label = dg->carcs[i].label;
+			//fprintf(stderr, "copying comp `%s' arc from %s to %p\n",
+			//	fnames[aptr->label], newcopy->type->name, dg->carcs[i].dest);
+			aptr->dest = copy_dg_with_comp_arcs_ss(dg->carcs[i].dest, &ch);
+			if(!aptr->dest)return 0;
+			aptr++;
+		}
+	}
+	newcopy->forward = 0;
+	newcopy->narcs = newcopy->aarcs;
+	*chret = ch;
+	return newcopy;
+}
+
 static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
 	struct darc	*aptr;
-	int		i;
+	int		i, ch = 0;
 
 	dg = dereference_dg(dg);
 	if(!dg)return 0;
@@ -518,7 +597,8 @@ int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 
 struct dg	*finalize_tmp(struct dg	*d)
 {
-	struct dg	*res = copy_dg_with_comp_arcs(d);
+	int		ch = 0;
+	struct dg	*res = copy_dg_with_comp_arcs_ss(d, &ch);
 
 	if(!res)set_slabstate(&tmpstate);
 	generation++;
