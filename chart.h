@@ -11,6 +11,9 @@ struct edge
 
 	struct lexeme	*lex;		// non-null if this is a lexical edge
 	short		rtl,used;	// right-to-left instantiation? active been used?
+
+	struct qc	*qc;	// for passive edges, qc vector for whole edge;
+				// for active edges, qc vector for next daughter
 };
 
 struct chart_cell

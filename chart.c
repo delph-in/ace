@@ -74,9 +74,9 @@ void	add_agenda(struct edge	*e)
 	agenda[nagenda-1] = e;
 }
 
-int	trace = 0, gen_qc = 1;
+int	trace = 0, gen_qc = 0;
 
-static int	fundamental_rule(struct edge	*A, struct edge	*B)
+static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 {
 	struct edge	*e, *a = 0, *b = 0;
 	struct dg	*u;
@@ -111,6 +111,7 @@ static int	fundamental_rule(struct edge	*A, struct edge	*B)
 	}
 
 	if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter rejected this combination
+	if(quickcheck(a->qc, b->qc))return 0;	// quickcheck rejected this combination
 
 	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, a->dg->xtype->name, arg);
 	u = unify_dg(b->dg, a->dg, arg);
@@ -131,6 +132,7 @@ static int	fundamental_rule(struct edge	*A, struct edge	*B)
 		e->daughters = slab_alloc(sizeof(struct edge*) * e->have);
 		e->rtl = a->rtl;
 		e->used = 0;
+		e->qc = extract_qc_arg(e->dg, (e->have==e->need)?-1: (e->rtl?(e->need-e->have-1):e->have));
 		if(e->rtl)
 		{
 			e->from = b->from;
@@ -197,7 +199,7 @@ static int	pack_edge(struct edge	*edge)
 
 	// since we're taking first-parse-only, this is ok perhaps.
 	for(i=0;i<c->nedges;i++)
-		if(c->edges[i]->need==c->edges[i]->have && equivalent_dg(c->edges[i]->dg, edge->dg))
+		if(c->edges[i]->need==c->edges[i]->have && !equiv_quickcheck(c->edges[i]->qc, edge->qc) && equivalent_dg(c->edges[i]->dg, edge->dg))
 		{
 			//fprintf(stderr, "packed %p in %p!\n", edge, c->edges[i]);
 			/*printf("host: "); print_dg(c->edges[i]->dg); printf("\n");

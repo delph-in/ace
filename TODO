@@ -21,8 +21,6 @@ statistical parse selection?
 
 OPTIMIZATIONS:
 
-use different quickchecks for different rules
-
 find a way to force struct dg's to align to 32 bytes,
 	so they fit one per cacheline nicely
 find a way to force struct darcs to align to 8 bytes

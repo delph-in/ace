@@ -482,8 +482,6 @@ struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 	}
 	else to = dg2;
 
-	if(quickcheck(to, dg1))return 0;
-
 	//printf("next unify...\n");
 	if(!unify1(to, dg1))
 	//if(!unify_dg_infrom(to, dg1))

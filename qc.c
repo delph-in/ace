@@ -1,98 +1,178 @@
+#include	<stdlib.h>
+
 #include	"dag.h"
 
+/* essentially, QC extracts a skeleton type tree from a dag
+ * and performs *tree*-unification on that skeleton before
+ * the full dag-unifier is allowed to run */
+
 /*
-  10085  SYNSEM LOCAL CAT VAL SPR FIRST OPT 
-  10576  SYNSEM NON-LOCAL SLASH LAST 
-  12579  SYNSEM LOCAL CAT VAL SPR FIRST 
-  12861  SYNSEM LOCAL CONT MSG 
-  13690  SYNSEM LOCAL CAT HEAD MOD FIRST LOCAL 
-  15094  SYNSEM LOCAL CAT MC 
-  15863  SYNSEM LOCAL CAT VAL SUBJ FIRST OPT 
-  15946  SYNSEM LOCAL CAT VAL SUBJ FIRST 
-  16647  SYNSEM LOCAL CAT HEAD PRD 
-  16882  SYNSEM LOCAL CAT HEAD INV 
-  43563  SYNSEM LOCAL CAT HEAD VFORM 
-  45221  SYNSEM LOCAL CAT HEAD KEYS KEY 
-  */
+  43563 unify failed at path: SYNSEM LOCAL CAT HEAD VFORM 
+  45221 unify failed at path: SYNSEM LOCAL CAT HEAD KEYS KEY 
+  59664 unify failed at path: SYNSEM 
+  75342 unify failed at path: SYNSEM LOCAL CAT HEAD MOD 
+ 103161 unify failed at path: SYNSEM LOCAL CAT POSTHEAD 
+ 113365 unify failed at path: SYNSEM LOCAL CAT HEAD MOD FIRST 
+ 225816 unify failed at path: SYNSEM LOCAL CAT VAL COMPS 
+ 624508 unify failed at path: SYNSEM LOCAL CAT HEAD 
+ */
 
-/*struct qc	extract_qc(struct dg	*d)
+/*
+  10549 unify failed at path: SYNSEM NON-LOCAL SLASH LAST 
+  11250 unify failed at path: SYNSEM LOCAL CAT HEAD INV 
+  11268 unify failed at path: SYNSEM LOCAL CONT MSG 
+  12404 unify failed at path: SYNSEM LOCAL CAT VAL SPR FIRST 
+  13457 unify failed at path: SYNSEM LOCAL CAT HEAD MOD FIRST LOCAL 
+  13698 unify failed at path: SYNSEM LOCAL CAT MC 
+  13886 unify failed at path: SYNSEM LOCAL CAT VAL SUBJ FIRST OPT 
+*/
+
+#define	QC_SIZE	16
+
+typedef enum
 {
+	_RECORD,
+	_PUSH,
+	_POP
+} qccom;
+
+#define	PUSH(str)	{_PUSH, str}
+#define	POP		{_POP, 0}
+#define	REC		{_RECORD, 0}
+
+struct qcinst
+{
+	qccom	com;
+	char	*arg;
+	int	fnum;
+}	qcprog[] = { REC,
+PUSH("SYNSEM"), REC,
+	PUSH("LOCAL"),
+		PUSH("CAT"),
+			PUSH("HEAD"), REC,
+				PUSH("MOD"), REC,
+					PUSH("FIRST"),REC,
+						PUSH("LOCAL"), REC, POP,
+						POP,
+					POP,
+				PUSH("KEYS"), PUSH("KEY"), REC, POP, POP,
+				PUSH("VFORM"), REC, POP,
+				PUSH("INV"), REC, POP,
+				POP,
+			PUSH("VAL"),
+				PUSH("COMPS"), REC, POP,
+				PUSH("SUBJ"), PUSH("FIRST"), PUSH("OPT"), REC, POP, POP, POP,
+				PUSH("SPR"), PUSH("FIRST"), REC, POP, POP,
+				POP,
+			PUSH("POSTHEAD"), REC, POP,
+			PUSH("MC"), REC, POP,
+			POP,
+		POP,
+		PUSH("CONT"), PUSH("MSG"), REC, POP, POP,
+	POP,
+	PUSH("NON-LOCAL"), PUSH("SLASH"), PUSH("LAST"), REC, POP, POP, POP,
+	};
+#define	nqcprog	(sizeof(qcprog)/(sizeof(struct qcinst)))
+
+struct qc
+{
+	struct type	*entries[QC_SIZE];
+};
+
+int	__qc_use_heap = 0;
+
+struct qc	*extract_qc(struct dg	*d)
+{
+	static int	init = 0;
 	struct qc	*q;
-
-	q = malloc(sizeof(struct qc));
-}*/
-
-int	quickcheck(struct dg	*a, struct dg	*b)
-{
-	static int	synsemf, localf, catf, headf, valf, compsf, phf, modf, firstf, init=0;
-	struct dg	*synsema, *synsemb, *locala, *localb, *cata, *catb;
-	struct dg	*heada, *headb, *vala, *valb, *compsa, *compsb;
-	struct dg	*moda, *modb, *modfa, *modfb, *pha, *phb;
+	int		i, sp = 0, ne = 0;
+	extern int	generation;
+	struct dg	*stack[32];
 
 	if(!init)
 	{
 		init = 1;
-		synsemf = lookup_fname("SYNSEM");
-		localf = lookup_fname("LOCAL");
-		catf = lookup_fname("CAT");
-		headf = lookup_fname("HEAD");
-		valf = lookup_fname("VAL");
-		compsf = lookup_fname("COMPS");
-		modf = lookup_fname("MOD");
-		firstf = lookup_fname("FIRST");
-		phf = lookup_fname("POSTHEAD");
+		for(i=0;i<nqcprog;i++)
+			if(qcprog[i].com==_PUSH)
+				qcprog[i].fnum = lookup_fname(qcprog[i].arg);
 	}
 
-	if(!glb(a->xtype, b->xtype))return -1;
+	if(!__qc_use_heap)
+		q = slab_alloc(sizeof(struct qc));
+	else q = malloc(sizeof(struct qc));
 
-	synsema = dg_hop(a, synsemf);
-	synsemb = dg_hop(b, synsemf);
-	if(synsema && synsemb)
+	stack[sp] = d;
+	for(i=0;i<nqcprog;i++)
 	{
-		if(!glb(synsema->xtype, synsemb->xtype))return -1;
-		locala = dg_hop(synsema, localf);
-		localb = dg_hop(synsemb, localf);
-		if(locala && localb)
+		switch(qcprog[i].com)
 		{
-			cata = dg_hop(locala, catf);
-			catb = dg_hop(localb, catf);
-			if(cata && catb)
-			{
-				heada = dg_hop(cata, headf);
-				headb = dg_hop(catb, headf);
-				if(heada && headb)
+			case	_PUSH:
+				if(stack[sp])stack[sp+1] = dg_hop(stack[sp], qcprog[i].fnum);
+				else stack[sp+1] = 0;
+				sp++;
+				//printf("on push %s have %p\n", qcprog[i].arg, stack[sp]);
+				break;
+			case	_POP:	--sp;	break;
+			case	_RECORD:
+				if(stack[sp])
 				{
-					if(!glb(heada->xtype, headb->xtype))return -1;
-
-					moda = dg_hop(heada, modf);
-					modb = dg_hop(headb, modf);
-					if(moda && modb)
-					{
-						if(!glb(moda->xtype, modb->xtype))return -1;
-						modfa = dg_hop(moda, firstf);
-						modfb = dg_hop(modb, firstf);
-						if(modfa && modfb)
-							if(!glb(modfa->xtype, modfb->xtype))return -1;
-					}
+					q->entries[ne++] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype;
+					//printf("rec[%d] [sp%d] = %s\n", ne-1, sp, q->entries[ne-1]->name);
 				}
-
-				vala = dg_hop(cata, valf);
-				valb = dg_hop(catb, valf);
-				if(vala && valb)
-				{
-					compsa = dg_hop(vala, compsf);
-					compsb = dg_hop(valb, compsf);
-					if(compsa && compsb)
-						if(!glb(compsa->xtype, compsb->xtype))return -1;
-				}
-
-				pha = dg_hop(cata, phf);
-				phb = dg_hop(catb, phf);
-				if(pha && phb)
-					if(!glb(pha->xtype, phb->xtype))return -1;
-			}
+				else q->entries[ne++] = 0;
+				break;
 		}
 	}
 
+	return q;
+}
+
+struct qc	*extract_qc_arg(struct dg	*d, int	arg)
+{
+	struct dg	*to;
+	int		i = 0;
+
+	if(arg>=0)
+	{
+		to = dg_hop(d, 0);	// 0 is guaranteed to be ARGS
+		while(to && i<arg)
+		{
+			to = dg_hop(to, 2);	// REST
+			i++;
+		}
+		if(to)to = dg_hop(to, 1);	// FIRST
+		if(!to)
+		{
+			fprintf(stderr, "extract_qc_arg: couldn't get arg %d position in %s\n", arg, d->xtype->name);
+			exit(-1);
+		}
+	}
+	else to = d;
+
+	return extract_qc(to);
+}
+
+int	quickcheck(struct qc	*a, struct qc	*b)
+{
+	int	i;
+
+	for(i=0;i<QC_SIZE;i++)
+	{
+		if(a->entries[i] && b->entries[i] &&
+			!glb(a->entries[i], b->entries[i]))
+		{
+			//printf("QC reject %d\n", i);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+int	equiv_quickcheck(struct qc	*a, struct qc	*b)
+{
+	int	i;
+
+	for(i=0;i<QC_SIZE;i++)
+		if(a->entries[i]!=b->entries[i])return -1;
 	return 0;
 }

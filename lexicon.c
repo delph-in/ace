@@ -20,12 +20,10 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	edge->dg = lex->dg;
 	//edge->dg = copy_dg(edge->dg);
 	edge->id = next_eid();
-	edge->have = edge->need = 0;
 	edge->from = i;
 	edge->to = i+len;
 	edge->lex = lex;
-	edge->rtl = 0;
-	edge->used = 0;
+	edge->qc = extract_qc(edge->dg);
 
 	if(trace)
 	{

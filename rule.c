@@ -14,6 +14,8 @@ char	*rule_filter;
 int	*nactive, *npassive;
 int	used_total = 0;
 
+struct qc	**ruleqc;
+
 rule_stats()
 {
 	int	i;
@@ -94,6 +96,7 @@ setup_rule_filter()
 struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 {
 	struct edge	*e = slab_alloc(sizeof(struct edge));
+	extern int	__qc_use_heap;
 
 	bzero(e, sizeof(struct edge));
 	e->from = e->to = x;
@@ -101,17 +104,24 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 	e->rule = r;
 	e->need = r->ndaughters;
 	e->have = 0;
-	e->daughters = 0;
 	e->dg = r->dg;
-	//e->dg = copy_dg(e->dg);
 	if(!e->dg)
 	{
 		fprintf(stderr, "epsilon_edge: bad frozen grammar! rule `%s' has no dg!\n", r->name);
 		exit(-1);
 	}
-	e->lex = 0;
 	e->rtl = rtl;
-	e->used = 0;
+
+	if(!ruleqc)ruleqc = calloc(sizeof(struct qc*), nrules);
+
+	if(!ruleqc[r->rnum])
+	{
+		__qc_use_heap = 1;
+		if(rtl)ruleqc[r->rnum] = extract_qc_arg(r->dg, r->ndaughters-1);
+		else ruleqc[r->rnum] = extract_qc_arg(r->dg, 0);
+		__qc_use_heap = 0;
+	}
+	e->qc = ruleqc[r->rnum];
 
 	return e;
 }
