@@ -2,6 +2,8 @@
 
 #include	<stdio.h>
 #include	<stdlib.h>
+#include	<string.h>
+#include	<assert.h>
 #include	"dag.h"
 #include	"freeze.h"
 
@@ -13,6 +15,7 @@ unsigned int	generation = 10;
 
 // when freezing a grammar, start all copy generations at 10
 void	null_generation() { generation = 10; }
+struct darc	*realloc_carcs(struct darc	*ptr, int	old, int	new);
 
 extern int	upath[1024];
 extern int	upathl;
@@ -409,6 +412,39 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 static struct dg	*extra_ocons, *extra_substcons, *extra_anti_synsem;
 static struct type	*ocons, *substcons, *anti_synsem;
 
+#define		CSDEPTH	10240
+struct darc	*carcstack;
+int		carcsp, carcsgen;
+
+struct darc	*alloc_carcs(int	n)
+{
+	struct darc	*ret;
+
+	if(carcsgen != generation) { carcsgen = generation; carcsp = 0; }
+	assert(carcsp +n <= CSDEPTH);
+	ret = carcstack + carcsp;
+	carcsp+=n;
+	return ret;
+}
+
+struct darc	*realloc_carcs(struct darc	*ptr, int	old, int	new)
+{
+	struct darc	*nptr;
+
+	if(carcsgen != generation) { carcsgen = generation; carcsp = 0; assert(!old); }
+	if(ptr+old == carcstack+carcsp)
+	{
+		carcsp += new-old;
+		return ptr;
+	}
+	else
+	{
+		nptr = alloc_carcs(new);
+		memcpy(nptr, ptr, old*sizeof(struct darc));
+		return nptr;
+	}
+}
+
 void	setup_extra_type_dgs()
 {
 	clear_slab();
@@ -418,6 +454,7 @@ void	setup_extra_type_dgs()
 	extra_substcons = copy_dg(substcons->dg);
 	anti_synsem = lookup_type("anti_synsem");
 	extra_anti_synsem = copy_dg(anti_synsem->dg);
+	carcstack = slab_alloc(sizeof(struct darc)*CSDEPTH);
 	commit_slab();
 }
 
@@ -538,14 +575,11 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	
 
 	// add remaining dg2 arcs and comps arcs to dg1's comps arcs
-	// XXX optimization: use a separate slab allocator for comps arcs
-	// since we want to free them *every* time after unify
-	// otherwise, they sit uselessly on the slab forever
-
 	if(nn+nc > 0)
 	{
-		dg1->carcs = slab_realloc(dg1->carcs, sizeof(struct darc) * dg1->ncarcs,
-				sizeof(struct darc) * (dg1->ncarcs + nn + nc));
+		//dg1->carcs = slab_realloc(dg1->carcs, sizeof(struct darc) * dg1->ncarcs,
+		//		sizeof(struct darc) * (dg1->ncarcs + nn + nc));
+		dg1->carcs = realloc_carcs(dg1->carcs, dg1->ncarcs, dg1->ncarcs + nn + nc);
 
 		//dg1->carcs = realloc(dg1->carcs, sizeof(struct darc) * (dg1->ncarcs + nn + nc));
 
