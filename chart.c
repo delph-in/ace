@@ -203,7 +203,8 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 		if(e->need==e->have)
 		{
 			// just finished a constituent
-			trim_args(e->dg); // fix this for dg's
+			// chop off ARGS et al
+			e->dg = trim_args(e->dg);
 
 			//printf("\n generated %d/%d for [%d-%d] %s with rule %s\n", e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
 			//print_dg(u);
@@ -255,16 +256,19 @@ static int	pack_edge(struct edge	*edge)
 			!c->edges[i]->lex &&
 			c->edges[i]->dg->xtype == edge->dg->xtype &&
 			//!equiv_quickcheck(c->edges[i]->qc, edge->qc) &&
-			!memcmp(c->edges[i]->qc, edge->qc, qcbytes) &&
-			equivalent_dg(c->edges[i]->dg, edge->dg))
+			!memcmp(c->edges[i]->qc, edge->qc, qcbytes))
 		{
-			//fprintf(stderr, "packed #%d in #%d!\n", edge->id, c->edges[i]->id);
-			//printf("host: "); print_dg(c->edges[i]->dg); printf("\n");
-			//printf("pack: "); print_dg(edge->dg); printf("\n");
-			// XXX should record
-			if(edge->lex)printf("HUH? packed a lexical edge!\n");
-			if(c->edges[i]->lex)printf("HUH? packed into a lexical edge!\n");
-			return 1;
+			if(equivalent_dg(c->edges[i]->dg, edge->dg))
+			{
+				//fprintf(stderr, "packed #%d in #%d!\n", edge->id, c->edges[i]->id);
+				//printf("host: "); print_dg(c->edges[i]->dg); printf("\n");
+				//printf("pack: "); print_dg(edge->dg); printf("\n");
+				//printf("EQUIV = %d\n", equivalent_dg(c->edges[i]->dg, edge->dg));
+				// XXX should record
+				if(edge->lex)printf("HUH? packed a lexical edge!\n");
+				if(c->edges[i]->lex)printf("HUH? packed into a lexical edge!\n");
+				return 1;
+			}
 		}
 	return 0;
 }

@@ -114,6 +114,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 		fprintf(stderr, "epsilon_edge: bad frozen grammar! rule `%s' has no dg!\n", r->name);
 		exit(-1);
 	}
+	//e->dg = copy_dg(e->dg);
 	e->rtl = rtl;
 
 	if(!ruleqc)ruleqc = calloc(sizeof(struct qc*), nrules);

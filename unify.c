@@ -110,16 +110,14 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 	return newcopy;
 }
 
+static struct dg	*subcopy_dg_ss(struct dg	*dg, int	*chret, int	forwarded);
+
 static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
 {
-	struct dg	*newcopy, *dg;
-	struct darc	*aptr;
-	int		i, ch = 0;
+	struct dg	*dg;
 
 	dg = dereference_dg(dg_underef);
 	if(!dg)return 0;
-	if(dg != dg_underef)ch=1;
-
 	// ignore mark left by check_cycles()
 	if((unsigned int)dg->copy<=2)dg->copy = 0;
 
@@ -132,61 +130,85 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
 		dg->type = dg->xtype;
 		dg->gen = generation;
 	}
-	else if(dg->copy && dg->copy->gen == generation)
+	if(dg->copy && dg->copy->gen == generation)
 	{
-		// we set the copy's 'forward' to be nonnull while this node is still copying
-		// this lets us detect a cycle
-		if(dg->copy->forward)
-		{
-			//fprintf(stderr, "XXX cycle\n");
+		if(dg == dg->copy) // apparently a cycle
 			return 0;
+		else
+		{
+			*chret = 1;	// if 'copy' is set, a copy was made... so changed.
+			return dg->copy;
 		}
-		return dg->copy;
 	}
-	if(dg->ncarcs || dg->type!=dg->xtype)ch = 1;
+	return subcopy_dg_ss(dg, chret, dg != dg_underef);
+}
+
+static struct dg	*subcopy_dg_ss(struct dg	*dg, int	*chret, int	forwarded)
+{
+	struct darc	*aptr;
+	int		i, ch = 0, st = 0;
+	struct dg	*newcopy;
+	struct slab_state	state;
+
+	if(!dg->narcs && !dg->ncarcs && dg->type==dg->xtype &&
+		!((unsigned int)dg>=0x60000000 && (unsigned int)dg<0x70000000))goto share;
+
+	get_slabstate(&state);
 
 	newcopy = slab_alloc(sizeof(struct dg));
-	dg->copy = newcopy;
 	*newcopy = *dg;
-	newcopy->xtype = newcopy->type = (dg->gen==generation)?dg->type:dg->xtype;
+	newcopy->xtype = newcopy->type = dg->type;
 	newcopy->class = _complex;
 	newcopy->gen = generation;
 	newcopy->copy = 0;
 	newcopy->ncarcs = 0;
 	newcopy->carcs = 0;
-	if(dg->gen == generation)
-		newcopy->aarcs = dg->narcs + dg->ncarcs;
-	else newcopy->aarcs = dg->narcs;
-	newcopy->narcs = 0;
+	newcopy->forward = 0;
+	newcopy->narcs = newcopy->aarcs = dg->narcs + dg->ncarcs;
 	aptr = newcopy->arcs = slab_alloc(sizeof(struct darc) * newcopy->aarcs);
 
 	// mark that we are inside this node, to detect cycles
-	newcopy->forward = (void*)1;
+	dg->copy = dg;
 	for(i=0;i<dg->narcs;i++)
 	{
 		aptr->label = dg->arcs[i].label;
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
 		//		fnames[aptr->label], newcopy->type->name, dg->arcs[i].dest);
+		ch = 0;
 		aptr->dest = copy_dg_with_comp_arcs_ss(dg->arcs[i].dest, &ch);
+		if(ch)st = 1;
 		if(!aptr->dest)return 0;
 		aptr++;
 	}
-	if(dg->gen == generation)
+	for(i=0;i<dg->ncarcs;i++)
 	{
-		for(i=0;i<dg->ncarcs;i++)
-		{
-			aptr->label = dg->carcs[i].label;
-			//fprintf(stderr, "copying comp `%s' arc from %s to %p\n",
-			//	fnames[aptr->label], newcopy->type->name, dg->carcs[i].dest);
-			aptr->dest = copy_dg_with_comp_arcs_ss(dg->carcs[i].dest, &ch);
-			if(!aptr->dest)return 0;
-			aptr++;
-		}
+		aptr->label = dg->carcs[i].label;
+		//fprintf(stderr, "copying comp `%s' arc from %s to %p\n",
+		//	fnames[aptr->label], newcopy->type->name, dg->carcs[i].dest);
+		ch = 0;
+		aptr->dest = copy_dg_with_comp_arcs_ss(dg->carcs[i].dest, &ch);
+		if(ch)st = 1;
+		if(!aptr->dest)return 0;
+		aptr++;
 	}
-	newcopy->forward = 0;
-	newcopy->narcs = newcopy->aarcs;
-	*chret = ch;
-	return newcopy;
+	dg->copy = newcopy;
+
+	if(dg->ncarcs || dg->type!=dg->xtype || st ||
+		((unsigned int)dg>=0x60000000 && (unsigned int)dg<0x70000000))	// don't share dg's from the grammar
+	{
+		*chret = 1;
+		return newcopy;
+	}
+	else
+	{
+		// slab-free the node we just built, it's guarranteed to be on top
+		set_slabstate(&state);
+		share:
+		dg->copy = 0;
+		if(forwarded)*chret = 1;	// since node was forwarded, consider it changed, even though we're sharing it
+		else *chret = 0;
+		return dg;
+	}
 }
 
 static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
@@ -758,18 +780,24 @@ void	print_dg(struct dg	*d)
 
 //char	*trims[] = {ARGS HEAD-DTR NON-HEAD-DTR LCONJ-DTR RCONJ-DTR DTR MOD-DTR NONMOD-DTR};
 
-void	trim_args(struct dg	*d)
+// clone top node of the dg, and don't include trim'd features
+struct dg	*trim_args(struct dg	*d)
 {
-	int	i;
+	int		i, narc = 0;
+	struct dg	*copy;
 
+	copy = slab_alloc(sizeof(struct dg));
+	*copy = *d;
+	for(i=0;i<d->narcs;i++)
+		if(!(d->arcs[i].label==0 || (d->arcs[i].label>=5 && d->arcs[i].label<=11)))
+			narc++;
+	copy->narcs = narc;
+	copy->arcs = slab_alloc(sizeof(struct dg) * narc);
+	narc = 0;
 	for(i=0;i<d->narcs;i++)
 	{
-		if(d->arcs[i].label==0 || (d->arcs[i].label>=5 && d->arcs[i].label<=11))
-		{
-			// d->arcs[i].dest will be collected when the parse is over
-			memmove(d->arcs+i, d->arcs+i+1, sizeof(struct darc) * (d->narcs-i-1));
-			d->narcs--;
-			i--;
-		}
+		if(!(d->arcs[i].label==0 || (d->arcs[i].label>=5 && d->arcs[i].label<=11)))
+			copy->arcs[narc++] = d->arcs[i];
 	}
+	return copy;
 }

@@ -20,10 +20,10 @@ int	slabu;
 extern void	*freeze_point, *freeze_next;
 extern int	freeze_fd;
 
+int	accum_ram_usage = 0;
+
 int	upath[1024];
 int	upathl;
-
-int	accum_ram_usage = 0;
 
 print_slab_stats()
 {
@@ -61,7 +61,7 @@ void	clear_slab()
 	}
 	else
 	{
-		accum_ram_usage += SLAB_SIZE * noldslabs + slabu;
+		accum_ram_usage += SLAB_SIZE*noldslabs + slabu;
 		// leave allocated slabs around for next parse!
 		noldslabs = 0;
 		next_slab();
@@ -150,6 +150,29 @@ void	add_dg_hop(struct dg	*d, int	label, struct dg	*value)
 int		nfnames;
 char		**fnames;
 
+// make sure 'copy' is either null or self-referential all the way through 'a's arcs
+int	equiv_same_dg(struct dg	*a)
+{
+	int	i;
+	extern int	generation;
+
+	//a = dereference_dg(a);
+	if(a->gen!=generation)
+	{
+		a->forward = a->copy = 0;
+		a->carcs = 0; a->ncarcs = 0;
+		a->type = a->xtype;
+		a->gen = generation;
+	}
+	if(a->copy==a && a->forward==a)return 1;
+	if(a->copy || a->forward)return 0;
+	a->copy = a;
+	a->forward = a;
+	for(i=0;i<a->narcs;i++)
+		if(!equiv_same_dg(a->arcs[i].dest))return 0;
+	return 1;
+}
+
 // on input, assume a and b both have noncurrent generation
 // on output, 'copy' pointers are used, so don't try to copy them until next generation
 int	equivalent_dg1(struct dg	*a, struct dg	*b)
@@ -157,9 +180,10 @@ int	equivalent_dg1(struct dg	*a, struct dg	*b)
 	int	i, j;
 	extern int	generation;
 
-	a = dereference_dg(a);
-	b = dereference_dg(b);
-	if(!a || !b)return 0;
+	//a = dereference_dg(a);
+	//b = dereference_dg(b);
+	//if(!a || !b)return 0;
+	if(a==b)return equiv_same_dg(a);
 	if(a->gen!=generation)
 	{
 		a->forward = a->copy = 0;
@@ -178,13 +202,12 @@ int	equivalent_dg1(struct dg	*a, struct dg	*b)
 	if(a->xtype != b->xtype)return 0;
 	if(a->narcs != b->narcs)return 0;
 
-	if(a->copy == b && b->copy == a)return 1;
-	if(a->copy || b->copy)return 0;
+	if(a->copy == b && b->forward == a)return 1;
+	if(a->copy || b->forward)return 0;
 
 	a->copy = b;
-	b->copy = a;
+	b->forward = a;
 
-	if(a==b)return 1;
 	//printf("maybe %p <=> %p\n", a, b);
 
 	for(i=0;i<a->narcs;i++)
@@ -202,9 +225,16 @@ int	equivalent_dg1(struct dg	*a, struct dg	*b)
 
 int	equivalent_dg(struct dg	*a, struct dg	*b)
 {
-	int	res = equivalent_dg1(a, b);
+	int	res;
 	extern unsigned int	generation;
 
+	/*generation++;
+	if(generation==0xffffffff)
+	{
+		fprintf(stderr, "generation counter overflowed!\n");
+		exit(-1);
+	}*/
+	res = equivalent_dg1(a, b);
 	generation++;
 	if(generation==0xffffffff)
 	{
