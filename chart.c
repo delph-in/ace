@@ -17,7 +17,7 @@ struct chart_cell	*cells;
 int	total_edges, real_edges, passive_edges, used_edges, pused_edges;
 
 extern int	debug_level;
-extern int	question, exhaustive, lui_chart;
+extern int	question, exhaustive, lui_chart, inhibit_pack;
 
 int		edge_id;
 
@@ -26,6 +26,12 @@ extern int noldslabs;
 extern int	rnohyper[1000];
 
 char	*show_orth_leaves(struct edge	*e);
+static void	hyperactive_excursion(struct edge	*e);
+static inline int	combine(struct edge	*a, struct edge	*b);
+
+void	print_sem(struct dg	*dg);
+void	print_rel(struct dg	*rel);
+int		unfold_edge(struct edge	*e);
 
 //int	*rtried;
 
@@ -34,18 +40,17 @@ unsigned int	require_ep_span = 0;
 
 int	cancel_parse;
 
-void	print_sem(struct dg	*dg);
-void	print_rel(struct dg	*rel);
-void	unfold_edge(struct edge	*e);
-
 #define	MAX_CHUNKS	680	// when to give up on a parse
 //#define	MAX_CHUNKS	71	// when to give up on a parse
 //#define	FIRST_ONLY
 
+//#define	EXCURSION
+
+extern unsigned int	generation;
+
 void	clear_chart(int	size)
 {
 	int	i;
-	extern unsigned int	generation;
 
 	// guard against generation overflow;
 	// reset the grammar if we are above 4-billion generations
@@ -123,7 +128,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	struct edge	*e;
 	struct dg	*u;
 	struct qc	*qc, *hqc;
-	int		nhave, nneed;
+	int		nhave, nneed, hyperactive = 0;
 	extern int	__qc_use_heap;
 #ifdef	TIM
 	struct timeval	tv1, tv2;
@@ -155,12 +160,20 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		{
 			// hyperactive
 			//if(check_cycles(dg))return -1;
+			hyperactive = 1;
+
 			__qc_use_heap = 1;
 			hqc = extract_qc_arg(dg, a->rtl?(nneed-nhave-1):nhave);
 			__qc_use_heap = 0;
+#ifdef	EXCURSION
+			// with hyperactive excursion, we can't free the extra space later since the QC is above us on the slab
+			// and we can't free it now since we need it after building the edge! :(
+#else
 			forget_tmp();
+#endif
 			qc = copy_qc(hqc);
 			free(hqc);
+
 			u = 0;
 			nhactive[a->rule->rnum]++;
 		}
@@ -238,6 +251,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 #ifdef	GENERATION
 	e->ep_span = a->ep_span | b->ep_span;
 #endif
+	e->npack=0;
+	e->pack=0;
 
 	if(trace)
 	{
@@ -278,9 +293,78 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	}
 	else nactive[e->rule->rnum]++;
 
+	e->hex = 0;
+#ifdef	EXCURSION
+	if(hyperactive)
+	{
+		e->dg = dg;
+		hyperactive_excursion(e);
+		e->dg = 0;
+		generation++;
+	}
+#endif
+
 	add_agenda(e);
 	return 0;
 }
+
+#ifdef	EXCURSION
+// try to find another passive edge to combine with while 'e' is still valid
+static void	hyperactive_excursion(struct edge	*e)
+{
+	int					i, j, remain, arg;
+	struct chart_cell	*c;
+	struct edge			*b;
+	extern int highest; // XXX snooping on agenda.c
+
+#ifdef GENERATION
+	return;
+#endif
+
+	if(e->prio < highest)return;
+
+	// active edge
+	remain = e->need - e->have;
+	if(e->rtl)
+	{
+		arg = e->need - e->have - 1;
+		for(i=0;i<=e->from;i++)
+		{
+			c = cells + e->from + i*chart_size;
+			for(j=0;j<c->p_nedges;j++)
+				if(c->p_edges[j]->from - (remain-1) >= 0)
+				{
+					b = c->p_edges[j];
+					if(b->rule && !check_rf(e->rule, b->rule, arg))continue;	// rule filter rejected this combination
+					if(!gen_qc && quickcheck(e->qc, b->qc))continue;			// quickcheck rejected this combination
+					//fprintf(stderr, "HEX %d+%d\n", e->id, b->id);
+					if(combine(e, b) == 1){}//fprintf(stderr, " +\n");
+					e->hex = b;
+					return;
+				}
+		}
+	}
+	else
+	{
+		arg = e->have;
+		for(i=e->to;i<chart_size;i++)
+		{
+			c = cells + i + e->to*chart_size;
+			for(j=0;j<c->p_nedges;j++)
+				if(c->p_edges[j]->to + (remain-1) < chart_size)
+				{
+					b = c->p_edges[j];
+					if(b->rule && !check_rf(e->rule, b->rule, arg))continue;	// rule filter rejected this combination
+					if(!gen_qc && quickcheck(e->qc, b->qc))continue;			// quickcheck rejected this combination
+					//fprintf(stderr, "HEX %d+%d\n", e->id, b->id);
+					if(combine(e, b) == 1){}//fprintf(stderr, " +\n");
+					e->hex = b;
+					return;
+				}
+		}
+	}
+}
+#endif
 
 static inline int	combine(struct edge	*a, struct edge	*b)
 {
@@ -290,6 +374,7 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 	struct timeval	tv1, tv2;
 #endif
 
+	if(a->hex == b)return 0;	// already did this
 	if(a->have==-1)return 0;	// ghosted hyperactive edge -- got kicked out of the chart for a latent cycle
 
 	//printf("FR: [%d-%d] + [%d-%d]?\n", a->from, a->to, b->from, b->to);
@@ -376,6 +461,7 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 			fprintf(stderr, "NOTE: terminating search, too much RAM\n");
 			return -1;	// give up :(
 		}
+		return 1;
 	}
 	else
 	{
@@ -384,6 +470,13 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 	}
 
 	return 0;
+}
+
+static void record_packing(struct edge *host, struct edge *e)
+{
+	host->npack++;
+	host->pack = slab_realloc(host->pack, (host->npack-1)*sizeof(struct edge*), host->npack*sizeof(struct edge*));
+	host->pack[host->npack-1] = e;
 }
 
 static int	pack_edge(struct edge	*edge)
@@ -413,14 +506,18 @@ static int	pack_edge(struct edge	*edge)
 				//printf("host: "); print_dg(c->p_edges[i]->dg); printf("\n");
 				//printf("pack: "); print_dg(edge->dg); printf("\n");
 				//printf("EQUIV = %d\n", equivalent_dg(c->p_edges[i]->dg, edge->dg));
-				// XXX should record
+				record_packing(c->p_edges[i], edge);
 				return 1;
 			}
 #ifdef	BIDIR_SS
 			else if(ssd == -1)
 			{
-				// XXX I bet we should do something more here :P
-				c->p_edges[i]->dg = edge->dg;
+				edge->npack = c->p_edges[i]->npack;
+				edge->pack = c->p_edges[i]->pack;
+				c->p_edges[i]->npack = 0;
+				c->p_edges[i]->pack = 0;
+				record_packing(edge, c->p_edges[i]);
+				c->p_edges[i] = edge;
 				return 1;
 			}
 #endif
@@ -434,7 +531,7 @@ static int	gen_process_edge(struct edge	*e)
 	struct chart_cell	*c = cells;
 	int	i;
 
-	if(!lui_chart && e->have == e->need && !e->lex && pack_edge(e))
+	if(!inhibit_pack && e->have == e->need && !e->lex && pack_edge(e))
 		return 0;	// big savings! woohoo!
 	add_edge_to_chart(e);
 
@@ -468,7 +565,7 @@ static int	parse_process_edge(struct edge	*e)
 	//printf("processing [%d-%d] edge;    ", e->from, e->to);
 	//printf("  status: %d/%d\n", e->have, e->need);
 
-	if(!lui_chart && e->have == e->need && !e->lex && pack_edge(e))
+	if(!inhibit_pack && e->have == e->need && !e->lex && pack_edge(e))
 		return 0;	// big savings! woohoo!
 	add_edge_to_chart(e);
 
@@ -637,7 +734,7 @@ int	nfinal;
 
 int	parse(int	nwords, char	*words[], char	*sentence)
 {
-	int		i;
+	int		i, count;
 	int		num_parses = 0, num_entries;
 	struct dg	*root;
 	struct dg	*sem;
@@ -686,8 +783,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 
 		show:
-		unfold_edge(edge);
-		num_parses++;
+		count = unfold_edge(edge);
+		num_parses+=count;
 		sem = dg_hop(root, lookup_fname("SYNSEM"));
 		if(sem)sem = dg_hop(sem, lookup_fname("LOCAL"));
 		if(sem)sem = dg_hop(sem, lookup_fname("CONT"));
@@ -732,9 +829,10 @@ void	final_chart_stats()
 #endif
 }
 
-void	unfold_edge(struct edge	*e)
+int	unfold_edge(struct edge	*e)
 {
-	int	i;
+	int	i, j, sum = 0, count;
+	struct edge	*E;
 
 	nfinal++;
 	if(e->rule)
@@ -742,8 +840,16 @@ void	unfold_edge(struct edge	*e)
 		nused[e->rule->rnum]++;
 		//if(e->rule)fprintf(stderr, "%s\n", e->rule->name);
 	}
-	for(i=0;i<e->have;i++)
-		unfold_edge(e->daughters[i]);
+	for(j=0;j<e->npack+1;j++)
+	{
+		count=1;
+		E = (j==e->npack)?e:e->pack[j];
+		for(i=0;i<E->have;i++)
+			count *= unfold_edge(E->daughters[i]);
+		sum += count;
+	}
+
+	return sum;
 }
 
 int	base_index;

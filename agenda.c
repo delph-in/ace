@@ -43,6 +43,8 @@ void	add_agenda(struct edge	*e)
 {
 	struct task	*t = slab_alloc(sizeof(struct task));
 
+	e->npack = 0;
+	e->pack = 0;
 #ifdef	BIDIR_SS
 	if(e->prio < LEX_PRIO)
 		e->prio = LEX_PRIO-1;

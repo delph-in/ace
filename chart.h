@@ -27,6 +27,7 @@ struct edge
 	// what dg to unify in to reconstruct this active edge's dg
 	char		ha_arg:4;
 	struct dg	*ha_dg, *ha_par;
+	struct edge	*hex;	// what edge did we try to combine with on hyperactive excursion?
 
 	// 1 for allowed inflr's, 0 for disallowed
 	char		*inflr_allow;
@@ -34,6 +35,9 @@ struct edge
 #ifdef	GENERATION
 	unsigned int	ep_span;
 #endif
+
+	int			npack;
+	struct edge	**pack;
 };
 
 struct chart_cell
