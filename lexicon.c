@@ -12,12 +12,26 @@ int		nlexemes;
 
 extern int trace;
 
+#define	FULL_LEXICON
+
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 {
 	struct edge	*edge = slab_alloc(sizeof(struct edge));
 
 	bzero(edge, sizeof(struct edge));
+
+#ifdef	FULL_LEXICON
 	edge->dg = lex->dg;
+#else
+	edge->dg = unify_dg(lex->dg, lex->lextype->dg, -1);
+	if(!edge->dg)
+	{
+		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed delayed unification\n", lex->word);
+		exit(-1);
+	}
+	//wellform(edge->dg, lex->word);
+#endif
+
 	//edge->dg = copy_dg(edge->dg);
 	edge->id = next_eid();
 	edge->from = i;
@@ -189,11 +203,13 @@ void	dump_parts_of_speech()
 	pclose(f);
 }
 
-void	add_lexeme(char	*word, struct dg	*dg)
+void	add_lexeme(char	*word, struct dg	*dg, struct type	*type)
 {
 	struct lexeme	*l = malloc(sizeof(struct lexeme));
 	struct dg	*stem, *str;
 	static int	sfeat = -1, rfeat = 2, ffeat = 1;
+
+	//wellform(dg, word);
 
 	if(sfeat==-1)sfeat = lookup_fname("STEM");
 	nlexemes++;
@@ -203,6 +219,7 @@ void	add_lexeme(char	*word, struct dg	*dg)
 	l->dg = dg;
 	l->stemlen = 0;
 	l->stem = 0;
+	l->lextype = type;
 
 	for(stem = dg_hop(dg, sfeat);stem;stem = dg_hop(stem, rfeat))
 	{
@@ -241,9 +258,29 @@ void	add_lexeme(char	*word, struct dg	*dg)
 	printf("\n");*/
 }
 
+int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
+{
+#ifdef	FULL_LEXICON
+	struct dg	*fulldg;
+
+	fulldg = unify_dg(dg, t->dg, -1);
+	if(!fulldg)
+	{
+		fprintf(stderr, "study_lexeme `%s': dag incompatible with type `%s'\n", t->name);
+		return -1;
+	}
+	wellform(fulldg, name);
+	dg = fulldg;
+#endif
+
+	add_lexeme(name, dg, t);
+
+	return 0;
+}
+
 int	study_lexicon(char	*lhs, struct dg	*dg)
 {
-	add_lexeme(lhs, dg);
+	add_lexeme(lhs, dg, dg->xtype);
 	return 0;
 }
 
@@ -262,7 +299,7 @@ int	lexcomp(const void	*a, const void	*b)
 int	load_lexicon()
 {
 #ifdef	ERG
-	if(iterate_tdl_dgs("../erg/lexicon.tdl", study_lexicon))
+	if(iterate_tdl_lex("../erg/lexicon.tdl"))
 #else
 	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/lexicon.tdl", study_lexicon))
 #endif
@@ -271,7 +308,7 @@ int	load_lexicon()
 		exit(-1);
 	}
 #ifdef	ERG
-	if(iterate_tdl_dgs("special-lex.tdl", study_lexicon))
+	if(iterate_tdl_lex("special-lex.tdl"))
 	{
 		fprintf(stderr, "lexicon: unable to load special-lex, bailing out.\n");
 		exit(-1);

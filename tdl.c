@@ -607,26 +607,6 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 		if(!lhs)return 0;
 		rhs = rdagify(R, ptr+1, building_type);
 		if(!rhs)return 0;
-		/*if(top)
-		{
-			g = glb(lhs->type, rhs->type);
-			if(!g ||	// no glb exists or...
-				!(g==lhs->type || g==rhs->type ||	// glb is not immediate
-				(g->par==lhs->type && g->parb==rhs->type) ||
-				(g->par==rhs->type && g->parb==lhs->type)))
-			{
-				// user apparently wanted to define multiple inheritance
-				//printf(" ... MI trying `%s' and `%s'\n", lhs->type->name, rhs->type->name);
-				//if(g)fprintf(stderr, "   MI: preextant glb `%s' not good enough\n", g->name);
-				if(make_glb_type(lhs->type, rhs->type))
-				{
-					fprintf(stderr, "MI: types `%s' and `%s' are incompatible\n", lhs->type->name, rhs->type->name);
-					unify_backtrace();
-					return 0;
-				}
-				//else printf("MI: defined a glb for `%s' and `%s'\n", lhs->type->name, rhs->type->name);
-			}
-		}*/
 		if(building_type)
 		{
 			lhs->type = rhs->type = building_type;
@@ -689,6 +669,27 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 	if(R.corefs)free(R.corefs);
 
 	return dg;
+}
+
+int	lexify_tdl_line(char	*lhs, char	*rhs, void	*ref)
+{
+	struct dg	*dg;
+	char	*type, *amp, *dag;
+	struct type	*ty;
+	extern int	study_lexeme(char	*name, struct dg	*dg, struct type	*t);
+
+	amp = strchr(rhs, '&');
+	if(!amp) { fprintf(stderr, "lexeme `%s': no & found\n", lhs); return -1; }
+	*amp = 0;
+	dag = trim_string(amp+1);
+	type = trim_string(rhs);
+
+	dg = dagify(dag, 0);
+	if(!dg) { fprintf(stderr, "hint: dagify failed\n"); return -1; }
+
+	ty = lookup_type(type);
+	if(!ty) { fprintf(stderr, "lexeme `%s' has nonextant type `%s'\n", lhs, type); return -1; }
+	return study_lexeme(lhs, dg, ty);
 }
 
 int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref)
@@ -773,6 +774,13 @@ int	iterate_tdl_types(char	*path)
 	enable_out_of_order = 1;
 
 	return iterate_tdl(path, typify_tdl_line, 0);
+}
+
+int	iterate_tdl_lex(char	*path)
+{
+	enable_out_of_order = 0;
+
+	return iterate_tdl(path, lexify_tdl_line, 0);
 }
 
 int	g_loaded = 0;

@@ -120,6 +120,7 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 
 	lout->stemlen = lin->stemlen;
 	lout->stem = slab_alloc(sizeof(struct type*) * lout->stemlen);
+	lout->lextype = types[lin->lextype->tnum];
 	memcpy(lout->stem, lin->stem, sizeof(struct type*) * lout->stemlen);
 
 	return lout;
