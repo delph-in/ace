@@ -53,6 +53,8 @@ void	commit_slab()
 
 void	clear_slab()
 {
+	int	i;
+
 	if(freeze_next)
 	{
 		noldslabs = 0;
@@ -62,7 +64,16 @@ void	clear_slab()
 	else
 	{
 		accum_ram_usage += SLAB_SIZE*noldslabs + slabu;
-		// leave allocated slabs around for next parse!
+		// leave up to 64 allocated slabs around for next parse!
+		if(aoldslabs>64)
+		{
+			for(i=64;i<aoldslabs;i++)
+			{
+				free(oldslabs[i]);
+				oldslabs[i] = 0;
+			}
+			aoldslabs = 64;
+		}
 		noldslabs = 0;
 		next_slab();
 		currslabsize = SLAB_SIZE;
