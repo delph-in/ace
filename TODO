@@ -13,7 +13,6 @@ FIX gen-counter overflow
 	- realistically though, only about 2kdags per sentence are produced
 	- so maybe we can do 400k sentences per run
 
-make equivalent_dg actually work...
 make ambiguity packing work with semantics (and record packing)
 
 preprocessing fsr?
@@ -24,10 +23,6 @@ make duplicate sentence detector
 add common missing lexemes
 
 OPTIMIZATIONS:
-
-find a way to force struct dg's to align to 32 bytes,
-	so they fit one per cacheline nicely
-find a way to force struct darcs to align to 8 bytes
 
 smarter ordering of agenda
 hyperactive parsing for certain rules only?

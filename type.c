@@ -367,6 +367,7 @@ int	find_common_subtypes(struct type	*a, struct type	*b, int	*_glb_common)
 	{
 		if(a->descendents[ia] == b->descendents[ib])
 		{
+			//if(ia==0 || ib==0)return -1;	// one type is a descendent of the other
 			if((_glb_ncommon+1) >= 10000)
 			{
 				fprintf(stderr, "too many common types for our buffer!\n");
@@ -391,6 +392,7 @@ check_for_glb(struct type	*a, struct type	*b)
 	struct type	*g;
 
 	_glb_ncommon = find_common_subtypes(a, b, _glb_common);
+	//if(_glb_ncommon==-1)return 0;	// one type is a descendent of the other
 
 	if(_glb_ncommon==0)return 0;	// no types in common, no glb
 	if(_glb_ncommon==1)return 0;	// one type in common, it must be the glb
@@ -475,19 +477,25 @@ check_for_glb(struct type	*a, struct type	*b)
 
 make_glbs()
 {
-	int	i, j;
+	int	i, j, k;
 
-	//for(i=0;i<ntypes;i++)
-		//for(j=0;j<i;j++)
-	for(i=ntypes-1;i>=0;i--)
+	// don't do 0; finding glb's of *top* with things is a big waste of time!
+	for(i=ntypes-1;i>0;i--)
 	{
 		more:
+		if(types[i]->ndescendents == 1)continue;
 		for(j=ntypes-1;j>i;j--)
+		{
+			if(types[j]->ndescendents == 1)continue;
 			if(check_for_glb(types[i], types[j]))
 			{
+				// check the newly created type against everything
+				//i = ntypes-1;
 				i++;
+				//printf(" +%d\n", ntypes);
 				goto more;
 			}
+		}
 	}
 }
 

@@ -264,8 +264,8 @@ static int	pack_edge(struct edge	*edge)
 		if(c->edges[i]->need==c->edges[i]->have && !equiv_quickcheck(c->edges[i]->qc, edge->qc) && equivalent_dg(c->edges[i]->dg, edge->dg))
 		{
 			//fprintf(stderr, "packed %p in %p!\n", edge, c->edges[i]);
-			/*printf("host: "); print_dg(c->edges[i]->dg); printf("\n");
-			printf("pack: "); print_dg(edge->dg); printf("\n");*/
+			//printf("host: "); print_dg(c->edges[i]->dg); printf("\n");
+			//printf("pack: "); print_dg(edge->dg); printf("\n");
 			// XXX should record
 			return 1;
 		}

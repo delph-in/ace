@@ -85,6 +85,24 @@ static inline	void	*slab_alloc(int	len)
 	extern int	slabu, currslabsize;
 	extern void	next_slab();
 
+	// align these special cases
+	/*if(len==32)
+	{
+		if((unsigned int)last & 31)
+		{
+			slabu += 32 - ((unsigned int)last & 31);
+			last += 32 - ((unsigned int)last & 31);
+		}
+	}
+	else if(!(len&7))
+	{
+		if((unsigned int)last & 7)
+		{
+			slabu += 8 - ((unsigned int)last & 7);
+			last += 8 - ((unsigned int)last & 7);
+		}
+	}*/
+
 	if(len>currslabsize)
 	{
 		fprintf(stderr, "allocation request %d too big for slab\n", len);

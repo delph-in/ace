@@ -144,14 +144,36 @@ void	add_dg_hop(struct dg	*d, int	label, struct dg	*value)
 	d->arcs[i].dest = value;
 }
 
-// XXX should use a marking algorithm to avoid multiple compares
+// on input, assume a and b both have noncurrent generation
+// on output, 'copy' pointers are used, so don't try to copy them until next generation
 int	equivalent_dg(struct dg	*a, struct dg	*b)
 {
 	int	i, j;
+	extern int	generation;
 
 	if(a==b)return 1;
+	if(a->gen!=generation)
+	{
+		a->forward = a->copy = 0;
+		a->carcs = 0; a->ncarcs = 0;
+		a->type = a->xtype;
+		a->gen = generation;
+	}
+	if(b->gen!=generation)
+	{
+		b->forward = b->copy = 0;
+		b->carcs = 0; b->ncarcs = 0;
+		b->type = b->xtype;
+		b->gen = generation;
+	}
+
 	if(a->xtype != b->xtype)return 0;
 	if(a->narcs != b->narcs)return 0;
+
+	if(a->copy == b && b->copy == a)return 1;
+	if(a->copy || b->copy)return 0;
+	a->copy = b;
+	b->copy = a;
 
 	for(i=0;i<a->narcs;i++)
 	{
