@@ -195,8 +195,9 @@ struct type	*find_type(char	*name, int	constrain)
 	struct type	*type = lookup_type(name);
 	int		i;
 
-	if(!type || (constrain && !type->dg))
+	if(!type || (name[0]!='"' && constrain && !type->dg))
 	{
+		// try to find constraint for this type before returning it
 		if(type && name[0]=='G' && name[1]=='(')
 		{
 			// glb types may not be referenced explicitly

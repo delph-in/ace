@@ -162,6 +162,7 @@ int	freeze_grammar()
 	int		i, j;
 	struct grammar	*G;
 
+	inval_thash();
 	for(i=0;i<ntypes;i++)
 		if(types[i]->tnum != i)
 		{

@@ -17,6 +17,62 @@ struct type	*add_string(char	*name);
 
 struct type	*strtype = 0;
 
+#define	THSIZE	100000
+static struct type	**typehash;
+
+void	th_init()
+{
+	typehash = calloc(sizeof(struct type*), THSIZE);
+}
+
+void	inval_thash()
+{
+	if(typehash)
+	{
+		free(typehash);
+		typehash = 0;
+	}
+}
+
+unsigned int	thash(char	*name)
+{
+	unsigned int	h = 0;
+
+	while(*name)
+	{
+		h <<= 1;
+		h ^= *name++;
+	}
+	return h;
+}
+
+void	th_add(char	*name, struct type	*t)
+{
+	unsigned int	h = thash(name), i;
+
+	if(!typehash)th_init();
+
+	for(i=0;i<THSIZE;i++)
+		if(!typehash[(h+i)%THSIZE])
+		{
+			typehash[(h+i)%THSIZE] = t;
+			return;
+		}
+	fprintf(stderr, "typehash: table full!\n");
+}
+
+struct type	*th_look(char	*name)
+{
+	unsigned int	h = thash(name), i;
+
+	if(!typehash)return 0;
+
+	for(i=0;i<THSIZE;i++)
+		if(typehash[(h+i)%THSIZE] && !strcasecmp(typehash[(h+i)%THSIZE]->name, name))
+			return typehash[(h+i)%THSIZE];
+	return 0;
+}
+
 struct type	*lookup_type(char	*name)
 {
 	int	i;
@@ -32,7 +88,8 @@ struct type	*lookup_type(char	*name)
 		return add_string(name);
 	}
 
-	for(i=0;i<ntypes;i++)
+	if(typehash)return th_look(name);
+	else for(i=0;i<ntypes;i++)
 		if(!strcasecmp(types[i]->name, name))
 			return types[i];
 	return 0;
@@ -164,6 +221,8 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 				add_descendent(types[i], ntypes-1);
 	add_descendent(t, ntypes-1);
 	//fprintf(stderr, " - done adding\n");
+
+	th_add(name, t);
 
 	return 0;
 }
@@ -302,7 +361,7 @@ fix_glbs()
 check_for_glb(struct type	*a, struct type	*b)
 {
 	int	common[100000], nc = 0;
-	int	ia, ib, i, j, mi;
+	int	ia, ib, i, j, mi, resort;
 	struct type	*ar[2] = {a, b};
 	char	name[1024];
 	struct type	*g;
@@ -378,12 +437,13 @@ check_for_glb(struct type	*a, struct type	*b)
 		{
 			g = types[i];
 			if(i>mi)g->tnum++;
+			resort = 0;
 			for(ia=0;ia<g->ndescendents;ia++)
 			{
-				if(g->descendents[ia]==ntypes-1)g->descendents[ia]=mi;
+				if(g->descendents[ia]==ntypes-1){resort=1;g->descendents[ia]=mi;}
 				else if(g->descendents[ia]>=mi)g->descendents[ia]++;
 			}
-			qsort(g->descendents, g->ndescendents, sizeof(int), intcomp);
+			if(resort)qsort(g->descendents, g->ndescendents, sizeof(int), intcomp);
 		}
 	}
 	glb_type_count++;
