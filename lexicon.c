@@ -24,7 +24,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	edge->to = i+len;
 	edge->lex = lex;
 	edge->qc = extract_qc(edge->dg);
-	edge->prio = 100;
+	edge->prio = LEX_PRIO;
 
 	if(trace)
 	{

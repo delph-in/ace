@@ -109,6 +109,8 @@ struct qc
 
 int	__qc_use_heap = 0;
 
+const int	qcbytes = sizeof(struct type*)*QC_SIZE;
+
 struct qc	*extract_qc(struct dg	*d)
 {
 	static int	init = 0;

@@ -125,7 +125,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 	}
 	e->qc = ruleqc[r->rnum];
 	e->prio = rprio[r->rnum];
-	if(r->lexical && e->prio==0)e->prio = 10;
+	if(r->lexical && e->prio==0)e->prio = 9;
 
 	return e;
 }

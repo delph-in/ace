@@ -27,6 +27,8 @@ struct chart_cell
 	struct edge	**edges;
 };
 
+#define	LEX_PRIO	10
+
 void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge);
 void	add_edge_to_chart(struct edge	*edge);
 void	clear_chart(int	size);

@@ -5,51 +5,82 @@
 
 extern int	debug_level;
 
-static int		nagenda, aagenda;
-static struct edge	**agenda;
+struct task
+{
+	struct task	*next, *prev;
+	struct edge	*edge;
+};
+
+#define	NPRIO	11
+
+static struct queue
+{
+	struct task	*start, *end;
+}	agenda[NPRIO];
+
+int	highest = -1;
 
 void	clear_agenda()
 {
-	nagenda = 0;
+	int	i;
+
+	for(i=0;i<NPRIO;i++)
+	{
+		agenda[i].start = 0;	// stuff is slab-alloc'd, don't worry about freeing
+		agenda[i].end = 0;
+	}
+	highest = -1;
 }
 
 void	add_agenda(struct edge	*e)
 {
-	int	i;
+	struct task	*t = slab_alloc(sizeof(struct task));
 
-	nagenda++;
-	if(nagenda>aagenda)
+	if(e->prio < 0 || e->prio >= NPRIO)
 	{
-		aagenda += 100;
-		agenda = realloc(agenda, sizeof(struct edge*)*aagenda);
+		fprintf(stderr, "tried to agendize an edge with priority %d!\n", e->prio);
+		exit(-1);
 	}
 
-	/*if(e->prio)
-	{
-		for(i=0;i<nagenda-1;i++)
-			if(e->prio > agenda[i]->prio)break;
-		memmove(agenda+i+1, agenda+i, sizeof(struct edge*)*(nagenda-1-i));
-		agenda[i] = e;
-	}*/
-	agenda[nagenda-1] = e;
+	t->edge = e;
+	t->next = 0;
+	t->prev = agenda[e->prio].end;
+	if(agenda[e->prio].end)agenda[e->prio].end->next = t;
+	else agenda[e->prio].start = t;
+	agenda[e->prio].end = t;
+
+	if(e->prio > highest)highest = e->prio;
 }
 
 struct edge	*next_agenda()
 {
-	int	i, j, k;
-	struct edge	*edge;
+	struct task	*best;
+	int		i;
 
-	if(nagenda)
+	for(i=highest;i>=0;i--) if(agenda[i].start)
 	{
-		// find highest priority edge on queue
-		//j = 0;
-		j=nagenda-1, k = 0;
-		for(i=0;i<nagenda;i++)
-			if(agenda[i]->prio > k)j=i, k=agenda[i]->prio;
-		edge = agenda[j];
-		nagenda--;
-		memmove(agenda+j, agenda+j+1, sizeof(struct edge*)*(nagenda-j));
-		return edge;
+		// pop most recent edge from this queue
+		best = agenda[i].end;
+		agenda[i].end = best->prev;
+		if(best==agenda[i].start)
+		{
+			agenda[i].start = 0;
+			highest--;
+		}
+		else highest = best->edge->prio;
+		if(best->next)best->next->prev=best->prev;
+		if(best->prev)best->prev->next=best->next;
+		return best->edge;
 	}
-	else return 0;
+	return 0;
+}
+
+int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to)
+{
+	struct task	*t;
+
+	for(t=agenda[LEX_PRIO].start;t;t=t->next)
+		if(t->edge->lex==lex && t->edge->from==from && t->edge->to==to)
+			return 1;
+	return 0;
 }

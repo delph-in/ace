@@ -11,9 +11,6 @@ int	total_edges, real_edges, passive_edges, used_edges;
 
 extern int	debug_level;
 
-static int		nagenda, aagenda;
-static struct edge	**agenda;
-
 int		edge_id;
 
 extern int	*nactive, *npassive, used_total;
@@ -186,7 +183,7 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 		//if(a->inflr)e->inflr = a->inflr;	// an active edge maintains its "required inflection"
 		//else if(b->inflr && !a->rule->inflr)
 		//	e->inflr = b->inflr;		// pre-inflectional lexical rules pick up "required inflectioN" from daughter
-		if(e->rule->lexical)e->lex = b->lex;
+		if(e->rule->lexical && !e->rule->inflr)e->lex = b->lex;
 		else e->lex = 0;
 		if(e->need==e->have)
 		{
@@ -210,8 +207,8 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 		else nactive[e->rule->rnum]++;
 		if(trace)
 		{
-			printf("generated #%d %d/%d for [%d-%d] %s with rule %s:\n", e->id, e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
-			if(trace>1){print_dg(u); printf("\n\n");}
+			printf("generated #%d %d/%d for [%d-%d] with rule %s:\n", e->id, e->have, e->need, e->from, e->to, e->rule->name);
+			if(e->have==e->need && trace>1){print_dg(u); printf("\n\n");}
 		}
 	
 		add_agenda(e);
@@ -234,16 +231,24 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 static int	pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
-	int					i;
+	int			i;
+	extern const int	qcbytes;
 
 	// since we're taking first-parse-only, this is ok perhaps.
 	for(i=0;i<c->nedges;i++)
-		if(c->edges[i]->need==c->edges[i]->have && !equiv_quickcheck(c->edges[i]->qc, edge->qc) && equivalent_dg(c->edges[i]->dg, edge->dg))
+		if(c->edges[i]->need==c->edges[i]->have &&
+			!c->edges[i]->lex &&
+			c->edges[i]->dg->xtype == edge->dg->xtype &&
+			//!equiv_quickcheck(c->edges[i]->qc, edge->qc) &&
+			!memcmp(c->edges[i]->qc, edge->qc, qcbytes) &&
+			equivalent_dg(c->edges[i]->dg, edge->dg))
 		{
 			//fprintf(stderr, "packed %p in %p!\n", edge, c->edges[i]);
 			//printf("host: "); print_dg(c->edges[i]->dg); printf("\n");
 			//printf("pack: "); print_dg(edge->dg); printf("\n");
 			// XXX should record
+			if(edge->lex)printf("HUH? packed a lexical edge!\n");
+			if(c->edges[i]->lex)printf("HUH? packed into a lexical edge!\n");
 			return 1;
 		}
 	return 0;
@@ -257,7 +262,7 @@ static int	process_edge(struct edge	*e)
 	//printf("processing [%d-%d] edge;    ", e->from, e->to);
 	//printf("  status: %d/%d\n", e->have, e->need);
 
-	if(e->have == e->need && pack_edge(e))return 0;	// big savings! woohoo!
+	if(e->have == e->need && !e->lex && pack_edge(e))return 0;	// big savings! woohoo!
 	add_edge_to_chart(e);
 
 	// try to combine with edges on either side
@@ -344,16 +349,6 @@ unfold_edge(struct edge	*e)
 	if(e->rule)fprintf(stderr, "%s\n", e->rule->name);
 	for(i=0;i<e->have;i++)
 		unfold_edge(e->daughters[i]);
-}
-
-int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to)
-{
-	int	i;
-
-	for(i=0;i<nagenda;i++)
-		if(agenda[i]->lex==lex && agenda[i]->from==from && agenda[i]->to==to)
-			return 1;
-	return 0;
 }
 
 int	base_index;
