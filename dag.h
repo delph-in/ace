@@ -12,24 +12,16 @@ struct darc
 	struct dg	*dest;
 };
 
-enum
-{
-	_atomic = 1,
-	_bottom = 2,
-	_complex = 3,
-};
-
 // 32-byte dg structure fits exactly in one standard cacheline
 struct dg
 {
 	struct type	*type;
 	struct type	*xtype;
 	struct darc	*arcs;
-	struct darc	*carcs;
 	struct dg	*forward;
+	struct darc	*carcs;
 	struct dg	*copy;
-	unsigned char	narcs, ncarcs, aarcs;
-	unsigned char	class;	// tomabechi's :atom, :bottom, :complex
+	unsigned short	narcs, ncarcs;
 	unsigned int	gen;
 };
 
@@ -39,15 +31,16 @@ struct dg	*unify_dg(struct dg	*a, struct dg	*b, int	arg);
 struct dg	*atomic_dg(char	*name);
 struct dg	*copy_dg(struct dg	*d);
 struct dg	*trim_args(struct dg	*d);
-int			lookup_fname(char	*label);
+int		lookup_fname(char	*label);
 void		null_generation();
 void		print_dg(struct dg	*d);
 void		unify_backtrace();
 void		introduce_feature(int	label, int	type);
 void		add_dg_hop(struct dg	*d, int	label, struct dg	*value);
 void		add_dg_feature(struct dg	*d, char	*label, struct dg	*value);
-int			init_fnames();
-int			equivalent_dg(struct dg	*a, struct dg	*b);
+int		init_fnames();
+int		equivalent_dg(struct dg	*a, struct dg	*b);
+void		setup_extra_type_dgs();
 
 // for hyperactive parsing
 int		unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg);
@@ -162,30 +155,48 @@ static inline struct dg	*dereference_dg(struct dg	*dg)
 
 static inline struct dg	*dg_hop(struct dg	*d, int	label)
 {
-	int	i;
+	int	i, j, k;
 	extern unsigned int	generation;
 
 	if(d->forward)d = dereference_dg(d);
 	if(!d)return 0;
 
-	for(i=0;i<d->narcs;i++)
+	//printf("looking for %d\n", label);
+	//for(i=0;i<d->narcs;i++)printf("a%d: %d\n", i, d->arcs[i].label);
+	for(i=0,j=d->narcs;i<j;)
+	{
+		k = (i+j)>>1;
+		//printf("guess %d: %d\n", k, d->arcs[k].label);
+		if(d->arcs[k].label==label){d=d->arcs[k].dest;goto ret;}
+		else if(d->arcs[k].label>label)j = k;
+		else i = k+1;
+	}
+	/*for(i=0;i<d->narcs;i++)
 		if(d->arcs[i].label==label)
 		{
 			d = d->arcs[i].dest;
-			if(d->forward)return dereference_dg(d);
-			else return d;
-		}
+			goto ret;
+		}*/
 	if(d->gen==generation)
 	{
-		for(i=0;i<d->ncarcs;i++)
+		/*for(i=0;i<d->ncarcs;i++)
 			if(d->carcs[i].label==label)
 			{
 				d = d->carcs[i].dest;
-				if(d->forward)return dereference_dg(d);
-				else return d;
-			}
+				goto ret;
+			}*/
+		for(i=0,j=d->ncarcs;i<j;)
+		{
+			k = (i+j)>>1;
+			if(d->carcs[k].label==label){d=d->carcs[k].dest;goto ret;}
+			else if(d->carcs[k].label>label)j = k;
+			else i = k+1;
+		}
 	}
 	return 0;
+ret:
+	if(d->forward)return dereference_dg(d);
+	else return d;
 }
 
 #endif

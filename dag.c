@@ -44,7 +44,7 @@ void	commit_slab()
 		close(freeze_fd);
 		freeze_next = 0;
 	}
-	else if(debug_level) { fprintf(stderr, "permanent: "); print_slab_stats(); }
+	else if(debug_level) { fprintf(stderr, "NOTE: permanent: "); print_slab_stats(); }
 	currslabsize = SLAB_SIZE;
 	noldslabs = 0;
 	aoldslabs = 0;
@@ -133,25 +133,18 @@ struct dg	*atomic_dg(char	*name)
 	return dg;
 }
 
-static inline void alloc_darcs(struct dg *d, int num, int	anum)
-{
-	if(d->narcs+num > d->aarcs)
-	{
-		d->aarcs += anum;
-		d->arcs = slab_realloc(d->arcs, sizeof(struct darc) * (d->aarcs-anum), sizeof(struct darc) * d->aarcs);
-	}
-}
-
 void	add_dg_hop(struct dg	*d, int	label, struct dg	*value)
 {
 	int	i;
 
 	d = dereference_dg(d);
-	for(i=0;i<d->narcs;i++)if(d->arcs[i].label==label)break;
-	if(i==d->narcs)
+	// insert in sorted order
+	for(i=0;i<d->narcs;i++)if(d->arcs[i].label>=label)break;
+	if(i==d->narcs || d->arcs[i].label>label)
 	{
-		alloc_darcs(d, 1, 10);
 		d->narcs++;
+		d->arcs = slab_realloc(d->arcs, sizeof(struct darc) * (d->narcs-1), sizeof(struct darc) * d->narcs);
+		memmove(d->arcs+i+1, d->arcs+i, sizeof(struct darc)*(d->narcs-1-i));
 	}
 	d->arcs[i].label = label;
 	d->arcs[i].dest = value;
