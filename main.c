@@ -8,6 +8,7 @@
 #include	"freeze.h"
 #include	"rule.h"
 #include	"lexicon.h"
+#include	"preprocessor.h"
 
 int	debug_level = 1, export_parts = 0;
 char	*save_grammar_path = 0;
@@ -133,10 +134,13 @@ int	main(int	argc, char	*argv[])
 
 int	parse_line(char	*line)
 {
-	char	*p, *w;
 	char	copy[10240];
+	int	nparse = 0;
+	/*char	*p, *w;
 	char	*words[100];
-	int	nwords = 0, nparse = 0;
+	int	nwords = 0;*/
+	int	nwords = 0, i, j;
+	char	**words;
 
 	current_sentence = "(preparing)";
 	if(!*line)return -1;
@@ -154,7 +158,7 @@ int	parse_line(char	*line)
 
 	strcpy(copy, line);
 	// break up into words, normalize capitalization
-	w = p = copy;
+	/*w = p = copy;
 	while(*p)
 	{
 		if(*p>='A' && *p<='Z')(*p) += 32;
@@ -169,6 +173,12 @@ int	parse_line(char	*line)
 				break;
 		}
 		p++;
+	}*/
+
+	if(preprocess_line(copy, &nwords, &words))
+	{
+		fprintf(stderr, "NOTE: preprocessor failed!\n");
+		return -1;
 	}
 	if(nwords<=2)return -1;	// experience shows short "sentences" to not usually be interesting
 	if(nwords>50)
@@ -178,8 +188,13 @@ int	parse_line(char	*line)
 	}
 
 	//printf("%d words\n", nwords);
+	for(j=0;j<nwords;j++)
+		for(i=0;words[j][i];i++)
+			words[j][i] = tolower(words[j][i]);
 	current_sentence = (char*)trim_string(line);
 	nparse = parse(nwords, words, current_sentence);
 	clear_slab();
+	for(i=0;i<nwords;i++)free(words[i]);
+	free(words);
 	return nparse;
 }

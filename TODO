@@ -1,20 +1,18 @@
 TODO:
 
-well-form lexemes?
-
+well-form lexemes for small lexicon
+record ersatzing
 improved MRS extractor
 
 make ambiguity packing work with semantics (and record packing)
-
-preprocessing fsr?
 statistical parse selection?
 
 FOR Apple SITE:
 make duplicate sentence detector
-add common missing lexemes
 
 OPTIMIZATIONS:
 
 smarter ordering of agenda
 hyperactive excursion?
 filter for "first" and "last" of each rule by lexical type
+when chart reduction leaves gaps, kill the parse (rare?)
