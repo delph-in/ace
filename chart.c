@@ -254,7 +254,7 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 		if(build_edge(a, b, arg) == -2)return -1;
 		if(noldslabs >= MAX_CHUNKS)
 		{
-			fprintf(stderr, "terminating search, too much RAM\n");
+			fprintf(stderr, "NOTE: terminating search, too much RAM\n");
 			return -1;	// give up :(
 		}
 	}
