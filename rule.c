@@ -12,7 +12,7 @@ struct rule	**rules;
 int		nrules;
 
 char	*rule_filter;
-int	*nhactive, *nactive, *npassive, *nrecomb;
+int	*nhactive, *nactive, *npassive, *nrecomb, *nused;
 int	used_total = 0, pused_total = 0;
 extern int nfinal;
 
@@ -28,10 +28,11 @@ void	rule_stats()
 	int	i;
 	int	nact = 0, npass = 0, nrec = 0, nhact = 0;
 
-	if(!nactive || !npassive || !nrecomb || !nhactive)return;
+	if(!nactive || !npassive || !nrecomb || !nhactive || !nused)return;
 	for(i=0;i<nrules;i++)
 	{
 		//printf("%4d %.3f %d %s\n", nactive[i], (float)nrecomb[i] / nactive[i], i, rules[i]->name);
+		//printf("%32s %6d %6d %6d %.1f\n", rules[i]->name, nused[i], npassive[i], nactive[i], 100*(float)nused[i]/npassive[i]);
 		nact+=nactive[i];
 		npass+=npassive[i];
 		nrec+=nrecomb[i];
@@ -188,6 +189,7 @@ void	agenda_rules(int	count)
 		nhactive = calloc(sizeof(int),nrules);
 		npassive = calloc(sizeof(int),nrules);
 		nrecomb = calloc(sizeof(int),nrules);
+		nused = calloc(sizeof(int),nrules);
 	}
 
 	for(i=0;i<count;i++)

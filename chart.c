@@ -19,7 +19,7 @@ extern int	question;
 
 int		edge_id;
 
-extern int	*nhactive, *nactive, *npassive, *nrecomb, used_total, pused_total;
+extern int	*nused, *nhactive, *nactive, *npassive, *nrecomb, used_total, pused_total;
 extern int noldslabs;
 extern int	rnohyper[1000];
 
@@ -489,7 +489,11 @@ void	unfold_edge(struct edge	*e)
 	int	i;
 
 	nfinal++;
-	//if(e->rule)fprintf(stderr, "%s\n", e->rule->name);
+	if(e->rule)
+	{
+		nused[e->rule->rnum]++;
+		//if(e->rule)fprintf(stderr, "%s\n", e->rule->name);
+	}
 	for(i=0;i<e->have;i++)
 		unfold_edge(e->daughters[i]);
 }
