@@ -382,7 +382,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	// setup the chart
 	clear_chart(nwords+1);
 	if(add_lexemes_to_chart(nwords, words))return -1;
-	if(reduce_chart(nwords))return 0;
+	if(reduce_chart(nwords))return -1;
 
 	agenda_rules(nwords+1);
 
