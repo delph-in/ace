@@ -29,12 +29,13 @@ void	print_current_sentence(int	sig)
 void	shutdown_net()
 {
 	if(saved_termerr == 2)return;
-	close(1); close(2);
+	close(1);
+	close(2);
 	shutdown(0, SHUT_RDWR);
 	close(0);
 }
 
-void	connect_to_master(char	*hostname)
+static int	conn(char	*hostname, int	port)
 {
 	int	s = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	struct hostent	*he;
@@ -49,19 +50,27 @@ void	connect_to_master(char	*hostname)
 	//printf("remote IP: %.8X\n", ntohl(ip));
 
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(PORT);
+	addr.sin_port = htons(port);
 	addr.sin_addr.s_addr = ip;
 	if(connect(s, (void*)&addr, sizeof(addr)))
 		{ perror("connect"); exit(-1); }
 
+	return s;
+}
+
+void	connect_to_master(char	*hostname)
+{
+	int	sout;
+
+	sout = conn(hostname, PORT);
 	//printf("connected.\n");
 
 	saved_termerr = dup(2);
 	close(0); close(1); close(2);
-	dup2(s, 0);
-	dup2(s, 1);
-	dup2(s, 2);
-	close(s);
+	dup2(sout, 0);
+	dup2(sout, 1);
+	dup2(sout, 2);
+	close(sout);
 }
 
 void	restore_stderr()
