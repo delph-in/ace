@@ -1,6 +1,7 @@
 #include	<stdlib.h>
 #include	<stdio.h>
 #include	<string.h>
+#include	<signal.h>
 
 #include	"chart.h"
 #include	"rule.h"
@@ -21,6 +22,8 @@ extern int noldslabs;
 extern int	rnohyper[1000];
 
 struct edge	*sentential = 0;
+
+int	cancel_parse;
 
 void	print_sem(struct dg	*dg);
 void	print_rel(struct dg	*rel);
@@ -357,6 +360,12 @@ static int	process_edge(struct edge	*e)
 
 int	is_root(struct dg	*d);
 
+void	alarm_handler(int	sig)
+{
+	fprintf(stderr, "NOTE: cancelling parse, too long\n");
+	cancel_parse = 1;
+}
+
 int	parse(int	nwords, char	*words[], char	*sentence)
 {
 	int		i;
@@ -371,8 +380,12 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	agenda_rules(nwords+1);
 
+	cancel_parse = 0;
+	signal(SIGALRM, alarm_handler);
+	alarm(10);
+	//ualarm(100000);
 	// do the actual parsing
-	while( (edge = next_agenda()) )
+	while( !cancel_parse && (edge = next_agenda()) )
 		if(process_edge(edge))break;
 
 	// show analyses

@@ -1,5 +1,7 @@
 TODO:
 
+well-form lexemes?
+
 improved MRS extractor
 
 make ambiguity packing work with semantics (and record packing)
@@ -15,3 +17,4 @@ OPTIMIZATIONS:
 
 smarter ordering of agenda
 hyperactive excursion?
+filter for "first" and "last" of each rule by lexical type
