@@ -102,7 +102,7 @@ int	main(int	argc, char	*argv[])
 	}
 
 	//build_lr_filter();
-	//print_rule("yesno");
+	//print_rule("hspec");
 	//print_type("v_np*_trans_le");
 	//print_type("np_trans_subst");
 

@@ -9,11 +9,16 @@ struct dg	**roots;
 
 int	is_root(struct dg	*dg)
 {
-	int		i;
+	int		i, res;
 
 	for(i=0;i<nroots;i++)
-		if(unify_dg(dg, roots[i], -1))	// yeah, yeah, this gets picked up by the slab free
-			return 1;
+	{
+		res = unify_dg_tmp(dg, roots[i], -1);
+		forget_tmp();
+		if(!res)return 1;
+		//if(unify_dg(dg, roots[i], -1))	// yeah, yeah, this gets picked up by the slab free
+		//	return 1;
+	}
 	return 0;
 }
 

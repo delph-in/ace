@@ -76,7 +76,7 @@ void	setup_rule_filter()
 	int	i, j, k;
 	struct rule	*m, *d;
 	struct dg	*mdg;
-	int	yes = 0, count = 0;
+	int	yes = 0, count = 0, res;
 	char	byte;
 
 	fprintf(stderr, "building rule filter...\n");
@@ -97,7 +97,10 @@ void	setup_rule_filter()
 			byte = 0;
 			for(k=0;k<m->ndaughters;k++)
 			{
-				if(unify_dg(d->dg, mdg, k))
+				res = unify_dg_tmp(d->dg, mdg, k);
+				forget_tmp();
+				//if(unify_dg(d->dg, mdg, k))
+				if(res==0)
 				{
 					byte |= (1<<k);
 					yes++;
@@ -392,19 +395,23 @@ char	**type_rftc, **type_rltc;
 char	*type_filter_rule(struct rule	*r, int arg)
 {
 	char	*table;
-	int	i, count = 0;
-	struct slab_state	slab;
+	int	i, count = 0, res;
+	//struct slab_state	slab;
 
 	table = calloc(sizeof(char), ntypes);
 	for(i=0;i<ntypes;i++)
 	{
-		get_slabstate(&slab);
-		if(types[i]->dg && unify_dg(types[i]->dg, r->dg, arg))
+		if(!types[i]->dg)continue;
+		res = unify_dg_tmp(types[i]->dg, r->dg, arg);
+		forget_tmp();
+		//get_slabstate(&slab);
+		//if(unify_dg(types[i]->dg, r->dg, arg))
+		if(res==0)
 		{
 			table[i] = 1;
 			count++;
 		}
-		set_slabstate(&slab);
+		//set_slabstate(&slab);
 	}
 	//printf("FIRST-TYPE(%s) = %d / %d\n", r->name, count, ntypes);
 	return table;

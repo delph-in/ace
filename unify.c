@@ -10,6 +10,8 @@
 extern char	**fnames;
 extern int	g_loaded;
 
+#define SHOULD_TRIM(label)		(label==0 || (label>=5 && label<=15))
+
 // global generation counter for invalidating quasi-destructive operations
 unsigned int	generation = 10;
 
@@ -19,6 +21,8 @@ struct darc	*realloc_carcs(struct darc	*ptr, int	old, int	new);
 
 extern int	upath[1024];
 extern int	upathl;
+
+long long copycount, copytraverse;
 
 static void dagreset_c(struct dg	*d);
 
@@ -122,7 +126,19 @@ static int darc_cmp(const void	*a, const void	*b)
 	return ((const struct darc*)a)->label - ((const struct darc*)b)->label;
 }
 
-static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
+int	copypath[1024], copypathp;
+
+static void print_copy_path(char	*name)
+{
+	int	i;
+
+	fprintf(stderr, "%s", name);
+	for(i=0;i<copypathp;i++)
+		fprintf(stderr, " %s", fnames[copypath[i]]);
+	fprintf(stderr, "\n");
+}
+
+static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, int trim)
 {
 	struct dg	*dg;
 	struct darc	xarc, *aptr, *optr;
@@ -130,6 +146,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	char		forwarded, i, j, ch, st;
 	struct slab_state	state;
 
+	copytraverse++;
 	if(dg_underef->forward)
 	{
 		dg = dereference_dg(dg_underef);
@@ -189,10 +206,24 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 		for(i=0;i<dg->narcs;i++)
 		{
 			aptr->label = optr->label;
+			if(trim && SHOULD_TRIM(aptr->label))
+			{
+				newcopy->narcs--;
+				optr++;
+				continue;
+			}
 			//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
 			//		fnames[aptr->label], newcopy->type->name, optr->dest);
 			ch = 0;
-			aptr->dest = copy_dg_with_comp_arcs_ss(optr->dest, &ch);
+
+#ifdef	COPY_PATHS
+			copypath[copypathp++] = optr->label;
+#endif
+			aptr->dest = copy_dg_with_comp_arcs_ss(optr->dest, &ch, 0);
+#ifdef	COPY_PATHS
+			copypathp--;
+#endif
+
 			if(ch)st = 1;
 			if(!aptr->dest)return 0;
 			aptr++;
@@ -210,10 +241,23 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 		else if(i<dg->narcs)xarc = optr[(int)i++];
 		else xarc = dg->carcs[(int)j++];
 		aptr->label = xarc.label;
+		if(trim && SHOULD_TRIM(aptr->label))
+		{
+			newcopy->narcs--;
+			continue;
+		}
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
 		//		fnames[aptr->label], newcopy->type->name, xarc.dest);
 		ch = 0;
-		aptr->dest = copy_dg_with_comp_arcs_ss(xarc.dest, &ch);
+
+#ifdef	COPY_PATHS
+		copypath[copypathp++] = xarc.label;
+#endif
+		aptr->dest = copy_dg_with_comp_arcs_ss(xarc.dest, &ch, 0);
+#ifdef	COPY_PATHS
+		copypathp--;
+#endif
+
 		if(ch)st = 1;
 		if(!aptr->dest)return 0;
 		aptr++;
@@ -223,6 +267,10 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	if(dg->ncarcs || dg->type!=dg->xtype || st || FROZEN(dg))
 	{
 		*chret = 1;
+		copycount++;
+#ifdef	COPY_PATHS
+		print_copy_path("COPY");
+#endif
 		return newcopy;
 	}
 	else
@@ -233,6 +281,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 		dg->copy = 0;
 		if(forwarded)*chret = 1;	// since node was forwarded, consider it changed, even though we're sharing it
 		else *chret = 0;
+		//print_copy_path("SHARE");
 		return dg;
 	}
 }
@@ -708,10 +757,10 @@ int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 	return unify1(to, dg1);
 }
 
-struct dg	*finalize_tmp(struct dg	*d)
+struct dg	*finalize_tmp(struct dg	*d, int trim)
 {
 	char		ch = 0;
-	struct dg	*res = copy_dg_with_comp_arcs_ss(d, &ch);
+	struct dg	*res = copy_dg_with_comp_arcs_ss(d, &ch, trim);
 
 	if(!res)set_slabstate(&tmpstate);
 	generation++;
@@ -720,6 +769,8 @@ struct dg	*finalize_tmp(struct dg	*d)
 		fprintf(stderr, "ERROR: generation overflowed!\n");
 		exit(-1);
 	}
+
+	//if(res && trim)return trim_args(res);
 	return res;
 }
 
@@ -738,7 +789,7 @@ void	forget_tmp()
 struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 {
 	if(!unify_dg_tmp(dg1, dg2, arg))
-		return finalize_tmp(dg2);
+		return finalize_tmp(dg2, 0);
 	else
 	{
 		forget_tmp();
@@ -889,7 +940,7 @@ void	print_dg(struct dg	*d)
 	generation++;
 }
 
-//char	*trims[] = {ARGS HEAD-DTR NON-HEAD-DTR LCONJ-DTR RCONJ-DTR DTR MOD-DTR NONMOD-DTR};
+//char	*trims[] = {ARGS HEAD-DTR NON-HEAD-DTR LCONJ-DTR RCONJ-DTR DTR MOD-DTR NONMOD-DTR DTR1 DTR2 DTRA DTRB};
 
 // clone top node of the dg, and don't include trim'd features
 struct dg	*trim_args(struct dg	*d)
@@ -899,7 +950,7 @@ struct dg	*trim_args(struct dg	*d)
 	struct darc	*arcs = DARCS(d), *cpy_arcs;
 
 	for(i=0;i<d->narcs;i++)
-		if(!(arcs[i].label==0 || (arcs[i].label>=5 && arcs[i].label<=13)))
+		if(!SHOULD_TRIM(arcs[i].label))
 			narc++;
 	copy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*narc);
 	*copy = *d;
@@ -908,7 +959,7 @@ struct dg	*trim_args(struct dg	*d)
 	narc = 0;
 	for(i=0;i<d->narcs;i++)
 	{
-		if(!(arcs[i].label==0 || (arcs[i].label>=5 && arcs[i].label<=13)))
+		if(!SHOULD_TRIM(arcs[i].label))
 			cpy_arcs[narc++] = arcs[i];
 	}
 	return copy;

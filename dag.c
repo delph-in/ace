@@ -201,7 +201,7 @@ int	subsume_same_dg(struct dg	*a)
 	arcs = DARCS(a);
 	for(i=0;i<a->narcs;i++)
 	{
-		if(arcs[i].label>=14 && arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+		if(arcs[i].label>=16 && arcs[i].label<=19)	// STEM, RELS, HCONS, RULE-NAME
 			continue;
 		if(!subsume_same_dg(arcs[i].dest))return 0;
 	}
@@ -264,7 +264,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		// types match exactly, arc labels match exactly...
 		for(i=0;i<a->narcs;i++)
 		{
-			if(aarcs[i].label>=14 && aarcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+			if(aarcs[i].label>=16 && aarcs[i].label<=19)	// STEM, RELS, HCONS, RULE-NAME
 				continue;
 			if(!subsume_dg1(aarcs[i].dest, barcs[i].dest))return 0;
 		}
@@ -273,8 +273,10 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	{
 		for(i=j=0;i<b->narcs;i++)
 		{
-			if(barcs[i].label>=14 && barcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+			if(barcs[i].label>=16 && barcs[i].label<=19)	// STEM, RELS, HCONS, RULE-NAME
 				continue;
+			while(aarcs[j].label>=16 && aarcs[j].label<=19)	// STEM, RELS, HCONS, RULE-NAME
+				j++;
 			if(aarcs[j].label == barcs[i].label)
 			{
 				if(!subsume_dg1(aarcs[j].dest, barcs[i].dest))return 0;
@@ -287,8 +289,10 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	{
 		for(i=j=0;i<a->narcs;i++)
 		{
-			if(aarcs[i].label>=14 && aarcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+			if(aarcs[i].label>=16 && aarcs[i].label<=19)	// STEM, RELS, HCONS, RULE-NAME
 				continue;
+			while(barcs[j].label>=16 && barcs[j].label<=19)	// STEM, RELS, HCONS, RULE-NAME
+				j++;
 			if(aarcs[i].label == barcs[j].label)
 			{
 				if(!subsume_dg1(aarcs[i].dest, barcs[j].dest))return 0;
@@ -410,7 +414,7 @@ struct dg	*add_dg_feature(struct dg	*d, char	*label, struct dg	*value)
 
 int	init_fnames()
 {
-	nfnames = 18;
+	nfnames = 20;
 	fnames = malloc(sizeof(char*)*nfnames);
 	introduce = malloc(sizeof(int)*nfnames);
 	memset(introduce, -1, sizeof(int)*nfnames);
@@ -430,10 +434,13 @@ int	init_fnames()
 	fnames[11] = strdup("NONMOD-DTR");
 	fnames[12] = strdup("DTRA");
 	fnames[13] = strdup("DTRB");
+	fnames[14] = strdup("DTR1");
+	fnames[15] = strdup("DTR2");
 
-	fnames[14] = strdup("STEM");
-	fnames[15] = strdup("RELS");
-	fnames[16] = strdup("HCONS");
-	fnames[17] = strdup("RULE-NAME");
+	fnames[16] = strdup("STEM");
+	fnames[17] = strdup("RELS");
+	fnames[18] = strdup("HCONS");
+	fnames[19] = strdup("RULE-NAME");
+
 	return 0;
 }

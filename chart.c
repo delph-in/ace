@@ -142,7 +142,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 #ifdef	TIM
 		gettimeofday(&tv1, 0);
 #endif
-		u = finalize_tmp(dg);
+		u = finalize_tmp(dg, 1);
 #ifdef	TIM
 		gettimeofday(&tv2, 0);
 		base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
@@ -183,7 +183,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 #ifdef	TIM
 			gettimeofday(&tv1, 0);
 #endif
-			u = finalize_tmp(dg);
+			u = finalize_tmp(dg, 0);
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
 			base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
@@ -268,7 +268,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	{
 		// just finished a constituent
 		// chop off ARGS et al
-		e->dg = trim_args(e->dg);
+		// actually, finalize_tmp() does this for us now.
+		//e->dg = trim_args(e->dg);
 
 		//printf("\n generated %d/%d for [%d-%d] %s with rule %s\n", e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
 		//print_dg(u);
@@ -494,7 +495,7 @@ static int	pack_edge(struct edge	*edge)
 #ifdef	GENERATION
 		&& c->p_edges[i]->ep_span == edge->ep_span
 #endif
-		&& c->p_edges[i]->dg->xtype == edge->dg->xtype
+		//&& c->p_edges[i]->dg->xtype == edge->dg->xtype
 		&& !equiv_quickcheck(c->p_edges[i]->qc, edge->qc)
 		//&& !memcmp(c->p_edges[i]->qc, edge->qc, qcbytes)
 			)
@@ -557,6 +558,9 @@ static int	gen_process_edge(struct edge	*e)
 	return 0;
 }
 
+static long long packcount = 0;
+extern long long copycount, copytraverse;
+
 static int	parse_process_edge(struct edge	*e)
 {
 	int			i, j, remain;
@@ -565,8 +569,13 @@ static int	parse_process_edge(struct edge	*e)
 	//printf("processing [%d-%d] edge;    ", e->from, e->to);
 	//printf("  status: %d/%d\n", e->have, e->need);
 
+	/*if(e->have==e->need)
+		e->dg->xtype = lookup_type("*top*");*/
 	if(!inhibit_pack && e->have == e->need && !e->lex && pack_edge(e))
+	{
+		packcount++;
 		return 0;	// big savings! woohoo!
+	}
 	add_edge_to_chart(e);
 
 	// try to combine with edges on either side
@@ -795,7 +804,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		}
 		if(sentence && !question)printf("SENT: %s\n", sentence);
 
-		//print_dg(sem);
+		//print_dg(root);
 		//printf("\n\n");
 
 		print_sem(sem);
@@ -821,6 +830,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 void	final_chart_stats()
 {
+	fprintf(stderr, "NOTE: %lld packings, %lld / %lld = %.1f%% copies\n", packcount,
+		copycount, copytraverse, 100*(float)copycount / copytraverse);
 #ifdef TIM
 	fprintf(stderr, "NOTE: unify was %.4fs\n", base_unify_time);
 	fprintf(stderr, "NOTE: finalize was %.4fs\n", base_finalize_time);

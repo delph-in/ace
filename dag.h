@@ -53,7 +53,7 @@ void		setup_carcs_stack();
 
 // for hyperactive parsing
 int		unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg);
-struct dg	*finalize_tmp(struct dg	*d);
+struct dg	*finalize_tmp(struct dg	*d, int trim);
 int		check_cycles(struct dg	*dg);
 void		forget_tmp();
 
