@@ -259,7 +259,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type)
 			if(keyrel)
 			{
 				pred = dg_hop(keyrel, predfeat);
-				if(pred)
+				if(pred && pred->xtype != predsort)
 				{
 					l->pred = pred->xtype;
 					//printf("lex `%s' provides `%s'\n", word, l->pred->name);

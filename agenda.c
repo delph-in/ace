@@ -100,6 +100,7 @@ int	reduce_chart()
 		for(t2=lag->start;t2;t2=t2->next)
 		{
 			assert(t2->edge->lex);
+			if(!t2->edge->lex->pred)continue;
 			if(glb(t2->edge->lex->pred, t1->edge->lex->select))break;
 		}
 		if(!t2)
@@ -110,6 +111,7 @@ int	reduce_chart()
 			if(t1==lag->start)lag->start = t1->next;
 			if(t1==lag->end)lag->end = t1->prev;
 		}
+		//else printf("provided by %s with pred %s\n", t2->edge->lex->word, t2->edge->lex->pred->name);
 	}
 	return 0;
 }
