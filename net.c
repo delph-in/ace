@@ -19,7 +19,7 @@ connect_to_master(char	*hostname)
 	//printf("remote IP: %.8X\n", ntohl(ip));
 
 	addr.sin_family = AF_INET;
-	addr.sin_port = PORT;
+	addr.sin_port = htons(PORT);
 	addr.sin_addr.s_addr = ip;
 	if(connect(s, (void*)&addr, sizeof(addr)))
 		{ perror("connect"); exit(-1); }
