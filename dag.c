@@ -20,7 +20,7 @@ int	slabu;
 extern void	*freeze_point, *freeze_next;
 extern int	freeze_fd;
 
-int	accum_ram_usage = 0;
+long long	accum_ram_usage = 0;
 
 int	upath[1024];
 int	upathl;

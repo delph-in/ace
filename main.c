@@ -9,7 +9,7 @@ char	*load_grammar_path = 0;
 char	*sentence_path = 0;
 
 extern int	g_loaded;
-extern int	accum_ram_usage;
+extern long long	accum_ram_usage;
 
 parse_args(int	argc, char	*argv[])
 {
@@ -103,7 +103,7 @@ main(int	argc, char	*argv[])
 
 	tv2.tv_sec -= tv1.tv_sec;
 	tv2.tv_usec -= tv1.tv_usec;
-	fprintf(stderr, "parsed %d / %d sentences, avg %dk, time %.5fs\n", success, count, accum_ram_usage / count / 1024, (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+	fprintf(stderr, "parsed %d / %d sentences, avg %dk, time %.5fs\n", success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
 	rule_stats();
 
 	if(num_parses<=0)return -1;
