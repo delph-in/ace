@@ -458,13 +458,13 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 			//fprintf(stderr, "parse had no semantics!\n");
 			continue;
 		}
-		if(sentence)printf("SENT: %s\n", sentence);
+		if(sentence && !question)printf("SENT: %s\n", sentence);
 
 		//print_dg(sem);
 		//printf("\n\n");
 
 		print_sem(sem);
-		printf("\n\n");
+		if(!question)printf("\n\n");
 		fflush(stdout);
 #ifdef	FIRST_ONLY
 		break;
