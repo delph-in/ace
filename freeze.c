@@ -27,6 +27,7 @@ extern struct dg	**roots;
 extern struct type	**strings;
 extern struct type	*strtype;
 extern char		**fnames;
+extern int		*introduce;
 extern char		*rule_filter;
 extern char		*lgroups[256];
 extern char	**type_rftc, **type_rltc;
@@ -46,6 +47,7 @@ struct grammar
 	char		*lgroups[256];
 	struct type	*strtype;
 	char		**type_rftc, **type_rltc;
+	int		*introduce;
 };
 
 extern void	*slab_alloc(int	len);
@@ -231,6 +233,8 @@ int	freeze_grammar()
 	for(i=0;i<nroots;i++)roots[i] = copy_dg(roots[i]);
 
 	for(i=0;i<nfnames;i++)fnames[i] = freeze_string(fnames[i]);
+	introduce = freeze_block(introduce, sizeof(int) * nfnames);
+
 	for(i=0;i<256;i++)
 		if(lgroups[i])
 			lgroups[i] = freeze_block(lgroups[i], 256);
@@ -259,6 +263,7 @@ int	freeze_grammar()
 	G->roots = slab_alloc(sizeof(void*) * G->nroots);	memcpy(G->roots, roots, sizeof(void*) * G->nroots);
 	G->fnames = slab_alloc(sizeof(void*) * G->nfnames);	memcpy(G->fnames, fnames, sizeof(char*) * G->nfnames);
 	G->strings = slab_alloc(sizeof(void*) * G->nstrings);	memcpy(G->strings, strings, sizeof(void*) * G->nstrings);
+	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
 	G->type_rftc = type_rftc;
@@ -307,7 +312,10 @@ static int	load_freeze()
 
 	// in case we accidentally add more during parsing
 	fnames = malloc(sizeof(char*) * nfnames);
+	introduce = malloc(sizeof(int) * nfnames);
 	memcpy(fnames, G->fnames, sizeof(char*) * nfnames);
+	memcpy(introduce, G->introduce, sizeof(int) * nfnames);
+
 	for(i=0;i<256;i++)
 	{
 		lgroups[i] = G->lgroups[i];

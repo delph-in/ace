@@ -259,7 +259,6 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 }
 
 int		*introduce;	// what type introduced this fname?
-extern struct type	**types;
 
 struct type	*most_general_type_for_dg(struct dg	*d)
 {

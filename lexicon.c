@@ -29,7 +29,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed delayed unification\n", lex->word);
 		exit(-1);
 	}
-	//wellform(edge->dg, lex->word);
+	wellform(edge->dg, lex->word);
 #endif
 
 	//edge->dg = copy_dg(edge->dg);
