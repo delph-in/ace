@@ -19,6 +19,7 @@ int	preprocess_line(char	*line, int	*nwordsP, char	***wordsP)
 		if(process_string(line, out, pprules+i, 0))
 			strcpy(line, out);
 	}
+	//printf("line `%s'\n", line);
 
 	wptr = 0;
 	for(j=0;line[j];j++)
@@ -45,18 +46,20 @@ int	preprocess_line(char	*line, int	*nwordsP, char	***wordsP)
 
 static char	*process_word(char	*win)
 {
-	char	tmp[2560], word[2560];
-	int	i;
+	int	i, state;
+	char	*p;
+	extern int ersatz_dfa;
 
-	strcpy(word, win);
-	for(i=0;i<npprules;i++)
+	p = win;
+	state = ersatz_dfa;
+	while(state!=-1 && *p!=0)
+		state = dfa[state].trans[(int)*p++];
+	if(state!=-1 && *p==0 && dfa[state].accept!=-1)
 	{
-		if(pprules[i].type != rtErsatz)continue;
-		if(process_string(word, tmp, pprules+i, 1))
-			strcpy(word, tmp);
+		i = dfa[state].accept;
+		return strdup(pprules[i].rep);
 	}
-	//printf("%s ", word);
-	return strdup(word);
+	return strdup(win);
 }
 
 static int	process_string(char	*str, char	*out, struct fspp_rule	*r, int	full)
@@ -69,9 +72,10 @@ static int	process_string(char	*str, char	*out, struct fspp_rule	*r, int	full)
 	while(*str)
 	{
 		//printf("applying dfa %d to `%s'\n", r->dfastart, str);
-		ap = p = str;
+		p = str;
 		state = r->dfastart;
 		astate = -1;
+		ap = 0;
 		for(i=0;i<4;i++)sstart[i] = send[i] = 0;
 		while(state!=-1)
 		{
