@@ -69,7 +69,7 @@ static int	process_string(char	*str, char	*out, struct fspp_rule	*r, int	full)
 	while(*str)
 	{
 		//printf("applying dfa %d to `%s'\n", r->dfastart, str);
-		p = str;
+		ap = p = str;
 		state = r->dfastart;
 		astate = -1;
 		for(i=0;i<4;i++)sstart[i] = send[i] = 0;
@@ -81,7 +81,7 @@ static int	process_string(char	*str, char	*out, struct fspp_rule	*r, int	full)
 				if(dfa[state].start[i+1] && !sstart[i])sstart[i] = p;
 				if(dfa[state].end[i+1])send[i] = p;
 			}
-			state = dfa[state].trans[*p++];
+			state = dfa[state].trans[(int)*p++];
 		}
 		if(astate==-1)
 			*out++ = *str++;

@@ -3,6 +3,7 @@
 #include	<sys/time.h>
 #include	<unistd.h>
 #include	<string.h>
+#include	<ctype.h>
 #include	"chart.h"
 #include	"net.h"
 #include	"freeze.h"
