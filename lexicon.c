@@ -204,7 +204,7 @@ void	dump_parts_of_speech()
 	pclose(f);
 }
 
-void	add_lexeme(char	*word, struct dg	*dg, struct type	*type)
+void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 {
 	struct lexeme	*l = malloc(sizeof(struct lexeme));
 	struct dg	*stem, *str, *synsem, *lkeys, *keyrel, *pred, *compkey, *ocompkey;
@@ -235,7 +235,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type)
 	l->pred = 0;
 	l->select = 0;
 
-	synsem = dg_hop(dg, synsemfeat);
+	synsem = dg_hop(fulldg, synsemfeat);
 	if(synsem)
 	{
 		lkeys = dg_hop(synsem, lkeysfeat);
@@ -269,7 +269,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type)
 		}
 	}
 
-	for(stem = dg_hop(dg, sfeat);stem;stem = dg_hop(stem, rfeat))
+	for(stem = dg_hop(fulldg, sfeat);stem;stem = dg_hop(stem, rfeat))
 	{
 		if(!strcasecmp(stem->type->name, "*null*"))break;
 		str = dg_hop(stem, ffeat);
@@ -308,7 +308,6 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type)
 
 int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 {
-#ifdef	FULL_LEXICON
 	struct dg	*fulldg;
 
 	fulldg = unify_dg(dg, t->dg, -1);
@@ -318,17 +317,18 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 		return -1;
 	}
 	wellform(fulldg, name);
+#ifdef	FULL_LEXICON
 	dg = fulldg;
 #endif
 
-	add_lexeme(name, dg, t);
+	add_lexeme(name, dg, t, fulldg);
 
 	return 0;
 }
 
 int	study_lexicon(char	*lhs, struct dg	*dg)
 {
-	add_lexeme(lhs, dg, dg->xtype);
+	add_lexeme(lhs, dg, dg->xtype, dg);
 	return 0;
 }
 

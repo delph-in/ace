@@ -81,7 +81,14 @@ struct rule	*freeze_rule(struct rule	*rin)
 	struct rule	*rout = slab_alloc(sizeof(struct rule));
 
 	*rout = *rin;
+#ifdef	ERG
+	// in the ERG, non-inflectional rules are completely defined by types.
+	// don't bother to make a copy of the type.
+	if(!rin->inflr)rout->dg = rin->dg->xtype->dg;
+	else rout->dg = copy_dg(rin->dg);
+#else
 	rout->dg = copy_dg(rin->dg);
+#endif
 	rout->name = freeze_string(rin->name);
 	strcpy(rout->name, rin->name);
 

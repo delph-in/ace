@@ -224,6 +224,19 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 {
 	struct rule	*r = calloc(sizeof(struct rule), 1);
 
+#ifdef	ERG
+	static int	rnamef = -1;
+	struct dg	*rnamedg;
+
+	if(rnamef==-1)rnamef = lookup_fname("RULE-NAME");
+	rnamedg = dg_hop(dg, rnamef);
+	if(rnamedg)
+	{
+		add_dg_hop(dg->xtype->dg, rnamef, rnamedg);
+		//printf("added rule name `%s' to rule type `%s'\n", rnamedg->xtype->name, dg->xtype->name);
+	}
+#endif
+
 	nrules++;
 	rules = realloc(rules, sizeof(struct rule*)*nrules);
 	rules[nrules-1] = r;
