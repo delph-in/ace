@@ -147,14 +147,15 @@ int	parse_line(char	*line)
 	char	**words;
 
 	current_sentence = "(preparing)";
+	while(line[0] && line[strlen(line)-1] == '\n')line[strlen(line)-1] = 0;
 	if(!*line)return -1;
 	if(!strncmp(line, "<DOC", 4))
 	{
-		printf("%s", line);
+		printf("%s\n", line);
 		return -1;
 	}
-	//if(!strcmp(line, "All rights reserved.\n"))return -1;	// not interesting.
-	if(!strcmp(line, "@reloadrules@\n"))
+	//if(!strcmp(line, "All rights reserved."))return -1;	// not interesting.
+	if(!strcmp(line, "@reloadrules@"))
 	{
 		load_rules_conf();
 		return -1;
@@ -195,7 +196,7 @@ int	parse_line(char	*line)
 	for(j=0;j<nwords;j++)
 		for(i=0;words[j][i];i++)
 			words[j][i] = tolower(words[j][i]);
-	current_sentence = (char*)trim_string(line);
+	current_sentence = line;//(char*)trim_string(line);
 	nparse = parse(nwords, words, current_sentence);
 	clear_slab();
 	for(i=0;i<nwords;i++)free(words[i]);
