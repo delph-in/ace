@@ -113,13 +113,12 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 	return newcopy;
 }
 
-static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
+static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 {
 	struct dg	*dg;
-	int		forwarded;
 	struct darc	*aptr;
-	int		i, ch = 0, st = 0;
 	struct dg	*newcopy;
+	char		forwarded, i, ch, st;
 	struct slab_state	state;
 
 	if(dg_underef->forward)
@@ -128,6 +127,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
 		if(!dg)return 0;
 	}
 	else dg = dg_underef;
+	forwarded = (dg != dg_underef);
 
 	// ignore mark left by check_cycles()
 	if((unsigned int)dg->copy<=2)dg->copy = 0;
@@ -151,7 +151,6 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
 			return dg->copy;
 		}
 	}
-	forwarded = (dg != dg_underef);
 
 	if(!dg->narcs && dg->type==dg->xtype &&
 		!((unsigned int)dg>=0x60000000 && (unsigned int)dg<0x70000000) && !dg->ncarcs)goto share;
@@ -173,6 +172,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, int	*chret)
 	newcopy->narcs = newcopy->aarcs = dg->narcs + dg->ncarcs;
 	aptr = newcopy->arcs = slab_alloc(sizeof(struct darc) * newcopy->aarcs);
 
+	st = 0;
 	for(i=0;i<dg->narcs;i++)
 	{
 		aptr->label = dg->arcs[i].label;
@@ -619,7 +619,7 @@ int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 
 struct dg	*finalize_tmp(struct dg	*d)
 {
-	int		ch = 0;
+	char		ch = 0;
 	struct dg	*res = copy_dg_with_comp_arcs_ss(d, &ch);
 
 	if(!res)set_slabstate(&tmpstate);
