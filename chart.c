@@ -22,6 +22,12 @@ extern int noldslabs;
 void	clear_chart(int	size)
 {
 	int	i, j;
+	extern unsigned int	generation;
+
+	// guard against generation overflow;
+	// reset the grammar if we are above 4-billion generations
+	if(generation > 4000000000UL)
+		reload_frozen_grammar();
 
 	if(cells)
 	{

@@ -2,17 +2,6 @@ TODO:
 
 improved MRS extractor
 
-FIX gen-counter overflow
-	- 32-bit counter is pretty big though
-	- 32-byte struct dag, 1GB RAM limit currently per sentence
-	- so, 32kdags per sentence max (actually much less due to arcs)
-	- figure 1/3rd of unifications fail
-	- so conceivably 100k unifications per sentence!
-	- limits us to 40k sentences per run :(
-	- appleout is in danger, then
-	- realistically though, only about 2kdags per sentence are produced
-	- so maybe we can do 400k sentences per run
-
 make ambiguity packing work with semantics (and record packing)
 
 preprocessing fsr?

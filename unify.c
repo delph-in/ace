@@ -204,6 +204,11 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 struct dg	*copy_dg(struct dg	*d)
 {
 	generation++;
+	if(generation==0xffffffff)
+	{
+		fprintf(stderr, "ERROR: generation overflowed!\n");
+		exit(-1);
+	}
 	return copy_dg_with_comp_arcs(d);
 }
 
@@ -517,6 +522,11 @@ struct dg	*finalize_tmp(struct dg	*d)
 
 	if(!res)set_slabstate(&tmpstate);
 	generation++;
+	if(generation==0xffffffff)
+	{
+		fprintf(stderr, "ERROR: generation overflowed!\n");
+		exit(-1);
+	}
 	return res;
 }
 
@@ -524,6 +534,11 @@ void	forget_tmp()
 {
 	set_slabstate(&tmpstate);
 	generation++;
+	if(generation==0xffffffff)
+	{
+		fprintf(stderr, "ERROR: generation overflowed!\n");
+		exit(-1);
+	}
 }
 
 // main entry point
@@ -531,9 +546,11 @@ struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 {
 	if(!unify_dg_tmp(dg1, dg2, arg))
 		return finalize_tmp(dg2);
-	set_slabstate(&tmpstate);
-	generation++;
-	return 0;
+	else
+	{
+		forget_tmp();
+		return 0;
+	}
 }
 
 static int	marker;
@@ -643,6 +660,11 @@ static void flat_print_dg(struct dg	*d)
 
 void	print_dg(struct dg	*d)
 {
+	if(generation>=0xfffffff0)
+	{
+		fprintf(stderr, "ERROR: generation overflowed!\n");
+		exit(-1);
+	}
 	generation++;
 	dgreset_r(d);
 	generation++;

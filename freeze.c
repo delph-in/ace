@@ -235,25 +235,46 @@ int	freeze_grammar()
 	commit_slab();
 }
 
+int	loaded_freeze_fd = -1, loaded_freeze_size;
+
+void	reload_frozen_grammar()
+{
+	if(loaded_freeze_fd==-1)
+	{
+		fprintf(stderr, "can't reload_frozen_grammar(), since no freeze is currently loaded!\n");
+		exit(-1);
+	}
+	munmap((void*)0x60000000, loaded_freeze_size);
+	null_generation();
+	load_freeze();
+}
+
 // load flat blocks grammar file
 int	load_frozen_grammar(char	*path)
 {
-	int	freeze_fd = open(path, O_RDONLY), i;
+	int	freeze_fd = open(path, O_RDONLY);
 	int	len;
-	struct grammar	*G;
 
 	if(freeze_fd<0) { perror(path); exit(-1); }
 
 	len = lseek(freeze_fd, 0, SEEK_END);
 	lseek(freeze_fd, 0, SEEK_SET);
+	loaded_freeze_fd = freeze_fd;
+	loaded_freeze_size = len;
+	return load_freeze();
+}
 
-	G = (struct grammar*)mmap((void*)0x60000000, len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, freeze_fd, 0);
+int	load_freeze()
+{
+	struct grammar	*G;
+	int		i;
+
+	G = (struct grammar*)mmap((void*)0x60000000, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, loaded_freeze_fd, 0);
 	if(!G || G==(struct grammar*)0xffffffff)
 	{
 		perror("mmap fixed 0x60000000");
 		exit(-1);
 	}
-	close(freeze_fd);
 
 	ntypes = G->ntypes;
 	nlexemes = G->nlexemes;
