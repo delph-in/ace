@@ -255,10 +255,13 @@ struct type	*find_type(char	*name, int	constrain)
 struct dg	*type_dg(char		*name)
 {
 	struct type	*type = find_type(name, 1);
+	struct dg	*ret;
 
 	if(!type)return 0;
 	if(!type->dg)return atomic_dg(name);
-	return copy_dg(type->dg);
+	ret = copy_dg(type->dg);
+	if(!ret) { fprintf(stderr, "type_dg(%s) couldn't copy %p\n", name, type->dg); exit(-1); }
+	return ret;
 }
 
 struct dagify_record
