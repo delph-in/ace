@@ -3,6 +3,7 @@
 #include	<string.h>
 #include	<signal.h>
 #include	<unistd.h>
+#include	<sys/time.h>
 
 #include	"chart.h"
 #include	"rule.h"
@@ -107,6 +108,9 @@ void	add_edge_to_chart(struct edge	*edge)
 
 int	trace = 0, gen_qc = 0;
 
+//#define TIM
+//double base_unify_time = 0, base_finalize_time = 0;
+
 int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force_noha)
 {
 	struct edge	*e;
@@ -114,13 +118,23 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	struct qc	*qc, *hqc;
 	int		nhave, nneed;
 	extern int	__qc_use_heap;
+#ifdef	TIM
+	struct timeval	tv1, tv2;
+#endif
 
 	nhave = a->have+1;
 	nneed = a->need;
 	if(nhave == nneed)
 	{
 		// building passive
+#ifdef	TIM
+		gettimeofday(&tv1, 0);
+#endif
 		u = finalize_tmp(dg);
+#ifdef	TIM
+		gettimeofday(&tv2, 0);
+		base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+#endif
 		if(!u)return -1;	// cycles might happen, check for them.
 		e = slab_alloc(sizeof(struct edge));
 		e->qc = extract_qc_arg(u, -1);
@@ -145,7 +159,14 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		else
 		{
 			// standard active
+#ifdef	TIM
+			gettimeofday(&tv1, 0);
+#endif
 			u = finalize_tmp(dg);
+#ifdef	TIM
+			gettimeofday(&tv2, 0);
+			base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+#endif
 			if(!u)return -1;	// cycles might happen, check for them.
 			qc = extract_qc_arg(u, a->rtl?(nneed-nhave-1):nhave);
 		}
@@ -158,10 +179,13 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		e->qc = qc;
 		//printf("active qc %p (copy of %p)\n", e->qc, qc);
 	}
+	//e->prio = a->prio+1;
+	//if(e->prio>20)e->prio = 20;
 	e->prio = a->prio;
 	if(nneed==nhave)
 	{
 		e->prio = 0;
+		//e->prio=20;
 		//e->prio = (e->to-e->from - 1)/2;
 		//if(e->prio>10)e->prio = 10;
 	}
@@ -235,8 +259,11 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 
 static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 {
-	int	remain, arg, force_noha = 0;
+	int	remain, arg, force_noha = 0, res;
 	struct dg	*rdg;
+#ifdef	TIM
+	struct timeval	tv1, tv2;
+#endif
 
 	if(a->have==-1)return 0;
 
@@ -275,7 +302,14 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 		nrecomb[a->rule->rnum]++;
 		if(a->ha_use > 2)
 		{
+#ifdef	TIM
+			gettimeofday(&tv1, 0);
+#endif
 			a->dg = unify_dg(a->ha_dg, a->ha_par, a->ha_arg);
+#ifdef	TIM
+			gettimeofday(&tv2, 0);
+			base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+#endif
 			if(!a->dg)
 			{
 				// latent cycle detection
@@ -291,7 +325,14 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 		}
 		else
 		{
+#ifdef	TIM
+			gettimeofday(&tv1, 0);
+#endif
 			unify_dg_tmp(a->ha_dg, a->ha_par, a->ha_arg);
+#ifdef	TIM
+			gettimeofday(&tv2, 0);
+			base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+#endif
 			rdg = a->ha_par;
 			force_noha = 1;
 			a->ha_use++;
@@ -301,7 +342,15 @@ static inline int	fundamental_rule(struct edge	*a, struct edge	*b)
 	//printf("recombine %s\n", a->rule->name);
 
 	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, rdg->xtype->name, arg);
-	if(!unify_dg_tmp(b->dg, rdg, arg))
+#ifdef	TIM
+	gettimeofday(&tv1, 0);
+#endif
+	res = unify_dg_tmp(b->dg, rdg, arg);
+#ifdef	TIM
+	gettimeofday(&tv2, 0);
+	base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+#endif
+	if(!res)
 	{
 		if(build_edge(a, b, arg, rdg, force_noha) == -2)return -1;
 		if(noldslabs >= MAX_CHUNKS)
@@ -484,6 +533,16 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	return num_parses;
 }
 
+void	final_chart_stats()
+{
+#ifdef TIM
+	fprintf(stderr, "NOTE: unify was %.4fs\n", base_unify_time);
+	fprintf(stderr, "NOTE: finalize was %.4fs\n", base_finalize_time);
+	base_unify_time = 0;
+	base_finalize_time = 0;
+#endif
+}
+
 void	unfold_edge(struct edge	*e)
 {
 	int	i;
@@ -658,7 +717,12 @@ void	print_rel(struct dg	*rel)
 		if(!strncmp(relstr, "bare_", 5))return;
 		if(!strcmp(relstr, "unspec_rel"))return;
 		if(!strcmp(relstr, "unspec_loc_rel"))return;
-		if(!strcmp(relstr, "time_rel"))return;
+		if(!strcmp(relstr, "time_rel"))
+		{
+			// time_rel doesn't (easily) tell us how it connects
+			printf("	tempwild 99999\n");
+			return;
+		}
 		if(!strcmp(relstr, "ellipsis_rel"))return;
 		if(!strcmp(relstr, "abstr_deg_rel"))return;
 		if(!strcmp(relstr, "number_rel"))return;

@@ -213,8 +213,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	}
 
 	//if(a->xtype != b->xtype)return 0;
-	if(!descendent_of(b->xtype->tnum, a->xtype))return 0;
 	//if(a->narcs != b->narcs)return 0;
+
+	if(!descendent_of(b->xtype->tnum, a->xtype))return 0;
+	//if(!descendent_of(b->xtype->tnum, a->xtype))subsume_forward = 0;
+	//if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
 
 	if(a->copy == b && b->forward == a)return 1;
 	if(a->copy)subsume_forward = 0;
@@ -238,7 +241,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			if(!subsume_dg1(a->arcs[i].dest, b->arcs[i].dest))return 0;
 		}
 	}
-	else // b is subtype of a, so has strict superset of features
+	else if(subsume_forward) // b is subtype of a, so has strict superset of features
 	{
 		for(i=j=0;i<b->narcs;i++)
 		{
@@ -251,6 +254,20 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			}
 		}
 	}
+	/*else if(subsume_backward) // a is subtype of b, so has strict superset of features
+	{
+		for(i=j=0;i<a->narcs;i++)
+		{
+			if(a->arcs[i].label>=14 && a->arcs[i].label<=17)	// STEM, RELS, HCONS, RULE-NAME
+				continue;
+			if(a->arcs[i].label == b->arcs[j].label)
+			{
+				if(!subsume_dg1(a->arcs[i].dest, b->arcs[j].dest))return 0;
+				j++;
+			}
+		}
+	}
+	else return 0;*/
 	return 1;
 }
 
@@ -275,6 +292,10 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 	}
 	//if(res && subsume_forward && !subsume_backward)printf("would have subsumed forward\n");
 	//else if(res && subsume_backward && !subsume_forward)printf("would have subsumed backward\n");
+	/*if(res && subsume_backward && !subsume_forward)
+			fprintf(stderr, "NOTE: back-subsumption\n");
+	if(res && subsume_forward)
+			fprintf(stderr, "NOTE: >= subsumption\n");*/
 	return res && subsume_forward;// && subsume_backward;
 	//return res;
 }

@@ -587,18 +587,23 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 
 		//dg1->carcs = realloc(dg1->carcs, sizeof(struct darc) * (dg1->ncarcs + nn + nc));
 
-		for(k=0;k<nn;k++)
+		// merge-sort
+		j=k=0;
+		/*if(nn&&nc)while(1)
 		{
-			i = news[k];
-			// add dg2->arcs[i] to dg1->carcs
-			dg1->carcs[dg1->ncarcs++] = dg2->arcs[i];
-		}
-		for(k=0;k<nc;k++)
-		{
-			i = newcs[k];
-			// add dg2->carcs[i] to dg1->carcs
-			dg1->carcs[dg1->ncarcs++] = dg2->carcs[i];
-		}
+			if(dg2->arcs[news[j]].label < dg2->carcs[newcs[k]].label)
+			{
+				dg1->carcs[dg1->ncarcs++] = dg2->arcs[news[j++]];
+				if(j==nn)break;
+			}
+			else
+			{
+				dg1->carcs[dg1->ncarcs++] = dg2->carcs[newcs[k++]];
+				if(k==nc)break;
+			}
+		}*/
+		while(j<nn) dg1->carcs[dg1->ncarcs++] = dg2->arcs[news[j++]];
+		while(k<nc) dg1->carcs[dg1->ncarcs++] = dg2->carcs[newcs[k++]];
 		if(nn+nc < dg1->ncarcs || (nc&&nn))
 		{
 			//fprintf(stderr, "NOTE: had to sort %d carcs\n", dg1->ncarcs);

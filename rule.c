@@ -31,7 +31,7 @@ void	rule_stats()
 	if(!nactive || !npassive || !nrecomb || !nhactive || !nused)return;
 	for(i=0;i<nrules;i++)
 	{
-		//printf("%4d %.3f %d %s\n", nactive[i], (float)nrecomb[i] / nactive[i], i, rules[i]->name);
+		//if(nactive[i])printf("%4d %.3f %d %s\n", nactive[i], (float)nrecomb[i] / nactive[i], i, rules[i]->name);
 		//printf("%32s %6d %6d %6d %.1f\n", rules[i]->name, nused[i], npassive[i], nactive[i], 100*(float)nused[i]/npassive[i]);
 		nact+=nactive[i];
 		npass+=npassive[i];
@@ -171,7 +171,7 @@ int	load_rules_conf()
 			//printf("rule `%s' should go RTL\n", name);
 			rules[i]->rtl = 1;
 		}
-		//if(hyper=='a')rnohyper[i] = 1;
+		if(hyper=='a')rnohyper[i] = 1;
 		rprio[i] = prio;
 	}
 

@@ -29,7 +29,8 @@ struct type	*glb(struct type	*a, struct type	*b)
 		b = (struct type*)h;
 	}
 
-	h = (((unsigned int)a>>5) ^ ((unsigned int)b)) & (HSIZE-1);
+	//h = (((unsigned int)a>>5) ^ ((unsigned int)b)) & (HSIZE-1);
+	h = (((unsigned int)a>>6) ^ ((unsigned int)b>>0)) & (HSIZE-1);
 	if(!htab)htab = calloc(sizeof(struct glb_hashent), HSIZE);
 
 	// check for a,b in 

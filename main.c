@@ -138,6 +138,7 @@ int	main(int	argc, char	*argv[])
 		rule_stats();
 		print_glb_stats();
 	}
+	final_chart_stats();
 
 	shutdown_net();
 

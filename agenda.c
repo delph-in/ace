@@ -68,13 +68,21 @@ struct edge	*next_agenda()
 
 	for(i=highest;i>=0;i--) if(agenda[i].start)
 	{
+		/*// pop least recent edge from this queue
+		best = agenda[i].start;
+		agenda[i].start = best->next;
+		if(best==agenda[i].end)
+		{
+			agenda[i].end = 0;
+			highest = best->edge->prio - 1;
+		}*/
 		// pop most recent edge from this queue
 		best = agenda[i].end;
 		agenda[i].end = best->prev;
 		if(best==agenda[i].start)
 		{
 			agenda[i].start = 0;
-			highest--;
+			highest = best->edge->prio - 1;
 		}
 		else highest = best->edge->prio;
 		if(best->next)best->next->prev=best->prev;

@@ -51,6 +51,7 @@ int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to);
 void	allow_inflr(int	x, struct lexeme	*lex, struct irule	*ir);
 int	reduce_chart(int	length);
 void	output_lui(char	*words[]);
+void	final_chart_stats();
 
 void	clear_agenda();
 void	add_agenda(struct edge	*e);
