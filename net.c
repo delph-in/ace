@@ -1,5 +1,9 @@
+#include	<sys/types.h>
 #include	<sys/socket.h>
+#define		BSD_COMP	1
+#include	<sys/ioctl.h>
 #include	<netinet/in.h>
+#include	<arpa/inet.h>
 #include	<netdb.h>
 
 #define	PORT	9977
