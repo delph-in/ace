@@ -4,21 +4,20 @@ struct edge
 {
 	struct dg	*dg;
 	struct rule	*rule;
-	short		have, need;
+	signed char		have, need, from, to;
 	struct edge	**daughters;
-	short		from, to;
 	int		id;
 
 	struct lexeme	*lex;		// non-null if this is a lexical edge
-	short		rtl,used;	// right-to-left instantiation? active been used?
 
 	struct qc	*qc;	// for passive edges, qc vector for whole edge;
 				// for active edges, qc vector for next daughter
-	int		prio;
 
+	unsigned	rtl:1,used:1;	// right-to-left instantiation? active been used?
+	unsigned	prio:4;
 	// what dg to unify in to reconstruct this active edge's dg
+	char		ha_arg;
 	struct dg	*ha_dg, *ha_par;
-	int		ha_arg;
 };
 
 struct chart_cell
