@@ -24,7 +24,7 @@ static struct queue
 
 int	highest = -1;
 
-struct task	*lstart[50];
+struct task	*lstart[500];
 
 void	clear_agenda()
 {
@@ -35,7 +35,7 @@ void	clear_agenda()
 		agenda[i].start = 0;	// stuff is slab-alloc'd, don't worry about freeing
 		agenda[i].end = 0;
 	}
-	bzero(lstart, sizeof(struct task*)*50);
+	bzero(lstart, sizeof(struct task*)*500);
 	highest = -1;
 }
 

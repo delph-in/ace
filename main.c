@@ -50,6 +50,10 @@ void	parse_args(int	argc, char	*argv[])
 	}
 }
 
+int	die = 0;
+
+void broken_pipe_handler(int sig) { die = 1; }
+
 int	main(int	argc, char	*argv[])
 {
 	int	num_parses, success = 0, fail = 0, count = 0;
@@ -112,8 +116,9 @@ int	main(int	argc, char	*argv[])
 
 	signal(SIGSEGV, print_current_sentence);
 	signal(SIGBUS, print_current_sentence);
+	signal(SIGPIPE, broken_pipe_handler);
 	gettimeofday(&tv1, 0);
-	while(!feof(fin) && fgets(line, 10240, fin))
+	while(!die && !feof(fin) && fgets(line, 10240, fin))
 	{
 		num_parses = parse_line(line);
 		if(num_parses==-1)fprintf(stderr, "NOTE: ignore\n");
@@ -189,12 +194,12 @@ int	parse_line(char	*line)
 		fprintf(stderr, "NOTE: preprocessor failed!\n");
 		return -1;
 	}
-	/*if(nwords<=2)return -1;	// experience shows short "sentences" to not usually be interesting
-	if(nwords>50)
+	//if(nwords<=1)return -1;	// experience shows short "sentences" to not usually be interesting
+	if(nwords>60)
 	{
-		fprintf(stderr, "NOTE: 0 readings. Too many words (50+)\n");
+		fprintf(stderr, "NOTE: 0 readings. Too many words (60+)\n");
 		return 0;	// trying to parse long sentences is a waste of time. we have lots of short ones.
-	}*/
+	}
 
 	//printf("%d words\n", nwords);
 	for(j=0;j<nwords;j++)

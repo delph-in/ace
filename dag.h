@@ -162,8 +162,6 @@ static inline struct dg	*dg_hop(struct dg	*d, int	label)
 	if(d->forward)d = dereference_dg(d);
 	if(!d)return 0;
 
-	//printf("looking for %d\n", label);
-	//for(i=0;i<d->narcs;i++)printf("a%d: %d\n", i, d->arcs[i].label);
 	for(i=0,j=d->narcs;i<j;)
 	{
 		k = (i+j)>>1;
@@ -172,20 +170,8 @@ static inline struct dg	*dg_hop(struct dg	*d, int	label)
 		else if(d->arcs[k].label>label)j = k;
 		else i = k+1;
 	}
-	/*for(i=0;i<d->narcs;i++)
-		if(d->arcs[i].label==label)
-		{
-			d = d->arcs[i].dest;
-			goto ret;
-		}*/
 	if(d->gen==generation)
 	{
-		/*for(i=0;i<d->ncarcs;i++)
-			if(d->carcs[i].label==label)
-			{
-				d = d->carcs[i].dest;
-				goto ret;
-			}*/
 		for(i=0,j=d->ncarcs;i<j;)
 		{
 			k = (i+j)>>1;
