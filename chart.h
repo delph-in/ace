@@ -31,3 +31,7 @@ void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge);
 void	add_edge_to_chart(struct edge	*edge);
 void	clear_chart(int	size);
 void	free_edge(struct edge	*edge);
+
+void	clear_agenda();
+void	add_agenda(struct edge	*e);
+struct edge	*next_agenda();

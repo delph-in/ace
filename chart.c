@@ -33,7 +33,7 @@ void	clear_chart(int	size)
 				free(cells[i].edges);
 		free(cells);
 	}
-	nagenda = 0;
+	clear_agenda();
 	edge_id = 1;
 
 	clear_slab();
@@ -62,27 +62,6 @@ void	add_edge_to_chart(struct edge	*edge)
 	int	k = edge->from*chart_size + edge->to;
 
 	add_edge_to_chart_cell(cells+k, edge);
-}
-
-void	add_agenda(struct edge	*e)
-{
-	int	i;
-
-	nagenda++;
-	if(nagenda>aagenda)
-	{
-		aagenda += 100;
-		agenda = realloc(agenda, sizeof(struct edge*)*aagenda);
-	}
-
-	/*if(e->prio)
-	{
-		for(i=0;i<nagenda-1;i++)
-			if(e->prio > agenda[i]->prio)break;
-		memmove(agenda+i+1, agenda+i, sizeof(struct edge*)*(nagenda-1-i));
-		agenda[i] = e;
-	}*/
-	agenda[nagenda-1] = e;
 }
 
 int	trace = 0, gen_qc = 0;
@@ -217,7 +196,6 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 			//printf("\n generated %d/%d for [%d-%d] %s with rule %s\n", e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
 			//print_dg(u);
 			//printf("\n");
-			//printf("%d...\r", nagenda);
 			npassive[e->rule->rnum]++;
 #ifdef	FIRST_ONLY
 			if(e->from==0 && e->to==chart_size-1 && is_root(e->dg))
@@ -236,7 +214,6 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 			if(trace>1){print_dg(u); printf("\n\n");}
 		}
 	
-		//printf("%d...\r", nagenda);
 		add_agenda(e);
 		if(noldslabs >= MAX_CHUNKS)
 		{
@@ -309,25 +286,17 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	struct dg	*sem;
 	struct edge	*edge;
 
+	// setup the chart
 	clear_chart(nwords+1);
 	if(add_lexemes_to_chart(nwords, words))return -1;
 
 	agenda_rules(nwords+1);
 
-	while(nagenda)
-	{
-		// find highest priority edge on queue
-		//j = 0;
-		j=nagenda-1, k = 0;
-		for(i=0;i<nagenda;i++)
-			if(agenda[i]->prio > k)j=i, k=agenda[i]->prio;
-		edge = agenda[j];
-		nagenda--;
-		memmove(agenda+j, agenda+j+1, sizeof(struct edge*)*(nagenda-j));
+	// do the actual parsing
+	while( (edge = next_agenda()) )
 		if(process_edge(edge))break;
-	}
 
-	//printf("analyses:\n");
+	// show analyses
 	num_entries = cells[chart_size-1].nedges;
 	for(i=0;i<num_entries;i++)
 	{
