@@ -14,5 +14,4 @@ add common missing lexemes
 OPTIMIZATIONS:
 
 smarter ordering of agenda
-hyperactive parsing for certain rules only?
 hyperactive excursion?

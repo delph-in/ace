@@ -13,8 +13,9 @@ extern int	debug_level;
 
 int		edge_id;
 
-extern int	*nactive, *npassive, used_total;
+extern int	*nhactive, *nactive, *npassive, *nrecomb, used_total;
 extern int noldslabs;
+extern int	rnohyper[1000];
 
 #define	MAX_CHUNKS	680	// when to give up on a parse
 #define	FIRST_ONLY
@@ -73,7 +74,7 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 {
 	struct edge	*e, *a = 0, *b = 0;
 	struct dg	*u;
-	struct qc	*qc;
+	struct qc	*qc, *hqc;
 	int	remain, arg, nhave, nneed;
 	extern int	__qc_use_heap;
 
@@ -117,7 +118,9 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 			fprintf(stderr, "hyperactive: rescheduled unify failed!\n");
 			exit(-1);
 		}
+		nrecomb[a->rule->rnum]++;
 	}
+	//printf("recombine %s\n", a->rule->name);
 
 	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, a->dg->xtype->name, arg);
 	if(!unify_dg_tmp(b->dg, a->dg, arg))
@@ -137,20 +140,34 @@ static inline int	fundamental_rule(struct edge	*A, struct edge	*B)
 		else
 		{
 			// building active
-			if(check_cycles(a->dg))goto fail;
-			__qc_use_heap = 1;
-			qc = extract_qc_arg(a->dg, a->rtl?(nneed-nhave-1):nhave);
-			__qc_use_heap = 0;
-			forget_tmp();
+			if(!rnohyper[a->rule->rnum])
+			{
+				// hyperactive
+				if(check_cycles(a->dg))goto fail;
+				__qc_use_heap = 1;
+				hqc = extract_qc_arg(a->dg, a->rtl?(nneed-nhave-1):nhave);
+				__qc_use_heap = 0;
+				forget_tmp();
+				qc = copy_qc(hqc);
+				free(hqc);
+				u = 0;
+				nhactive[a->rule->rnum]++;
+			}
+			else
+			{
+				// standard active
+				u = finalize_tmp(a->dg);
+				if(!u)goto fail;	// cycles might happen, check for them.
+				qc = extract_qc_arg(u, a->rtl?(nneed-nhave-1):nhave);
+			}
 			e = slab_alloc(sizeof(struct edge));
+			e->dg = u;
 			e->prio = a->prio;
 			e->ha_par = a->dg;
 			e->ha_dg = b->dg;
 			e->ha_arg = arg;
-			e->dg = 0;
-			e->qc = copy_qc(qc);
+			e->qc = qc;
 			//printf("active qc %p (copy of %p)\n", e->qc, qc);
-			free(qc);
 		}
 		e->need = nneed;
 		e->have = nhave;

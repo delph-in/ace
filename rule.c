@@ -11,26 +11,28 @@ struct rule	**rules;
 int		nrules;
 
 char	*rule_filter;
-int	*nactive, *npassive;
+int	*nhactive, *nactive, *npassive, *nrecomb;
 int	used_total = 0;
 
-int	rprio[1000];
+int	rprio[1000], rnohyper[1000];
 
 struct qc	**ruleqc;
 
 rule_stats()
 {
 	int	i;
-	int	nact = 0, npass = 0;
+	int	nact = 0, npass = 0, nrec = 0, nhact = 0;
 
-	if(!nactive || !npassive)return;
+	if(!nactive || !npassive || !nrecomb || !nhactive)return;
 	for(i=0;i<nrules;i++)
 	{
-		//printf("%4d %d %s\n", nactive[i], i, rules[i]->name);
+		//printf("%4d %.3f %d %s\n", nactive[i], (float)nrecomb[i] / nactive[i], i, rules[i]->name);
 		nact+=nactive[i];
 		npass+=npassive[i];
+		nrec+=nrecomb[i];
+		nhact+=nhactive[i];
 	}
-	fprintf(stderr, "%d active / %d passive edges total (%d actives used)\n", nact, npass, used_total);
+	fprintf(stderr, "%d active (%d hyper) / %d passive edges total (%d actives used, %d reformed)\n", nact, nhact, npass, used_total, nrec);
 }
 
 int	rule_is_rtl(struct rule	*r)
@@ -133,7 +135,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 load_rules_conf()
 {
 	FILE	*f = fopen("rules.conf", "r");
-	char	dir;
+	char	dir, hyper;
 	int	save, i, prio;
 	char	name[1024];
 
@@ -147,7 +149,7 @@ load_rules_conf()
 	while(!feof(f))
 	{
 		prio = 0;
-		if(fscanf(f, "%c %d %s %d\n", &dir, &save, name, &prio) < 3)break;
+		if(fscanf(f, "%c %c %d %s %d\n", &dir, &hyper, &save, name, &prio) < 3)break;
 		//printf("dir %c save %d name %s\n", dir, save, name);
 		for(i=0;i<nrules;i++)
 			if(!strcmp(rules[i]->name, name))break;
@@ -158,6 +160,7 @@ load_rules_conf()
 			//printf("rule `%s' should go RTL\n", name);
 			rules[i]->rtl = 1;
 		}
+		if(hyper=='a')rnohyper[i] = 1;
 		rprio[i] = prio;
 	}
 
@@ -171,7 +174,9 @@ void	agenda_rules(int	count)
 	if(!nactive)
 	{
 		nactive = calloc(sizeof(int),nrules);
+		nhactive = calloc(sizeof(int),nrules);
 		npassive = calloc(sizeof(int),nrules);
+		nrecomb = calloc(sizeof(int),nrules);
 	}
 
 	for(i=0;i<count;i++)
