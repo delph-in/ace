@@ -182,7 +182,9 @@ int	subsume_same_dg(struct dg	*a)
 	extern unsigned int	generation;
 	struct darc	*arcs;
 
-	//a = dereference_dg(a);
+	//return 0;
+	//a = p_dereference_dg(a);
+
 	if(a->gen!=generation)
 	{
 		a->forward = a->copy = 0;
@@ -190,11 +192,16 @@ int	subsume_same_dg(struct dg	*a)
 		a->type = a->xtype;
 		a->gen = generation;
 	}
+
 	if(a->copy==a && a->forward==a)return 1;
 	if(a->copy)subsume_forward = 0;
 	if(a->forward)subsume_backward = 0;
 	if(!subsume_forward && !subsume_backward)return 0;
 	//if(a->copy || a->forward)return 0;
+
+	/*fprintf(stderr, "  ssself %p=[%s %p %p]\n",
+				a, a->xtype->name, a->copy, a->forward);*/
+
 	a->copy = a;
 	a->forward = a;
 
@@ -216,8 +223,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	extern unsigned int	generation;
 	struct darc	*aarcs, *barcs;
 
-	//a = dereference_dg(a);
-	//b = dereference_dg(b);
+	//a = p_dereference_dg(a);
+	//b = p_dereference_dg(b);
+
 	//if(!a || !b)return 0;
 	if(a==b)return subsume_same_dg(a);
 	if(a->gen!=generation)
@@ -237,6 +245,10 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 
 	//if(a->xtype != b->xtype)return 0;
 	//if(a->narcs != b->narcs)return 0;
+
+	/*fprintf(stderr, "  sscheck %p=[%s %p %p] vs. %p=[%s %p %p]\n",
+				a, a->xtype->name, a->copy, a->forward,
+				b, b->xtype->name, b->copy, b->forward);*/
 
 #ifndef	BIDIR_SS
 	if(!descendent_of(b->xtype->tnum, a->xtype))return 0;
@@ -310,12 +322,13 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 	int	res;
 	extern unsigned int	generation;
 
-	/*generation++;
+	generation++;
 	if(generation==MAX_GEN)
 	{
 		fprintf(stderr, "generation counter overflowed!\n");
 		exit(-1);
-	}*/
+	}
+
 	subsume_forward = subsume_backward = 1;
 	res = subsume_dg1(a, b);
 	generation++;
@@ -324,6 +337,9 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 		fprintf(stderr, "generation counter overflowed!\n");
 		exit(-1);
 	}
+
+	//fprintf(stderr, "subs %p %p = %d %d %d\n", a, b, res, subsume_forward, subsume_backward);
+
 	//if(res && subsume_forward && !subsume_backward)printf("would have subsumed forward\n");
 	//else if(res && subsume_backward && !subsume_forward)printf("would have subsumed backward\n");
 	/*if(res && subsume_backward && !subsume_forward)
@@ -333,6 +349,8 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 
 	if(res)
 	{
+		//if(subsume_forward && subsume_backward)return 1;
+		//else return 0;
 		if(subsume_forward)return 1;
 		if(subsume_backward)return -1;
 	}

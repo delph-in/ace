@@ -151,7 +151,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		e = slab_alloc(sizeof(struct edge));
 		e->qc = extract_qc_arg(u, -1);
 		e->dg = u;
-		e->age = (e->have==1)?(a->age+1):0;	// binary passive edges get age 0; unary get daughter.age+1
+		e->age = (nhave==1)?(b->age+1):0;	// binary passive edges get age 0; unary get daughter.age+1
 	}
 	else
 	{
@@ -223,6 +223,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		//printf("promoted lexeme %s to word %s via rule %s\n", b->dg->xtype->name, u->xtype->name, a->rule->name);
 	}
 	e->id = next_eid();
+	//fprintf(stderr, "build #%d %s age %d on #%d\n", e->id, e->rule->name, e->age, b->id);
 	e->daughters = slab_alloc(sizeof(struct edge*) * e->have);
 	e->rtl = a->rtl;
 	e->used = 0;
@@ -500,6 +501,7 @@ static int	pack_edge(struct edge	*edge)
 		//&& !memcmp(c->p_edges[i]->qc, edge->qc, qcbytes)
 			)
 		{
+			//fprintf(stderr, "PACK? #%d subs #%d\n", c->p_edges[i]->id, edge->id);
 			ssd = equivalent_dg(c->p_edges[i]->dg, edge->dg);
 			if(ssd == 1)
 			{
@@ -761,7 +763,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
-	alarm(10);
+
+	//alarm(10);
 	//ualarm(100000);
 
 	// do the actual parsing

@@ -88,8 +88,8 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 	dg = p_dereference_dg(dg);
 	if(!dg)return 0;
 
-	// ignore mark left by check_cycles()
-	if((unsigned long)dg->copy<=2)dg->copy = 0;
+	// ignore mark left by check_cycles() et al
+	if((unsigned long)dg->copy<=5)dg->copy = 0;
 
 	if(dg->copy)return dg->copy;
 
@@ -167,11 +167,16 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 		dg->type = dg->xtype;
 		dg->gen = generation;
 	}
+	if((unsigned long)dg->copy == 3)	// cycle marker
+		return 0;
+	if((unsigned long)dg->copy == 5)	// sharable marker
+		goto share;
+
 	if(dg->copy && dg->copy->gen == generation)
 	{
-		if(dg == dg->copy) // apparently a cycle
+		/*if(dg == dg->copy) // apparently a cycle
 			return 0;
-		else
+		else*/
 		{
 			*chret = 1;	// if 'copy' is set, a copy was made... so changed.
 			return dg->copy;
@@ -184,7 +189,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 	//if(dg->xtype->ndescendents==0)goto share;
 
 	// mark that we are inside this node, to detect cycles
-	dg->copy = dg;
+	dg->copy = (struct dg*)3;//dg;
 
 	get_slabstate(&state);
 
@@ -278,8 +283,9 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 		// slab-free the node we just built, it's guarranteed to be on top
 		set_slabstate(&state);
 		share:
-		dg->copy = 0;
-		if(forwarded)*chret = 1;	// since node was forwarded, consider it changed, even though we're sharing it
+		// mark this node as sharable in case someone reenters into it
+		dg->copy = (struct dg*)5;
+		if(forwarded)*chret = 1;	// since node was forwarded, parent must consider it changed, even though we're sharing it
 		else *chret = 0;
 		//print_copy_path("SHARE");
 		return dg;
