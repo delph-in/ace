@@ -1,0 +1,141 @@
+#include	<stdio.h>
+#include	<sys/time.h>
+#include	<getopt.h>
+#include	"chart.h"
+
+int	debug_level = 1;
+char	*save_grammar_path = 0;
+char	*load_grammar_path = 0;
+char	*sentence_path = 0;
+
+extern int	g_loaded;
+
+parse_args(int	argc, char	*argv[])
+{
+	char	*prog = argv[0], ch;
+
+	while((ch=getopt(argc, argv, "hvg:G:"))!=255)switch(ch)
+	{
+		case	'h':	usage: printf("usage: %s [-h] [-v] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
+		case	'v':	debug_level++;	break;
+		case	'g':	load_grammar_path = optarg;	break;
+		case	'G':	save_grammar_path = optarg;	break;
+		case	'?':	goto usage;
+	}
+	if(optind<argc-1)goto usage;
+	if(optind<argc)sentence_path = argv[optind];
+	else if(!save_grammar_path)sentence_path = "-";
+
+	if(load_grammar_path && save_grammar_path)
+	{
+		fprintf(stderr, "use cp(1) for duplicating grammars.\n");
+		exit(-1);
+	}
+}
+
+main(int	argc, char	*argv[])
+{
+	int	num_parses, i, success = 0, fail = 0, count = 0;
+	struct timeval	tv1, tv2;
+	char	line[10240];
+	FILE	*fin;
+
+	parse_args(argc, argv);
+
+	gettimeofday(&tv1, 0);
+	if(load_grammar_path)load_frozen_grammar(load_grammar_path);
+	else load_grammar();
+	gettimeofday(&tv2, 0);
+	tv2.tv_sec -= tv1.tv_sec;
+	tv2.tv_usec -= tv1.tv_usec;
+	fprintf(stderr, "loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+
+	if(save_grammar_path)
+		setup_save_frozen_grammar(save_grammar_path);
+
+	if(!load_grammar_path)
+	{
+		fprintf(stderr, "freezing grammar...\n");
+		freeze_grammar();
+	}
+	else fprintf(stderr, "(not freezing)\n");
+	load_rules_conf();
+
+	if(save_grammar_path)
+		exit(0);
+
+	//dump_grammar();
+
+	g_loaded = 1;
+
+	//print_rule("nadj_rr_nt");
+	//print_type("v_np*_trans_le");
+	//print_type("np_trans_subst");
+
+	if(!sentence_path)return 0;
+	if(!strcmp(sentence_path, "-"))fin = stdin;
+	else
+	{
+		fin = fopen(sentence_path, "r");
+		if(!fin)
+		{
+			perror(sentence_path);
+			return -1;
+		}
+	}
+
+	gettimeofday(&tv1, 0);
+	while(!feof(fin) && fgets(line, 10240, fin))
+	{
+		num_parses = parse_line(line);
+		if(num_parses>0)success++;
+		else if(num_parses==0)fail++;
+		if(num_parses>=0)count++;
+	}
+	gettimeofday(&tv2, 0);
+
+	tv2.tv_sec -= tv1.tv_sec;
+	tv2.tv_usec -= tv1.tv_usec;
+	fprintf(stderr, "parsed %d / %d sentences in %.5fs\n", success, count, (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+	rule_stats();
+
+	if(num_parses<=0)return -1;
+	else return 0;
+}
+
+int	parse_line(char	*line)
+{
+	char	*p, *w;
+	char	copy[10240];
+	char	*words[100];
+	int	nwords = 0;
+
+	if(!*line)return -1;
+	if(!strncmp(line, "<DOC", 4))
+	{
+		printf("%s", line);
+		return -1;
+	}
+
+	strcpy(copy, line);
+	// break up into words, normalize capitalization
+	w = p = line;
+	while(*p)
+	{
+		if(*p>='A' && *p<='Z')(*p) += 32;
+		switch(*p)
+		{
+			case	' ': case '\t': case '.': case '\n':
+			case	',': case '?': case '!':
+				*p = 0;
+				if(w != p)words[nwords++] = w;
+				w = p+1;
+				break;
+		}
+		p++;
+	}
+	//if(nwords<=2)return -1;	// experience shows short "sentences" to not usually be interesting
+
+	//printf("%d words\n", nwords);
+	return parse(nwords, words, trim_string(copy));
+}

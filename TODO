@@ -1,0 +1,36 @@
+TODO:
+
+for Apple site:
+make duplicate sentence detector
+add common missing lexemes
+
+FIX gen-counter overflow
+	- 32-bit counter is pretty big though
+	- 32-byte struct dag, 1GB RAM limit currently per sentence
+	- so, 32kdags per sentence max (actually much less due to arcs)
+	- figure 1/3rd of unifications fail
+	- so conceivably 100k unifications per sentence!
+	- limits us to 40k sentences per run :(
+	- appleout is in danger, then
+	- realistically though, only about 2kdags per sentence are produced
+	- so maybe we can do 400k sentences per run
+
+make equivalent_dg actually work...
+
+multi-word stems for lexical entries
+make ambiguity packing work with semantics (and record packing)
+preprocessing fsr?
+statistical parse selection?
+
+OPTIMIZATIONS:
+
+find a safe way to not copy types for extra constraints
+
+use different quickchecks for different rules
+
+find a way to force struct dg's to align to 32 bytes,
+	so they fit one per cacheline nicely
+find a way to force struct darcs to align to 8 bytes
+smart ordering of agenda
+
+hyperactive parsing -- for certain rules only
