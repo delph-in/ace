@@ -15,6 +15,8 @@ extern int	wcap[1024];
 #include	"tdl.h"
 #include	"lexicon.h"
 
+#define	MAX_ORTH_RULES	5
+
 int		nirules;
 struct irule	**irules;
 
@@ -25,7 +27,7 @@ int	add_lexemes_to_chart(int	nwords, char	**words)
 
 	for(i=0;i<nwords;i++)
 	{
-		simple = add_lexemes_to_chart_for_form(i, words[i]);
+		simple = add_lexemes_to_chart_for_form(i, words[i], 0, 0);
 		compound = add_multilexemes_to_chart(i, nwords-i, words+i);
 		if(compound>max)max = compound;
 		if(!simple && !max)
@@ -38,7 +40,15 @@ int	add_lexemes_to_chart(int	nwords, char	**words)
 	return 0;
 }
 
-int	add_lexemes_to_chart_for_form(int	x, char	*form)
+int	*longer_rule_list(int nr, int *ru, struct irule	*ir)
+{
+	int *r = slab_alloc(sizeof(int)*(nr+1));
+	memcpy(r+1,ru,sizeof(int)*nr);
+	r[0] = ir->rule->rnum;
+	return r;
+}
+
+int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rules)
 {
 	int	i, j, count = 0, n;
 	char	stem[1024];
@@ -47,19 +57,24 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 	struct lexeme	*lex;
 
 	// get any non-inflecting lexemes
-	n = add_lexemes_to_chart_for_stem(x, form, 0);
+	n = add_lexemes_to_chart_for_stem(x, form, nrules, rules);
 	count += n;
 	if(!strcmp(form, "is"))return count;
 
+	if(nrules >= MAX_ORTH_RULES)return count;
+
 	for(i=0;i<nirules;i++)
 	{
+		int	*mrules = 0;
+
 		ir = irules[i];
 		if(!ir->nsub)
 		{
-			n = add_lexemes_to_chart_for_stem(x, form, ir);
+			if(!mrules)mrules = longer_rule_list(nrules, rules, ir);
+			n = add_lexemes_to_chart_for_stem(x, form, nrules+1, mrules);
 			count += n;
 #ifndef	GENERATION
-			if(n)add_agenda(epsilon_edge(ir->rule, x, 0));
+			if(n)add_agenda_lrule(x, ir->rule);//(epsilon_edge(ir->rule, x, 0));
 #endif
 		}
 		else
@@ -71,10 +86,11 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 				{
 					//fprintf(stderr, "used irreg `%s -> %s' for rule %s\n",
 					//		irr->stem, irr->form, ir->rule->name);
-					n = add_lexemes_to_chart_for_stem(x, irr->stem, ir);
+					if(!mrules)mrules = longer_rule_list(nrules, rules, ir);
+					n = add_lexemes_to_chart_for_form(x, irr->stem, nrules+1, mrules);
 					count += n;
 #ifndef	GENERATION
-					if(n)add_agenda(epsilon_edge(ir->rule, x, 0));
+					if(n)add_agenda_lrule(x, ir->rule);//(epsilon_edge(ir->rule, x, 0));
 #endif
 					break;
 				}
@@ -86,12 +102,13 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 				{
 					//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d]\n",
 							//form, stem, ir->rule->name, j);
-					n = add_lexemes_to_chart_for_stem(x, stem, ir);
+					if(!mrules)mrules = longer_rule_list(nrules, rules, ir);
+					n = add_lexemes_to_chart_for_form(x, stem, nrules+1, mrules);
 					count += n;
 					if(n)
 					{
 #ifndef	GENERATION
-						add_agenda(epsilon_edge(ir->rule, x, 0));
+						add_agenda_lrule(x, ir->rule);//(epsilon_edge(ir->rule, x, 0));
 #endif
 						break;
 					}
@@ -100,21 +117,20 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form)
 		}
 	}
 
-	if(!count && wcap[x]/* && x!=0*/)	// unknown uppercase word not at start of sentence; proper noun?
+	if(nrules==0 && !count && wcap[x]/* && x!=0*/)	// unknown uppercase word not at start of sentence; proper noun?
 	{
 		sprintf(stem, "\"%s\"", form);
-		//add_lexemes_to_chart_for_stem(x, "george", 0);
 		lex = proper_noun_lex(stem);
 		add_agenda(lexical_edge(lex, x, 1));
-		allow_inflr(x, lex, 0);
+		allow_inflr(x, lex, 0, 0);
 		count++;
 		for(i=0;i<nirules;i++)
 			if(irules[i]->nsub==0)
 			{
 #ifndef	GENERATION
-				add_agenda(epsilon_edge(irules[i]->rule, x, 0));
+				add_agenda_lrule(x, irules[i]->rule);//(epsilon_edge(irules[i]->rule, x, 0));
 #endif
-				allow_inflr(x, lex, irules[i]);
+				allow_inflr(x, lex, 1, longer_rule_list(0,0, irules[i]));
 				count++;
 			}
 		return 1;
@@ -204,7 +220,10 @@ char	*inflect(struct irule	*ir, char	*str)
 		strcpy(res, str);
 		for(i=ir->nsub-1;i>=0;i--)
 			if(!invert_ipat_suffix(ir->subrep[i], ir->subpat[i], str, res))
+			{
+				//printf("applied (%s %s)\n", ir->subpat[i], ir->subrep[i]);
 				break;
+			}
 	}
 	//printf("inflected[%s] `%s' to `%s'\n", ir->rule->name, str, res);
 	return res;
@@ -214,16 +233,22 @@ int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem)
 {
 	int	let;
 	int	len = strlen(form)-1, len2 = strlen(rep)-1;
-	char	letters[256];
+	char	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
 
-	do
+	bzero(letters, 256);
+	if(len2==0 && rep[len2]=='*' && len>=0)len2--;	// trivially match
+	else do
 	{
 		let = form[len--];
+		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
 		if(len2>0 && rep[len2-1]=='!')
 		{
 			if(appropriate_letter(let, rep[len2]))
 			{
-				letters[(int)rep[len2]] = let;
+				if(letters[(int)rep[len2]] == 0)
+					letters[(int)rep[len2]] = let;
+				else if(let != letters[(int)rep[len2]])
+					break;
 				len2-=2;
 			}
 			else break;
@@ -248,6 +273,7 @@ int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem)
 			}
 		}
 		*stem++ = 0;
+		//printf(" form `%s' -> stem `%s' under pat `%s' rep `%s' [len %d len2 %d]\n", form, rstem, rpat, rrep, len, len2);
 		return 0;
 	}
 	else return -1;
@@ -331,7 +357,7 @@ void	add_inflr(struct rule	*rule, char	*def)
 }
 
 
-int	study_inflr(char	*name, struct dg	*dg)
+/*int	study_inflr(char	*name, struct dg	*dg)
 {
 	extern int	study_lrule(char	*name, struct dg	*dg);
 	extern char	*g_inflr_def;
@@ -339,9 +365,9 @@ int	study_inflr(char	*name, struct dg	*dg)
 	extern int		nrules;
 
 	if(study_lrule(name, dg))return -1;
-	add_inflr(rules[nrules-1], g_inflr_def);
+	if(g_inflr_def)add_inflr(rules[nrules-1], g_inflr_def);
 	return 0;
-}
+}*/
 
 struct irule	*lookup_irule(char	*rule)
 {
@@ -396,19 +422,32 @@ int	load_irregulars(char	*path)
 
 int	load_inflr()
 {
+	extern int	study_lrule(char	*name, struct dg	*dg);
+
+#ifndef	ERG
+	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/lrules.tdl", study_lrule))
+	{
+		fprintf(stderr, "rules: unable to load lexrinst.tdl, bailing out.\n");
+		exit(-1);
+	}
+#endif
 #ifdef	ERG
-	if(iterate_tdl_dgs("../erg/inflr.tdl", study_inflr))
+	//if(iterate_tdl_dgs("../erg/inflr.tdl", study_lrule) || iterate_tdl_dgs("../erg/lexrinst.tdl", study_lrule))
+	if(process_tdl_dgs_status("lex-rule", study_lrule))
 #else
-	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/inflr.tdl", study_inflr))
+	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/inflr.tdl", study_lrule))
 #endif
 	{
 		fprintf(stderr, "inflr: unable to load, bailing out.\n");
 		exit(-1);
 	}
+
+#ifdef	ERG
 	if(load_irregulars("../erg/irregs.tab"))
 	{
 		fprintf(stderr, "inflr: unable to load irregulars table.\n");
 		exit(-1);
 	}
+#endif
 	return 0;
 }
