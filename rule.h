@@ -1,9 +1,6 @@
 #ifndef	_RULE_H
 #define	_RULE_H
 
-#include	"dag.h"
-#include	"chart.h"
-
 struct rule
 {
 	char		*name;
@@ -15,13 +12,16 @@ struct rule
 	int		rtl;
 };
 
+#include	"dag.h"
+#include	"chart.h"
+
 int			load_rules_conf();
 void		rule_stats();
 struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl);
 void		print_rule(char	*name);
 void		setup_rule_filter();
 void		lex_filter_rules();
-void		agenda_rules(int	count);
+void		agenda_rules(int	count, int (*skolemize)(struct dg*, struct rule*));
 int			load_rules();
 int			load_roots();
 int			is_root(struct dg	*dg);

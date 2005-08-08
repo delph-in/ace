@@ -12,9 +12,11 @@ struct rule	**rules;
 int		nrules;
 
 char	*rule_filter;
-int	*nhactive, *nactive, *npassive, *nrecomb, *nused;
+int	*nhactive, *nactive, *npassive, *nrecomb, *nused, *nptries, *natries;
 int	used_total = 0, pused_total = 0;
-extern int nfinal;
+extern int nfinal, trace;
+
+extern unsigned int generation;
 
 int	rprio[1000], rnohyper[1000];
 
@@ -26,7 +28,7 @@ struct qc	**ruleqc;
 void	rule_stats()
 {
 	int	i;
-	int	nact = 0, npass = 0, nrec = 0, nhact = 0;
+	int	nact = 0, npass = 0, nrec = 0, nhact = 0, natry=0, nptry=0;
 
 	if(!nactive || !npassive || !nrecomb || !nhactive || !nused)return;
 	for(i=0;i<nrules;i++)
@@ -37,13 +39,24 @@ void	rule_stats()
 		npass+=npassive[i];
 		nrec+=nrecomb[i];
 		nhact+=nhactive[i];
+		natry+=natries[i];
+		nptry+=nptries[i];
 	}
+	//nptry += nptries[nrules];
 	fprintf(stderr, "NOTE: %d active (%d hyper) / %d passive edges total (%d actives used, %d passives used, %d reformed) ; %d final edges\n", nact, nhact, npass, used_total, pused_total, nrec, nfinal);
+	fprintf(stderr, "NOTE: %d a-tries = %.1f%%, %d p-tries = %.1f%%\n", natry, 100*(float)natry / nact, nptry, 100*(float)nptry / npass);
+	free(nactive);
+	free(npassive);
+	free(nhactive);
+	free(nrecomb);
+	free(nused);
+	free(natries);
+	free(nptries);
 }
 
 int	rule_is_rtl(struct rule	*r)
 {
-	struct dg	*hd = dg_hop(r->dg, lookup_fname("HEAD-DTR"));
+	//struct dg	*hd = dg_hop(r->dg, lookup_fname("HEAD-DTR"));
 	struct type	*plus = lookup_type("+");
 	struct dg	*args, *asec, *afkey;
 
@@ -153,6 +166,8 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 	e->prio = rprio[r->rnum];
 	if(r->lexical && e->prio==0)e->prio = 9;
 
+	if(trace>1)printf("epsilon [%d] of %s is #%d prio %d\n", x, r->name, e->id, e->prio);
+
 	return e;
 }
 
@@ -163,6 +178,12 @@ int	load_rules_conf()
 	int	save, i, prio;
 	char	name[1024];
 
+	if(!f)
+	{
+		char fname[1024];
+		sprintf(fname, "%s/.rules.conf", getenv("HOME"));
+		f = fopen(fname, "r");
+	}
 	if(!f)
 	{
 		perror("rules.conf");
@@ -195,10 +216,21 @@ int	load_rules_conf()
 	return 0;
 }
 
-void	agenda_rules(int	count)
+int nonempty_ccont(struct dg	*dg)
+{
+	if(dg)dg = dg_hop(dg, lookup_fname("C-CONT"));
+	if(dg)dg = dg_hop(dg, lookup_fname("RELS"));
+	if(dg)dg = dg_hop(dg, lookup_fname("LIST"));
+	if(dg)dg = dg_hop(dg, lookup_fname("FIRST"));
+	if(dg)return 1;
+	else return 0;
+}
+
+void	agenda_rules(int	count, int (*skolemize)(struct dg *dag, struct rule *rule))
 {
 	int	i, j, rtl, nlf = 0;
 
+#ifdef	RULE_STATS
 	if(!nactive)
 	{
 		nactive = calloc(sizeof(int),nrules);
@@ -206,7 +238,10 @@ void	agenda_rules(int	count)
 		npassive = calloc(sizeof(int),nrules);
 		nrecomb = calloc(sizeof(int),nrules);
 		nused = calloc(sizeof(int),nrules);
+		natries = calloc(sizeof(int),nrules);
+		nptries = calloc(sizeof(int),nrules+1);
 	}
+#endif
 
 	for(i=0;i<count;i++)
 	{
@@ -235,7 +270,20 @@ void	agenda_rules(int	count)
 				}
 			}
 #else
-			add_agenda(epsilon_edge(rules[j], i, rtl));
+			//if(!strcmp(rules[j]->name, "bare_np") || !strcmp(rules[j]->name, "subjh") || !nonempty_ccont(rules[j]->dg))
+			{
+				struct edge 	*e = epsilon_edge(rules[j], i, rtl);
+				struct slab_state tmpstate;
+
+				get_slabstate(&tmpstate);
+				if(0 == skolemize(e->dg, rules[j]))
+				{
+					printf("add rule %s\n", rules[j]->name);
+					add_agenda(e);
+				}
+				else set_slabstate(&tmpstate);
+			}
+			//else printf("skip rule %s\n", rules[j]->name);
 #endif
 		}
 	}
@@ -271,9 +319,11 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 	r->rnum = nrules-1;
 	r->rtl = rule_is_rtl(r);
 
-	/*printf("rule %s [%d]:  ", name, num);
-	print_dg(dg);
-	printf("\n");*/
+	add_semantic_index(r, dg, 1);
+
+	//printf("rule %s [%d]:  ", name, num);
+	//print_dg(dg);
+	//printf("\n");
 }
 
 int	study_rule(char	*name, struct dg	*dg)
@@ -307,6 +357,7 @@ int	study_lrule(char	*name, struct dg	*dg)
 {
 	int	num = 0;
 	struct dg	*p;
+	extern char	*g_inflr_def;
 
 	p = dg_hop(dg, 0);	// ARGS
 	while(p)
@@ -316,27 +367,21 @@ int	study_lrule(char	*name, struct dg	*dg)
 	}
 	add_rule(name, dg, num);
 	rules[nrules-1]->lexical = 1;
+
+	if(g_inflr_def)add_inflr(rules[nrules-1], g_inflr_def);
 	return 0;
 }
 
 int	load_rules()
 {
 #ifdef	ERG
-	if(iterate_tdl_dgs("../erg/constructions.tdl", study_rule))
+	//if(iterate_tdl_dgs("../erg/constructions.tdl", study_rule))
+	if(process_tdl_dgs_status("rule", study_rule))
 #else
 	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/rules.tdl", study_rule))
 #endif
 	{
 		fprintf(stderr, "rules: unable to load constructions.tdl, bailing out.\n");
-		exit(-1);
-	}
-#ifdef	ERG
-	if(iterate_tdl_dgs("../erg/lexrinst.tdl", study_lrule))
-#else
-	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/lrules.tdl", study_lrule))
-#endif
-	{
-		fprintf(stderr, "rules: unable to load lexrinst.tdl, bailing out.\n");
 		exit(-1);
 	}
 	return 0;
@@ -401,6 +446,10 @@ char	*type_filter_rule(struct rule	*r, int arg)
 	table = calloc(sizeof(char), ntypes);
 	for(i=0;i<ntypes;i++)
 	{
+		// XXX hack
+		if(generation > MAX_GEN_RESET)generation = 11;
+		// XXX hack
+
 		if(!types[i]->dg)continue;
 		res = unify_dg_tmp(types[i]->dg, r->dg, arg);
 		forget_tmp();
