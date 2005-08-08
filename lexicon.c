@@ -196,7 +196,10 @@ int	add_multilexemes_to_chart(int	x, int	nwords, char	**words)
 			}
 			if(j<lexemes[i]->stemlen)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+lexemes[i]->stemlen))
-				add_agenda(lexical_edge(lexemes[i], x, lexemes[i]->stemlen));
+			{
+				struct edge *e = lexical_edge(lexemes[i], x, lexemes[i]->stemlen);
+				add_agenda(e);
+			}
 			if(lexemes[i]->stemlen > max)max = lexemes[i]->stemlen;
 			num++;
 		}
@@ -211,7 +214,10 @@ int	add_multilexemes_to_chart(int	x, int	nwords, char	**words)
 			}
 			if(j<lexemes[i]->stemlen)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+lexemes[i]->stemlen))
-				add_agenda(lexical_edge(lexemes[i], x, lexemes[i]->stemlen));
+			{
+				struct edge *e = lexical_edge(lexemes[i], x, lexemes[i]->stemlen);
+				add_agenda(e);
+			}
 			if(lexemes[i]->stemlen > max)max = lexemes[i]->stemlen;
 			num++;
 		}

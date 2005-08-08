@@ -212,6 +212,9 @@ int	load_rules_conf()
 		rprio[i] = prio;
 	}
 
+//	for(i=0;i<nrules;i++)
+//		printf("rule `%s' inflr %p\n", rules[i]->name, rules[i]->inflr);
+
 	fclose(f);
 	return 0;
 }
@@ -256,13 +259,13 @@ void	agenda_rules(int	count, int (*skolemize)(struct dg *dag, struct rule *rule)
 				{
 					if(!rtl && lexrulefilt_f(i, j))
 					{
-						//printf(" rule %s filtered for position %d\n", rules[j]->name, i);
+						//printf(" rule %s F-filtered for position %d\n", rules[j]->name, i);
 						nlf++;
 						continue;
 					}
-					if(rtl && lexrulefilt_l(i-1, j))
+					if(rtl && lexrulefilt_l(i, j))
 					{
-						//printf(" rule %s filtered for position %d\n", rules[j]->name, i);
+						//printf(" rule %s L-filtered for position %d\n", rules[j]->name, i);
 						nlf++;
 						continue;
 					}

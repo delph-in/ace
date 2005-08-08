@@ -244,7 +244,7 @@ int	lexrulefilt_f(int	x, int	rule)
 
 	for(t=lstart[x];t;t=t->next)
 	{
-		if(!(t->edge->from==x && t->edge->to==x+1))break;
+		if(!(t->edge->from==x && t->edge->lex))break;
 		if(lexfirst(t->edge->dg->type, rule))return 0;
 	}
 	return 1;
@@ -253,11 +253,16 @@ int	lexrulefilt_f(int	x, int	rule)
 int	lexrulefilt_l(int	x, int	rule)
 {
 	struct task	*t;
+	int			s;
 
-	for(t=lstart[x];t;t=t->next)
+	// for each starting position
+	for(s=0;s<x;s++)
 	{
-		if(!(t->edge->from==x && t->edge->to==x+1))break;
-		if(lexlast(t->edge->dg->type, rule))return 0;
+		for(t=lstart[s];t;t=t->next)
+		{
+			if(!(t->edge->to==x && t->edge->lex))break;
+			if(lexlast(t->edge->dg->type, rule))return 0;
+		}
 	}
 	return 1;
 }
