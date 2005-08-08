@@ -1,12 +1,26 @@
 TODO:
 
+    L+O-     L+O+   L-
+L+                  [ OA <> ]
+L-  ----    -----
+
+
+allow packing in lexical rules
+
 record ersatzing
+
 improve MRS extractor
 
 unpacking + statistical parse selection
 
 OPTIMIZATIONS:
 
+kill RELS & HCONS while parsing, reconstruct when unpacking
+	- this won't increase packing; we already
+		ignore everything under these features
+		for subsumption checking
+	- but reduces memory usage significantly
+		on long sentences
 
 
 (considered)
