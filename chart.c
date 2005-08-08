@@ -43,8 +43,8 @@ unsigned int	require_ep_span = 0;
 
 int	cancel_parse;
 
-//#define	MAX_CHUNKS	1280	// when to give up on a parse
-#define	MAX_CHUNKS	680	// when to give up on a parse
+#define	MAX_CHUNKS	1280	// when to give up on a parse
+//#define	MAX_CHUNKS	680	// when to give up on a parse
 //#define	MAX_CHUNKS	71	// when to give up on a parse
 //#define	FIRST_ONLY
 
@@ -1119,6 +1119,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		printf("rule %32s: %8d tries\n", rules[i]->name, rtried[i]);
 	}
 	printf(" -- %d / %d were tried\n", num_entries, nrules);*/
+
+	capi_print_derivations();
 
 	// show analyses
 //#ifdef	FIRST_ONLY

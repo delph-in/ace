@@ -39,14 +39,14 @@ static int process_item(int i_id, char *i_input, int parse_id,
 {
 	extern int total_edges, real_edges, passive_edges;
 	extern int last_mem_bytes;
-	int readings, msec, id;
+	int readings, msec;
 	struct timeval tv1, tv2;
 	clock_t	c0, c1;
 
 	if(nanalyses == 0)
 	{
 		exhaustive = 1;
-		inhibit_pack = 0;
+		inhibit_pack = 1;
 	}
 	else
 	{
@@ -73,26 +73,34 @@ static int process_item(int i_id, char *i_input, int parse_id,
 
 	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
 
-	capi_printf("(:results . (");
+	capi_print_derivations();
+
+	return 0;
+}
+
+#define	DER_PRINTF	printf
+capi_print_derivations()
+{
+	int id;
+
+	DER_PRINTF("(:results . (");
 	id = 0;
 	void capi_print_tree(struct edge *e)
 	{
 		void capi_print_tree0(struct edge *e)
 		{
 			int i;
-			capi_printf(" (%d %s %f %d %d", e->id, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), (float)e->prio, e->from, e->to);
+			DER_PRINTF(" (%d %s %f %d %d", e->id, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), (float)e->prio, e->from, e->to);
 			for(i=0;i<e->have;i++)
 				capi_print_tree0(e->daughters[i]);
-			capi_printf(")");
+			DER_PRINTF(")");
 		}
-		capi_printf("((:result-id . %d) (:derivation .\"", id++);
+		DER_PRINTF("((:result-id . %d) (:derivation .\"", id++);
 		capi_print_tree0(e);
-		capi_printf("\"))");
+		DER_PRINTF("\"))");
 	}
 	visit_roots(capi_print_tree);
-	capi_printf("))");
-
-	return 0;
+	DER_PRINTF("))");
 }
 
 static int complete_test_run(int run_id, char *custom)
