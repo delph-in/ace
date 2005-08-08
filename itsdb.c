@@ -34,6 +34,8 @@ static int create_test_run(char *data, int run_id, char *comment,
 extern int exhaustive, inhibit_pack;
 extern long top_unifies, top_unifies_wellform, top_copies;
 
+int itsdb_report_derivations;
+
 static int process_item(int i_id, char *i_input, int parse_id, 
 		int edges, int nanalyses, int nderivations, int interactive)
 {
@@ -46,7 +48,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 	if(nanalyses == 0)
 	{
 		exhaustive = 1;
-		inhibit_pack = 1;
+		inhibit_pack = 0;
 	}
 	else
 	{
@@ -54,6 +56,8 @@ static int process_item(int i_id, char *i_input, int parse_id,
 		inhibit_pack = 0;
 	}
 	inhibit_results = 1;
+
+	itsdb_report_derivations = nderivations;
 
 	top_copies = top_unifies_wellform = top_unifies = 0;
 
@@ -78,13 +82,13 @@ itsdb_report(int nwords, char **words, int readings)
 
 	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
 
-	capi_print_derivations();
+	capi_print_derivations(nwords, words);
 
 	return 0;
 }
 
 #define DER_PRINTF capi_printf
-capi_print_derivations()
+capi_print_derivations(int nwords, char **words)
 {
 	int id;
 
@@ -92,15 +96,17 @@ capi_print_derivations()
 	id = 0;
 	void capi_print_tree(struct edge *e)
 	{
-		return;
 		void capi_print_tree0(struct edge *e)
 		{
 			int i;
 			DER_PRINTF(" (%d %s %f %d %d", e->id, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), (float)e->prio, e->from, e->to);
-			for(i=0;i<e->have;i++)
-				capi_print_tree0(e->daughters[i]);
+			if(e->have)
+				for(i=0;i<e->have;i++)
+					capi_print_tree0(e->daughters[i]);
+			else DER_PRINTF(" (\\\"%s\\\" %d %d)", words[e->from], e->from, e->to);
 			DER_PRINTF(")");
 		}
+		if(itsdb_report_derivations && id>=itsdb_report_derivations)return;
 		DER_PRINTF("((:result-id . %d) (:derivation .\"", id++);
 		capi_print_tree0(e);
 		DER_PRINTF("\"))");

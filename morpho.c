@@ -56,10 +56,12 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rnums)
 	struct irreg	*irr;
 	struct lexeme	*lex;
 
+/*
 	for(i=0;i<nrules;i++)printf("  ");
 	printf("exploring hypothesis `%s' with rule chain:", form);
 	for(i=0;i<nrules;i++)printf(" %s", rules[rnums[i]]->name);
 	printf("\n");
+*/
 
 	// get any no-further-inflecting lexemes
 	n = add_lexemes_to_chart_for_stem(x, form, nrules, rnums);
