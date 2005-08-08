@@ -242,6 +242,7 @@ int	parse_line(char	*line)
 	}
 	current_sentence = line;//(char*)trim_string(line);
 	nparse = parse(nwords, words, current_sentence);
+	if(do_itsdb)itsdb_report(nwords, words, nparse);
 	clear_slab();
 	for(i=0;i<nwords;i++)free(words[i]);
 	free(words);

@@ -64,12 +64,17 @@ static int process_item(int i_id, char *i_input, int parse_id,
 	c1 = clock();
 	msec = 1000*(tv2.tv_sec - tv1.tv_sec) + 0.001*(tv2.tv_usec - tv1.tv_usec);
 
+	capi_printf(" (:total . %d) (:treal . %d) (:tcpu . %d)", msec, msec, (int)((c1-c0)*0.001));
+}
+
+itsdb_report(int nwords, char **words, int readings)
+{
+	extern int total_edges, real_edges, passive_edges, slab_usage();
+
 	capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
 		readings, passive_edges, real_edges - passive_edges);
 
-	capi_printf("(:tcpu . %d) (:total . %d) (:treal . %d) ", msec, msec, msec);//(int)((c1-c0)*0.001));
-
-	capi_printf("(:others . %d) ", last_mem_bytes);
+	capi_printf("(:others . %d) ", slab_usage());
 
 	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
 
@@ -78,7 +83,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 	return 0;
 }
 
-#define	DER_PRINTF	printf
+#define DER_PRINTF capi_printf
 capi_print_derivations()
 {
 	int id;
@@ -87,6 +92,7 @@ capi_print_derivations()
 	id = 0;
 	void capi_print_tree(struct edge *e)
 	{
+		return;
 		void capi_print_tree0(struct edge *e)
 		{
 			int i;

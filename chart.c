@@ -1120,7 +1120,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	}
 	printf(" -- %d / %d were tried\n", num_entries, nrules);*/
 
-	capi_print_derivations();
+	//capi_print_derivations();
 
 	// show analyses
 //#ifdef	FIRST_ONLY
