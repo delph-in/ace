@@ -11,6 +11,9 @@
 #include	"lexicon.h"
 #include	"freeze.h"
 #include	"morpho.h"
+#include	"mrs.h"
+
+int	inhibit_results = 0;
 
 int			chart_size;
 struct chart_cell	*cells;
@@ -21,7 +24,7 @@ extern int	question, exhaustive, lui_chart, inhibit_pack;
 
 int		edge_id;
 
-extern int	*nused, *nhactive, *nactive, *npassive, *nrecomb, used_total, pused_total;
+extern int	*nused, *nhactive, *nactive, *npassive, *nrecomb, *natries, *nptries, used_total, pused_total;
 extern int noldslabs;
 extern int	rnohyper[1000];
 
@@ -40,6 +43,7 @@ unsigned int	require_ep_span = 0;
 
 int	cancel_parse;
 
+//#define	MAX_CHUNKS	1280	// when to give up on a parse
 #define	MAX_CHUNKS	680	// when to give up on a parse
 //#define	MAX_CHUNKS	71	// when to give up on a parse
 //#define	FIRST_ONLY
@@ -54,7 +58,7 @@ void	clear_chart(int	size)
 
 	// guard against generation overflow;
 	// reset the grammar if we are above 4-billion generations
-	if(generation > 4000000000UL)
+	if(generation > MAX_GEN_RESET)//4000000000UL)
 		reload_frozen_grammar();
 
 	if(cells)
@@ -128,30 +132,64 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	struct edge	*e;
 	struct dg	*u;
 	struct qc	*qc, *hqc;
-	int		nhave, nneed, hyperactive = 0;
+	int		nhave, nneed, hyperactive = 0, from, to, spanning = 0;
 	extern int	__qc_use_heap;
 #ifdef	TIM
 	struct timeval	tv1, tv2;
 #endif
+
+	if(a->rtl)
+	{
+		from = b->from;
+		to = a->to;
+	}
+	else
+	{
+		from = a->from;
+		to = b->to;
+	}
+	spanning = (from==0) && (to==chart_size-1);
 
 	nhave = a->have+1;
 	nneed = a->need;
 	if(nhave == nneed)
 	{
 		// building passive
+		if(a->dg && b->dg && !spanning && 0)
+		{
+			// hyperpassive
+			hyperactive = 1;
+			__qc_use_heap = 1;
+			hqc = extract_qc_arg(dg, -1);
+			__qc_use_heap = 0;
+			forget_tmp();
+			qc = copy_qc(hqc);
+			free(hqc);
+			u = 0;
+			//printf("built hyperpassive on #%d+#%d\n", a->id, b->id);
+		}
+		else
+		{
+			// regular passive
 #ifdef	TIM
-		gettimeofday(&tv1, 0);
+			gettimeofday(&tv1, 0);
 #endif
-		u = finalize_tmp(dg, 1);
+			u = finalize_tmp(dg, 1);
 #ifdef	TIM
-		gettimeofday(&tv2, 0);
-		base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+			gettimeofday(&tv2, 0);
+			base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
 #endif
-		if(!u)return -1;	// cycles might happen, check for them.
+			if(!u)return -1;	// cycles might happen, check for them.
+			qc = extract_qc_arg(u, -1);
+		}
 		e = slab_alloc(sizeof(struct edge));
-		e->qc = extract_qc_arg(u, -1);
+		e->qc = qc;
 		e->dg = u;
 		e->age = (nhave==1)?(b->age+1):0;	// binary passive edges get age 0; unary get daughter.age+1
+		e->ha_par = a->dg;
+		e->ha_dg = b->dg;
+		e->ha_arg = arg;
+		e->ha_use = 0;
 	}
 	else
 	{
@@ -175,7 +213,9 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			free(hqc);
 
 			u = 0;
+#ifdef	RULE_STATS
 			nhactive[a->rule->rnum]++;
+#endif
 		}
 		else
 		{
@@ -241,11 +281,34 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		memcpy(e->daughters, a->daughters, sizeof(struct edge*) * a->have);
 		e->daughters[arg] = b;
 	}
-	if(e->rule->lexical && !e->rule->inflr)
+
+	if(e->rule->lexical)
 	{
 		e->lex = b->lex;
-		e->allow_no_inflr = b->allow_no_inflr;
-		e->inflr_allow = b->inflr_allow;
+		if(!e->rule->inflr)
+		{
+			e->ninflr_routes = b->ninflr_routes;
+			e->inflr_routes = b->inflr_routes;
+		}
+		else
+		{
+			int i;
+			e->ninflr_routes = 0;
+			e->inflr_routes = slab_alloc(sizeof(struct inflr_route)*b->ninflr_routes);
+			for(i=0;i<b->ninflr_routes;i++)
+			{
+				struct inflr_route *r = b->inflr_routes+i;
+				if(r->len && r->rules[0]==e->rule->rnum)
+				{
+					e->ninflr_routes++;
+					e->inflr_routes[e->ninflr_routes-1].len = r->len-1;
+					e->inflr_routes[e->ninflr_routes-1].rules = slab_alloc(sizeof(int)*(r->len-1));
+					memcpy(e->inflr_routes[e->ninflr_routes-1].rules, r->rules+1, sizeof(int)*(r->len-1));
+				}
+			}
+			//printf("realloc %d routes down to %d\n", b->ninflr_routes, e->ninflr_routes);
+			//e->inflr_routes = slab_realloc(e->inflr_routes, sizeof(struct inflr_route)*b->ninflr_routes, sizeof(struct inflr_route)*e->ninflr_routes);
+		}
 	}
 	else e->lex = 0;
 
@@ -261,7 +324,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		printf("generated #%d %d/%d from #%d, #%d for [%8.8X] with rule %s: ", e->id, e->have, e->need, a->id, b->id, e->ep_span, e->rule->name);
 		printf("%s\n", show_orth_leaves(e));
 #else
-		printf("generated #%d %d/%d for [%d-%d] with rule %s:\n", e->id, e->have, e->need, e->from, e->to, e->rule->name);
+		printf("generated #%d %d/%d for [%d-%d] with rule %s: ", e->id, e->have, e->need, e->from, e->to, e->rule->name);
+		printf("%s\n", show_orth_leaves(e));
 #endif
 		if(e->have==e->need && trace>1){print_dg(u); printf("\n\n");}
 	}
@@ -275,8 +339,10 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		//printf("\n generated %d/%d for [%d-%d] %s with rule %s\n", e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
 		//print_dg(u);
 		//printf("\n");
+#ifdef	RULE_STATS
 		npassive[e->rule->rnum]++;
-//#ifdef	FIRST_ONLY
+#endif
+
 		if(!exhaustive &&
 #ifdef	GENERATION
 			e->ep_span == require_ep_span &&
@@ -291,13 +357,14 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			sentential = e;	// stop the parser
 			return -2;
 		}
-//#endif
 	}
+#ifdef	RULE_STATS
 	else nactive[e->rule->rnum]++;
+#endif
 
 	e->hex = 0;
 #ifdef	EXCURSION
-	if(hyperactive)
+	if(hyperactive && e->have==e->need)
 	{
 		e->dg = dg;
 		hyperactive_excursion(e);
@@ -337,6 +404,7 @@ static void	hyperactive_excursion(struct edge	*e)
 				if(c->p_edges[j]->from - (remain-1) >= 0)
 				{
 					b = c->p_edges[j];
+					if(!b->dg)continue;	// can't play with hyperpassive edges
 					if(b->rule && !check_rf(e->rule, b->rule, arg))continue;	// rule filter rejected this combination
 					if(!gen_qc && quickcheck(e->qc, b->qc))continue;			// quickcheck rejected this combination
 					//fprintf(stderr, "HEX %d+%d\n", e->id, b->id);
@@ -356,6 +424,7 @@ static void	hyperactive_excursion(struct edge	*e)
 				if(c->p_edges[j]->to + (remain-1) < chart_size)
 				{
 					b = c->p_edges[j];
+					if(!b->dg)continue;	// can't play with hyperpassive edges
 					if(b->rule && !check_rf(e->rule, b->rule, arg))continue;	// rule filter rejected this combination
 					if(!gen_qc && quickcheck(e->qc, b->qc))continue;			// quickcheck rejected this combination
 					//fprintf(stderr, "HEX %d+%d\n", e->id, b->id);
@@ -368,16 +437,48 @@ static void	hyperactive_excursion(struct edge	*e)
 }
 #endif
 
+static inline int	recall_hyper(struct edge	*b)
+{
+#ifdef	TIM
+	struct timeval	tv1, tv2;
+	gettimeofday(&tv1, 0);
+#endif
+
+#ifdef	RULE_STATS
+	nrecomb[b->rule->rnum]++;
+#endif
+	//printf("hyperpassive reconstruct #%d from %p[%d] <- %p\n", b->id, b->ha_dg, b->ha_arg, b->ha_par);
+	if(unify_dg_tmp(b->ha_dg, b->ha_par, b->ha_arg))
+	{
+		fprintf(stderr, "hyperpassive: rescheduled unify failed!\n");
+		exit(-1);
+	}
+	b->dg = finalize_tmp(b->ha_par, (b->have==b->need)?1:0);
+#ifdef	TIM
+	gettimeofday(&tv2, 0);
+	base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+#endif
+	if(!b->dg)
+	{
+		// latent cycle detection
+		//fprintf(stderr, "NOTE: hyperpassive: latent cycle\n");
+		b->have = -1;
+		return -1;
+	}
+	return 0;
+}
+
 static inline int	combine(struct edge	*a, struct edge	*b)
 {
 	int	arg, force_noha = 0, res;
-	struct dg	*rdg;
+	struct dg	*rdg, *pdg;
 #ifdef	TIM
 	struct timeval	tv1, tv2;
 #endif
 
 	if(a->hex == b)return 0;	// already did this
 	if(a->have==-1)return 0;	// ghosted hyperactive edge -- got kicked out of the chart for a latent cycle
+	if(b->have==-1)return 0;	// ghosted hyperpassive edge -- got hicked out of the chart for a latent cycle
 
 	//printf("FR: [%d-%d] + [%d-%d]?\n", a->from, a->to, b->from, b->to);
 	//printf("    <%d/%d> + <%d/%d>\n", a->have, a->need, b->have, b->need);
@@ -388,10 +489,29 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 
 	if(a->rule->lexical)
 	{
-		//if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
-		if(b->lex && a->rule->inflr && !b->inflr_allow[a->rule->rnum])return 0;
+		if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
+		// if 'a' is inflectional, make sure it's the right one
+		if(a->rule->inflr)
+		{
+			int i;
+			// look at each route 'b' allows and see if this is the first rule on it
+			for(i=0;i<b->ninflr_routes;i++)
+			{
+				struct inflr_route *r = b->inflr_routes+i;
+				if(r->len && r->rules[0] == a->rule->rnum)
+					break;
+			}
+			if(i==b->ninflr_routes)return 0;
+		}
 	}
-	else if(b->lex && !b->allow_no_inflr)return 0;
+	else if(b->lex)
+	{
+		int i;
+		// 'b' is lexical but 'a' is a syntax rule; see if 'b' might be done with its inflection
+		for(i=0;i<b->ninflr_routes;i++)
+			if(b->inflr_routes[i].len == 0)break;
+		if(i==b->ninflr_routes)return 0;
+	}
 
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
@@ -401,35 +521,30 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 
 	//rtried[a->rule->rnum]++;
 
+#ifdef	RULE_STATS
+	if(a->ntries==0)natries[a->rule->rnum]++;
+	a->ntries++;
+	if(b->ntries==0)
+	{
+		if(b->rule)nptries[b->rule->rnum]++;
+		else nptries[nrules]++;
+	}
+	b->ntries++;
+#endif
+
 	if(!a->dg)
 	{
 		// hyperactive parsing: we don't save active edges' dg's until they're actually used
-		nrecomb[a->rule->rnum]++;
-		if(a->ha_use > 2)
+		if(a->ha_use > 2 || !b->dg)
 		{
-#ifdef	TIM
-			gettimeofday(&tv1, 0);
-#endif
-			a->dg = unify_dg(a->ha_dg, a->ha_par, a->ha_arg);
-#ifdef	TIM
-			gettimeofday(&tv2, 0);
-			base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
-#endif
-			if(!a->dg)
-			{
-				// latent cycle detection
-				// this doesn't seem to happen... not sure why?
-				// update: it has happened at least once
-				fprintf(stderr, "NOTE: hyperactive: latent cycle\n");
-				a->have = -1;
-				return 0;
-				//fprintf(stderr, "hyperactive: rescheduled unify failed!\n");
-				//exit(-1);
-			}
+			if(recall_hyper(a))return 0;
 			rdg = a->dg;
 		}
 		else
 		{
+#ifdef	RULE_STATS
+			nrecomb[a->rule->rnum]++;
+#endif
 #ifdef	TIM
 			gettimeofday(&tv1, 0);
 #endif
@@ -444,13 +559,41 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 		}
 	}
 	else rdg = a->dg;
+
+	if(!b->dg)
+	{
+		// hyperpassive parsing: we don't save passive edges' dg's until they're actually used
+		if(b->ha_use > 2 || 1)
+		{
+			if(recall_hyper(b))return 0;
+			pdg = b->dg;
+		}
+		else
+		{
+#ifdef	RULE_STATS
+			nrecomb[b->rule->rnum]++;
+#endif
+#ifdef	TIM
+			gettimeofday(&tv1, 0);
+#endif
+			unify_dg_tmp(b->ha_dg, b->ha_par, b->ha_arg);
+#ifdef	TIM
+			gettimeofday(&tv2, 0);
+			base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+#endif
+			pdg = b->ha_par;
+			force_noha = 1;
+			b->ha_use++;
+		}
+	}
+	else pdg = b->dg;
 	//printf("recombine %s\n", a->rule->name);
 
-	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, b->dg->xtype->name, a->id, rdg->xtype->name, arg);
+	if(trace>1)printf("trying: #%d %s in #%d %s[%d]\n", b->id, pdg->xtype->name, a->id, rdg->xtype->name, arg);
 #ifdef	TIM
 	gettimeofday(&tv1, 0);
 #endif
-	res = unify_dg_tmp(b->dg, rdg, arg);
+	res = unify_dg_tmp(pdg, rdg, arg);
 #ifdef	TIM
 	gettimeofday(&tv2, 0);
 	base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
@@ -467,7 +610,9 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 	}
 	else
 	{
+#ifdef	UNIFY_PATHS
 		if(trace>1 || gen_qc)unify_backtrace();
+#endif
 		forget_tmp();
 	}
 
@@ -481,47 +626,81 @@ static void record_packing(struct edge *host, struct edge *e)
 	host->pack[host->npack-1] = e;
 }
 
+#ifdef	COPY_COUNTS
+static long long packcount = 0, packtry = 0;
+extern long long copycount, copytraverse;
+#endif
+
 static int	pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
+	struct edge			*h;
 	int			i, ssd;
 	//extern const int	qcbytes;
 
 	// since we're taking first-parse-only, this is ok perhaps.
-	for(i=0;i<c->p_nedges;i++)
-		if(!c->p_edges[i]->lex
+	for(i=0;i<c->p_nedges && (h=c->p_edges[i]);i++)
+		if(!h->lex
+		&& h->have != -1
+		//&& c->p_edges[i]->dg
 //#ifdef	BIDIR_SS
-		&& c->p_edges[i]->age == edge->age
+		&& h->age == edge->age
 //#endif
 #ifdef	GENERATION
-		&& c->p_edges[i]->ep_span == edge->ep_span
+		&& h->ep_span == edge->ep_span
 #endif
 		//&& c->p_edges[i]->dg->xtype == edge->dg->xtype
-		&& !equiv_quickcheck(c->p_edges[i]->qc, edge->qc)
+		&& !equiv_quickcheck(h->qc, edge->qc)
 		//&& !memcmp(c->p_edges[i]->qc, edge->qc, qcbytes)
 			)
 		{
-			//fprintf(stderr, "PACK? #%d subs #%d\n", c->p_edges[i]->id, edge->id);
-			ssd = equivalent_dg(c->p_edges[i]->dg, edge->dg);
+#ifdef	COPY_COUNTS
+			packtry++;
+#endif
+
+			if(!edge->dg)
+				if(recall_hyper(edge))return 0;
+			if(!h->dg)
+				if(recall_hyper(h))continue;
+
+#ifdef	RULE_STATS
+			if(edge->ntries==0)
+			{
+				if(edge->rule)nptries[edge->rule->rnum]++;
+				else nptries[nrules]++;
+			}
+			edge->ntries++;
+			if(h->ntries==0)
+			{
+				if(h->rule)nptries[h->rule->rnum]++;
+				else nptries[nrules]++;
+			}
+			h->ntries++;
+#endif
+
+			ssd = equivalent_dg(h->dg, edge->dg);
 			if(ssd == 1)
 			{
-				//fprintf(stderr, "packed #%d in #%d!\n", edge->id, c->p_edges[i]->id);
-				//printf("host: "); print_dg(c->p_edges[i]->dg); printf("\n");
+				//fprintf(stderr, "packed #%d in #%d!\n", edge->id, h->id);
+				//printf("host: "); print_dg(h->dg); printf("\n");
 				//printf("pack: "); print_dg(edge->dg); printf("\n");
-				//printf("EQUIV = %d\n", equivalent_dg(c->p_edges[i]->dg, edge->dg));
-				record_packing(c->p_edges[i], edge);
+				//printf("EQUIV = %d\n", equivalent_dg(h->dg, edge->dg));
+				record_packing(h, edge);
 				return 1;
 			}
 #ifdef	BIDIR_SS
 			else if(ssd == -1)
 			{
-				edge->npack = c->p_edges[i]->npack;
-				edge->pack = c->p_edges[i]->pack;
-				c->p_edges[i]->npack = 0;
-				c->p_edges[i]->pack = 0;
-				record_packing(edge, c->p_edges[i]);
+				//fprintf(stderr, "reverse packed #%d in #%d!\n", h->id, edge->id);
+				//printf("host: "); print_dg(edge->dg); printf("\n");
+				//printf("pack: "); print_dg(h->dg); printf("\n");
+				edge->npack = h->npack;
+				edge->pack = h->pack;
+				h->npack = 0;
+				h->pack = 0;
+				record_packing(edge, h);
 				c->p_edges[i] = edge;
-				return 1;
+				return 2;	// tell caller the edge is in the chart but requires further processing
 			}
 #endif
 		}
@@ -532,11 +711,15 @@ static int	gen_process_edge(struct edge	*e)
 {
 #ifdef	GENERATION
 	struct chart_cell	*c = cells;
-	int	i;
+	int	i, pack = 0;
 
-	if(!inhibit_pack && e->have == e->need && !e->lex && pack_edge(e))
-		return 0;	// big savings! woohoo!
-	add_edge_to_chart(e);
+	if(!inhibit_pack && e->have == e->need && !e->lex)
+	{
+		pack = pack_edge(e);
+		if(pack==1)
+			return 0;	// big savings! woohoo!
+	}
+	if(pack==0)add_edge_to_chart(e);
 
 	// try to combine against any other edge with disjoint ep_span
 	if(e->have == e->need)
@@ -560,12 +743,9 @@ static int	gen_process_edge(struct edge	*e)
 	return 0;
 }
 
-static long long packcount = 0;
-extern long long copycount, copytraverse;
-
 static int	parse_process_edge(struct edge	*e)
 {
-	int			i, j, remain;
+	int			i, j, remain, pack = 0;
 	struct chart_cell	*c;
 
 	//printf("processing [%d-%d] edge;    ", e->from, e->to);
@@ -573,12 +753,16 @@ static int	parse_process_edge(struct edge	*e)
 
 	/*if(e->have==e->need)
 		e->dg->xtype = lookup_type("*top*");*/
-	if(!inhibit_pack && e->have == e->need && !e->lex && pack_edge(e))
+	if(!inhibit_pack && e->have == e->need && !e->lex)
 	{
+		pack = pack_edge(e);
+#ifdef	COPY_COUNTS
 		packcount++;
-		return 0;	// big savings! woohoo!
+#endif
+		if(pack==1)
+			return 0;	// big savings! woohoo!
 	}
-	add_edge_to_chart(e);
+	if(pack==0)add_edge_to_chart(e);
 
 	// try to combine with edges on either side
 	if(e->have == e->need)
@@ -662,6 +846,7 @@ char	*show_orth_leaves(struct edge	*e)
 		sub = show_orth_leaves(e->daughters[0]);
 		if(e->rule->inflr)
 		{
+			//printf("applying inflr `%s' to `%s'\n", e->rule->name, sub);
 			ret = inflect(e->rule->inflr, sub);
 			free(sub);
 			return ret;
@@ -682,43 +867,192 @@ char	*show_orth_leaves(struct edge	*e)
 	}
 }
 
+void	skolemize_rel(struct dg	*rel, struct mrs_ep	*p, struct mrs_vlist *vlist, struct dg **sk)
+{
+	extern void	skolemize_arg(struct dg	*dg, char	*arg, struct dg	*inst);
+	int	i, j;
+
+	for(i=0;i<p->nargs;i++)
+	{
+		for(j=0;j<vlist->nvars;j++)
+			if(vlist->vars[j] == p->args[i].value)break;
+		if(j==vlist->nvars)
+		{
+			fprintf(stderr, "ERROR: skolemize_rel unable to find an MRS variable\n");
+			continue;
+		}
+		// XXX need to skolemize the value's properties in as well
+		skolemize_arg(rel, p->args[i].name, sk[j]);
+	}
+}
+
 #ifdef	GENERATION
-int	generate()
+int	compatible_rels(char	*a, char	*b)
+{
+	//return !strcmp(a,b);
+	struct type	*ta = lookup_type(a), *tb = lookup_type(b), *g = glb(ta, tb);
+	if(g==ta || g==tb)return 1;
+	else return 0;
+}
+
+int	generate(struct mrs	*mrs)
 {
 	struct edge	*edge;
 	char		*str;
-	struct dg	*sk1, *sk2, *sk3;
 	int			i, count = 0;
-	extern struct type	**strings;
+
+	struct dg	**sk;
 
 	clear_chart(1);
-	sk1 = atomic_dg("*top*"); sk1->type = sk1->xtype = strings[0];
-	sk2 = atomic_dg("*top*"); sk2->type = sk2->xtype = strings[1];
-	sk3 = atomic_dg("*top*"); sk3->type = sk3->xtype = strings[2];
+
+	printf("trying to generate from MRS:\n");
+	print_mrs(mrs); printf("\n");
+
+	// set up the skolem constants we'll need.
+	sk = malloc(sizeof(struct dg*) * mrs->vlist.nvars);
+	for(i=0;i<mrs->vlist.nvars;i++)
+	{
+		extern struct type	**strings;
+		sk[i] = atomic_dg("*top*");
+		sk[i]->type = sk[i]->xtype = strings[i];
+	}
+
 	// set up some lexemes for the generator to play with
-	add_generative_lexeme("dog", sk1, 0, 0, 0);
-	add_generative_lexeme("cat", sk2, 0, 0, 0);
-	add_generative_lexeme("sometimes", sk3, 0, 0, 0);
-	add_generative_lexeme("those", sk1, 0, 0, 0);
-	add_generative_lexeme("certain", 0, sk2, 0, 0);
-	add_generative_lexeme("chase", 0, sk1, sk2, 0);
+	// XXX should refuse to add a lexeme multiple times for the same input EP
+	require_ep_span = 0;
+	for(i=0;i<mrs->nrels;i++)
+	{
+		struct mrs_ep *p = mrs->rels+i;
+		int skolem(struct edge	*e, struct lexeme *lex)
+		{
+			// XXX for multi-rel lexemes, need to add a copy for *every* alignment of its rels to the input rels.
+			struct dg	*dag = e->dg;
+			extern void	skolemize_rel_as(struct dg	*rel, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3);
+			// check whether this lexeme has any extra EPs that we can't use
+			static int	savef[10] = {-1,-1,-1,-1,-1,-1,-1,-1};
+			struct dg	*rels = walk_dg(dag, savef, "SYNSEM", "LOCAL", "CONT", "RELS", "LIST", 0), *rel = rels?dg_hop(rels, 1):0;
+			static int predf = -1;
+			printf("    consider `%s'\n", lex->word);
+			if(predf==-1)predf = lookup_fname("PRED");
+			while(rel)
+			{
+				struct dg *pred = dg_hop(rel, lookup_fname("PRED"));
+				char	*predn = pred?pred->xtype->name:0;
+				if(predn && compatible_rels(predn, p->pred))
+				{
+					printf(" skolemized `%s' relation of `%s'\n", predn, lex->word);
+					skolemize_rel(rel, p, &mrs->vlist, sk);
+				}
+				else if(predn)
+				{
+					int j;
+					for(j=0;j<mrs->nrels;j++) if(i!=j)
+						if(compatible_rels(predn, mrs->rels[j].pred))
+						{
+							struct mrs *m = mrs;
+							printf(" `%s' is compatible with `%s'\n",
+										predn, m->rels[j].pred);
+							break;
+						}
+					if(j==mrs->nrels)return -1;	// this relation isn't in the input semantics
+				}
+				rels = dg_hop(rels, 2);
+				rel = rels?dg_hop(rels, 1):0;
+			}
+			printf(" adding `%s'\n", lex->word);
+			return 0;
+		}
+		printf(" -- lexical lookup for relation `%s'\n", p->pred);
+		int nlex = add_lexemes_for_relation(i, p->pred, skolem);
+		if(!nlex)
+		{
+			printf("NOTE: no lexemes provide acceptable relation `%s'\n", p->pred);
+			printf("NOTE: we hope it's in some rule\n");
+			//return -1;
+		}
+		else require_ep_span |= (1 << i);
+	}
+	if(mrs->nrels > 32)
+	{
+		fprintf(stderr, "NOTE: WARNING: generator currently only supports up to 32 EPs\n");
+		return -1;
+	}
+	//int yes(struct dg *dag, struct lexeme *lex) { return 0; }
+	//int nvac = add_lexemes_for_relation(-1, "vacuous", yes);
+	//printf("%d vacuous lexemes\n", nvac);
 
-	agenda_rules(1);
+	// add vacuous lexemes which trigger rules specify
+	int trigger(struct edge	*e, struct lexeme *lex)
+	{
+		int	i;
+		for(i=0;i<mrs->ntriggers;i++)
+			if(!strcmp(lex->word, mrs->triggers[i]))
+				return 0;
+		return -1;
+	}
+	add_lexemes_for_relation(-1, "vacuous", trigger);
+
+	for(i=0;i<mrs->nrels;i++)
+	{
+		struct mrs_ep	*p = mrs->rels+i;
+		int rskolem(struct edge *e, struct rule *rule)
+		{
+			struct dg	*dag = e->dg;
+			static int savef[] = {-1,-1,-1,-1};
+			struct dg	*rels = walk_dg(dag, savef, "C-CONT", "RELS", "LIST", 0), *rel = rels?dg_hop(rels, 1):0;
+			static int predf = -1;
+			//printf("    consider `%s'\n", lex->word);
+			if(predf==-1)predf = lookup_fname("PRED");
+			while(rel)
+			{
+				static int predf=-1;
+				struct dg *pred = walk_dg(rel, &predf, "PRED", 0);
+				char	*predn = pred?pred->xtype->name:0;;
+				assert(predn != 0 || !"C-CONT RELS LIST FIRST had no PRED!");
+				if(compatible_rels(predn, p->pred))
+				{
+					printf(" should skolemize `%s' relation of rule `%s'\n", predn, rule->name);
+				}
+				else
+				{
+					int j;
+					for(j=0;j<mrs->nrels;j++) if(i!=j)
+						if(compatible_rels(predn, mrs->rels[j].pred))
+							break;
+					if(j==mrs->nrels)return -1;	// this relation isn't in the input semantics
+				}
+				rels = dg_hop(rels, 2);
+				rel = rels?dg_hop(rels, 1):0;
+			}
+			// other semantically vacuous rules all go in!
+			return 0;
+		}
+		add_rules_for_relation(p->pred, rskolem);
+	}
 	sentential = 0;
+	int ryes(struct edge *e, struct rule *rule)
+	{
+		// no filler-head constructions;
+		if(!strcmp(rule->name, "fillhead_non_wh"))
+			return -1;
+		return 0;
+	}
+	add_rules_for_relation("vacuous", ryes);
 
+	printf("start generating...\n");
 	while( (edge = next_agenda(0)) )
 	{
 		//printf("... process %p = #%d\n", edge, edge->id);
-		if(gen_process_edge(edge)){printf("terminated!\n");break;}
+		if(gen_process_edge(edge)){/*printf("terminated!\n");break;*/}
 	}
 
-	if(sentential)
+	/*if(sentential)
 	{
 		i = cells->p_nedges+1;
 		edge = sentential;
 		goto show;
 	}
-	else
+	else*/
 	{
 		for(i=0;i<cells->p_nedges;i++)
 		{
@@ -736,12 +1070,17 @@ int	generate()
 	}
 	printf("NOTE: %d passive, %d active edges in final generation chart\n",
 		cells->p_nedges, cells->al_nedges + cells->ar_nedges);
+	if(lui_chart)
+	{
+		char	*words[] = {"generate"};
+		output_lui(words);
+	}
 
 	return count;
 }
 #endif
 
-int	nfinal;
+int	nfinal, last_mem_bytes;
 
 int	parse(int	nwords, char	*words[], char	*sentence)
 {
@@ -759,7 +1098,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	//if(rtried)free(rtried);
 	//rtried = calloc(sizeof(int),nrules);
 
-	agenda_rules(nwords+1);
+	agenda_rules(nwords+1, 0);
 
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
@@ -789,30 +1128,37 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	for(i=0;i<num_entries;i++)
 	{
 		edge = cells[chart_size-1].p_edges[i];
-		if(edge->have != edge->need)continue;	// only passive edges, please!
 		root = edge->dg;
 		if(!is_root(root))continue;
+		//printf("edge #%d is root\n", edge->id);
 
+		// XXX no enumeration at all
+		//num_parses = 1;
+		//break;
 
 		show:
-		count = unfold_edge(edge);
+		count = 1;//unfold_edge(edge);
 		num_parses+=count;
-		sem = dg_hop(root, lookup_fname("SYNSEM"));
-		if(sem)sem = dg_hop(sem, lookup_fname("LOCAL"));
-		if(sem)sem = dg_hop(sem, lookup_fname("CONT"));
-		if(!sem)
+
+		if(!inhibit_results)
 		{
-			//fprintf(stderr, "parse had no semantics!\n");
-			continue;
+			//print_dg(root);
+			//printf("\n\n");
+
+			sem = dg_hop(root, lookup_fname("SYNSEM"));
+			if(sem)sem = dg_hop(sem, lookup_fname("LOCAL"));
+			if(sem)sem = dg_hop(sem, lookup_fname("CONT"));
+			if(!sem)
+			{
+				//fprintf(stderr, "parse had no semantics!\n");
+				continue;
+			}
+			if(sentence && !question)printf("SENT: %s\n", sentence);
+
+			print_sem(sem);
+			if(!question)printf("\n\n");
+			fflush(stdout);
 		}
-		if(sentence && !question)printf("SENT: %s\n", sentence);
-
-		//print_dg(root);
-		//printf("\n\n");
-
-		print_sem(sem);
-		if(!question)printf("\n\n");
-		fflush(stdout);
 //#ifdef	FIRST_ONLY
 		if(!exhaustive)break;
 //#endif
@@ -825,16 +1171,33 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		print_slab_stats();
 		if(lui_chart)output_lui(words);
 	}
+	last_mem_bytes = slab_usage();
 	used_total += used_edges;
 	pused_total += pused_edges;
 
 	return num_parses;
 }
 
+visit_roots(void (*visitter)(struct edge *e))
+{
+	int i, num_entries;
+	struct edge *edge;
+
+	num_entries = cells[chart_size-1].p_nedges;
+	for(i=0;i<num_entries;i++)
+	{
+		edge = cells[chart_size-1].p_edges[i];
+		if(is_root(edge->dg))
+			visitter(edge);
+	}
+}
+
 void	final_chart_stats()
 {
-	fprintf(stderr, "NOTE: %lld packings, %lld / %lld = %.1f%% copies\n", packcount,
+#ifdef	COPY_COUNTS
+	fprintf(stderr, "NOTE: %lld packings (%.1f%% success), %lld / %lld = %.1f%% copies\n", packcount, 100*(float)packcount / packtry,
 		copycount, copytraverse, 100*(float)copycount / copytraverse);
+#endif
 #ifdef TIM
 	fprintf(stderr, "NOTE: unify was %.4fs\n", base_unify_time);
 	fprintf(stderr, "NOTE: finalize was %.4fs\n", base_finalize_time);
@@ -851,7 +1214,9 @@ int	unfold_edge(struct edge	*e)
 	nfinal++;
 	if(e->rule)
 	{
+#ifdef	RULE_STATS
 		nused[e->rule->rnum]++;
+#endif
 		//if(e->rule)fprintf(stderr, "%s\n", e->rule->name);
 	}
 	for(j=0;j<e->npack+1;j++)
@@ -1080,19 +1445,26 @@ void	print_rel(struct dg	*rel)
 void	output_lui(char	*words[])
 {
 	int	i, j, k, l;
-	struct edge	*e;
+	struct edge	*e, *esave;
 	extern char	*current_sentence;
 	FILE	*lf = popen("yzlui", "w");
 
+	#ifdef GENERATION
+		chart_size++;
+	#endif
 	fprintf(lf, "chart 1 %d \"%s\"", chart_size-1, current_sentence);
 	for(i=0;i<chart_size-1;i++)
 		fprintf(lf, " #E[%d %d %d %d \"%s\" orth [ ]]", -i-1, -i-1, i, i+1, words[i]);
+	#ifdef GENERATION
+		chart_size--;
+	#endif
 
 	for(i=0;i<chart_size;i++)
 		for(j=0;j<chart_size;j++)
 			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
 			{
 				e = cells[j*chart_size + i].p_edges[k];
+				//if(e->id == 1155)esave = e;
 				if(e->rule)
 				{
 					fprintf(lf, " #E[%d %d %d %d %s %s []", e->id, e->id, j, i, e->rule->name, e->rule->name);
@@ -1108,4 +1480,5 @@ void	output_lui(char	*words[])
 	fprintf(lf, "\n");
 	fflush(lf);
 	pclose(lf);
+	//print_dg(esave->dg); printf("\n\n");
 }

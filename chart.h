@@ -6,7 +6,7 @@
 
 //#define	GENERATION
 
-//#define	BIDIR_SS
+#define	BIDIR_SS
 
 struct edge
 {
@@ -23,19 +23,28 @@ struct edge
 
 	unsigned	rtl:1,used:1;	// right-to-left instantiation? active been used?
 	unsigned	prio:4;
-	unsigned	ha_use:4;	// how many times have we beensummoned?
-	// what dg to unify in to reconstruct this active edge's dg
+
+	unsigned	ha_use:4;	// how many times have we been summoned?
+	// what dg to unify in to reconstruct this edge's dg
 	char		ha_arg:4;
 	struct dg	*ha_dg, *ha_par;
 	struct edge	*hex;	// what edge did we try to combine with on hyperactive excursion?
 
+	int	ninflr_routes;
+	struct inflr_route
+	{
+		int len;
+		int *rules;
+	}	*inflr_routes;
 	// 1 for allowed inflr's, 0 for disallowed
-	char		*inflr_allow;
-	int		allow_no_inflr;
+	//char		*inflr_allow;
+	//int		allow_no_inflr;
+
 #ifdef	GENERATION
 	unsigned int	ep_span;
 #endif
 
+	int			ntries;
 	int			npack;
 	struct edge	**pack;
 };
@@ -59,7 +68,7 @@ void	clear_chart(int	size);
 void	free_edge(struct edge	*edge);
 int	next_eid();
 int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to);
-void	allow_inflr(int	x, struct lexeme	*lex, struct irule	*ir);
+void	allow_inflr(int	x, struct lexeme	*lex, int nrules, int *rules);
 int	reduce_chart(int	length);
 void	output_lui(char	*words[]);
 void	final_chart_stats();
