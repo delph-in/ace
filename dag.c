@@ -1,3 +1,4 @@
+#include	<stdarg.h>
 #include	<stdlib.h>
 #include	<stdio.h>
 #include	<string.h>
@@ -25,8 +26,12 @@ extern int	freeze_fd;
 
 long long	accum_ram_usage = 0;
 
+#ifdef	UNIFY_PATHS
 int	upath[1024];
 int	upathl;
+#endif
+
+int slab_usage() { return (noldslabs-1)*SLAB_SIZE + slabu; }
 
 void	print_slab_stats()
 {
@@ -110,10 +115,28 @@ void	*slab_realloc(void	*ptr, int	oldlen, int	newlen)
 	}
 	else*/
 	{
-		slab_alloc(newlen);
-		memcpy(last, ptr, oldlen);
-		return last;
+		void *to = slab_alloc(newlen);
+		memcpy(to, ptr, oldlen);
+		return to;
 	}
+}
+
+struct dg	*walk_dg(struct dg	*dg, int *save, ...)
+{
+	va_list	va;
+	int		i = 0;
+	char	*fname;
+
+	va_start(va, save);
+	if(save[0]==-1)
+	{
+		while((fname = va_arg(va, char*)) != 0)
+			if(dg)dg = dg_hop(dg, save[i++] = lookup_fname(fname));
+	}
+	else while((fname = va_arg(va, char*)) != 0)
+			if(dg)dg = dg_hop(dg, save[i++]);
+	va_end(va);
+	return dg;
 }
 
 struct dg	*atomic_dg(char	*name)
@@ -178,7 +201,7 @@ int	subsume_forward, subsume_backward;
 #ifdef	ERG_JULY
 #define	SUBS_IGNORE(label)	(label>=16 && label<=19)
 #else
-#define	SUBS_IGNORE(label)	(label>=16 && label<=20)
+#define	SUBS_IGNORE(label)	((label>=16 && label<=20))
 #endif
 
 // make sure 'copy' is either null or self-referential all the way through 'a's arcs
@@ -189,7 +212,7 @@ int	subsume_same_dg(struct dg	*a)
 	struct darc	*arcs;
 
 	//return 0;
-	//a = p_dereference_dg(a);
+	a = p_dereference_dg(a);
 
 	if(a->gen!=generation)
 	{
@@ -204,9 +227,6 @@ int	subsume_same_dg(struct dg	*a)
 	if(a->forward)subsume_backward = 0;
 	if(!subsume_forward && !subsume_backward)return 0;
 	//if(a->copy || a->forward)return 0;
-
-	/*fprintf(stderr, "  ssself %p=[%s %p %p]\n",
-				a, a->xtype->name, a->copy, a->forward);*/
 
 	a->copy = a;
 	a->forward = a;
@@ -229,8 +249,8 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	extern unsigned int	generation;
 	struct darc	*aarcs, *barcs;
 
-	//a = p_dereference_dg(a);
-	//b = p_dereference_dg(b);
+	a = p_dereference_dg(a);
+	b = p_dereference_dg(b);
 
 	//if(!a || !b)return 0;
 	if(a==b)return subsume_same_dg(a);
@@ -252,16 +272,8 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	//if(a->xtype != b->xtype)return 0;
 	//if(a->narcs != b->narcs)return 0;
 
-	/*fprintf(stderr, "  sscheck %p=[%s %p %p] vs. %p=[%s %p %p]\n",
-				a, a->xtype->name, a->copy, a->forward,
-				b, b->xtype->name, b->copy, b->forward);*/
-
-#ifndef	BIDIR_SS
-	if(!descendent_of(b->xtype->tnum, a->xtype))return 0;
-#else
 	if(!descendent_of(b->xtype->tnum, a->xtype))subsume_forward = 0;
 	if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
-#endif
 
 	if(a->copy == b && b->forward == a)return 1;
 	if(a->copy)subsume_forward = 0;
@@ -303,7 +315,6 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			}
 		}
 	}
-#ifdef	BIDIR_SS
 	else if(subsume_backward) // a is subtype of b, so has strict superset of features
 	{
 		for(i=j=0;i<a->narcs;i++)
@@ -312,7 +323,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 				continue;
 			while(j<b->narcs && SUBS_IGNORE(barcs[j].label))
 				j++;
-			if(n>=b->narcs)break;
+			if(j>=b->narcs)break;
 			if(aarcs[i].label == barcs[j].label)
 			{
 				if(!subsume_dg1(aarcs[i].dest, barcs[j].dest))return 0;
@@ -321,7 +332,6 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		}
 	}
 	else return 0;
-#endif
 	return 1;
 }
 
@@ -359,6 +369,7 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 	{
 		//if(subsume_forward && subsume_backward)return 1;
 		//else return 0;
+		//printf("subs-forward = %d, subs-backward = %d\n", subsume_forward, subsume_backward);
 		if(subsume_forward)return 1;
 		if(subsume_backward)return -1;
 	}
@@ -422,6 +433,7 @@ int	lookup_fname(char	*label)
 	return i;
 }
 
+#ifdef	UNIFY_PATHS
 void	unify_backtrace()
 {
 	int	i;
@@ -432,6 +444,7 @@ void	unify_backtrace()
 	fprintf(stderr, "\n");
 	fflush(stderr);
 }
+#endif
 
 struct dg	*add_dg_feature(struct dg	*d, char	*label, struct dg	*value)
 {
@@ -448,7 +461,7 @@ int	init_fnames()
 	fnames[0] = strdup("ARGS");
 	fnames[1] = strdup("FIRST");
 	fnames[2] = strdup("REST");
-	fnames[3] = strdup("SEM");
+	fnames[3] = strdup("SEM");		//expired
 	fnames[4] = strdup("HEAD");
 
 #ifdef	ERG_JULY
@@ -461,8 +474,8 @@ int	init_fnames()
 	fnames[7] = strdup("LCONJ-DTR");
 	fnames[8] = strdup("RCONJ-DTR");
 	fnames[9] = strdup("DTR");
-	fnames[10] = strdup("MOD-DTR");
-	fnames[11] = strdup("NONMOD-DTR");
+	fnames[10] = strdup("MOD-DTR");		//expired
+	fnames[11] = strdup("NONMOD-DTR");	//expired
 	fnames[12] = strdup("DTRA");
 	fnames[13] = strdup("DTRB");
 	fnames[14] = strdup("DTR1");
