@@ -21,8 +21,8 @@ struct dfastate
 	char	*set;
 	short	nns;
 	// which vars do we start/stop saving?
-	char	start[4];
-	char	end[4];
+	char	start[6];
+	char	end[6];
 };
 
 extern int		ndfa;
