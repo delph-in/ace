@@ -106,14 +106,16 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rnums)
 				if(!invert_ipat_suffix(ir->subpat[j], ir->subrep[j], form, stem))
 				{
 					// good guess; now check whether 'stem' actually inflects to 'form'
-					char *check = inflect(ir, stem);
+					/*char *check = inflect(ir, stem);
 					if(!check || strcasecmp(check, form))
 					{
-						fprintf(stderr, "hah! we avoided being tricked; `%s' doesn't disinflect to `%s' under `%s'\n", form, stem, ir->rule->name);
+						fprintf(stderr, "hah! we avoided being tricked; `%s' doesn't disinflect to `%s' under `%s', since that would go to `%s'\n",
+							form, stem, ir->rule->name, check?check:"(null)");
 						if(check)free(check);
 						continue;
 					}
-					free(check);
+					free(check);*/
+
 					//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d], i.e. `%s' replaced by `%s'\n",
 					//		form, stem, ir->rule->name, j, ir->subpat[j], ir->subrep[j]);
 					if(!mrules)mrules = longer_rule_list(nrules, rnums, ir);
