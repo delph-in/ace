@@ -43,12 +43,13 @@ void	add_agenda(struct edge	*e)
 {
 	struct task	*t = slab_alloc(sizeof(struct task));
 
+	e->ntries = 0;
 	e->npack = 0;
 	e->pack = 0;
-#ifdef	BIDIR_SS
-	if(e->prio < LEX_PRIO)
-		e->prio = LEX_PRIO-1;
-#endif
+//#ifdef	BIDIR_SS
+//	if(e->prio < LEX_PRIO)
+//		e->prio = LEX_PRIO-1;
+//#endif
 
 	if(e->prio < 0 || e->prio >= NPRIO)
 	{
@@ -120,21 +121,40 @@ int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to)
 	return 0;
 }
 
-void	allow_edge_inflr(struct edge	*e, struct irule	*ir)
+void add_agenda_lrule(int x, struct rule *rule)
 {
-	if(!ir)
+	extern int rprio[];
+	struct task	*t;
+	int			prio = rprio[rule->rnum]?:9;
+
+	for(t=agenda[prio].start;t;t=t->next)
 	{
-		//printf("allow no irule on edge %d\n", e->id);
-		e->allow_no_inflr = 1;
+		//if(t->edge->rule)printf(" -- already %s [%d-%d]\n", t->edge->rule->name, t->edge->from, t->edge->to);
+#ifdef	GENERATION
+		if(t->edge->rule==rule && t->edge->ep_span == 1<<x)
+#else
+		if(t->edge->rule==rule && t->edge->from==x && t->edge->to==x)
+#endif
+		{
+			//printf("save work - `%s' was already in the chart for %d\n", rule->name, x);
+			return;
+		}
 	}
-	else
-	{
-		//printf("allow irule %s on edge %d\n", ir->rule->name, e->id);
-		e->inflr_allow[ir->rule->rnum] = 1;
-	}
+	//printf("sadly, have to add `%s' at prio? %d\n", rule->name, prio);
+	add_agenda(epsilon_edge(rule, x, 0));
 }
 
-void	allow_inflr(int	x, struct lexeme	*lex, struct irule	*ir)
+void	allow_edge_inflr_route(struct edge	*e, int nrules, int *rules)
+{
+	e->ninflr_routes++;
+	e->inflr_routes = slab_realloc(e->inflr_routes,
+		sizeof(struct inflr_route)*(e->ninflr_routes-1),
+		sizeof(struct inflr_route)*e->ninflr_routes);
+	e->inflr_routes[e->ninflr_routes-1].len = nrules;
+	e->inflr_routes[e->ninflr_routes-1].rules = rules;
+}
+
+void	allow_inflr(int	x, struct lexeme	*lex, int nrules, int *rules)
 {
 	struct task	*t;
 
@@ -149,7 +169,7 @@ void	allow_inflr(int	x, struct lexeme	*lex, struct irule	*ir)
 #else
 		if(!(t->edge->from==x && t->edge->to==x+1))break;
 #endif
-		if(t->edge->lex==lex)allow_edge_inflr(t->edge, ir);
+		if(t->edge->lex==lex)allow_edge_inflr_route(t->edge, nrules, rules);
 	}
 }
 
