@@ -220,14 +220,14 @@ int	add_multilexemes_to_chart(int	x, int	nwords, char	**words)
 	else return 0;
 }
 
-int	add_lexemes_to_chart_for_stem(int	x, char	*stem, int nrules, int *rules)
+int	add_lexemes_to_chart_for_stem(int	x, char	*stem, int nrules, int *rnums)
 {
 	int		num=0;
 	char		stemcmp[1024];
 	int		i, j, k, r = -1;
 
 	sprintf(stemcmp, "\"%s\"", stem);
-	//printf("adding lexemes for stem `%s'\n", stem);
+	//printf("adding lexemes for stem `%s' next rule %s\n", stem, nrules?rules[rnums[0]]->name:"norule");
 
 	for(i=0,j=nlexemes-1;i<=j;)
 	{
@@ -245,7 +245,7 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem, int nrules, int *rules)
 			if(lexemes[i]->stemlen>1)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+1))
 				add_agenda(lexical_edge(lexemes[i], x, 1));
-			allow_inflr(x, lexemes[i], nrules, rules);
+			allow_inflr(x, lexemes[i], nrules, rnums);
 			num++;
 		}
 		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
@@ -253,7 +253,7 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem, int nrules, int *rules)
 			if(lexemes[i]->stemlen>1)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+1))
 				add_agenda(lexical_edge(lexemes[i], x, 1));
-			allow_inflr(x, lexemes[i], nrules, rules);
+			allow_inflr(x, lexemes[i], nrules, rnums);
 			num++;
 		}
 		return num;

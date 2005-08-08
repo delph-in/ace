@@ -48,7 +48,7 @@ int	*longer_rule_list(int nr, int *ru, struct irule	*ir)
 	return r;
 }
 
-int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rules)
+int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rnums)
 {
 	int	i, j, count = 0, n;
 	char	stem[1024];
@@ -56,8 +56,13 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rules)
 	struct irreg	*irr;
 	struct lexeme	*lex;
 
-	// get any non-inflecting lexemes
-	n = add_lexemes_to_chart_for_stem(x, form, nrules, rules);
+	for(i=0;i<nrules;i++)printf("  ");
+	printf("exploring hypothesis `%s' with rule chain:", form);
+	for(i=0;i<nrules;i++)printf(" %s", rules[rnums[i]]->name);
+	printf("\n");
+
+	// get any no-further-inflecting lexemes
+	n = add_lexemes_to_chart_for_stem(x, form, nrules, rnums);
 	count += n;
 	if(!strcmp(form, "is"))return count;
 
@@ -70,7 +75,7 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rules)
 		ir = irules[i];
 		if(!ir->nsub)
 		{
-			if(!mrules)mrules = longer_rule_list(nrules, rules, ir);
+			if(!mrules)mrules = longer_rule_list(nrules, rnums, ir);
 			n = add_lexemes_to_chart_for_stem(x, form, nrules+1, mrules);
 			count += n;
 #ifndef	GENERATION
@@ -86,7 +91,7 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rules)
 				{
 					//fprintf(stderr, "used irreg `%s -> %s' for rule %s\n",
 					//		irr->stem, irr->form, ir->rule->name);
-					if(!mrules)mrules = longer_rule_list(nrules, rules, ir);
+					if(!mrules)mrules = longer_rule_list(nrules, rnums, ir);
 					n = add_lexemes_to_chart_for_form(x, irr->stem, nrules+1, mrules);
 					count += n;
 #ifndef	GENERATION
@@ -95,14 +100,23 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rules)
 					break;
 				}
 			}
-			if(j<ir->nirregs)continue;	// if we got it with an irreg, don't try rules
+			if(j<ir->nirregs)continue;	// if we got it with an irreg, don't try patterns
 			for(j=ir->nsub-1;j>=0;j--)
 			{
 				if(!invert_ipat_suffix(ir->subpat[j], ir->subrep[j], form, stem))
 				{
-					//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d]\n",
-							//form, stem, ir->rule->name, j);
-					if(!mrules)mrules = longer_rule_list(nrules, rules, ir);
+					// good guess; now check whether 'stem' actually inflects to 'form'
+					char *check = inflect(ir, stem);
+					if(!check || strcasecmp(check, form))
+					{
+						fprintf(stderr, "hah! we avoided being tricked; `%s' doesn't disinflect to `%s' under `%s'\n", form, stem, ir->rule->name);
+						if(check)free(check);
+						continue;
+					}
+					free(check);
+					//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d], i.e. `%s' replaced by `%s'\n",
+					//		form, stem, ir->rule->name, j, ir->subpat[j], ir->subrep[j]);
+					if(!mrules)mrules = longer_rule_list(nrules, rnums, ir);
 					n = add_lexemes_to_chart_for_form(x, stem, nrules+1, mrules);
 					count += n;
 					if(n)
@@ -110,7 +124,7 @@ int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rules)
 #ifndef	GENERATION
 						add_agenda_lrule(x, ir->rule);//(epsilon_edge(ir->rule, x, 0));
 #endif
-						break;
+						//break;
 					}
 				}
 			}
