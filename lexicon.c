@@ -12,6 +12,8 @@
 struct lexeme	**lexemes;
 int		nlexemes;
 
+extern unsigned int	generation;
+
 extern int trace;
 extern unsigned int require_ep_span;
 
@@ -22,6 +24,14 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 {
 	struct edge	*edge = slab_alloc(sizeof(struct edge));
 	struct dg	*ldg;
+
+#define RECORD_LEXICAL_ACCESS
+#ifdef RECORD_LEXICAL_ACCESS
+	static FILE	*lexf = 0;
+	if(!lexf)lexf = fopen("/tmp/lexical-access", "w");
+	fprintf(lexf, "%s\n", lex->word);
+	fflush(lexf);
+#endif
 
 	bzero(edge, sizeof(struct edge));
 
@@ -54,21 +64,34 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	edge->lex = lex;
 	edge->qc = extract_qc(edge->dg);
 	edge->prio = LEX_PRIO;
-	edge->inflr_allow = slab_alloc(nrules);
 #ifdef	GENERATION
-	memset(edge->inflr_allow, 1, nrules);
-	edge->allow_no_inflr = 1;
+	edge->ninflr_routes = 1;
+	edge->inflr_routes = slab_alloc(sizeof(struct inflr_route));
+	edge->inflr_routes[0].len = 0;
+	edge->inflr_routes[0].rules = 0;
 #else
-	bzero(edge->inflr_allow, nrules);
-	edge->allow_no_inflr = (len==1)?0:1;
+	if(len==1)
+	{
+		edge->ninflr_routes = 0;
+		edge->inflr_routes = 0;
+	}
+	else
+	{
+		edge->ninflr_routes = 1;
+		edge->inflr_routes = slab_alloc(sizeof(struct inflr_route));
+		edge->inflr_routes[0].len = 0;
+		edge->inflr_routes[0].rules = 0;
+	}
 #endif
 	edge->age = 0;
 
+#ifndef	GENERATION
 	if(trace)
 	{
 		printf("added lexeme `%s' = #%d\n", lex->word, edge->id);
 		if(trace>1){print_dg(edge->dg); printf("\n\n");}
 	}
+#endif
 
 	return edge;
 }
@@ -197,13 +220,14 @@ int	add_multilexemes_to_chart(int	x, int	nwords, char	**words)
 	else return 0;
 }
 
-int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct irule	*ir)
+int	add_lexemes_to_chart_for_stem(int	x, char	*stem, int nrules, int *rules)
 {
 	int		num=0;
 	char		stemcmp[1024];
 	int		i, j, k, r = -1;
 
 	sprintf(stemcmp, "\"%s\"", stem);
+	//printf("adding lexemes for stem `%s'\n", stem);
 
 	for(i=0,j=nlexemes-1;i<=j;)
 	{
@@ -221,7 +245,7 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct irule	*ir)
 			if(lexemes[i]->stemlen>1)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+1))
 				add_agenda(lexical_edge(lexemes[i], x, 1));
-			allow_inflr(x, lexemes[i], ir);
+			allow_inflr(x, lexemes[i], nrules, rules);
 			num++;
 		}
 		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
@@ -229,7 +253,7 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct irule	*ir)
 			if(lexemes[i]->stemlen>1)continue;
 			if(!lexeme_in_agenda(lexemes[i], x, x+1))
 				add_agenda(lexical_edge(lexemes[i], x, 1));
-			allow_inflr(x, lexemes[i], ir);
+			allow_inflr(x, lexemes[i], nrules, rules);
 			num++;
 		}
 		return num;
@@ -243,24 +267,29 @@ void	skolemize_arg(struct dg	*dg, char	*arg, struct dg	*inst)
 	if(dg)add_dg_feature(dg, "INSTLOC", inst);
 }
 
+void	skolemize_rel_as(struct dg	*rel, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3)
+{
+	if(a0)skolemize_arg(rel, "ARG0", a0);
+	if(a1)skolemize_arg(rel, "ARG1", a1);
+	if(a2)skolemize_arg(rel, "ARG2", a2);
+	if(a3)skolemize_arg(rel, "ARG3", a3);
+}
+
 void	skolemize_as(struct dg	*dg, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3)
 {
 	struct dg	*rel=0;
 
 	if(dg)dg = dg_hop(dg, lookup_fname("SYNSEM"));
-	if(dg)dg = dg_hop(dg, lookup_fname("LOCAL"));
+	/*if(dg)dg = dg_hop(dg, lookup_fname("LOCAL"));
 	if(dg)dg = dg_hop(dg, lookup_fname("CONT"));
 	if(dg)dg = dg_hop(dg, lookup_fname("RELS"));
 	if(dg)dg = dg_hop(dg, lookup_fname("LIST"));
-	if(dg)rel = dg_hop(dg, lookup_fname("FIRST"));
-	if(rel)
-	{
-		if(a0)skolemize_arg(rel, "ARG0", a0);
-		if(a1)skolemize_arg(rel, "ARG1", a1);
-		if(a2)skolemize_arg(rel, "ARG2", a2);
-		if(a3)skolemize_arg(rel, "ARG3", a3);
-	}
+	if(dg)rel = dg_hop(dg, lookup_fname("FIRST"));*/
+	if(dg)dg = dg_hop(dg, lookup_fname("LKEYS"));
+	if(dg)rel = dg_hop(dg, lookup_fname("KEYREL"));
+	if(rel)skolemize_rel_as(rel, a0, a1, a2, a3);
 }
+
 
 int	add_generative_lexeme(char	*stem, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3)
 {
@@ -292,6 +321,7 @@ int	add_generative_lexeme(char	*stem, struct dg	*a0, struct dg	*a1, struct dg	*a
 			add_agenda(ed = lexical_edge(lexemes[i], x, 1));
 			dg = ed->dg;
 			skolemize_as(dg, a0, a1, a2, a3);
+			printf(" generative lex %s\n", lexemes[i]->word);
 			num++;
 		}
 		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
@@ -300,6 +330,7 @@ int	add_generative_lexeme(char	*stem, struct dg	*a0, struct dg	*a1, struct dg	*a
 			add_agenda(ed = lexical_edge(lexemes[i], x, 1));
 			dg = ed->dg;
 			skolemize_as(dg, a0, a1, a2, a3);
+			printf(" generative lex %s\n", lexemes[i]->word);
 			num++;
 		}
 		return num;
@@ -435,10 +466,28 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 	return dg;
 }
 
+void print_lexeme(char *name)
+{
+	int	i;
+
+	for(i=0;i<nlexemes;i++)
+		if(!strcmp(lexemes[i]->word, name))
+		{
+			print_dg(lexemes[i]->dg); printf("\n");
+			printf(" lex type %s\n", lexemes[i]->lextype->name);
+			print_dg(lexemes[i]->lextype->dg); printf("\n");
+		}
+}
+
 void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 {
 	struct lexeme	*l = malloc(sizeof(struct lexeme));
 	struct dg	*stem, *str, *synsem, *lkeys, *keyrel, *pred, *compkey, *ocompkey;
+	int			print = 0;
+
+	// XXX hack!
+	if(generation > MAX_GEN_RESET)generation = 11;
+	// XXX hack!
 
 	//wellform(dg, word);
 
@@ -488,6 +537,8 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 		}
 	}
 
+	//if(!strcmp(word, "hand_v1")) { printf("hand_v1...\n"); print = 1; }
+
 	for(stem = dg_hop(fulldg, stemfeat);stem;stem = dg_hop(stem, rfeat))
 	{
 		if(!strcasecmp(stem->type->name, "*null*"))break;
@@ -505,7 +556,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 		l->stemlen++;
 		l->stem = realloc(l->stem, sizeof(struct type*)*l->stemlen);
 		l->stem[l->stemlen-1] = str->type;
-		//printf("%s[%d] = %s\n", word, l->stemlen, str->type->name);
+		if(print)printf("%s[%d] = %s\n", word, l->stemlen, str->type->name);
 	}
 	if(l->stemlen == 0)
 	{
@@ -521,6 +572,8 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 #ifdef	SIMPLE_LEXICON
 	simplify_lexeme(l);
 #endif
+
+	add_semantic_index(l, fulldg, 0);
 
 	//printf("lexeme %s has %d-long stem starting %s\n", word, l->stemlen, l->stem[0]->name);
 	if(nlexemes%100 == 0)printf("lexeme %s             \r", word); fflush(stdout);
@@ -569,8 +622,11 @@ int	lexcomp(const void	*a, const void	*b)
 
 int	load_lexicon()
 {
+	extern int	lexify_tdl_line(char	*lhs, char	*rhs, void	*ref);
+
 #ifdef	ERG
-	if(iterate_tdl_lex("../erg/lexicon.tdl"))
+	//if(iterate_tdl_lex("../erg/lexicon.tdl"))
+	if(process_tdl_status("lex-entry", lexify_tdl_line, 0))
 #else
 	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/lexicon.tdl", study_lexicon))
 #endif
@@ -578,13 +634,13 @@ int	load_lexicon()
 		fprintf(stderr, "lexicon: unable to load, bailing out.\n");
 		exit(-1);
 	}
-#ifdef	ERG
+/*#ifdef	ERG
 	if(iterate_tdl_lex("special-lex.tdl"))
 	{
 		fprintf(stderr, "lexicon: unable to load special-lex, bailing out.\n");
 		exit(-1);
 	}
-#endif
+#endif*/
 	qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
 	printf("%d / %d = %.2f%% lexemes were simple\n",
 		nsimpleform, nlexemes, 100*(float)nsimpleform / nlexemes);

@@ -18,11 +18,19 @@ struct lexeme
 	struct type	*pred;		// this lexeme provides relation 'pred'
 };
 
-int	add_lexemes_to_chart_for_stem(int	x, char	*stem, struct irule	*ir);
+int	add_lexemes_to_chart_for_stem(int	x, char	*stem, int nrules, int *rules);
 int	add_multilexemes_to_chart(int	x, int	nwords, char	**words);
 int	add_generative_lexeme(char	*stem, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3);
 void	dump_parts_of_speech();
 int		load_lexicon();
 struct dg	*expand_lexeme(struct lexeme	*l);
+struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len);
+
+// semantic index
+void	add_semantic_index(struct lexeme *l, struct dg *full, int which);
+int		add_lexemes_for_relation(int	x, char	*rel, int (*skolemize)(struct edge	*e, struct lexeme	*lex));
+int		add_rules_for_relation(char	*rel, int (*skolemize)(struct edge	*e, struct rule	*rule));
+void	*freeze_semantic_index();
+void	recover_semantic_index(void *frozen_hash);
 
 #endif
