@@ -21,6 +21,8 @@ struct type	*strtype = 0;
 #define	THSIZE	100000
 static struct type	**typehash;
 
+extern unsigned int generation;
+
 void	th_init()
 {
 	typehash = calloc(sizeof(struct type*), THSIZE);
@@ -278,7 +280,9 @@ int	constrain_glb_type(struct type	*g)
 	if(!g->dg)
 	{
 		fprintf(stderr, "glb-fix: unexpected error! glb type `%s' is inconsistent.\n", g->name);
+#ifdef	UNIFY_PATHS
 		unify_backtrace();
+#endif
 		exit(-1);
 	}
 	return 0;
@@ -294,9 +298,17 @@ void	fix_glbs()
 	if(fixes)free(fixes);
 }
 
+#define	CSTSIZE	16384
+static char	csthashres[CSTSIZE];
+static struct type	*csthasha[CSTSIZE];
+static struct type	*csthashb[CSTSIZE];
+
 int	find_common_subtypes(struct type	*a, struct type	*b, unsigned short	*_glb_common)
 {
 	int	_glb_ncommon = 0, ia, ib;
+	unsigned int	h = ((unsigned int)a ^ ((unsigned int)b>>6)) % CSTSIZE;
+
+	if(csthasha[h]==a && csthashb[h]==b && !csthashres[h])return 0;
 
 	ia = ib = 0;
 	while(ia < a->ndescendents && ib < b->ndescendents)
@@ -316,6 +328,10 @@ int	find_common_subtypes(struct type	*a, struct type	*b, unsigned short	*_glb_co
 		else if(a->descendents[ia] < b->descendents[ib])ia++;
 		else ib++;
 	}
+
+	csthasha[h] = a;
+	csthashb[h] = b;
+	csthashres[h] = _glb_ncommon?1:0;
 	return _glb_ncommon;
 }
 
@@ -439,6 +455,8 @@ void	make_glbs()
 struct type	*most_general_type_for_dg(struct dg	*d);
 int		wfpath[1024], wfpl = 0;
 
+long top_unifies_wellform;
+
 // make children well-formed
 void	wellform(struct dg	*d, char	*typename)
 {
@@ -469,6 +487,7 @@ void	wellform(struct dg	*d, char	*typename)
 				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i].dest->type->name, t->name);
 				exit(-1);
 			}
+			top_unifies_wellform++;
 			if(unify_dg_infrom(arcs[i].dest, copy_dg(t->dg)))
 			{
 				fprintf(stderr, "failed well-formedness constraint!\n");
@@ -480,81 +499,34 @@ void	wellform(struct dg	*d, char	*typename)
 	}
 }
 
-int	load_types()
+int	init_top_type()
 {
-#ifdef	ERG
-	char	*files[] = {	"../erg/fundamentals.tdl",
-				"../erg/lextypes.tdl",
-				"../erg/syntax.tdl",
-				"../erg/lexrules.tdl",
-				"../erg/auxverbs.tdl",
-				"../erg/letypes.tdl"	};
-#else
-	char	*files[] = {	"../smallgrammars/esslli2k-grammar9/types.tdl" };
-#endif
-	int	i, j, descbytes = 0;
-	struct timeval	tv1, tv2;
-	struct type	*block;
-
 	types = calloc(sizeof(struct type*), 1);
 
 	if(add_type_only("*top*", 0, 0)) return -1;
 	types[0]->dg = atomic_dg("*top*");
+	return 0;
+}
 
-	for(i=0;i<sizeof(files)/sizeof(char*);i++)
-	{
-		fprintf(stderr, "gleaning types from `%s'\n", files[i]);
-		if(iterate_tdl_types(files[i]))
-		{
-			fprintf(stderr, "types: unable to load `%s' types, bailing out!\n", files[i]);
-			exit(-1);
-		}
-	}
-	fprintf(stderr, "checking for glbs... ");
-	gettimeofday(&tv1, 0);
-	make_glbs();
-	gettimeofday(&tv2, 0);
-	tv2.tv_sec -= tv1.tv_sec;
-	tv2.tv_usec -= tv1.tv_usec;
-	fprintf(stderr, "%.2fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec / 1000000);
+int	constrain_glbs_and_wellformedness()
+{
+	int	i, j, descbytes = 0;
 
-/*
-	// fix types to be correctly offset relative to types[0].
-	// this allows a tnum calculation without dereferencing a type*,
-	// which in turn speeds up glb calculation (hopefully)
-	// 
-	// on second thought, it perhaps isn't necessary;
-	// we can make the glb computation a hash on the pointers directly.
-	block = malloc(sizeof(struct type) * ntypes);
-	inval_thash();
-	for(i=0;i<ntypes;i++)
-	{
-		block[i] = *types[i];
-		free(types[i]);
-		if(types[i] == strtype)strtype = block + i;
-		types[i] = block + i;
-		th_add(types[i]->name, types[i]);
-	}
-*/
-
-	for(i=0;i<sizeof(files)/sizeof(char*);i++)
-	{
-		fprintf(stderr, "constraining types from `%s'\n", files[i]);
-		if(iterate_tdl_dgs(files[i], constrain_type))
-		{
-			fprintf(stderr, "types: unable to load `%s' constraints, bailing out!\n", files[i]);
-			exit(-1);
-		}
-	}
 	fix_glbs();
 
 	for(i=0;i<ntypes;i++)
 	{
 		// introduce top-level features for this type, it might be the most general type for them
+		//printf("pre-welformed dag for `%s':\n", types[i]->name);
+		//print_dg(types[i]->dg); printf("\n\n");
 		for(j=0;j<types[i]->dg->narcs;j++)
 			introduce_feature(DARCS(types[i]->dg)[j].label, i);
 	}
 	number_strings();	// just in case
+
+	// XXX hack!
+	generation = 11;
+	// XXX hack!
 
 	fprintf(stderr, "enforcing well-formedness...\n");
 	for(i=0;i<ntypes;i++)
@@ -566,5 +538,32 @@ int	load_types()
 	}
 	fprintf(stderr, "%d bytes were needed for descendent arrays\n", descbytes);
 
+	return 0;
+}
+
+int	load_types()
+{
+	//char	*files[] = {	"../smallgrammars/esslli2k-grammar9/types.tdl" };
+	struct timeval	tv1, tv2;
+extern int enable_out_of_order;
+int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
+
+	if(init_top_type())return -1;
+
+	enable_out_of_order = 1;
+	process_tdl_status("type", typify_tdl_line, 0);
+
+	fprintf(stderr, "checking for glbs... ");
+	gettimeofday(&tv1, 0);
+	make_glbs();
+	gettimeofday(&tv2, 0);
+	tv2.tv_sec -= tv1.tv_sec;
+	tv2.tv_usec -= tv1.tv_usec;
+	fprintf(stderr, "%.2fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec / 1000000);
+
+	process_tdl_dgs_status("type", constrain_type);
+	enable_out_of_order = 0;
+
+	if(constrain_glbs_and_wellformedness())return -1;
 	return 0;
 }

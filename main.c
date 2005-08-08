@@ -11,14 +11,15 @@
 #include	"rule.h"
 #include	"lexicon.h"
 #include	"preprocessor.h"
+#include	"mrs.h"
 
-int	debug_level = 1, export_parts = 0;
+int	debug_level = 1, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0;
 int	question = 0, exhaustive = 0, lui_chart = 0, inhibit_pack = 0;
 
-extern int	g_loaded;
+extern int	g_loaded, inhibit_results;
 extern long long	accum_ram_usage;
 
 char	*current_sentence = "(not initialized)";
@@ -29,7 +30,7 @@ void	parse_args(int	argc, char	*argv[])
 {
 	char	*prog = argv[0], ch;
 
-	while((ch=getopt(argc, argv, "hvplxcg:G:m:q"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvplxcg:G:m:qtR"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-x] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	debug_level++;	break;
@@ -39,8 +40,10 @@ void	parse_args(int	argc, char	*argv[])
 		case	'm':	connect_to_master(optarg);	break;
 		case	'q':	question = 1;			break;
 		case	'x':	exhaustive = 1;			break;
-		case	'c':	inhibit_pack = lui_chart = 1;			break;
+		case	'c':	lui_chart = 1;			break;
 		case	'p':	inhibit_pack = 1;		break;
+		case	'R':	inhibit_results = 1;		break;
+		case	't':	do_itsdb = 1;			break;
 		case	'?':	goto usage;
 	}
 	if(optind<argc-1)goto usage;
@@ -69,6 +72,8 @@ int	main(int	argc, char	*argv[])
 	setup_carcs_stack();
 
 	gettimeofday(&tv1, 0);
+	init_glb_cache();
+
 	if(load_grammar_path)load_frozen_grammar(load_grammar_path);
 	else load_grammar();
 	gettimeofday(&tv2, 0);
@@ -104,10 +109,22 @@ int	main(int	argc, char	*argv[])
 	//build_lr_filter();
 	//print_rule("hspec");
 	//print_type("v_np*_trans_le");
-	//print_type("np_trans_subst");
+	//print_rule("adjh_i_ques");
+	//print_type("adj_head_int_ques_phrase");
+	//print_type("basic_adj_head_phrase");
+	//print_type("phrasal");
+	//print_lexeme("delete_v2");
 
 #ifdef	GENERATION
-	generate();
+	{
+		struct mrs	*mrs = read_mrs(stdin);
+		if(mrs)
+		{
+			generate(mrs);
+			free_mrs(mrs);
+		}
+		else fprintf(stderr, "NOTE: unable to read an input MRS\n");
+	}
 #endif
 
 	if(!sentence_path)return 0;
@@ -121,6 +138,8 @@ int	main(int	argc, char	*argv[])
 			return -1;
 		}
 	}
+
+	if(do_itsdb) itsdb_mode();
 
 	signal(SIGSEGV, print_current_sentence);
 	signal(SIGBUS, print_current_sentence);

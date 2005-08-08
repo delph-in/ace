@@ -6,21 +6,28 @@
 
 int	glb_ncollis, glb_nhit, glb_nmiss;
 
-struct type	*glb(struct type	*a, struct type	*b)
-{
 #define	HSIZE		32768
 #define	ROLLOVER	4
 
-	extern int	glb_ncollis, glb_nhit, glb_nmiss;
-	struct type	*calc_glb(struct type	*a, struct type	*b);
-	static struct glb_hashent
-	{
-		struct type	*glb, *a, *b;
-		int		use;
-	}	*htab;
+extern int	glb_ncollis, glb_nhit, glb_nmiss;
+struct type	*calc_glb(struct type	*a, struct type	*b);
 
+static struct glb_hashent
+{
+	struct type	*glb, *a, *b;
+	int		use;
+}	*htab;
+
+void	init_glb_cache()
+{
+	if(!htab)htab = calloc(sizeof(struct glb_hashent), HSIZE);
+}
+
+struct type	*glb(struct type	*a, struct type	*b)
+{
 	unsigned int	h;
 	int		i, j, mi = 0, min = 0x3fff0000;
+	register struct glb_hashent	*ht = htab;
 
 	if(a==b)return a;
 	if(a>b)
@@ -30,40 +37,40 @@ struct type	*glb(struct type	*a, struct type	*b)
 		b = (struct type*)h;
 	}
 
-	//h = (((unsigned int)a>>5) ^ ((unsigned int)b)) & (HSIZE-1);
 	h = (((unsigned int)a>>6) ^ ((unsigned int)b>>0)) & (HSIZE-1);
-	if(!htab)htab = calloc(sizeof(struct glb_hashent), HSIZE);
 
 	// check for a,b in 
 	for(j=0;j<ROLLOVER;j++)
 	{
 		i = (h+j) & (HSIZE-1);
-		if(htab[i].a==a && htab[i].b==b)
+		if(ht[i].a==a && ht[i].b==b)
 		{
-			htab[i].use++;
-			if(j)glb_ncollis++;
-			else glb_nhit++;
-			goto ret;
+			//ht[i].use++;
+			//if(j)glb_ncollis++;
+			//else glb_nhit++;
+			//goto ret;
+			return ht[i].glb;
 		}
-		if(!htab[i].use)	// this automatically wins
+		if(!ht[i].use)	// this automatically wins
 			goto grab;
-		if(htab[i].use < min)
+		if(ht[i].use < min)
 		{
 			mi = i;
-			min = htab[i].use;
+			min = ht[i].use;
 		}
 	}
 	i = mi;
+	//i = h;
 
 grab:
 	glb_nmiss++;
-	htab[i].a = a;
-	htab[i].b = b;
-	htab[i].use = 1;
-	htab[i].glb = calc_glb(a, b);
+	ht[i].a = a;
+	ht[i].b = b;
+	ht[i].use = 1;
+	ht[i].glb = calc_glb(a, b);
 
 	ret:
-	return htab[i].glb;
+	return ht[i].glb;
 }
 
 struct type	*calc_glb(struct type	*a, struct type	*b)
@@ -113,5 +120,5 @@ struct type	*calc_glb(struct type	*a, struct type	*b)
 
 void	print_glb_stats()
 {
-	fprintf(stderr, "NOTE: glb hash: %d direct hits, %d collisions, %d misses\n", glb_nhit, glb_ncollis, glb_nmiss);
+	//fprintf(stderr, "NOTE: glb hash: %d direct hits, %d collisions, %d misses\n", glb_nhit, glb_ncollis, glb_nmiss);
 }

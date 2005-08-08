@@ -203,7 +203,8 @@ struct qc	*extract_qc(struct dg	*d)
 {
 	static int	init = 0;
 	struct qc	*q;
-	long		i, sp = 0, dst;
+	long		i, sp = 0, dst, fn, onf;
+	extern int	nfnames;
 	int			*lp;
 	extern unsigned int	generation;
 	struct dg	*stack[64];
@@ -215,7 +216,7 @@ struct qc	*extract_qc(struct dg	*d)
 		lp = labels;
 #define	REC(dst)
 #define	POP
-#define	PUSH(fstr)			*lp++ = lookup_fname(#fstr);
+#define	PUSH(fstr)			onf = nfnames ; *lp++ = fn = lookup_fname(#fstr); if(fn>=onf)fprintf(stderr, "QC: feature %s does not exist\n", #fstr);
 #include	"qccode.c"
 #undef	PUSH
 #undef	POP
@@ -329,6 +330,7 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 {
 	int	i;
 	struct type	*ta, *tb, *g;
+	int	fw = 1, bw = 1;
 
 	for(i=0;i<QC_SIZE;i++)
 	{
@@ -342,12 +344,16 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 		if(ta && tb)
 		{
 			g = glb(ta, tb);
-#ifdef	BIDIR_SS
-			if(g!=ta && g!=tb)return -1;
-#else
-			if(g!=tb)return -1;
-#endif
+			if(g!=tb)fw = 0;
+			if(g!=ta)bw = 0;
 		}
+		if(ta && !tb)fw = 0;
+		if(tb && !ta)bw = 0;
+#ifdef	BIDIR_SS
+		if(!fw && !bw)return -1;
+#else
+		if(!fw)return -1;
+#endif
 	}
 	return 0;
 }

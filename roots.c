@@ -33,7 +33,8 @@ int	study_roots(char	*lhs, struct dg	*dg)
 int	load_roots()
 {
 #ifdef	ERG
-	if(iterate_tdl_dgs("../erg/roots.tdl", study_roots))
+	//if(iterate_tdl_dgs("../erg/roots.tdl", study_roots))
+	if(process_tdl_dgs_status("root", study_roots))
 #else
 	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/roots.tdl", study_roots))
 #endif

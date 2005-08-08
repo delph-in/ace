@@ -4,6 +4,8 @@
 #include	<stdio.h>
 #include	"type.h"
 
+//#define	UNIFY_PATHS
+
 // tomabechi dgs
 
 #define	MAX_GEN	0xffffffff
@@ -50,6 +52,8 @@ int		init_fnames();
 int		equivalent_dg(struct dg	*a, struct dg	*b);
 void		setup_extra_type_dgs();
 void		setup_carcs_stack();
+
+struct dg	*walk_dg(struct dg	*dg, int *save, ...);
 
 // for hyperactive parsing
 int		unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg);
@@ -167,7 +171,7 @@ static inline struct dg	*dereference_dg(struct dg	*dg)
 
 static inline struct dg	*dg_hop(struct dg	*d, int	label)
 {
-	int	i, j, k;
+	int	i, j, k, l;
 	extern unsigned int	generation;
 	struct darc	*arcs;
 
@@ -179,8 +183,9 @@ static inline struct dg	*dg_hop(struct dg	*d, int	label)
 	{
 		k = (i+j)>>1;
 		//printf("guess %d: %d\n", k, arcs[k].label);
-		if(arcs[k].label==label){d=arcs[k].dest;goto ret;}
-		else if(arcs[k].label>label)j = k;
+		l = arcs[k].label;
+		if(l==label){d=arcs[k].dest;goto ret;}
+		else if(l>label)j = k;
 		else i = k+1;
 	}
 	if(d->gen==generation)
@@ -188,8 +193,9 @@ static inline struct dg	*dg_hop(struct dg	*d, int	label)
 		for(i=0,j=d->ncarcs;i<j;)
 		{
 			k = (i+j)>>1;
-			if(d->carcs[k].label==label){d=d->carcs[k].dest;goto ret;}
-			else if(d->carcs[k].label>label)j = k;
+			l = d->carcs[k].label;
+			if(l==label){d=d->carcs[k].dest;goto ret;}
+			else if(l>label)j = k;
 			else i = k+1;
 		}
 	}

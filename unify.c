@@ -10,6 +10,8 @@
 extern char	**fnames;
 extern int	g_loaded;
 
+static int	cont_fnum, hcons_fnum;
+//#define SHOULD_TRIM(label)		(label==0 || (label>=5 && label<=15) || label==cont_fnum || label==hcons_fnum)
 #define SHOULD_TRIM(label)		(label==0 || (label>=5 && label<=15))
 
 // global generation counter for invalidating quasi-destructive operations
@@ -19,10 +21,16 @@ unsigned int	generation = 10;
 void	null_generation() { generation = 10; }
 struct darc	*realloc_carcs(struct darc	*ptr, int	old, int	new);
 
+#ifdef	UNIFY_PATHS
 extern int	upath[1024];
 extern int	upathl;
+#endif
 
+#ifdef	COPY_COUNTS
 long long copycount, copytraverse;
+#endif
+
+long top_copies, top_unifies;
 
 static void dagreset_c(struct dg	*d);
 
@@ -46,6 +54,7 @@ static inline void	forward_dg(struct dg	*from, struct dg	*to)
 	}
 }
 
+#ifdef	HAVE_CHECK_CYCLES
 int	check_cycles(struct dg	*dg)
 {
 	int	i;
@@ -78,6 +87,7 @@ int	check_cycles(struct dg	*dg)
 	dg->copy = (void*)2;
 	return 0;
 }
+#endif
 
 static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 {
@@ -134,7 +144,7 @@ static void print_copy_path(char	*name)
 
 	fprintf(stderr, "%s", name);
 	for(i=0;i<copypathp;i++)
-		fprintf(stderr, " %s", fnames[copypath[i]]);
+		fprintf(stderr, " %s.%d", fnames[copypath[i]], copypath[i]);
 	fprintf(stderr, "\n");
 }
 
@@ -146,7 +156,9 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 	char		forwarded, i, j, ch, st;
 	struct slab_state	state;
 
+#ifdef	COPY_COUNTS
 	copytraverse++;
+#endif
 	if(dg_underef->forward)
 	{
 		dg = dereference_dg(dg_underef);
@@ -154,9 +166,6 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 	}
 	else dg = dg_underef;
 	forwarded = (dg != dg_underef);
-
-	// ignore mark left by check_cycles()
-	if((unsigned long)dg->copy<=2)dg->copy = 0;
 
 	if(dg->gen != generation)
 	{
@@ -166,17 +175,21 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 		dg->carcs = 0;
 		dg->type = dg->xtype;
 		dg->gen = generation;
+		if(!dg->narcs && !FROZEN(dg))goto share;
 	}
-	if((unsigned long)dg->copy == 3)	// cycle marker
-		return 0;
-	if((unsigned long)dg->copy == 5)	// sharable marker
-		goto share;
-
-	if(dg->copy && dg->copy->gen == generation)
+	else
 	{
-		/*if(dg == dg->copy) // apparently a cycle
+#ifdef	HAVE_CHECK_CYCLES
+		// ignore mark left by check_cycles()
+		if((unsigned long)dg->copy<=2)dg->copy = 0;
+#endif
+
+		if((unsigned long)dg->copy == 3)	// cycle marker
 			return 0;
-		else*/
+		if((unsigned long)dg->copy == 5)	// sharable marker
+			goto share;
+
+		if(dg->copy && dg->copy->gen == generation)
 		{
 			*chret = 1;	// if 'copy' is set, a copy was made... so changed.
 			return dg->copy;
@@ -215,16 +228,18 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 			{
 				newcopy->narcs--;
 				optr++;
+				st=1;
 				continue;
 			}
 			//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
 			//		fnames[aptr->label], newcopy->type->name, optr->dest);
 			ch = 0;
 
+//#define	COPY_PATHS
 #ifdef	COPY_PATHS
 			copypath[copypathp++] = optr->label;
 #endif
-			aptr->dest = copy_dg_with_comp_arcs_ss(optr->dest, &ch, 0);
+			aptr->dest = copy_dg_with_comp_arcs_ss(optr->dest, &ch, trim);
 #ifdef	COPY_PATHS
 			copypathp--;
 #endif
@@ -249,6 +264,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 		if(trim && SHOULD_TRIM(aptr->label))
 		{
 			newcopy->narcs--;
+			st=1;
 			continue;
 		}
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
@@ -258,7 +274,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 #ifdef	COPY_PATHS
 		copypath[copypathp++] = xarc.label;
 #endif
-		aptr->dest = copy_dg_with_comp_arcs_ss(xarc.dest, &ch, 0);
+		aptr->dest = copy_dg_with_comp_arcs_ss(xarc.dest, &ch, trim);
 #ifdef	COPY_PATHS
 		copypathp--;
 #endif
@@ -272,9 +288,11 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 	if(dg->ncarcs || dg->type!=dg->xtype || st || FROZEN(dg))
 	{
 		*chret = 1;
+#ifdef	COPY_COUNTS
 		copycount++;
 #ifdef	COPY_PATHS
 		print_copy_path("COPY");
+#endif
 #endif
 		return newcopy;
 	}
@@ -287,7 +305,9 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 		dg->copy = (struct dg*)5;
 		if(forwarded)*chret = 1;	// since node was forwarded, parent must consider it changed, even though we're sharing it
 		else *chret = 0;
-		//print_copy_path("SHARE");
+#ifdef	COPY_PATHS
+		print_copy_path("SHARE");
+#endif
 		return dg;
 	}
 }
@@ -301,8 +321,10 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 	dg = dereference_dg(dg);
 	if(!dg)return 0;
 
+#ifdef	HAVE_CHECK_CYCLES
 	// ignore mark left by check_cycles()
 	if((unsigned long)dg->copy<=2)dg->copy = 0;
+#endif
 
 	if(dg->gen != generation)
 	{
@@ -377,6 +399,7 @@ struct dg	*copy_dg(struct dg	*d)
 		fprintf(stderr, "ERROR: generation overflowed!\n");
 		exit(-1);
 	}
+	top_copies++;
 	return copy_dg_with_comp_arcs(d);
 }
 
@@ -439,9 +462,13 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 		if(j==dg1->narcs || arcs2[i].label != arcs1[j].label)news[nn++] = i;
 		else
 		{
+#ifdef	UNIFY_PATHS
 			upath[upathl++] = arcs2[i].label;
+#endif
 			if(unify_dg_infrom(arcs1[j].dest, arcs2[i].dest))return -1;
+#ifdef	UNIFY_PATHS
 			upathl--;
+#endif
 		}
 	}
 
@@ -606,16 +633,20 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	// quasi-destructively unify the four sets of arcs together!
 
 	t = glb(t1, t2);
-	if(!t)return -1;
+	if(!t)
+	{
+		//printf("no glb for %s and %s\n", t1->name, t2->name);
+		return -1;
+	}
 
 	if(dg1->gen != generation)
 	{
 		dg1->ncarcs = 0;
 		dg1->carcs = 0;
+		dg1->gen = generation;
 	}
 	dg1->type = t;
 	dg1->forward = 0;
-	dg1->gen = generation;
 	//fprintf(stderr, "type `%s' at ", t->name); unify_backtrace();
 
 	forward_dg(dg2, dg1);
@@ -626,7 +657,9 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	for(j=0,k=0,i=0;i<dg2->narcs;i++)
 	{
 		if(k>=dg1->narcs && j>=dg1->ncarcs)break;
+#ifdef	UNIFY_PATHS
 		upath[upathl++] = arcs2[i].label;
+#endif
 		for(;k<dg1->narcs && arcs2[i].label > arcs1[k].label;k++) {}
 		if(k<dg1->narcs && arcs2[i].label == arcs1[k].label)
 		{
@@ -641,7 +674,9 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 			}
 			else news[nn++] = i;
 		}
+#ifdef	UNIFY_PATHS
 		upathl--;
+#endif
 	}
 	for(;i<dg2->narcs;i++)news[nn++] = i;
 
@@ -649,7 +684,9 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 	for(j=0,k=0,i=0;i<dg2->ncarcs;i++)
 	{
 		if(k>=dg1->narcs && j>=dg1->ncarcs)break;
+#ifdef	UNIFY_PATHS
 		upath[upathl++] = dg2->carcs[i].label;
+#endif
 		for(;k<dg1->narcs && dg2->carcs[i].label > arcs1[k].label;k++) {}
 		if(k<dg1->narcs && dg2->carcs[i].label == arcs1[k].label)
 		{
@@ -664,7 +701,9 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 			}
 			else newcs[nc++] = i;
 		}
+#ifdef	UNIFY_PATHS
 		upathl--;
+#endif
 	}
 	for(;i<dg2->ncarcs;i++)newcs[nc++] = i;
 	
@@ -740,6 +779,7 @@ int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 	struct dg	*to;
 	int		i = 0;
 
+	top_unifies++;
 	get_slabstate(&tmpstate);
 
 	if(arg>=0)
@@ -759,14 +799,24 @@ int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 	}
 	else to = dg2;
 
+#ifdef	UNIFY_PATHS
 	upathl = 0;
+#endif
 	return unify1(to, dg1);
 }
 
 struct dg	*finalize_tmp(struct dg	*d, int trim)
 {
 	char		ch = 0;
-	struct dg	*res = copy_dg_with_comp_arcs_ss(d, &ch, trim);
+	struct dg	*res;
+	
+	if(!cont_fnum)
+	{
+		cont_fnum = lookup_fname("RELS");
+		hcons_fnum = lookup_fname("HCONS");
+		//printf("cont = %d\n", cont_fnum);
+	}
+	res = copy_dg_with_comp_arcs_ss(d, &ch, trim);
 
 	if(!res)set_slabstate(&tmpstate);
 	generation++;
@@ -776,6 +826,7 @@ struct dg	*finalize_tmp(struct dg	*d, int trim)
 		exit(-1);
 	}
 
+	top_copies++;
 	//if(res && trim)return trim_args(res);
 	return res;
 }

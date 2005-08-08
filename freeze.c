@@ -32,6 +32,8 @@ extern char		*rule_filter;
 extern char		*lgroups[256];
 extern char	**type_rftc, **type_rltc;
 
+extern unsigned int generation;
+
 struct grammar
 {
 	char		message[128];
@@ -48,6 +50,7 @@ struct grammar
 	struct type	*strtype;
 	char		**type_rftc, **type_rltc;
 	int		*introduce;
+	void	*semindex;
 };
 
 extern void	*slab_alloc(int	len);
@@ -67,6 +70,10 @@ struct type	*freeze_type(struct type	*tin)
 {
 	struct type	*tout = slab_alloc(sizeof(struct type));
 
+	// XXX hack!
+	if(generation > MAX_GEN_RESET)generation = 11;
+	// XXX hack!
+
 	*tout = *tin;
 	tout->dg = tin->dg?copy_dg(tin->dg):0;
 	tout->name = freeze_string(tin->name);
@@ -84,14 +91,16 @@ struct rule	*freeze_rule(struct rule	*rin)
 #ifdef	ERG
 	// in the ERG, non-inflectional rules are completely defined by types.
 	// don't bother to make a copy of the type.
-	if(!rin->inflr)rout->dg = rin->dg->xtype->dg;
-	else rout->dg = copy_dg(rin->dg);
+	/*if(!rin->inflr)rout->dg = rin->dg->xtype->dg;
+	else */rout->dg = copy_dg(rin->dg);
 #else
 	rout->dg = copy_dg(rin->dg);
 #endif
 	rout->name = freeze_string(rin->name);
 	strcpy(rout->name, rin->name);
 
+	// make sure the semantic index pointers can find the frozen rules
+	rin->dg = (struct dg*)rout;
 	return rout;
 }
 
@@ -131,6 +140,10 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 {
 	struct lexeme	*lout = slab_alloc(sizeof(struct lexeme));
 
+	// XXX hack!
+	if(generation > MAX_GEN_RESET)generation = 11;
+	// XXX hack!
+
 	lout->dg = lin->dg;	// NOTE: this is frozen *later*, for file layout reasons
 	lout->word = freeze_string(lin->word);
 
@@ -140,6 +153,8 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 	lout->select = FT(lin->select);
 	lout->pred = FT(lin->pred);
 	memcpy(lout->stem, lin->stem, sizeof(struct type*) * lout->stemlen);
+
+	lin->dg = (struct dg*)lout;	// NOTE: keep pointer to new copy of lexeme, so semantic index can be updated
 
 	return lout;
 }
@@ -204,6 +219,8 @@ int	freeze_grammar()
 	int		i, j;
 	struct grammar	*G;
 
+	//print_rule("sing_noun_infl_rule");
+
 	inval_thash();
 	for(i=0;i<ntypes;i++)
 		if(types[i]->tnum != i)
@@ -219,7 +236,10 @@ int	freeze_grammar()
 	null_generation();
 
 	for(i=0;i<ntypes;i++)types[i] = freeze_type(types[i]);
+	//fprintf(stderr, "froze types.\n");
+
 	for(i=0;i<nstrings;i++)strings[i] = freeze_type(strings[i]);
+	//fprintf(stderr, "froze strings.\n");
 	strtype = lookup_type("string");
 
 	for(i=0;i<ntypes;i++)patch_dg(types[i]->dg);
@@ -231,19 +251,27 @@ int	freeze_grammar()
 			lexemes[i]->stem[j] = strings[lexemes[i]->stem[j]->tnum];
 	}
 	for(i=0;i<nroots;i++)patch_dg(roots[i]);
+	//fprintf(stderr, "patched.\n");
+
+	//printf("\n"); print_rule("sing_noun_infl_rule");
 
 	for(i=0;i<nrules;i++)rules[i] = freeze_rule(rules[i]);
 	for(i=0;i<nirules;i++)
 		irules[i]->rule = rules[irules[i]->rule->rnum];
 
 	for(i=0;i<nirules;i++)irules[i] = freeze_irule(irules[i]);
+	//fprintf(stderr, "froze rules.\n");
+
+	//printf("\n"); print_rule("sing_noun_infl_rule");
 
 	for(i=0;i<nlexemes;i++)lexemes[i] = freeze_lexeme(lexemes[i]);
+	//fprintf(stderr, "froze lexemes.\n");
 
 	for(i=0;i<nroots;i++)roots[i] = copy_dg(roots[i]);
 
 	for(i=0;i<nfnames;i++)fnames[i] = freeze_string(fnames[i]);
 	introduce = freeze_block(introduce, sizeof(int) * nfnames);
+	//fprintf(stderr, "froze features and roots.\n");
 
 	for(i=0;i<256;i++)
 		if(lgroups[i])
@@ -257,7 +285,13 @@ int	freeze_grammar()
 	// 	'struct lexemes' will all be quickly accessible without
 	// 	having to page in all their dgs
 	for(i=0;i<nlexemes;i++)
+	{
+		// XXX hack!
+		if(generation > MAX_GEN_RESET)generation = 11;
+		// XXX hack!
+
 		if(lexemes[i]->dg)lexemes[i]->dg = copy_dg(lexemes[i]->dg);
+	}
 
 	G->rule_filter = rule_filter;
 	G->ntypes = ntypes;
@@ -279,8 +313,11 @@ int	freeze_grammar()
 	G->strtype = strtype;
 	G->type_rftc = type_rftc;
 	G->type_rltc = type_rltc;
+	G->semindex = freeze_semantic_index();
 	strcpy(G->message, "frozen grammar file\n");
 	strcat(G->message, "english resource grammar (erg)\n");
+
+	//printf("\n"); print_rule("sing_noun_infl_rule");
 
 	commit_slab();
 	return 0;
@@ -321,6 +358,8 @@ static int	load_freeze()
 	type_rftc = G->type_rftc;
 	type_rltc = G->type_rltc;
 
+	recover_semantic_index(G->semindex);
+
 	// in case we accidentally add more during parsing
 	fnames = malloc(sizeof(char*) * nfnames);
 	introduce = malloc(sizeof(int) * nfnames);
@@ -351,6 +390,7 @@ void	reload_frozen_grammar()
 		fprintf(stderr, "can't reload_frozen_grammar(), since no freeze is currently loaded!\n");
 		exit(-1);
 	}
+	fprintf(stderr, "NOTE: generation reset\n");
 	munmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size);
 	null_generation();
 	load_freeze();
