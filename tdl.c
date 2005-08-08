@@ -9,6 +9,7 @@
 
 int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
+int	load_tdl(char	*path);
 
 char	*trim_string(char	*str)
 {
@@ -27,11 +28,13 @@ struct tdl_line
 	int	processed;
 	char	*lhs, *rhs;
 	char	*idef;
-	int	lnum;
+	char	*status, *filename;
+	int		lnum;
 };
 
-int		ntdllines;
+int				ntdllines;
 struct tdl_line	*tdllines;
+char			*tdlstatus = 0;
 
 int	loud_noises = 0;
 
@@ -40,13 +43,21 @@ int	constrain_type(char	*name, struct dg	*dg);
 
 int	enable_out_of_order = 0;
 
-void	add_tdlline(char	*lhs, char	*rhs, char	*idef, int	lnum)
+void	add_tdlline(char	*lhs, char	*rhs, char	*idef, int	lnum, char	*path)
 {
+	if(!tdlstatus)
+	{
+		fprintf(stderr, "error at %s:%d\n", path, lnum);
+		fprintf(stderr, "tdlstatus must be set before definitions\n");
+		exit(-1);
+	}
 	ntdllines++;
 	tdllines = realloc(tdllines, sizeof(struct tdl_line)*ntdllines);
 	tdllines[ntdllines-1].processed = 0;
 	tdllines[ntdllines-1].lhs = strdup(lhs);
 	tdllines[ntdllines-1].rhs = strdup(rhs);
+	tdllines[ntdllines-1].filename = path;
+	tdllines[ntdllines-1].status = tdlstatus;
 	tdllines[ntdllines-1].idef = (*idef)?strdup(idef):0;
 	tdllines[ntdllines-1].lnum = lnum;
 }
@@ -94,15 +105,75 @@ int	unbalanced(char	*line)
 	return bal;
 }
 
-int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), void	*ref)
+int	process_colon_command(char	*parent, char	*cmd)
+{
+	char	*word, *what, *status, *whatstatus, *p;
+	char	iname[1024], dirpath[1024];
+
+	cmd = trim_string(cmd);
+	word = strtok(cmd, " 	\n");
+
+	if(word && !strcmp(word, ":begin"))
+	{
+		what = strtok(0, " 	\n");
+		if(what && !strcmp(what, ":type"))tdlstatus = "type";
+		else if(what && !strcmp(what, ":instance"))
+		{
+			status = strtok(0, " 	\n");
+			if(status && !strcmp(status, ":status"))
+			{
+				whatstatus = strtok(0, " 	\n");
+				if(whatstatus)tdlstatus = strdup(whatstatus);
+			}
+		}
+		//printf("status now `%s'\n", tdlstatus);
+	}
+	else if(word && !strcmp(word, ":end"))
+		tdlstatus = 0;
+	else if(word && !strcmp(word, ":include"))
+	{
+		what = trim_string(cmd + 9);
+		if(what[0]=='"' && what[strlen(what)-1]=='"' && strlen(what) > 2)
+		{
+			what++;
+			what[strlen(what)-1] = 0;
+			strcpy(dirpath, parent);
+			p = dirpath + strlen(dirpath) - 1;
+			while(p>dirpath && *p!='/')p--;
+			*p = 0;
+			sprintf(iname, "%s%s%s.tdl", dirpath, dirpath[0]?"/":"", what);
+			if(!tdlstatus && !strcmp(what, "roots"))
+			{
+				fprintf(stderr, "WARNING: implicitly setting tdl status to `root'\n");
+				tdlstatus = "root";
+			}
+			if(!tdlstatus && !strcmp(what, "parse-nodes"))
+			{
+				fprintf(stderr, "WARNING: implicitly setting tdl status to `parse-node'\n");
+				tdlstatus = "parse-node";
+			}
+			//printf(" should include `%s'\n", iname);
+			load_tdl(iname);
+		}
+		else
+		{
+			fprintf(stderr, "malformed tdl syntax: `:include %s'\n", what);
+			return -1;
+		}
+	}
+	else printf("colon command: `%s'\n", cmd);
+	return 0;
+}
+
+int	load_tdl(char	*path)
 {
 	FILE	*f = fopen(path, "r");
-	int	i;
 	char	buffer[10240], *lhs, *rhs, *end;
-	char	line[1024], *lp;
-	char	idef[1024];
+	char	line[10240], *lp;
+	char	idef[10240];
 	int	in_comment = 0;
 	int	lnum = 0;
+	char	*tdlstatuses = "grammar";
 
 	if(!f)
 	{
@@ -111,18 +182,27 @@ int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), vo
 	}
 	buffer[0] = 0;
 
-	tdllines = 0;
-	ntdllines = 0;
+	if(tdlstatus && !strcmp(tdlstatus, "type"))tdlstatuses = "types";
+	if(tdlstatus && !strcmp(tdlstatus, "rule"))tdlstatuses = "rules";
+	if(tdlstatus && !strcmp(tdlstatus, "lex-rule"))tdlstatuses = "lexical rules";
+	if(tdlstatus && !strcmp(tdlstatus, "lex-entry"))tdlstatuses = "lexical entries";
+	if(tdlstatus && !strcmp(tdlstatus, "root"))tdlstatuses = "roots";
+	if(tdlstatus && !strcmp(tdlstatus, "parse-node"))tdlstatuses = "tree labels";
+	printf("loading %-16s from `%s'\n", tdlstatuses, path);
 
+	//tdllines = 0;
+	//ntdllines = 0;
+
+	path = strdup(path);	// make our own copy so we can put it in tdlline records without duplicating further
 	*idef = 0;
-	while(fgets(line, 1023, f))
+	while(fgets(line, 10239, f))
 	{
 		if(line[0]==0)break;
 		lnum++;
 		if(line[0]=='\n')continue;
 		if(line[strlen(line)-1]=='\n')	// make sure we don't kill noeol files' last char
 			line[strlen(line)-1] = 0;
-		in_comment = process_comments(line, in_comment);
+		if(line[0]!='%')in_comment = process_comments(line, in_comment);
 		if(line[0]==0)continue;
 		if(line[0]=='%')
 		{
@@ -149,12 +229,19 @@ int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), vo
 		}
 		if(unbalanced(buffer))continue;	// '.' can validly occur inside a list without ending the tdl statement.
 		*end = 0;
-		lhs = buffer;
+		lhs = trim_string(buffer);
+		if(lhs[0]==':')
+		{
+			if(process_colon_command(path, lhs))return -1;
+			*buffer = *idef = 0;
+			continue;
+		}
 		end = strstr(lhs, ":=");
 		if(!end)end = strstr(lhs, ":<");
 		if(!end)
 		{
 			fprintf(stderr, "tdl: `%s' malformed input string, does not contain ':=' or ':<'\n", buffer);
+			*buffer = *idef = 0;
 			continue;
 		}
 		*end = 0;
@@ -165,25 +252,23 @@ int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), vo
 		if(*lhs==0 || *rhs==0)
 		{
 			fprintf(stderr, "tdl: `%s := %s' malformed input string, degenerate statement\n", lhs, rhs);
+			*buffer = *idef = 0;
 			continue;
 		}
 
 		//printf("tdl input: `%s'  -->  `%s'\n", lhs, rhs);
-		add_tdlline(lhs, rhs, idef, lnum);
+		add_tdlline(lhs, rhs, idef, lnum, path);
 		*buffer = 0;
 		*idef = 0;
 	}
-	for(i=0;i<ntdllines;i++)
-	{
-		if(tdllines[i].processed)continue;
-		tdllines[i].processed = 1;
-		g_inflr_def = tdllines[i].idef;
-		if(callback(tdllines[i].lhs, tdllines[i].rhs, ref))
-		{
-			fprintf(stderr, "tdl: error (non-recursed) occured near line %d\n", tdllines[i].lnum);
-			return -1;
-		}
-	}
+	fclose(f);
+	return 0;
+}
+
+void	free_tdl()
+{
+	int	i;
+
 	for(i=0;i<ntdllines;i++)
 	{
 		free(tdllines[i].lhs);
@@ -192,9 +277,43 @@ int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), vo
 			free(tdllines[i].idef);
 	}
 	ntdllines = 0;
-	free(tdllines);
+	if(tdllines)free(tdllines);
 	tdllines = 0;
-	fclose(f);
+	//tdlstatus = 0;
+}
+
+int	process_tdl_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	*ref), void	*ref)
+{
+	int	i;
+
+	for(i=0;i<ntdllines;i++)
+		tdllines[i].processed = 0;
+	for(i=0;i<ntdllines;i++)
+	{
+		if(strcmp(status, tdllines[i].status))continue;
+		if(tdllines[i].processed)continue;
+		tdllines[i].processed = 1;
+		g_inflr_def = tdllines[i].idef;
+		if(callback(tdllines[i].lhs, tdllines[i].rhs, ref))
+		{
+			fprintf(stderr, "tdl: top-level error occured near %s:%d\n", tdllines[i].filename, tdllines[i].lnum);
+			return -1;
+		}
+	}
+	return 0;
+}
+
+int	process_tdl_dgs_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	*ref))
+{
+	return process_tdl_status(status, dagify_tdl_line, callback);
+}
+
+int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), void	*ref)
+{
+	free_tdl();
+	if(load_tdl(path))return -1;
+	if(process_tdl_status(tdlstatus, callback, ref))return -1;
+	free_tdl();
 	return 0;
 }
 
@@ -213,7 +332,7 @@ struct type	*find_type(char	*name, int	constrain)
 			goto notype;
 		}
 		for(i=0;i<ntdllines;i++)
-			if(!strcmp(name, tdllines[i].lhs))break;
+			if(!strcmp("type", tdllines[i].status) && !strcmp(name, tdllines[i].lhs))break;
 		if(i<ntdllines)
 		{
 			if(tdllines[i].processed)
@@ -637,7 +756,9 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 		if(!res)
 		{
 			fprintf(stderr, "tdl: requested unification failed\n");
+#ifdef	UNIFY_PATHS
 			unify_backtrace();
+#endif
 			printf("lhs: "); print_dg(lhs); printf("\n");
 			printf("rhs: "); print_dg(rhs); printf("\n");
 			return 0;
@@ -671,7 +792,9 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 	if(patch_coreferences(&R, dg))
 	{
 		fprintf(stderr, "dagify: failed to patch in coreferences\n");
+#ifdef	UNIFY_PATHS
 		unify_backtrace();
+#endif
 		dg = 0;
 	}
 
@@ -734,13 +857,14 @@ int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 	return callback(lhs, dg);
 }
 
-int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref)
+int	typify_tdl_line(char	*lhs, char	*rhs_save, void	*ref)
 {
-	char		*p, *chunk = rhs;
 	struct type	**parents = 0;
 	int		nparents = 0, done = 0;
 	int		depth = 0, quote = 0;
 	int		res;
+	char		*rhs = strdup(rhs_save);
+	char		*p, *chunk = rhs;
 
 	for(p=rhs;!done;p++)
 	{
@@ -755,9 +879,10 @@ int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 			*p = 0;
 			if(!(*chunk=='<' || *chunk=='#' || *chunk=='['))
 			{
+				char	*name = trim_string(chunk);
 				nparents++;
 				parents = realloc(parents, sizeof(struct type*)*nparents);
-				parents[nparents-1] = find_type(trim_string(chunk), 0);
+				parents[nparents-1] = find_type(name, 0);
 				if(!parents[nparents-1])
 				{
 					free(parents);
@@ -773,6 +898,8 @@ int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 	}
 	res = add_type_only(lhs, nparents, parents);
 	if(parents)free(parents);
+	free(rhs);
+
 	return res;
 }
 
@@ -784,12 +911,13 @@ int	iterate_tdl_dgs(char	*path, int	(*callback)(char	*rhs, struct dg	*dg))
 	return iterate_tdl(path, dagify_tdl_line, callback);
 }
 
-int	iterate_tdl_types(char	*path)
+/*int	iterate_tdl_types(char	*path)
 {
 	enable_out_of_order = 1;
 
+	tdlstatus = "type";
 	return iterate_tdl(path, typify_tdl_line, 0);
-}
+}*/
 
 int	iterate_tdl_lex(char	*path)
 {
@@ -804,13 +932,20 @@ extern int	ntypes, nlexemes, nrules, nirules, nroots, glb_type_count, debug_leve
 int	load_grammar()
 {
 	clear_slab();
-
 	init_fnames();
+
+	load_tdl("../erg/english.tdl");
+	tdlstatus = "lex-entry";
+	//load_tdl("special-lex.tdl");
+	tdlstatus = 0;
+
 	if(load_types())exit(-1);
 	if(load_rules())exit(-1);
 	if(load_roots())exit(-1);
 	if(load_inflr())exit(-1);
 	if(load_lexicon())exit(-1);
+	free_tdl();
+
 	number_strings();
 	g_loaded = 1;	// make unify shut up about failures
 	setup_rule_filter();
