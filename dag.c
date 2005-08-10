@@ -50,7 +50,7 @@ void	commit_slab()
 		close(freeze_fd);
 		freeze_next = 0;
 	}
-	else if(debug_level) { fprintf(stderr, "NOTE: permanent: "); print_slab_stats(); }
+	else if(debug_level) { fprintf(stderr, "permanent "); print_slab_stats(); }
 	currslabsize = SLAB_SIZE;
 	noldslabs = 0;
 	aoldslabs = 0;

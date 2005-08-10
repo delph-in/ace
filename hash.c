@@ -100,7 +100,7 @@ extern char	*freeze_string(char	*str);
 		}
 		*Bp = 0;
 	}
-	printf("freezing hash %s bucket pointers at %p\n", ht->name, nh->buckets);
+	//printf("freezing hash %s bucket pointers at %p\n", ht->name, nh->buckets);
 	nh->name = freeze_string(ht->name);
 
 	return nh;

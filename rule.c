@@ -92,7 +92,7 @@ void	setup_rule_filter()
 	int	yes = 0, count = 0, res;
 	char	byte;
 
-	fprintf(stderr, "building rule filter...\n");
+	fprintf(stderr, "rule filter... "); fflush(stderr);
 	rule_filter = calloc(sizeof(char), nrules*nrules);
 
 	for(i=0;i<nrules;i++)
@@ -123,7 +123,7 @@ void	setup_rule_filter()
 			rule_filter[i*nrules + j] = byte;
 		}
 	}
-	fprintf(stderr, "rule filter done (%.1f%%)\n", 100*(float)yes/count);
+	fprintf(stderr, " %.1f%% blocked\n", 100*(float)(count-yes)/count);
 	lex_filter_rules();
 }
 
@@ -473,7 +473,7 @@ void	lex_filter_rules()
 {
 	int	i, j, k;
 
-	fprintf(stderr, "NOTE: building rf-transitive closure\n");
+	fprintf(stderr, "building rf-transitive closure\n");
 	rf_tc = malloc(sizeof(char*) * nrules);
 	rl_tc = malloc(sizeof(char*) * nrules);
 	for(i=0;i<nrules;i++)
@@ -482,7 +482,7 @@ void	lex_filter_rules()
 		rl_tc[i] = lex_filter_rule(rules[i], rules[i]->ndaughters-1);
 	}
 
-	fprintf(stderr, "NOTE: building type-rule filter\n");
+	fprintf(stderr, "building type-rule filter\n");
 	type_rf = malloc(sizeof(char*) * nrules);
 	type_rl = malloc(sizeof(char*) * nrules);
 	for(i=0;i<nrules;i++)
@@ -491,7 +491,7 @@ void	lex_filter_rules()
 		type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1);
 	}
 
-	fprintf(stderr, "NOTE: composing  type-rule closured filter\n");
+	fprintf(stderr, "composing  type-rule closured filter\n");
 	type_rftc = malloc(sizeof(char*) * nrules);
 	type_rltc = malloc(sizeof(char*) * nrules);
 	for(i=0;i<nrules;i++)
