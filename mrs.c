@@ -166,7 +166,7 @@ void	*parse_list(struct mrs_vlist	*vlist, char	**P, int	*N, void (*parse)(struct
 
 char	**parse_mrs_trigger(char	**P, int	*Ntriggers)
 {
-	void	parse_trigger(struct mrs_vlist *v, char **P, char **T) { *T = parse_word(P, 1); }
+	void	parse_trigger(struct mrs_vlist *v, char **P, char **T) { *T = strdup(parse_word(P, 1)); }
 	return (char**)parse_list(0, P, Ntriggers,
 		(void(*)(struct mrs_vlist*,char**,void*))parse_trigger);
 }
