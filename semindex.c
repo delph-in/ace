@@ -76,11 +76,11 @@ int	add_lexemes_for_relation(int	x, char	*rel, int (*skolemize)(struct edge	*e, 
 {
 	int	i, count = 0;
 
-	void visitter(struct lexeme *l)
+	void visitor(struct lexeme *l)
 	{
 		struct edge	*e;
 		struct slab_state tmpstate;
-		
+	
 		get_slabstate(&tmpstate);
 		e = lexical_edge(l, x, 1);
 		if(!skolemize(e, l))
@@ -91,7 +91,7 @@ int	add_lexemes_for_relation(int	x, char	*rel, int (*skolemize)(struct edge	*e, 
 		else set_slabstate(&tmpstate);
 	}
 
-	hash_visit_key(sindex, rel, (void (*)(void*))visitter);
+	hash_visit_key(sindex, rel, (void (*)(void*))visitor);
 	return count;
 }
 
@@ -99,7 +99,7 @@ int	add_rules_for_relation(char	*rel, int (*skolemize)(struct edge	*e, struct ru
 {
 	int	i, count = 0;
 
-	void visitter(struct rule *r)
+	void visitor(struct rule *r)
 	{
 		struct edge	*e;
 		struct slab_state tmpstate;
@@ -114,7 +114,7 @@ int	add_rules_for_relation(char	*rel, int (*skolemize)(struct edge	*e, struct ru
 		else set_slabstate(&tmpstate);
 	}
 
-	hash_visit_key(ruindex, rel, (void (*)(void*))visitter);
+	hash_visit_key(ruindex, rel, (void (*)(void*))visitor);
 	return count;
 }
 

@@ -18,7 +18,7 @@ struct lexeme
 	struct type	*pred;		// this lexeme provides relation 'pred'
 };
 
-void	visit_lexicon(char	*stem, void (*visitter)(struct lexeme *lex));
+void	visit_lexicon(char	*stem, void (*visitor)(struct lexeme *lex));
 void	dump_parts_of_speech();
 int		load_lexicon();
 struct dg	*expand_lexeme(struct lexeme	*l);

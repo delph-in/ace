@@ -16,6 +16,6 @@ struct hash
 struct hash	*hash_new(char	*name);
 struct hash	*freeze_hash(struct hash	*ht);
 void		hash_add(struct hash	*ht, char	*key, void	*value);
-void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitter)(void *value));
+void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitor)(void *value));
 
 #endif

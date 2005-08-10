@@ -24,7 +24,7 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2)
 	int found = 0;
 
 	//printf("scoring [%s %s %s]\n", lhs, rhs1, rhs2?:"(null)");
-	void visitter(struct maxent_feature *feat)
+	void visitor(struct maxent_feature *feat)
 	{
 		if(found)return;
 		if(!rhs2)
@@ -55,7 +55,7 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2)
 			}
 		}
 	}
-	if(mem)hash_visit_key(mem, lhs, (void(*)(void*))visitter);
+	if(mem)hash_visit_key(mem, lhs, (void(*)(void*))visitor);
 	else printf("WARNING: maxent_score() invoked with no max-ent model loaded\n");
 	//printf(" ... %f\n", ret);
 	return ret;

@@ -146,7 +146,7 @@ int	wstrcmp(char	*a, char	*b)
 	return 0;
 }
 
-void	visit_lexicon(char	*stem, void (*visitter)(struct lexeme *lex))
+void	visit_lexicon(char	*stem, void (*visitor)(struct lexeme *lex))
 {
 	int		num=0;
 	char		stemcmp[1024];
@@ -165,9 +165,9 @@ void	visit_lexicon(char	*stem, void (*visitter)(struct lexeme *lex))
 	{
 		i=k;
 		for(i=k;i<nlexemes && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
-			visitter(lexemes[i]);
+			visitor(lexemes[i]);
 		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
-			visitter(lexemes[i]);
+			visitor(lexemes[i]);
 	}
 }
 

@@ -68,7 +68,7 @@ void		hash_add(struct hash	*ht, char	*key, void	*value)
 	hash_add_bucket(ht, bucket);
 }
 
-void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitter)(void *value))
+void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitor)(void *value))
 {
 	unsigned h = hash_code(ht, key);
 	struct hash_bucket	*bucket;
@@ -76,7 +76,7 @@ void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitter)(void *value))
 	for(bucket=ht->buckets[h];bucket;bucket=bucket->next)
 	{
 		//printf(" visit `%s' found `%s'\n", key, bucket->key);
-		if(!strcmp(bucket->key, key))visitter(bucket->value);
+		if(!strcmp(bucket->key, key))visitor(bucket->value);
 	}
 }
 

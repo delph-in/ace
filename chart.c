@@ -967,7 +967,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	return num_parses;
 }
 
-visit_roots(void (*visitter)(struct edge *e))
+visit_roots(void (*visitor)(struct edge *e))
 {
 	int i, num_entries;
 	struct edge *edge;
@@ -977,7 +977,7 @@ visit_roots(void (*visitter)(struct edge *e))
 	{
 		edge = cells[chart_size-1].p_edges[i];
 		if(is_root(edge->dg))
-			visitter(edge);
+			visitor(edge);
 	}
 }
 
