@@ -13,7 +13,51 @@ struct maxent_feature
 	float	score;
 };
 
+void print_mef(struct maxent_feature *f);
+
 static struct hash	*mem;
+
+
+float	maxent_score(char *lhs, char *rhs1, char *rhs2)
+{
+	float ret = 0;
+	int found = 0;
+
+	void visitter(struct maxent_feature *feat)
+	{
+		if(found)return;
+		if(!rhs2)
+		{
+			if(feat->rhs[1])return;
+			if(strcasecmp(rhs1, feat->rhs[0]))return;
+			found = 1;
+			ret = feat->score;
+		}
+		else
+		{
+			if(feat->rhs[1])
+			{
+				if(strcasecmp(rhs1, feat->rhs[0]))return;
+				if(strcasecmp(rhs2, feat->rhs[1]))return;
+				found = 1;
+				ret = feat->score;
+			}
+			else
+			{
+				// backoff
+				if(strcasecmp(rhs1, feat->rhs[0]) &&
+					strcasecmp(rhs2, feat->rhs[1]))return;
+				// don't set 'found=1', we want to keep looking for a real match
+				ret = feat->score;
+			}
+		}
+	}
+	if(mem)hash_visit_key(mem, lhs, (void(*)(void*))visitter);
+	else printf("WARNING: maxent_score() invoked with no max-ent model loaded\n");
+	return ret;
+}
+
+// loading
 
 void print_mef(struct maxent_feature *f)
 {
