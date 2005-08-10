@@ -428,7 +428,7 @@ int	check_for_glb(struct type	*a, struct type	*b)
 	return 1;
 }
 
-void	make_glbs()
+int	make_glbs()
 {
 	int	i, j;
 
@@ -450,6 +450,7 @@ void	make_glbs()
 			}
 		}
 	}
+	return 0;
 }
 
 struct type	*most_general_type_for_dg(struct dg	*d);
@@ -528,7 +529,6 @@ int	constrain_glbs_and_wellformedness()
 	generation = 11;
 	// XXX hack!
 
-	fprintf(stderr, "enforcing well-formedness...\n");
 	for(i=0;i<ntypes;i++)
 	{
 		//printf("well-forming `%s', current dag:\n", types[i]->name);
@@ -543,8 +543,6 @@ int	constrain_glbs_and_wellformedness()
 
 int	load_types()
 {
-	//char	*files[] = {	"../smallgrammars/esslli2k-grammar9/types.tdl" };
-	struct timeval	tv1, tv2;
 extern int enable_out_of_order;
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 
@@ -553,17 +551,11 @@ int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 	enable_out_of_order = 1;
 	process_tdl_status("type", typify_tdl_line, 0);
 
-	fprintf(stderr, "checking for glbs... ");
-	gettimeofday(&tv1, 0);
-	make_glbs();
-	gettimeofday(&tv2, 0);
-	tv2.tv_sec -= tv1.tv_sec;
-	tv2.tv_usec -= tv1.tv_usec;
-	fprintf(stderr, "%.2fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec / 1000000);
+	run_task("checking for glbs...", make_glbs);
 
 	process_tdl_dgs_status("type", constrain_type);
 	enable_out_of_order = 0;
 
-	if(constrain_glbs_and_wellformedness())return -1;
+	run_task("processing constraints...", constrain_glbs_and_wellformedness);
 	return 0;
 }

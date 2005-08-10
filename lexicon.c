@@ -513,26 +513,21 @@ int	lexcomp(const void	*a, const void	*b)
 int	load_lexicon()
 {
 	extern int	lexify_tdl_line(char	*lhs, char	*rhs, void	*ref);
+	struct timeval tv1, tv2;
 
-#ifdef	ERG
-	//if(iterate_tdl_lex("../erg/lexicon.tdl"))
+	gettimeofday(&tv1, 0);
 	if(process_tdl_status("lex-entry", lexify_tdl_line, 0))
-#else
-	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/lexicon.tdl", study_lexicon))
-#endif
 	{
 		fprintf(stderr, "lexicon: unable to load, bailing out.\n");
 		exit(-1);
 	}
-/*#ifdef	ERG
-	if(iterate_tdl_lex("special-lex.tdl"))
-	{
-		fprintf(stderr, "lexicon: unable to load special-lex, bailing out.\n");
-		exit(-1);
-	}
-#endif*/
+	gettimeofday(&tv2, 0);
+	show_task_name("loading lexicon...");
+	printf("%.1f secs\n",
+		(tv2.tv_sec - tv1.tv_sec) + 0.000001*(tv2.tv_usec-tv1.tv_usec));
+
 	qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
-	printf("simple lexemes were %d / %d = %.2f%%\n",
-		nsimpleform, nlexemes, 100*(float)nsimpleform / nlexemes);
+	show_task_name("simple lexemes");
+	printf("%d / %d = %.2f%%\n", nsimpleform, nlexemes, 100*(float)nsimpleform / nlexemes);
 	return 0;
 }

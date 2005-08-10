@@ -1,6 +1,7 @@
 #include	<stdio.h>
 #include	<string.h>
 #include	<stdlib.h>
+#include	<sys/time.h>
 
 #include	"tdl.h"
 #include	"dag.h"
@@ -92,7 +93,7 @@ void	setup_rule_filter()
 	int	yes = 0, count = 0, res;
 	char	byte;
 
-	fprintf(stderr, "rule filter... "); fflush(stderr);
+	show_task_name("rule filter...");
 	rule_filter = calloc(sizeof(char), nrules*nrules);
 
 	for(i=0;i<nrules;i++)
@@ -123,7 +124,7 @@ void	setup_rule_filter()
 			rule_filter[i*nrules + j] = byte;
 		}
 	}
-	fprintf(stderr, " %.1f%% blocked\n", 100*(float)(count-yes)/count);
+	printf("%.1f%% blocked\n", 100*(float)(count-yes)/count);
 	lex_filter_rules();
 }
 
@@ -449,49 +450,65 @@ char	*type_filter_rule(struct rule	*r, int arg)
 
 void	lex_filter_rules()
 {
-	int	i, j, k;
-
-	fprintf(stderr, "building rf-transitive closure\n");
-	rf_tc = malloc(sizeof(char*) * nrules);
-	rl_tc = malloc(sizeof(char*) * nrules);
-	for(i=0;i<nrules;i++)
+	int build_rule_filter_transitive_closure()
 	{
-		rf_tc[i] = lex_filter_rule(rules[i], 0);
-		rl_tc[i] = lex_filter_rule(rules[i], rules[i]->ndaughters-1);
-	}
+		int i;
 
-	fprintf(stderr, "building type-rule filter\n");
-	type_rf = malloc(sizeof(char*) * nrules);
-	type_rl = malloc(sizeof(char*) * nrules);
-	for(i=0;i<nrules;i++)
-	{
-		type_rf[i] = type_filter_rule(rules[i], 0);
-		type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1);
-	}
-
-	fprintf(stderr, "composing  type-rule closured filter\n");
-	type_rftc = malloc(sizeof(char*) * nrules);
-	type_rltc = malloc(sizeof(char*) * nrules);
-	for(i=0;i<nrules;i++)
-	{
-		type_rftc[i] = calloc(sizeof(char), ntypes);
-		type_rltc[i] = calloc(sizeof(char), ntypes);
-		for(j=0;j<ntypes;j++)
+		rf_tc = malloc(sizeof(char*) * nrules);
+		rl_tc = malloc(sizeof(char*) * nrules);
+		for(i=0;i<nrules;i++)
 		{
-			if(type_rf[i][j])type_rftc[i][j] = 1;
-			else for(k=0;k<nrules;k++)
-				if(rf_tc[i][k] && type_rf[k][j])
-				{
-					type_rftc[i][j] = 1;
-					break;
-				}
-			if(type_rl[i][j])type_rltc[i][j] = 1;
-			else for(k=0;k<nrules;k++)
-				if(rl_tc[i][k] && type_rl[k][j])
-				{
-					type_rltc[i][j] = 1;
-					break;
-				}
+			rf_tc[i] = lex_filter_rule(rules[i], 0);
+			rl_tc[i] = lex_filter_rule(rules[i], rules[i]->ndaughters-1);
 		}
+		return 0;
 	}
+	run_task("rf-transitive closure...", build_rule_filter_transitive_closure);
+
+	int build_type_rule_filter()
+	{
+		int i;
+
+		type_rf = malloc(sizeof(char*) * nrules);
+		type_rl = malloc(sizeof(char*) * nrules);
+		for(i=0;i<nrules;i++)
+		{
+			type_rf[i] = type_filter_rule(rules[i], 0);
+			type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1);
+		}
+		return 0;
+	}
+	run_task("type-rule filter...", build_type_rule_filter);
+
+	int compose_type_rule_closured_filter()
+	{
+		int	i, j, k;
+
+		type_rftc = malloc(sizeof(char*) * nrules);
+		type_rltc = malloc(sizeof(char*) * nrules);
+		for(i=0;i<nrules;i++)
+		{
+			type_rftc[i] = calloc(sizeof(char), ntypes);
+			type_rltc[i] = calloc(sizeof(char), ntypes);
+			for(j=0;j<ntypes;j++)
+			{
+				if(type_rf[i][j])type_rftc[i][j] = 1;
+				else for(k=0;k<nrules;k++)
+					if(rf_tc[i][k] && type_rf[k][j])
+					{
+						type_rftc[i][j] = 1;
+						break;
+					}
+				if(type_rl[i][j])type_rltc[i][j] = 1;
+				else for(k=0;k<nrules;k++)
+					if(rl_tc[i][k] && type_rl[k][j])
+					{
+						type_rltc[i][j] = 1;
+						break;
+					}
+			}
+		}
+		return 0;
+	}
+	run_task("type-rule-closed filter...", compose_type_rule_closured_filter);
 }

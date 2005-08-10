@@ -11,6 +11,12 @@ int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	load_tdl(char	*path);
 
+void show_task_name(char *task)
+{
+	printf("\033[0;1m%-28s\033[0m", task);
+	fflush(stdout);
+}
+
 char	*trim_string(char	*str)
 {
 	int	len;
@@ -170,7 +176,7 @@ int	load_tdl(char	*path)
 	FILE	*f = fopen(path, "r");
 	char	buffer[10240], *lhs, *rhs, *end;
 	char	line[10240], *lp;
-	char	idef[10240];
+	char	idef[10240], doing[256];
 	int	in_comment = 0;
 	int	lnum = 0;
 	char	*tdlstatuses = "grammar";
@@ -188,7 +194,9 @@ int	load_tdl(char	*path)
 	if(tdlstatus && !strcmp(tdlstatus, "lex-entry"))tdlstatuses = "lexical entries";
 	if(tdlstatus && !strcmp(tdlstatus, "root"))tdlstatuses = "roots";
 	if(tdlstatus && !strcmp(tdlstatus, "parse-node"))tdlstatuses = "tree labels";
-	printf("loading %-16s from `%s'\n", tdlstatuses, path);
+
+	sprintf(doing, "loading %s", tdlstatuses); show_task_name(doing);
+	printf("from `%s'\n", path);
 
 	//tdllines = 0;
 	//ntdllines = 0;
@@ -928,6 +936,28 @@ int	iterate_tdl_lex(char	*path)
 
 int	g_loaded = 0;
 extern int	ntypes, nlexemes, nrules, nirules, nroots, glb_type_count, debug_level, nfnames, nstrings;
+
+void run_task(char *task, int (*worker)())
+{
+	int ret;
+	struct timeval tv1, tv2;
+
+	show_task_name(task);
+	gettimeofday(&tv1, 0);
+	ret = worker();
+	gettimeofday(&tv2, 0);
+	if(ret)
+	{
+		fprintf(stderr, "\033[33;1mFAIL\033[0m\n");
+		exit(-1);
+	}
+	else
+	{
+		float s = (tv2.tv_sec - tv1.tv_sec) + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+		if(s > 0.1) printf("%.2f sec\n", s);
+		else printf("%d ms\n", (int)(1000*s));
+	}
+}
 
 int	load_grammar()
 {

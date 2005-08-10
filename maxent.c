@@ -43,7 +43,7 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2)
 				if(strcasecmp(rhs2, feat->rhs[1]))return;
 				found = 1;
 				ret = feat->score;
-				printf("MAXENT feature fired: "); print_mef(feat);
+				//printf("MAXENT feature fired: "); print_mef(feat);
 			}
 			else
 			{
