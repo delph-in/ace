@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 struct mrs_var
 {
 	char		*name, *type;
