@@ -70,15 +70,13 @@ struct forest
 
 #define	LEX_PRIO	10
 
-int	parse(int	nwords, char	*words[], char	*sentence);
+int		parse(int	nwords, char	*words[], char	*sentence);
 void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge);
 void	add_edge_to_chart(struct edge	*edge);
 void	clear_chart(int	size);
 void	free_edge(struct edge	*edge);
-int	next_eid();
-int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to);
-void	allow_inflr(int	x, struct lexeme	*lex, int nrules, int *rules);
-int	reduce_chart(int	length);
+int		next_eid();
+int		reduce_chart(int	length);
 void	output_lui(char	*words[]);
 void	final_chart_stats();
 

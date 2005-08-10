@@ -108,20 +108,6 @@ struct edge	*next_agenda(int	from_start)
 	return 0;
 }
 
-int	lexeme_in_agenda(struct lexeme	*lex, int	from, int	to)
-{
-	struct task	*t;
-
-	for(t=agenda[LEX_PRIO].start;t;t=t->next)
-#ifdef	GENERATION
-		if(t->edge->lex==lex && t->edge->ep_span == 1<<from)
-#else
-		if(t->edge->lex==lex && t->edge->from==from && t->edge->to==to)
-#endif
-			return 1;
-	return 0;
-}
-
 void add_agenda_lrule(int x, struct rule *rule)
 {
 	extern int rprio[];
@@ -153,25 +139,6 @@ void	allow_edge_inflr_route(struct edge	*e, int nrules, int *rules)
 		sizeof(struct inflr_route)*e->ninflr_routes);
 	e->inflr_routes[e->ninflr_routes-1].len = nrules;
 	e->inflr_routes[e->ninflr_routes-1].rules = rules;
-}
-
-void	allow_inflr(int	x, struct lexeme	*lex, int nrules, int *rules)
-{
-	struct task	*t;
-
-#ifdef	GENERATION
-	for(t=lstart[0];t;t=t->next)
-#else
-	for(t=lstart[x];t;t=t->next)
-#endif
-	{
-#ifdef	GENERATION
-		if(t->edge->ep_span != 1<<x)continue;
-#else
-		if(!(t->edge->from==x && t->edge->to==x+1))break;
-#endif
-		if(t->edge->lex==lex)allow_edge_inflr_route(t->edge, nrules, rules);
-	}
 }
 
 int	reduce_chart(int	length)

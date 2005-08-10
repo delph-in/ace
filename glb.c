@@ -77,27 +77,15 @@ struct type	*calc_glb(struct type	*a, struct type	*b)
 {
 	extern struct type	*strtype;
 	int	ia, ib;
-#ifdef GENERATION
-	static struct type	*instloc;
-	if(!instloc)instloc = lookup_type("instloc");
-#endif
 
 	if(a->name[0]=='"')
 	{
-#ifdef	GENERATION
-		if(b==instloc){return a;}
-#endif
-
 		if(b->name[0]=='"')return 0;
 		else if(strtype && descendent_of(strtype->tnum, b))return a;
 		else return 0;
 	}
 	if(b->name[0]=='"')
 	{
-#ifdef	GENERATION
-		if(a==instloc){return b;}
-#endif
-
 		if(strtype && descendent_of(strtype->tnum, a))return b;
 		else return 0;
 	}
