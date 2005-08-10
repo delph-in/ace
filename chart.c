@@ -183,6 +183,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			qc = extract_qc_arg(u, -1);
 		}
 		e = slab_alloc(sizeof(struct edge));
+		e->unpack = 0;
 		e->qc = qc;
 		e->dg = u;
 		e->age = (nhave==1)?(b->age+1):0;	// binary passive edges get age 0; unary get daughter.age+1
@@ -232,6 +233,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			qc = extract_qc_arg(u, a->rtl?(nneed-nhave-1):nhave);
 		}
 		e = slab_alloc(sizeof(struct edge));
+		e->unpack = 0;
 		e->dg = u;
 		e->ha_par = dg;
 		e->ha_dg = b->dg;
