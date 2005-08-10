@@ -4,7 +4,7 @@
 #include	"dag.h"
 #include	"morpho.h"
 
-//#define	GENERATION
+#define	GENERATION
 
 #define	BIDIR_SS
 
@@ -73,15 +73,21 @@ struct forest
 int		parse(int	nwords, char	*words[], char	*sentence);
 void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge);
 void	add_edge_to_chart(struct edge	*edge);
+int		combine(struct edge	*a, struct edge	*b);
+int		pack_edge(struct edge	*edge);
 void	clear_chart(int	size);
 void	free_edge(struct edge	*edge);
 int		next_eid();
 int		reduce_chart(int	length);
 void	output_lui(char	*words[]);
 void	final_chart_stats();
+char	*show_orth_leaves(struct edge	*e);
 
 void	clear_agenda();
 void	add_agenda(struct edge	*e);
 struct edge	*next_agenda(int	from_start);
+
+extern struct chart_cell	*cells;
+extern unsigned int			require_ep_span;
 
 #endif
