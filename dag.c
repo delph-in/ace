@@ -46,7 +46,7 @@ void	commit_slab()
 	{
 		fprintf(stderr, "freezing %.1fM to file map %p\n", (float)slabu/1024/1024, freeze_point);
 		if(ftruncate(freeze_fd, slabu)) { perror("ftruncate to final length"); exit(-1); }
-		if(msync(freeze_point, slabu, MS_SYNC)) { perror("msync"); exit(-1); }
+		if(msync(freeze_point, slabu, MS_ASYNC)) { perror("msync"); exit(-1); }
 		close(freeze_fd);
 		freeze_next = 0;
 	}
