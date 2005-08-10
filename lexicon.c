@@ -264,8 +264,8 @@ void	dump_parts_of_speech()
 	pclose(f);
 }
 
-static int	stemfeat = -1, rfeat = 2, ffeat = 1, synsemfeat, lkeysfeat, keyrelfeat, predfeat, compkeyfeat, ocompkeyfeat;
-static struct type	*predsort;
+static int	stemfeat = -1, rfeat = 2, ffeat = 1, synsemfeat, lkeysfeat, keyrelfeat, predfeat, compkeyfeat, ocompkeyfeat, phonfeat, onsetfeat;
+static struct type	*predsort, *con, *voc;
 
 int	nsimpleform = 0;
 
@@ -278,12 +278,23 @@ void	init_fnums()
 	predfeat = lookup_fname("PRED");
 	compkeyfeat = lookup_fname("--+COMPKEY");
 	ocompkeyfeat = lookup_fname("--+OCOMPKEY");
+	phonfeat = lookup_fname("PHON");
+	onsetfeat = lookup_fname("ONSET");
 	predsort = lookup_type("predsort");
+	con = lookup_type("con");
+	voc = lookup_type("voc");
+}
+
+struct type *predict_onset(char *form)
+{
+	if(*form=='"')form++;
+	if(strchr("aeiouAEIOU", *form))return voc;
+	else return con;
 }
 
 void	simplify_lexeme(struct lexeme	*l)
 {
-	struct dg	*dg = l->dg, *ss, *lk, *kr, *pr;
+	struct dg	*dg = l->dg, *ss, *lk, *kr, *pr, *ph, *on;
 
 	// check for most common structures and just store parameters for them
 	if(l->stemlen != 1)return;
@@ -294,8 +305,12 @@ void	simplify_lexeme(struct lexeme	*l)
 	if(DARCS(dg)[0].label != synsemfeat && DARCS(dg)[1].label != synsemfeat)return;
 
 	ss = dg_hop(dg, synsemfeat);
-	// we want just 'LKEYS'
-	if(ss->narcs != 1 || DARCS(ss)[0].label != lkeysfeat)return;
+	// we want just 'LKEYS' and 'ONSET'
+	if(ss->narcs != 2)return;
+	if(DARCS(ss)[0].label != lkeysfeat && DARCS(ss)[1].label != lkeysfeat)return;
+	if(DARCS(ss)[0].label != phonfeat && DARCS(ss)[1].label != phonfeat)return;
+
+	// check LKEYS branch
 	lk = dg_hop(ss, lkeysfeat);
 	// we want just 'KEYREL'
 	if(lk->narcs != 1 || DARCS(lk)[0].label != keyrelfeat)return;
@@ -306,6 +321,14 @@ void	simplify_lexeme(struct lexeme	*l)
 	// we want l->pred
 	if(pr->narcs != 0 || pr->type != l->pred)return;
 
+	// check PHON branch
+	ph = dg_hop(ss, phonfeat);
+	// we want just 'ONSET'
+	if(ph->narcs != 1 || DARCS(ph)[0].label != onsetfeat)return;
+	on = dg_hop(ph, onsetfeat);
+	// we want predictable onset
+	if(on->narcs != 0 || on->type != predict_onset(l->stem[0]->name))return;
+
 	//printf("`%s' has simple form\n", l->word);
 	nsimpleform++;
 	l->dg = 0;
@@ -313,7 +336,7 @@ void	simplify_lexeme(struct lexeme	*l)
 
 struct dg	*expand_lexeme(struct lexeme	*l)
 {
-	struct dg	*dg, *ss, *lk, *kr, *pr, *st, *f;
+	struct dg	*dg, *ss, *lk, *kr, *pr, *st, *f, *ph, *on;
 
 	if(stemfeat==-1)init_fnums();
 	if(l->dg)return l->dg;
@@ -323,6 +346,11 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 	kr = add_dg_hop(atomic_dg("*top*"), predfeat, pr);
 	lk = add_dg_hop(atomic_dg("*top*"), keyrelfeat, kr);
 	ss = add_dg_hop(atomic_dg("*top*"), lkeysfeat, lk);
+
+	on = atomic_dg("*top*");
+	on->xtype = on->type = predict_onset(l->stem[0]->name);
+	ph = add_dg_hop(atomic_dg("*top*"), onsetfeat, on);
+	ss = add_dg_hop(ss, phonfeat, ph);
 
 	f = atomic_dg("*top*");
 	f->xtype = f->type = l->stem[0];
@@ -513,7 +541,7 @@ int	load_lexicon()
 	}
 #endif*/
 	qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
-	printf("%d / %d = %.2f%% lexemes were simple\n",
+	printf("simple lexemes were %d / %d = %.2f%%\n",
 		nsimpleform, nlexemes, 100*(float)nsimpleform / nlexemes);
 	return 0;
 }
