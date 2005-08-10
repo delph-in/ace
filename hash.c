@@ -74,7 +74,10 @@ void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitter)(void *value))
 	struct hash_bucket	*bucket;
 	
 	for(bucket=ht->buckets[h];bucket;bucket=bucket->next)
+	{
+		//printf(" visit `%s' found `%s'\n", key, bucket->key);
 		if(!strcmp(bucket->key, key))visitter(bucket->value);
+	}
 }
 
 struct hash	*freeze_hash(struct hash	*ht)

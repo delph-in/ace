@@ -23,6 +23,7 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2)
 	float ret = 0;
 	int found = 0;
 
+	//printf("scoring [%s %s %s]\n", lhs, rhs1, rhs2?:"(null)");
 	void visitter(struct maxent_feature *feat)
 	{
 		if(found)return;
@@ -32,6 +33,7 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2)
 			if(strcasecmp(rhs1, feat->rhs[0]))return;
 			found = 1;
 			ret = feat->score;
+			//printf("MAXENT feature fired: "); print_mef(feat);
 		}
 		else
 		{
@@ -41,19 +43,21 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2)
 				if(strcasecmp(rhs2, feat->rhs[1]))return;
 				found = 1;
 				ret = feat->score;
+				printf("MAXENT feature fired: "); print_mef(feat);
 			}
 			else
 			{
 				// backoff
 				if(strcasecmp(rhs1, feat->rhs[0]) &&
-					strcasecmp(rhs2, feat->rhs[1]))return;
+					strcasecmp(rhs2, feat->rhs[0]))return;
 				// don't set 'found=1', we want to keep looking for a real match
-				ret = feat->score;
+				ret += feat->score;	// accumulate all the backoff scores that match
 			}
 		}
 	}
 	if(mem)hash_visit_key(mem, lhs, (void(*)(void*))visitter);
 	else printf("WARNING: maxent_score() invoked with no max-ent model loaded\n");
+	//printf(" ... %f\n", ret);
 	return ret;
 }
 
@@ -69,12 +73,12 @@ void record_maxent_feature(char *head, char *rhs[2], float score)
 {
 	struct maxent_feature *feat = malloc(sizeof(struct maxent_feature));
 
-	feat->head = head;
-	feat->rhs[0] = rhs[0];
-	feat->rhs[1] = rhs[1];
+	feat->head = strdup(head);
+	feat->rhs[0] = rhs[0]?strdup(rhs[0]):0;
+	feat->rhs[1] = rhs[1]?strdup(rhs[1]):0;
 	feat->score = score;
 	//print_mef(feat);
-	hash_add(mem, head, feat);
+	hash_add(mem, feat->head, feat);
 }
 
 static char	*parse_word(char	**P)
@@ -142,7 +146,15 @@ void	*freeze_stochastic_model()
 	if(!mem)return 0;
 	for(i=0;i<mem->size;i++)
 		for(walk=mem->buckets[i];walk;walk=walk->next)
-			walk->value = (void*)freeze_block(walk->value, sizeof(struct maxent_feature));
+		{
+			struct maxent_feature *fi = walk->value;
+			struct maxent_feature *fo = slab_alloc(sizeof(struct maxent_feature));
+			fo->head = (char*)freeze_string(fi->head);
+			fo->rhs[0] = (char*)freeze_string(fi->rhs[0]);
+			fo->rhs[1] = (char*)freeze_string(fi->rhs[1]);
+			fo->score = fi->score;
+			walk->value = fo;
+		}
 	return freeze_hash(mem);
 }
 
