@@ -3,7 +3,7 @@
 #include	<string.h>
 #include	<ctype.h>
 
-int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem);
+int	invert_ipat(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem, int type);
 struct lexeme	*proper_noun_lex(char	*name);
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len);
 
@@ -17,26 +17,157 @@ extern int	wcap[1024];
 
 #define	MAX_ORTH_RULES	5
 
-int		nirules;
+int				nirules;
 struct irule	**irules;
+
+struct ochart
+{
+	int	nedges;
+	struct ochart_edge
+	{
+		char				*form;
+		int					ninflr_routes;
+		struct inflr_route	*inflr_routes;
+		int					nparents;
+		struct ochart_parent
+		{
+			struct ochart_edge	*edge;
+			struct irule		*rule;
+		}					*parents;
+	}	**edges;
+};
+
+void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct irule *rule);
+void	unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int nrules, int *rnums);
+
+void add_inflrs(struct edge *le)
+{
+	int i, j;
+
+	for(i=0;i<le->ninflr_routes;i++)
+	{
+		struct inflr_route *r = le->inflr_routes+i;
+		for(j=0;j<r->len;j++)
+			add_agenda_lrule(le->from, rules[r->rules[j]]);
+	}
+}
+
+static inline is_type_route(struct inflr_route *r, int type)
+{
+	int j;
+
+	for(j=0;j<r->len;j++)
+		if(rules[r->rules[j]]->inflr->type != type)break;
+	// found a route to this form by rule only of type `type'
+	if(j==r->len)return 1;
+	else return 0;
+}
+
+int is_type_only_oedge(struct ochart_edge *e, int type)
+{
+	int i;
+
+	for(i=0;i<e->ninflr_routes;i++)
+		if(is_type_route(e->inflr_routes+i, type))return 1;
+	return 0;
+}
+
+void add_mwe_routes(struct edge *e, struct ochart_edge *pre, struct ochart_edge *suf)
+{
+	int i, j;
+
+	for(i=0;i<suf->ninflr_routes;i++) if(is_type_route(suf->inflr_routes+i, ir_suffix))
+		for(j=0;j<pre->ninflr_routes;j++) if(is_type_route(pre->inflr_routes+j, ir_prefix))
+			{
+				struct inflr_route *a = suf->inflr_routes+i, *b = pre->inflr_routes+j;
+				int len, *route;
+				len = a->len + b->len;
+				route = slab_alloc(sizeof(int)*len);
+				memcpy(route, a->rules, sizeof(int)*a->len);
+				memcpy(route+a->len, b->rules, sizeof(int)*b->len);
+				allow_edge_inflr_route(e, len, route);
+			}
+}
 
 int	add_lexemes_to_chart(int	nwords, char	**words)
 {
-	int	i, simple, compound;
-	int	max = 0;
+	struct ochart	*charts = slab_alloc(sizeof(struct ochart)*nwords);
+	int				i, j, k;
 
+	// compute all the orthography variations
+	bzero(charts, sizeof(struct ochart)*nwords);
 	for(i=0;i<nwords;i++)
 	{
-		simple = add_lexemes_to_chart_for_form(i, words[i], 0, 0);
-		compound = add_multilexemes_to_chart(i, nwords-i, words+i);
-		if(compound>max)max = compound;
-		if(!simple && !max)
+		add_ochart_edge(0, charts+i, words[i], 0);
+		for(j=0;j<charts[i].nedges;j++)
+			unfold_oroutes(charts[i].edges[j], charts[i].edges[j], 0, 0);
+		/*for(j=0;j<charts[i].nedges;j++)
 		{
-			fprintf(stderr, "NOTE: No lexeme found for `%s'\n", words[i]);
-			return -1;
-		}
-		if(max>0)max--;
+			printf("%s -> %s\n", words[i], charts[i].edges[j]->form);
+			for(k=0;k<charts[i].edges[j]->ninflr_routes;k++)
+			{
+				struct inflr_route *r = charts[i].edges[j]->inflr_routes+k;
+				int					l;
+				printf("	");
+				for(l=0;l<r->len;l++)printf(" %s", rules[r->rules[l]]->name);
+				printf("\n");
+			}
+		}*/
 	}
+
+	// do lexical lookup on each variation
+	for(i=0;i<nwords;i++)
+	{
+		for(j=0;j<charts[i].nedges;j++)
+		{
+			struct ochart_edge *e = charts[i].edges[j];
+
+			void lex_adder(struct lexeme *lex)
+			{
+				int k;
+				struct edge			*le = 0;
+				if(lex->stemlen!=1)
+				{
+					char *last = lex->stem[lex->stemlen-1]->name;
+					char stemcmp[1024];
+					if(!is_type_only_oedge(e, ir_prefix))return;
+					if(lex->stemlen + i > nwords)return;
+					for(k=1;k<lex->stemlen-1;k++)
+					{
+						sprintf(stemcmp, "\"%s\"", words[i+k]);
+						// no inflection allowed on inner elements of MWEs
+						if(strcasecmp(lex->stem[k]->name, stemcmp))
+							return;
+					}
+					for(k=0;k<charts[i+lex->stemlen-1].nedges;k++)
+					{
+						struct ochart_edge *f = charts[i+lex->stemlen-1].edges[k];
+						sprintf(stemcmp, "\"%s\"", f->form);
+						if(!strcasecmp(stemcmp, last) && is_type_only_oedge(f, ir_suffix))
+						{
+							le = lexical_edge(lex, i, lex->stemlen);
+							add_mwe_routes(le, e, f);
+							break;
+						}
+					}
+				}
+				else
+				{
+					le = lexical_edge(lex, i, lex->stemlen);
+					le->ninflr_routes = e->ninflr_routes;
+					le->inflr_routes = e->inflr_routes;
+				}
+				if(le)
+				{
+					add_agenda(le);
+					add_inflrs(le);
+					//printf("added lexeme `%s' at %d\n", lex->word, i);
+				}
+			}
+			visit_lexicon(e->form, lex_adder);
+		}
+	}
+
 	return 0;
 }
 
@@ -48,115 +179,137 @@ int	*longer_rule_list(int nr, int *ru, struct irule	*ir)
 	return r;
 }
 
-int	add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rnums)
+int	*longer_rule_list_rev(int nr, int *ru, struct irule	*ir)
 {
-	int	i, j, count = 0, n;
-	char	stem[1024];
-	struct irule	*ir;
-	struct irreg	*irr;
-	struct lexeme	*lex;
+	int *r = slab_alloc(sizeof(int)*(nr+1));
+	memcpy(r,ru,sizeof(int)*nr);
+	r[nr] = ir->rule->rnum;
+	return r;
+}
 
-/*
-	for(i=0;i<nrules;i++)printf("  ");
-	printf("exploring hypothesis `%s' with rule chain:", form);
-	for(i=0;i<nrules;i++)printf(" %s", rules[rnums[i]]->name);
-	printf("\n");
-*/
+int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
+{
+	int i;
 
-	// get any no-further-inflecting lexemes
-	n = add_lexemes_to_chart_for_stem(x, form, nrules, rnums);
-	count += n;
-	if(!strcmp(form, "is"))return count;
+	// see if this route is already packed on the edge
+	for(i=0;i<e->ninflr_routes;i++)
+	{
+		struct inflr_route *r = e->inflr_routes+i;
+		if(r->len == nrules && !memcmp(r->rules, rnums, sizeof(int)*nrules))
+			return 0;
+	}
 
-	if(nrules >= MAX_ORTH_RULES)return count;
+	// otherwise, add it
+	e->ninflr_routes++;
+	e->inflr_routes = slab_realloc(e->inflr_routes,
+		sizeof(struct inflr_route) * (e->ninflr_routes-1),
+		sizeof(struct inflr_route) * e->ninflr_routes);
+	e->inflr_routes[e->ninflr_routes-1].len = nrules;
+	e->inflr_routes[e->ninflr_routes-1].rules = rnums;
+	return 1;
+}
 
+void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int nrules, int *rnums)
+{
+	int i;
+
+	// don't go down garden paths
+	if(nrules >= MAX_ORTH_RULES)return;
+
+	for(i=0;i<visit->nparents;i++)
+	{
+		struct ochart_parent	*d = visit->parents+i;
+		int						*mnums = d->rule?longer_rule_list_rev(nrules, rnums, d->rule):0;
+		if(d->edge)unfold_oroutes(target, d->edge, nrules+1, mnums);
+		else record_oroute(target, nrules, rnums);
+	}
+}
+
+void add_oparent(struct ochart_edge *daughter, struct ochart_edge *parent, struct irule *rule)
+{
+	//if(parent)printf("add %p [`%s' %s] parent of %p `%s'\n", parent, parent->form, rule->rule->name, daughter, daughter->form);
+	daughter->nparents++;
+	daughter->parents = slab_realloc(daughter->parents,
+				sizeof(struct ochart_parent) * (daughter->nparents-1),
+				sizeof(struct ochart_parent) * daughter->nparents);
+	daughter->parents[daughter->nparents-1].edge = parent;
+	daughter->parents[daughter->nparents-1].rule = rule;
+}
+
+void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct irule *rule)
+{
+	int	i, forml = strlen(form);
+	struct ochart_edge *edge = 0;
+
+	// check for a compatible edge already in the chart
+	for(i=0;i<chart->nedges;i++)
+		if(!strcmp(chart->edges[i]->form, form))
+		{
+			// pack into this edge; the forms possible from here have already been explored.
+			add_oparent(chart->edges[i], parent, rule);
+			return;
+		}
+
+	//printf(".. `%s' is new\n", form);
+	if(!edge)
+	{
+		// completely new edge; add it to the chart
+		chart->nedges++;
+		chart->edges = slab_realloc(chart->edges, sizeof(struct ochart_edge*)*(chart->nedges-1), sizeof(struct ochart_edge)*chart->nedges);
+		edge = chart->edges[chart->nedges-1] = slab_alloc(sizeof(struct ochart_edge));
+		edge->form = (char*)freeze_string(form);
+		edge->ninflr_routes = 0;
+		edge->inflr_routes = 0;
+		edge->nparents = 0;
+		edge->parents = 0;
+	}
+	add_oparent(edge, parent, rule);
+
+	// this edge is at least partly new; try to combine it with all the orthographemic rules
 	for(i=0;i<nirules;i++)
 	{
-		int	*mrules = 0;
+		int				j;//, *mrules = 0;
+		char			stem[1024];
+		struct irule	*ir = irules[i];
+		struct irreg	*irr;
 
-		ir = irules[i];
-		if(!ir->nsub)
+		for(j=0;j<ir->nirregs;j++)
 		{
-			if(!mrules)mrules = longer_rule_list(nrules, rnums, ir);
-			n = add_lexemes_to_chart_for_stem(x, form, nrules+1, mrules);
-			count += n;
-#ifndef	GENERATION
-			if(n)add_agenda_lrule(x, ir->rule);//(epsilon_edge(ir->rule, x, 0));
-#endif
-		}
-		else
-		{
-			for(j=0;j<ir->nirregs;j++)
+			irr = ir->irregs+j;
+			if(!strcmp(form, irr->form))
 			{
-				irr = ir->irregs+j;
-				if(!strcmp(form, irr->form))
-				{
-					//fprintf(stderr, "used irreg `%s -> %s' for rule %s\n",
-					//		irr->stem, irr->form, ir->rule->name);
-					if(!mrules)mrules = longer_rule_list(nrules, rnums, ir);
-					n = add_lexemes_to_chart_for_form(x, irr->stem, nrules+1, mrules);
-					count += n;
-#ifndef	GENERATION
-					if(n)add_agenda_lrule(x, ir->rule);//(epsilon_edge(ir->rule, x, 0));
-#endif
-					break;
-				}
+				//fprintf(stderr, "used irreg `%s -> %s' for rule %s\n",
+				//		irr->stem, irr->form, ir->rule->name);
+				add_ochart_edge(edge, chart, irr->stem, ir);
+				break;	// TODO support irregs.tab defining whether to cut the search here or continue it
 			}
-			if(j<ir->nirregs)continue;	// if we got it with an irreg, don't try patterns
-			for(j=ir->nsub-1;j>=0;j--)
+		}
+		if(j<ir->nirregs)continue;	// if we got it with an irreg, don't try patterns
+		for(j=ir->nsub-1;j>=0;j--)
+		{
+			struct irule_sub *sub = ir->sub+j;
+			if(!invert_ipat(sub->pat, sub->patl, sub->rep, sub->repl, form, forml, stem, ir->type))
 			{
-				if(!invert_ipat_suffix(ir->subpat[j], ir->subrep[j], form, stem))
+				// good guess; now check whether 'stem' actually inflects to 'form'
+				/*char *check = inflect(ir, stem);
+				if(!check || strcasecmp(check, form))
 				{
-					// good guess; now check whether 'stem' actually inflects to 'form'
-					/*char *check = inflect(ir, stem);
-					if(!check || strcasecmp(check, form))
-					{
-						fprintf(stderr, "hah! we avoided being tricked; `%s' doesn't disinflect to `%s' under `%s', since that would go to `%s'\n",
-							form, stem, ir->rule->name, check?check:"(null)");
-						if(check)free(check);
-						continue;
-					}
-					free(check);*/
-
-					//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d], i.e. `%s' replaced by `%s'\n",
-					//		form, stem, ir->rule->name, j, ir->subpat[j], ir->subrep[j]);
-					if(!mrules)mrules = longer_rule_list(nrules, rnums, ir);
-					n = add_lexemes_to_chart_for_form(x, stem, nrules+1, mrules);
-					count += n;
-					if(n)
-					{
-#ifndef	GENERATION
-						add_agenda_lrule(x, ir->rule);//(epsilon_edge(ir->rule, x, 0));
-#endif
-						//break;
-					}
+					fprintf(stderr, "hah! we avoided being tricked; `%s' doesn't disinflect to `%s' under `%s', since that would go to `%s'\n",
+						form, stem, ir->rule->name, check?check:"(null)");
+					if(check)free(check);
+					continue;
 				}
+				free(check);*/
+
+				//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d], i.e. `%s' replaced by `%s'\n",
+				//		form, stem, ir->rule->name, j, sub->pat, sub->rep);
+				add_ochart_edge(edge, chart, stem, ir);
 			}
 		}
 	}
-
-	if(nrules==0 && !count && wcap[x]/* && x!=0*/)	// unknown uppercase word not at start of sentence; proper noun?
-	{
-		sprintf(stem, "\"%s\"", form);
-		lex = proper_noun_lex(stem);
-		add_agenda(lexical_edge(lex, x, 1));
-		allow_inflr(x, lex, 0, 0);
-		count++;
-		for(i=0;i<nirules;i++)
-			if(irules[i]->nsub==0)
-			{
-#ifndef	GENERATION
-				add_agenda_lrule(x, irules[i]->rule);//(epsilon_edge(irules[i]->rule, x, 0));
-#endif
-				allow_inflr(x, lex, 1, longer_rule_list(0,0, irules[i]));
-				count++;
-			}
-		return 1;
-	}
-
-	//if(count)printf("** found %d lexeme/rules for `%s'\n", count, form);
-	return count;
+	return;
 }
+
 
 char	*lgroups[256];
 
@@ -227,7 +380,7 @@ int	appropriate_letter(int	let, int	group)
 char	*inflect(struct irule	*ir, char	*str)
 {
 	char	*res=0;
-	int		i;
+	int		i, strl = strlen(str);
 
 	for(i=0;i<ir->nirregs;i++)
 		if(!strcmp(str, ir->irregs[i].stem))
@@ -237,30 +390,82 @@ char	*inflect(struct irule	*ir, char	*str)
 		res = malloc(strlen(str) + 10);
 		strcpy(res, str);
 		for(i=ir->nsub-1;i>=0;i--)
-			if(!invert_ipat_suffix(ir->subrep[i], ir->subpat[i], str, res))
+		{
+			struct irule_sub *sub = ir->sub+i;
+			if(!invert_ipat(sub->rep, sub->repl, sub->pat, sub->patl, str, strl, res, ir->type))
 			{
-				//printf("applied (%s %s)\n", ir->subpat[i], ir->subrep[i]);
+				//printf("applied (%s %s)\n", pat, rep);
 				break;
 			}
+		}
 	}
 	//printf("inflected[%s] `%s' to `%s'\n", ir->rule->name, str, res);
 	return res;
 }
 
-int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem)
+int	invert_ipat_prefix(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem)
 {
-	int	let;
-	int	len = strlen(form)-1, len2 = strlen(rep)-1;
+	int	let, lclear = 0;
+	int	ri = 0, fi = 0;
 	char	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
 
-	bzero(letters, 256);
-	if(len2==0 && rep[len2]=='*' && len>=0)len2--;	// trivially match
+	if(repl==1 && rep[0]=='*')ri++;	// trivially match
+	else do
+	{
+		let = form[fi++];
+		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
+		if(ri+1<repl && rep[ri]=='!')
+		{
+			if(!lclear){bzero(letters, 256);lclear=1;}
+			if(appropriate_letter(let, rep[++ri]))
+			{
+				if(letters[(int)rep[ri]] == 0)
+					letters[(int)rep[ri]] = let;
+				else if(let != letters[(int)rep[ri]])
+					break;
+				ri++;
+			}
+			else break;
+		}
+		else if(rep[ri] != let)break;
+		else ri++; // matched.
+	} while(ri<repl && fi<forml);
+
+	if(ri==repl)
+	{
+		match:
+		// success!
+		if(*pat!='*') while(*pat)
+		{
+			if(*pat != '!')
+				*stem++ = *pat++;
+			else
+			{
+				*stem++ = letters[(int)pat[1]];
+				pat+=2;
+			}
+		}
+		memcpy(stem, form+fi, forml-fi+1);
+		//printf(" form `%s' -> stem `%s' under pat `%s' rep `%s' [len %d len2 %d]\n", form, rstem, rpat, rrep, len, len2);
+		return 0;
+	}
+	else return -1;
+}
+
+int	invert_ipat_suffix(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem)
+{
+	int	let, lclear = 0;
+	int	len = forml-1, len2 = repl-1;
+	char	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
+
+	if(repl==1 && rep[0]=='*')len2--;	// trivially match
 	else do
 	{
 		let = form[len--];
 		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
 		if(len2>0 && rep[len2-1]=='!')
 		{
+			if(!lclear){bzero(letters, 256);lclear=1;}
 			if(appropriate_letter(let, rep[len2]))
 			{
 				if(letters[(int)rep[len2]] == 0)
@@ -277,6 +482,7 @@ int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem)
 
 	if(len2<0)
 	{
+		match:
 		// success!
 		strncpy(stem, form, len+1);
 		stem += len+1;
@@ -297,13 +503,19 @@ int	invert_ipat_suffix(char	*pat, char	*rep, char	*form, char	*stem)
 	else return -1;
 }
 
+int	invert_ipat(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem, int type)
+{
+	if(type == ir_suffix)
+		return invert_ipat_suffix(pat, patl, rep, repl, form, forml, stem);
+	else return invert_ipat_prefix(pat, patl, rep, repl, form, forml, stem);
+}
+
 void	setup_irule(struct irule	*ir, char	*def)
 {
 	char	*sp, *type, *next;
 
 	ir->nsub = 0;
-	ir->subpat = 0;
-	ir->subrep = 0;
+	ir->sub = 0;
 
 	if(!def)return;
 	for(sp=def;*sp && *sp!=' ' && *sp!='\t';sp++) {}
@@ -316,14 +528,17 @@ void	setup_irule(struct irule	*ir, char	*def)
 	*sp = 0;
 	type = trim_string(def);
 	def = trim_string(sp+1);
-	if(strcmp(type, "suffix"))
+	if(strcmp(type, "suffix") && strcmp(type, "prefix"))
 	{
-		fprintf(stderr, "morpho: only `suffix' inflr patterns are supported (not `%s')\n", type);
+		fprintf(stderr, "morpho: only `suffix' and `prefix' inflr patterns are supported (not `%s')\n", type);
 		exit(-1);
 	}
+	if(!strcmp(type, "suffix"))ir->type = ir_suffix;
+	else ir->type = ir_prefix;
 
 	while(*def == '(')
 	{
+		struct irule_sub *sub;
 		def++;
 		sp = strchr(def, ')');
 		if(!sp)
@@ -343,16 +558,18 @@ void	setup_irule(struct irule	*ir, char	*def)
 		sp = trim_string(sp+1);
 		//printf("subrule lhs `%s', rhs `%s'\n", def, sp);
 		ir->nsub++;
-		ir->subpat = realloc(ir->subpat, sizeof(char*)*ir->nsub);
-		ir->subrep = realloc(ir->subrep, sizeof(char*)*ir->nsub);
-		ir->subpat[ir->nsub-1] = strdup(def);
-		ir->subrep[ir->nsub-1] = strdup(sp);
+		ir->sub = realloc(ir->sub, sizeof(struct irule_sub)*ir->nsub);
+		sub = ir->sub + ir->nsub-1;
+		sub->pat = strdup(def);
+		sub->patl = strlen(def);
+		sub->rep = strdup(sp);
+		sub->repl = strlen(sp);
 
 		def = trim_string(next);
 	}
 	if(*def)
 	{
-		fprintf(stderr, "morpho: syntax for inflr patterns is %%suffix (pat rep) (pat rep) ...\n");
+		fprintf(stderr, "morpho: syntax for inflr patterns is %%type (pat rep) (pat rep) ...\n");
 		fprintf(stderr, "   trailing garbage `%s' after subrules\n", def);
 		exit(-1);
 	}

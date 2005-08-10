@@ -70,18 +70,8 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	edge->inflr_routes[0].len = 0;
 	edge->inflr_routes[0].rules = 0;
 #else
-	if(len==1)
-	{
-		edge->ninflr_routes = 0;
-		edge->inflr_routes = 0;
-	}
-	else
-	{
-		edge->ninflr_routes = 1;
-		edge->inflr_routes = slab_alloc(sizeof(struct inflr_route));
-		edge->inflr_routes[0].len = 0;
-		edge->inflr_routes[0].rules = 0;
-	}
+	edge->ninflr_routes = 0;
+	edge->inflr_routes = 0;
 #endif
 	edge->age = 0;
 
@@ -165,76 +155,13 @@ int	wstrcmp(char	*a, char	*b)
 	return 0;
 }
 
-int	add_multilexemes_to_chart(int	x, int	nwords, char	**words)
-{
-	int		num=0;
-	char	stemcmp[1024], extracmp[1024];
-	int		i, j, k, r = -1;
-	int		max = 0;
-
-	if(nwords<2)return 0;
-	sprintf(stemcmp, "\"%s\"", words[0]);
-
-	for(i=0,j=nlexemes-1;i<=j;)
-	{
-		k = (i+j)/2;
-		r = wstrcmp(lexemes[k]->stem[0]->name, stemcmp);
-		if(r==0)break;
-		if(r<0)i = k+1;
-		else j = k-1;
-	}
-	if(r==0)
-	{
-		for(i=k;i<nlexemes && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
-		{
-			//printf("lex %s len %d\n", lexemes[i]->word, lexemes[i]->stemlen);
-			if(lexemes[i]->stemlen<=1 || lexemes[i]->stemlen > nwords)continue;
-			for(j=1;j<lexemes[i]->stemlen;j++)
-			{
-				sprintf(extracmp, "\"%s\"", words[j]);
-				if(wstrcmp(lexemes[i]->stem[j]->name, extracmp))break;
-			}
-			if(j<lexemes[i]->stemlen)continue;
-			if(!lexeme_in_agenda(lexemes[i], x, x+lexemes[i]->stemlen))
-			{
-				struct edge *e = lexical_edge(lexemes[i], x, lexemes[i]->stemlen);
-				add_agenda(e);
-			}
-			if(lexemes[i]->stemlen > max)max = lexemes[i]->stemlen;
-			num++;
-		}
-		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
-		{
-			if(lexemes[i]->stemlen<=1 || lexemes[i]->stemlen > nwords)continue;
-			//printf("lex %s len %d\n", lexemes[i]->word, lexemes[i]->stemlen);
-			for(j=1;j<lexemes[i]->stemlen;j++)
-			{
-				sprintf(extracmp, "\"%s\"", words[j]);
-				if(wstrcmp(lexemes[i]->stem[j]->name, extracmp))break;
-			}
-			if(j<lexemes[i]->stemlen)continue;
-			if(!lexeme_in_agenda(lexemes[i], x, x+lexemes[i]->stemlen))
-			{
-				struct edge *e = lexical_edge(lexemes[i], x, lexemes[i]->stemlen);
-				add_agenda(e);
-			}
-			if(lexemes[i]->stemlen > max)max = lexemes[i]->stemlen;
-			num++;
-		}
-		return max;
-	}
-	else return 0;
-}
-
-int	add_lexemes_to_chart_for_stem(int	x, char	*stem, int nrules, int *rnums)
+void	visit_lexicon(char	*stem, void (*visitter)(struct lexeme *lex))
 {
 	int		num=0;
 	char		stemcmp[1024];
 	int		i, j, k, r = -1;
 
 	sprintf(stemcmp, "\"%s\"", stem);
-	//printf("adding lexemes for stem `%s' next rule %s\n", stem, nrules?rules[rnums[0]]->name:"norule");
-
 	for(i=0,j=nlexemes-1;i<=j;)
 	{
 		k = (i+j)/2;
@@ -247,24 +174,10 @@ int	add_lexemes_to_chart_for_stem(int	x, char	*stem, int nrules, int *rnums)
 	{
 		i=k;
 		for(i=k;i<nlexemes && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
-		{
-			if(lexemes[i]->stemlen>1)continue;
-			if(!lexeme_in_agenda(lexemes[i], x, x+1))
-				add_agenda(lexical_edge(lexemes[i], x, 1));
-			allow_inflr(x, lexemes[i], nrules, rnums);
-			num++;
-		}
+			visitter(lexemes[i]);
 		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
-		{
-			if(lexemes[i]->stemlen>1)continue;
-			if(!lexeme_in_agenda(lexemes[i], x, x+1))
-				add_agenda(lexical_edge(lexemes[i], x, 1));
-			allow_inflr(x, lexemes[i], nrules, rnums);
-			num++;
-		}
-		return num;
+			visitter(lexemes[i]);
 	}
-	else return 0;
 }
 
 void	skolemize_arg(struct dg	*dg, char	*arg, struct dg	*inst)
@@ -294,54 +207,6 @@ void	skolemize_as(struct dg	*dg, struct dg	*a0, struct dg	*a1, struct dg	*a2, st
 	if(dg)dg = dg_hop(dg, lookup_fname("LKEYS"));
 	if(dg)rel = dg_hop(dg, lookup_fname("KEYREL"));
 	if(rel)skolemize_rel_as(rel, a0, a1, a2, a3);
-}
-
-
-int	add_generative_lexeme(char	*stem, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3)
-{
-	int		num=0;
-	char		stemcmp[1024];
-	int		i, j, k, r = -1, x;
-	struct edge	*ed;
-	struct dg	*dg;
-
-	for(x=0;require_ep_span & 1<<x;x++){}
-	require_ep_span += 1<<x;
-
-	sprintf(stemcmp, "\"%s\"", stem);
-
-	for(i=0,j=nlexemes-1;i<=j;)
-	{
-		k = (i+j)/2;
-		r = wstrcmp(lexemes[k]->stem[0]->name, stemcmp);
-		if(r==0)break;
-		if(r<0)i = k+1;
-		else j = k-1;
-	}
-	if(r==0)
-	{
-		i=k;
-		for(i=k;i<nlexemes && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
-		{
-			if(lexemes[i]->stemlen>1)continue;
-			add_agenda(ed = lexical_edge(lexemes[i], x, 1));
-			dg = ed->dg;
-			skolemize_as(dg, a0, a1, a2, a3);
-			printf(" generative lex %s\n", lexemes[i]->word);
-			num++;
-		}
-		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
-		{
-			if(lexemes[i]->stemlen>1)continue;
-			add_agenda(ed = lexical_edge(lexemes[i], x, 1));
-			dg = ed->dg;
-			skolemize_as(dg, a0, a1, a2, a3);
-			printf(" generative lex %s\n", lexemes[i]->word);
-			num++;
-		}
-		return num;
-	}
-	else return 0;
 }
 
 void	dump_parts_of_speech()

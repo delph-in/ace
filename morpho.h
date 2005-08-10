@@ -4,9 +4,15 @@
 struct irule
 {
 	struct rule	*rule;
+	enum { ir_suffix = 1, ir_prefix = 2 } type;
 	int		nsub;
-	char		**subpat;
-	char		**subrep;
+	struct irule_sub
+	{
+		char		*pat;
+		int			patl;
+		char		*rep;
+		int			repl;
+	}		*sub;
 
 	int		nirregs;
 	struct irreg
@@ -14,6 +20,9 @@ struct irule
 		char	*form, *stem;
 	}	*irregs;
 };
+
+extern int		nirules;
+extern struct irule	**irules;
 
 int		add_lexemes_to_chart(int	nwords, char	**words);
 int		add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rules);
