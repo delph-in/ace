@@ -46,6 +46,7 @@ void	add_agenda(struct edge	*e)
 	e->ntries = 0;
 	e->npack = 0;
 	e->pack = 0;
+	e->unpack = 0;
 //#ifdef	BIDIR_SS
 //	if(e->prio < LEX_PRIO)
 //		e->prio = LEX_PRIO-1;

@@ -40,6 +40,8 @@ struct edge
 	//char		*inflr_allow;
 	//int		allow_no_inflr;
 
+	struct unpack_info *unpack;
+
 #ifdef	GENERATION
 	unsigned int	ep_span;
 #endif
@@ -57,6 +59,13 @@ struct chart_cell
 	struct edge	**al_edges;
 	int		ar_nedges;
 	struct edge	**ar_edges;
+};
+
+struct forest
+{
+	int 		ntrees;
+	struct edge **trees;
+	float		*scores;
 };
 
 #define	LEX_PRIO	10
