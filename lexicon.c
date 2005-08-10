@@ -64,24 +64,15 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	edge->lex = lex;
 	edge->qc = extract_qc(edge->dg);
 	edge->prio = LEX_PRIO;
-#ifdef	GENERATION
-	edge->ninflr_routes = 1;
-	edge->inflr_routes = slab_alloc(sizeof(struct inflr_route));
-	edge->inflr_routes[0].len = 0;
-	edge->inflr_routes[0].rules = 0;
-#else
 	edge->ninflr_routes = 0;
 	edge->inflr_routes = 0;
-#endif
 	edge->age = 0;
 
-#ifndef	GENERATION
 	if(trace)
 	{
 		printf("added lexeme `%s' = #%d\n", lex->word, edge->id);
 		if(trace>1){print_dg(edge->dg); printf("\n\n");}
 	}
-#endif
 
 	return edge;
 }
