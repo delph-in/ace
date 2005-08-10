@@ -7,6 +7,8 @@
 int		nroots;
 struct dg	**roots;
 
+extern int trace;
+
 int	is_root(struct dg	*dg)
 {
 	int		i, res;
@@ -15,7 +17,15 @@ int	is_root(struct dg	*dg)
 	{
 		res = unify_dg_tmp(dg, roots[i], -1);
 		forget_tmp();
-		if(!res)return 1;
+		if(!res)
+			return 1;
+#ifdef UNIFY_PATHS
+		else if(trace>2)
+		{
+			printf("not root: ");
+			unify_backtrace();
+		}
+#endif
 		//if(unify_dg(dg, roots[i], -1))	// yeah, yeah, this gets picked up by the slab free
 		//	return 1;
 	}
