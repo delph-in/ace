@@ -419,37 +419,47 @@ char	*lex_filter_rule(struct rule	*r, int arg)
 char	**type_rf, **type_rl;
 char	**type_rftc, **type_rltc;
 
-char	*type_filter_rule(struct rule	*r, int arg)
+char	*type_filter_rule(struct rule	*r, int arg, struct qc **typeqc)
 {
+	struct qc *rqc = extract_qc_arg(r->dg, arg);
 	char	*table;
-	int	i, count = 0, res;
-	//struct slab_state	slab;
+	int	i, j, count = 0, res;
 
 	table = calloc(sizeof(char), ntypes);
 	for(i=0;i<ntypes;i++)
 	{
+		struct type *t = types[i];
 		// XXX hack
 		if(generation > MAX_GEN_RESET)generation = 11;
 		// XXX hack
 
-		if(!types[i]->dg)continue;
-		res = unify_dg_tmp(types[i]->dg, r->dg, arg);
+		if(table[i] == 2 || !t->dg)
+		{
+			table[i] = 0;
+			continue;
+		}
+		if(quickcheck(rqc, typeqc[i]) != 0)
+		{
+			if(t->ndescendents < 16)
+				for(j=1;j<t->ndescendents;j++)
+					table[t->descendents[j]] = 2;
+			continue;
+		}
+		res = unify_dg_tmp(t->dg, r->dg, arg);
 		forget_tmp();
-		//get_slabstate(&slab);
-		//if(unify_dg(types[i]->dg, r->dg, arg))
 		if(res==0)
 		{
 			table[i] = 1;
 			count++;
 		}
-		//set_slabstate(&slab);
 	}
-	//printf("FIRST-TYPE(%s) = %d / %d\n", r->name, count, ntypes);
 	return table;
 }
 
 void	lex_filter_rules()
 {
+	char **type_rf_t, **type_rl_t;
+
 	int build_rule_filter_transitive_closure()
 	{
 		int i;
@@ -467,14 +477,26 @@ void	lex_filter_rules()
 
 	int build_type_rule_filter()
 	{
-		int i;
+		int i, j;
+		struct qc *tqc[ntypes];
 
 		type_rf = malloc(sizeof(char*) * nrules);
 		type_rl = malloc(sizeof(char*) * nrules);
+		type_rf_t = malloc(sizeof(char*) * ntypes);
+		type_rl_t = malloc(sizeof(char*) * ntypes);
+		for(i=0;i<ntypes;i++)
+			tqc[i] = types[i]->dg?extract_qc(types[i]->dg):0;
 		for(i=0;i<nrules;i++)
 		{
-			type_rf[i] = type_filter_rule(rules[i], 0);
-			type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1);
+			type_rf[i] = type_filter_rule(rules[i], 0, tqc);
+			type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1, tqc);
+		}
+		for(i=0;i<ntypes;i++)
+		{
+			type_rf_t[i] = malloc(nrules);
+			for(j=0;j<nrules;j++)type_rf_t[i][j] = type_rf[j][i];
+			type_rl_t[i] = malloc(nrules);
+			for(j=0;j<nrules;j++)type_rl_t[i][j] = type_rl[j][i];
 		}
 		return 0;
 	}
@@ -492,16 +514,21 @@ void	lex_filter_rules()
 			type_rltc[i] = calloc(sizeof(char), ntypes);
 			for(j=0;j<ntypes;j++)
 			{
+				char *fit_rule_f = type_rf_t[j];
+				char *fit_rule_l = type_rl_t[j];
+				char *accept_rule_f = rf_tc[i];
+				char *accept_rule_l = rl_tc[i];
+
 				if(type_rf[i][j])type_rftc[i][j] = 1;
 				else for(k=0;k<nrules;k++)
-					if(rf_tc[i][k] && type_rf[k][j])
+					if(accept_rule_f[k] && fit_rule_f[k])
 					{
 						type_rftc[i][j] = 1;
 						break;
 					}
 				if(type_rl[i][j])type_rltc[i][j] = 1;
 				else for(k=0;k<nrules;k++)
-					if(rl_tc[i][k] && type_rl[k][j])
+					if(accept_rule_l[k] && fit_rule_l[k])
 					{
 						type_rltc[i][j] = 1;
 						break;
