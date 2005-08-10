@@ -106,7 +106,7 @@ int	generate(struct mrs	*mrs)
 			static int	savef[10] = {-1,-1,-1,-1,-1,-1,-1,-1};
 			struct dg	*rels = walk_dg(dag, savef, "SYNSEM", "LOCAL", "CONT", "RELS", "LIST", 0), *rel = rels?dg_hop(rels, 1):0;
 			static int predf = -1;
-			printf("    consider `%s'\n", lex->word);
+			//printf("    consider `%s'\n", lex->word);
 			if(predf==-1)predf = lookup_fname("PRED");
 			while(rel)
 			{
@@ -158,14 +158,13 @@ int	generate(struct mrs	*mrs)
 		int	i;
 		for(i=0;i<mrs->ntriggers;i++)
 		{
-			printf(" trigger `%s'\n", mrs->triggers[i]);
 			if(!strcmp(lex->word, mrs->triggers[i]))
 			{
 				printf("GEN-add `%s'\n", lex->word);
+				e->ep_span = 0;
 				return 0;
 			}
 		}
-		printf("don't add `%s'\n", lex->word);
 		return -1;
 	}
 	add_lexemes_for_relation(-1, "vacuous", trigger);

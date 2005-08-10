@@ -134,8 +134,12 @@ int	main(int	argc, char	*argv[])
 		struct mrs	*mrs = read_mrs(stdin);
 		if(mrs)
 		{
+			gettimeofday(&tv1, 0);
 			generate(mrs);
 			free_mrs(mrs);
+			count = 1;
+			gettimeofday(&tv2, 0);
+			goto report;
 		}
 		else fprintf(stderr, "NOTE: unable to read an input MRS\n");
 	}
@@ -170,10 +174,12 @@ int	main(int	argc, char	*argv[])
 	gettimeofday(&tv2, 0);
 	restore_stderr();
 
-	tv2.tv_sec -= tv1.tv_sec;
-	tv2.tv_usec -= tv1.tv_usec;
 	if(count)
 	{
+		report:
+		tv2.tv_sec -= tv1.tv_sec;
+		tv2.tv_usec -= tv1.tv_usec;
+		clear_slab();
 		fprintf(stderr, "NOTE: parsed %d / %d sentences, avg %dk, time %.5fs\n",
 			success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
 	}
