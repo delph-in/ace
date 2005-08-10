@@ -285,6 +285,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	if(e->rule->lexical)
 	{
 		e->lex = b->lex;
+#ifndef GENERATION
 		if(!e->rule->inflr)
 		{
 			e->ninflr_routes = b->ninflr_routes;
@@ -309,6 +310,10 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			//printf("realloc %d routes down to %d\n", b->ninflr_routes, e->ninflr_routes);
 			//e->inflr_routes = slab_realloc(e->inflr_routes, sizeof(struct inflr_route)*b->ninflr_routes, sizeof(struct inflr_route)*e->ninflr_routes);
 		}
+#else
+		e->ninflr_routes = 0;
+		e->inflr_routes = 0;
+#endif
 	}
 	else e->lex = 0;
 
@@ -484,8 +489,8 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 	//printf("    <%d/%d> + <%d/%d>\n", a->have, a->need, b->have, b->need);
 	//printf("    %s   + %s\n", a->dg->xtype->name, b->dg->xtype->name);
 
-	//if(trace>1)printf("[%8.8X #%d [lex %d infl %p] + %8.8X #%d [lex %d]] rule %s?\n",
-		//a->ep_span, a->id, a->rule->lexical, a->rule->inflr, b->ep_span, b->id, b->lex, a->rule->name);
+	if(trace>1)printf("[%8.8X #%d [lex %d infl %p] + %8.8X #%d [lex %p]] rule %s?\n",
+		0/*a->ep_span*/, a->id, a->rule->lexical, a->rule->inflr, 0/*b->ep_span*/, b->id, b->lex, a->rule->name);
 
 	if(a->rule->lexical)
 	{
@@ -493,6 +498,7 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 		// if 'a' is inflectional, make sure it's the right one
 		if(a->rule->inflr)
 		{
+#ifndef GENERATION
 			int i;
 			// look at each route 'b' allows and see if this is the first rule on it
 			for(i=0;i<b->ninflr_routes;i++)
@@ -502,15 +508,18 @@ static inline int	combine(struct edge	*a, struct edge	*b)
 					break;
 			}
 			if(i==b->ninflr_routes)return 0;
+#endif
 		}
 	}
 	else if(b->lex)
 	{
 		int i;
+#ifndef GENERATION
 		// 'b' is lexical but 'a' is a syntax rule; see if 'b' might be done with its inflection
 		for(i=0;i<b->ninflr_routes;i++)
 			if(b->inflr_routes[i].len == 0)break;
 		if(i==b->ninflr_routes)return 0;
+#endif
 	}
 
 	if(a->rtl)arg = a->need - a->have - 1;
@@ -1098,7 +1107,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	//if(rtried)free(rtried);
 	//rtried = calloc(sizeof(int),nrules);
 
-	agenda_rules(nwords+1, 0);
+	agenda_rules(nwords+1);
 
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
@@ -1132,6 +1141,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		edge = cells[chart_size-1].p_edges[i];
 		root = edge->dg;
 		if(!is_root(root))continue;
+
 		//printf("edge #%d is root\n", edge->id);
 
 		// XXX no enumeration at all
@@ -1144,6 +1154,13 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 		if(!inhibit_results)
 		{
+#define SELECTIVE
+#ifdef SELECTIVE
+			extern struct forest *selectively_unpack(struct edge *e, int n);
+			struct forest *f = selectively_unpack(edge, 10);
+			printf(" ... selectively unpacked %d trees\n", f->ntrees);
+#endif
+
 			//print_dg(root);
 			//printf("\n\n");
 
