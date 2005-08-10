@@ -10,6 +10,7 @@
 #include	"rule.h"
 #include	"morpho.h"
 #include	"lexicon.h"
+#include	"maxent.h"
 #include	"freeze.h"
 
 extern void		**oldslabs;
@@ -51,6 +52,7 @@ struct grammar
 	char		**type_rftc, **type_rltc;
 	int		*introduce;
 	void	*semindex;
+	void	*stochmodel;
 };
 
 extern void	*slab_alloc(int	len);
@@ -111,12 +113,14 @@ struct irule	*freeze_irule(struct irule	*irin)
 
 	*irout = *irin;
 	irout->rule->inflr = irout;
-	irout->subpat = slab_alloc(sizeof(char*) * irout->nsub);
-	irout->subrep = slab_alloc(sizeof(char*) * irout->nsub);
+	irout->sub = slab_alloc(sizeof(struct irule_sub) * irout->nsub);
 	for(i=0;i<irout->nsub;i++)
 	{
-		irout->subpat[i] = freeze_string(irin->subpat[i]);
-		irout->subrep[i] = freeze_string(irin->subrep[i]);
+		struct irule_sub *subi = irin->sub+i, *subo = irout->sub+i;
+		subo->pat = freeze_string(subi->pat);
+		subo->rep = freeze_string(subi->rep);
+		subo->patl = subi->patl;
+		subo->repl = subi->repl;
 	}
 
 	irout->irregs = slab_alloc(sizeof(struct irreg) * irout->nirregs);
@@ -314,6 +318,7 @@ int	freeze_grammar()
 	G->type_rftc = type_rftc;
 	G->type_rltc = type_rltc;
 	G->semindex = freeze_semantic_index();
+	G->stochmodel = freeze_stochastic_model();
 	strcpy(G->message, "frozen grammar file\n");
 	strcat(G->message, "english resource grammar (erg)\n");
 
@@ -359,6 +364,7 @@ static int	load_freeze()
 	type_rltc = G->type_rltc;
 
 	recover_semantic_index(G->semindex);
+	recover_stochastic_model(G->stochmodel);
 
 	// in case we accidentally add more during parsing
 	fnames = malloc(sizeof(char*) * nfnames);

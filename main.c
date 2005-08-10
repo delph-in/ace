@@ -15,7 +15,7 @@
 
 int	debug_level = 1, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;
-char	*load_grammar_path = 0;
+char	*load_grammar_path = 0, *load_mem_path = 0;
 char	*sentence_path = 0;
 int	question = 0, exhaustive = 0, lui_chart = 0, inhibit_pack = 0;
 
@@ -30,11 +30,12 @@ void	parse_args(int	argc, char	*argv[])
 {
 	char	*prog = argv[0], ch;
 
-	while((ch=getopt(argc, argv, "hvplxcg:G:m:qtR"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvplxcg:G:m:qtRM:"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-x] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
+		case	'M':	load_mem_path = optarg;		break;
 		case	'G':	save_grammar_path = optarg;	break;
 		case	'l':	export_parts = 1;		break;
 		case	'm':	connect_to_master(optarg);	break;
@@ -70,26 +71,39 @@ int	main(int	argc, char	*argv[])
 
 	parse_args(argc, argv);
 	setup_carcs_stack();
-
-	gettimeofday(&tv1, 0);
 	init_glb_cache();
 
 	if(load_grammar_path)load_frozen_grammar(load_grammar_path);
-	else load_grammar();
-	gettimeofday(&tv2, 0);
-	tv2.tv_sec -= tv1.tv_sec;
-	tv2.tv_usec -= tv1.tv_usec;
-	fprintf(stderr, "NOTE: loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+	else
+	{
+		gettimeofday(&tv1, 0);
+		load_grammar();
+		gettimeofday(&tv2, 0);
+		tv2.tv_sec -= tv1.tv_sec;
+		tv2.tv_usec -= tv1.tv_usec;
+		fprintf(stderr, "loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+	}
+
+	if(load_mem_path)
+	{
+		gettimeofday(&tv1, 0);
+		if(0 != load_mem(load_mem_path))
+		{
+			fprintf(stderr, "couldn't load max-ent model `%s'\n", load_mem_path);
+			return -1;
+		}
+		gettimeofday(&tv2, 0);
+		tv2.tv_sec -= tv1.tv_sec;
+		tv2.tv_usec -= tv1.tv_usec;
+		fprintf(stderr, "%sloaded max-ent model in %.5fs\n",
+			load_grammar_path?"NOTE: ":"", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+	}
 
 	if(save_grammar_path)
 		setup_save_frozen_grammar(save_grammar_path);
-
 	if(!load_grammar_path)
-	{
-		fprintf(stderr, "freezing grammar...\n");
 		freeze_grammar();
-	}
-	//else fprintf(stderr, "(not freezing)\n");
+
 	load_rules_conf();
 
 	if(save_grammar_path)
