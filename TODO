@@ -1,12 +1,14 @@
 TODO:
 
+unpacking + statistical parse selection
+	- fix maxent scoring to be completely additive
+
 allow packing in lexical rules
 
-record ersatzing
-
 improve MRS extractor
+	- perhaps into mrs.c's format
 
-unpacking + statistical parse selection
+record ersatzing
 
 OPTIMIZATIONS:
 
