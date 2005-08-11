@@ -30,7 +30,8 @@ int	parse_line(char	*line);
 
 void	parse_args(int	argc, char	*argv[])
 {
-	unsigned char	*prog = argv[0], ch;
+	char	*prog = argv[0];
+	unsigned char ch;
 
 	while((ch=getopt(argc, argv, "hvplxcg:G:m:qtRM:e"))!=255)switch(ch)
 	{
