@@ -285,53 +285,57 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	if(e->rule->lexical)
 	{
 		e->lex = b->lex;
-#ifndef GENERATION
-		if(!e->rule->inflr)
+		if(g_mode == PARSING)
 		{
-			e->ninflr_routes = b->ninflr_routes;
-			e->inflr_routes = b->inflr_routes;
-		}
-		else
-		{
-			int i;
-			e->ninflr_routes = 0;
-			e->inflr_routes = slab_alloc(sizeof(struct inflr_route)*b->ninflr_routes);
-			for(i=0;i<b->ninflr_routes;i++)
+			if(!e->rule->inflr)
 			{
-				struct inflr_route *r = b->inflr_routes+i;
-				if(r->len && r->rules[0]==e->rule->rnum)
-				{
-					e->ninflr_routes++;
-					e->inflr_routes[e->ninflr_routes-1].len = r->len-1;
-					e->inflr_routes[e->ninflr_routes-1].rules = slab_alloc(sizeof(int)*(r->len-1));
-					memcpy(e->inflr_routes[e->ninflr_routes-1].rules, r->rules+1, sizeof(int)*(r->len-1));
-				}
+				e->ninflr_routes = b->ninflr_routes;
+				e->inflr_routes = b->inflr_routes;
 			}
-			//printf("realloc %d routes down to %d\n", b->ninflr_routes, e->ninflr_routes);
-			//e->inflr_routes = slab_realloc(e->inflr_routes, sizeof(struct inflr_route)*b->ninflr_routes, sizeof(struct inflr_route)*e->ninflr_routes);
+			else
+			{
+				int i;
+				e->ninflr_routes = 0;
+				e->inflr_routes = slab_alloc(sizeof(struct inflr_route)*b->ninflr_routes);
+				for(i=0;i<b->ninflr_routes;i++)
+				{
+					struct inflr_route *r = b->inflr_routes+i;
+					if(r->len && r->rules[0]==e->rule->rnum)
+					{
+						e->ninflr_routes++;
+						e->inflr_routes[e->ninflr_routes-1].len = r->len-1;
+						e->inflr_routes[e->ninflr_routes-1].rules = slab_alloc(sizeof(int)*(r->len-1));
+						memcpy(e->inflr_routes[e->ninflr_routes-1].rules, r->rules+1, sizeof(int)*(r->len-1));
+					}
+				}
+				//printf("realloc %d routes down to %d\n", b->ninflr_routes, e->ninflr_routes);
+				//e->inflr_routes = slab_realloc(e->inflr_routes, sizeof(struct inflr_route)*b->ninflr_routes, sizeof(struct inflr_route)*e->ninflr_routes);
+			}
 		}
-#else
-		e->ninflr_routes = 0;
-		e->inflr_routes = 0;
-#endif
+		else // (g_mode == GENERATING)
+		{
+			e->ninflr_routes = 0;
+			e->inflr_routes = 0;
+		}
 	}
 	else e->lex = 0;
 
-#ifdef	GENERATION
 	e->ep_span = a->ep_span | b->ep_span;
-#endif
 	e->npack=0;
 	e->pack=0;
 
 	if(trace)
 	{
-#ifdef	GENERATION
-		printf("generated #%d %d/%d from #%d, #%d for [%8.8X] with rule %s: ", e->id, e->have, e->need, a->id, b->id, e->ep_span, e->rule->name);
-		printf("%s\n", show_orth_leaves(e));
-#else
-		printf("generated #%d %d/%d for [%d-%d] with rule %s: ", e->id, e->have, e->need, e->from, e->to, e->rule->name);
-		printf("%s\n", show_orth_leaves(e));
-#endif
+		if(g_mode == GENERATING)
+		{
+			printf("generated #%d %d/%d from #%d, #%d for [%8.8X] with rule %s: ", e->id, e->have, e->need, a->id, b->id, e->ep_span, e->rule->name);
+			printf("%s\n", show_orth_leaves(e));
+		}
+		else // (g_mode == PARSING)
+		{
+			printf("generated #%d %d/%d for [%d-%d] with rule %s: ", e->id, e->have, e->need, e->from, e->to, e->rule->name);
+			printf("%s\n", show_orth_leaves(e));
+		}
 		if(e->have==e->need && trace>1){print_dg(u); printf("\n\n");}
 	}
 	if(e->need==e->have)
@@ -349,11 +353,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 #endif
 
 		if(!exhaustive &&
-#ifdef	GENERATION
-			e->ep_span == require_ep_span &&
-#else
-			e->from==0 && e->to==chart_size-1 &&
-#endif
+			((g_mode == GENERATING && e->ep_span == require_ep_span) ||
+			(g_mode == PARSING && e->from==0 && e->to==chart_size-1)) &&
 			is_root(e->dg))
 		{
 			//printf("sentential\n");
@@ -391,9 +392,7 @@ static void	hyperactive_excursion(struct edge	*e)
 	struct edge			*b;
 	extern int highest; // XXX snooping on agenda.c
 
-#ifdef GENERATION
-	return;
-#endif
+	if(g_mode == GENERATING)return;	// XXX why do we need to do this?
 
 	if(e->prio < highest)return;
 
@@ -496,9 +495,8 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	{
 		if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
 		// if 'a' is inflectional, make sure it's the right one
-		if(a->rule->inflr)
+		if(a->rule->inflr && g_mode == PARSING)
 		{
-#ifndef GENERATION
 			int i;
 			// look at each route 'b' allows and see if this is the first rule on it
 			for(i=0;i<b->ninflr_routes;i++)
@@ -508,18 +506,15 @@ inline int	combine(struct edge	*a, struct edge	*b)
 					break;
 			}
 			if(i==b->ninflr_routes)return 0;
-#endif
 		}
 	}
-	else if(b->lex)
+	else if(b->lex && g_mode == PARSING)
 	{
 		int i;
-#ifndef GENERATION
 		// 'b' is lexical but 'a' is a syntax rule; see if 'b' might be done with its inflection
 		for(i=0;i<b->ninflr_routes;i++)
 			if(b->inflr_routes[i].len == 0)break;
 		if(i==b->ninflr_routes)return 0;
-#endif
 	}
 
 	if(a->rtl)arg = a->need - a->have - 1;
@@ -649,18 +644,13 @@ int	pack_edge(struct edge	*edge)
 
 	// since we're taking first-parse-only, this is ok perhaps.
 	for(i=0;i<c->p_nedges && (h=c->p_edges[i]);i++)
-		if(!h->lex
+		if(!h->lex // XXX think about this carefully
 		&& h->have != -1
-		//&& c->p_edges[i]->dg
-//#ifdef	BIDIR_SS
+//#ifdef	BIDIR_SS	// XXX think about this carefully
 		&& h->age == edge->age
 //#endif
-#ifdef	GENERATION
-		&& h->ep_span == edge->ep_span
-#endif
-		//&& c->p_edges[i]->dg->xtype == edge->dg->xtype
+		&& (g_mode != GENERATING || h->ep_span == edge->ep_span)
 		&& !equiv_quickcheck(h->qc, edge->qc)
-		//&& !memcmp(c->p_edges[i]->qc, edge->qc, qcbytes)
 			)
 		{
 #ifdef	COPY_COUNTS
@@ -1238,15 +1228,13 @@ void	output_lui(char	*words[])
 	extern char	*current_sentence;
 	FILE	*lf = popen("yzlui", "w");
 
-	#ifdef GENERATION
+	if(g_mode == GENERATING)
 		chart_size++;
-	#endif
 	fprintf(lf, "chart 1 %d \"%s\"", chart_size-1, current_sentence);
 	for(i=0;i<chart_size-1;i++)
 		fprintf(lf, " #E[%d %d %d %d \"%s\" orth [ ]]", -i-1, -i-1, i, i+1, words[i]);
-	#ifdef GENERATION
+	if(g_mode == GENERATING)
 		chart_size--;
-	#endif
 
 	for(i=0;i<chart_size;i++)
 		for(j=0;j<chart_size;j++)

@@ -117,11 +117,9 @@ void add_agenda_lrule(int x, struct rule *rule)
 	for(t=agenda[prio].start;t;t=t->next)
 	{
 		//if(t->edge->rule)printf(" -- already %s [%d-%d]\n", t->edge->rule->name, t->edge->from, t->edge->to);
-#ifdef	GENERATION
-		if(t->edge->rule==rule && t->edge->ep_span == 1<<x)
-#else
-		if(t->edge->rule==rule && t->edge->from==x && t->edge->to==x)
-#endif
+		if(t->edge->rule==rule &&
+			((g_mode==GENERATING && t->edge->ep_span == 1<<x) ||
+			(g_mode==PARSING && t->edge->from==x && t->edge->to==x)))
 		{
 			//printf("save work - `%s' was already in the chart for %d\n", rule->name, x);
 			return;

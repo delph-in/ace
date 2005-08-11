@@ -42,9 +42,7 @@ struct edge
 
 	struct unpack_info *unpack;
 
-#ifdef	GENERATION
 	unsigned int	ep_span;
-#endif
 
 	int			ntries;
 	int			npack;
@@ -89,5 +87,9 @@ struct edge	*next_agenda(int	from_start);
 
 extern struct chart_cell	*cells;
 extern unsigned int			require_ep_span;
+
+#define PARSING 1
+#define GENERATING 2
+extern int g_mode;
 
 #endif

@@ -54,13 +54,16 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 
 	//edge->dg = copy_dg(edge->dg);
 	edge->id = next_eid();
-#ifdef	GENERATION
-	edge->from = edge->to = 0;
-	edge->ep_span = 1<<i;
-#else
-	edge->from = i;
-	edge->to = i+len;
-#endif
+	if(g_mode == GENERATING)
+	{
+		edge->from = edge->to = 0;
+		edge->ep_span = 1<<i;
+	}
+	else // (g_mode == PARSING)
+	{
+		edge->from = i;
+		edge->to = i+len;
+	}
 	edge->lex = lex;
 	edge->qc = extract_qc(edge->dg);
 	edge->prio = LEX_PRIO;

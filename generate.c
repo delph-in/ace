@@ -7,7 +7,6 @@
 #include "lexicon.h"
 #include "chart.h"
 
-#ifdef	GENERATION
 extern int	question, exhaustive, lui_chart, inhibit_pack, trace;
 
 /* from erg/lkb/globas.lsp:
@@ -256,4 +255,3 @@ int	generate(struct mrs	*mrs)
 
 	return count;
 }
-#endif

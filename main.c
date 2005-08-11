@@ -19,6 +19,8 @@ char	*load_grammar_path = 0, *load_mem_path = 0;
 char	*sentence_path = 0;
 int	question = 0, exhaustive = 0, lui_chart = 0, inhibit_pack = 0;
 
+int g_mode = PARSING;
+
 extern int	g_loaded, inhibit_results;
 extern long long	accum_ram_usage;
 
@@ -28,9 +30,9 @@ int	parse_line(char	*line);
 
 void	parse_args(int	argc, char	*argv[])
 {
-	char	*prog = argv[0], ch;
+	unsigned char	*prog = argv[0], ch;
 
-	while((ch=getopt(argc, argv, "hvplxcg:G:m:qtRM:"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvplxcg:G:m:qtRM:e"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-x] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	debug_level++;	break;
@@ -45,6 +47,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'p':	inhibit_pack = 1;		break;
 		case	'R':	inhibit_results = 1;		break;
 		case	't':	do_itsdb = 1;			break;
+		case	'e':	g_mode = GENERATING;	break;
 		case	'?':	goto usage;
 	}
 	if(optind<argc-1)goto usage;
@@ -129,7 +132,7 @@ int	main(int	argc, char	*argv[])
 	//print_type("phrasal");
 	//print_lexeme("delete_v2");
 
-#ifdef	GENERATION
+	if(g_mode == GENERATING)
 	{
 		struct mrs	*mrs = read_mrs(stdin);
 		if(mrs)
@@ -143,7 +146,6 @@ int	main(int	argc, char	*argv[])
 		}
 		else fprintf(stderr, "NOTE: unable to read an input MRS\n");
 	}
-#endif
 
 	if(!sentence_path)return 0;
 	if(!strcmp(sentence_path, "-"))fin = stdin;
