@@ -105,8 +105,11 @@ capi_print_derivations(int nwords, char **words)
 					capi_print_tree0(e->daughters[i]);
 			else
 			{
-				// XXX fix for MWEs
-				DER_PRINTF(" (\\\"%s\\\" %d %d)", words[e->from], e->from, e->to);
+				int i;
+				DER_PRINTF(" (\\\"");
+				for(i=e->from;i<e->to;i++)
+					DER_PRINTF("%s%s", (i==e->from)?"":" ", words[i]);
+				DER_PRINTF("\\\" %d %d)", e->from, e->to);
 			}
 			DER_PRINTF(")");
 		}
