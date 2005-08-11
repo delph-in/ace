@@ -198,11 +198,7 @@ char		**fnames;
 
 int	subsume_forward, subsume_backward;
 
-#ifdef	ERG_JULY
-#define	SUBS_IGNORE(label)	(label>=16 && label<=19)
-#else
 #define	SUBS_IGNORE(label)	((label>=16 && label<=20))
-#endif
 
 // make sure 'copy' is either null or self-referential all the way through 'a's arcs
 int	subsume_same_dg(struct dg	*a)
@@ -464,13 +460,8 @@ int	init_fnames()
 	fnames[3] = strdup("SEM");		//expired
 	fnames[4] = strdup("HEAD");
 
-#ifdef	ERG_JULY
-	fnames[5] = strdup("HEAD-DTR");
-	fnames[6] = strdup("NON-HEAD-DTR");
-#else
 	fnames[5] = strdup("HD-DTR");
 	fnames[6] = strdup("NH-DTR");
-#endif
 	fnames[7] = strdup("LCONJ-DTR");
 	fnames[8] = strdup("RCONJ-DTR");
 	fnames[9] = strdup("DTR");
@@ -484,12 +475,8 @@ int	init_fnames()
 	fnames[16] = strdup("STEM");
 	fnames[17] = strdup("RELS");
 	fnames[18] = strdup("HCONS");
-#ifdef	ERG_JULY
-	fnames[19] = strdup("RULE-NAME");
-#else
 	fnames[19] = strdup("RNAME");
-#endif
-	fnames[20] = strdup("RPUNCT");
+	fnames[20] = strdup("PUNCT");
 
 	return 0;
 }

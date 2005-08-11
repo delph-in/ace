@@ -114,6 +114,9 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 			var.nprops++;
 			var.props = realloc(var.props, sizeof(struct mrs_var_property)*var.nprops);
 			prop = var.props + var.nprops-1;
+			// trim off pesky ':' at end of role name
+			if(word[0]!=':' && word[strlen(word)-1]==':')
+				word[strlen(word)-1] = 0;
 			prop->name = strdup(word);
 			prop->value = (word=parse_word(P,1))?strdup(word):0;
 			//printf(" { prop `%s' value `%s' }\n", prop->name, prop->value);
@@ -217,6 +220,7 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		ep->pred = (word=parse_word(P,1))?strdup(word):0;
 		ep->nargs = 0;
 		ep->args = 0;
+		ep->epnum = nrels-1;
 		while((word=parse_word(P,1)) && strcmp(word,"]"))
 		{
 			if(!strcmp(word, "LBL:"))ep->lbl = parse_mrs_var(vlist, P);
@@ -226,8 +230,10 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 				ep->nargs++;
 				ep->args = realloc(ep->args, sizeof(struct mrs_ep_role)*ep->nargs);
 				role = ep->args+ep->nargs-1;
+				if(word[0]!=':' && word[strlen(word)-1]==':')
+					word[strlen(word)-1] = 0;
 				role->name = strdup(word);
-				if(!strcmp(word, "CARG:"))
+				if(!strcmp(word, "CARG"))
 					role->value = parse_mrs_const(P);
 				else role->value = parse_mrs_var(vlist, P);
 			}
@@ -308,7 +314,7 @@ void	print_mrs_var(struct mrs_var	*var)
 		int	i;
 		printf(" [");
 		for(i=0;i<var->nprops;i++)
-			{ printf(" %s %s", var->props[i].name, var->props[i].value); }
+			{ printf(" %s: %s", var->props[i].name, var->props[i].value); }
 		printf(" ]");
 	}
 }
@@ -327,7 +333,7 @@ void	print_mrs(struct mrs	*mrs)
 		int				j;
 		printf("	[ %s LBL: ", ep->pred); print_mrs_var(ep->lbl);
 		for(j=0;j<ep->nargs;j++)
-			{ printf(" %s ", ep->args[j].name); print_mrs_var(ep->args[j].value); }
+			{ printf(" %s: ", ep->args[j].name); print_mrs_var(ep->args[j].value); }
 		printf(" ]");
 		if(i+1 != mrs->nrels)printf("\n");
 	}

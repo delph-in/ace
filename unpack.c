@@ -30,9 +30,9 @@ void score_decomposition(struct decomposition *d)
 	{
 		// leaf node
 		// XXX make this work for MWEs
-		d->score = maxent_score(edge_sign(d->edge), d->edge->lex->stem[0]->name, 0);
+		d->score = maxent_score(edge_sign(d->edge), d->edge->lex->stem[0]->name, 0, 0);
 	}
-	else d->score = maxent_score(edge_sign(d->edge), edge_sign(d->rhs[0]), edge_sign(d->rhs[1]));
+	else d->score = maxent_score(edge_sign(d->edge), edge_sign(d->rhs[0]), edge_sign(d->rhs[1]), d->edge->rule->rtl);
 }
 
 struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
@@ -134,8 +134,6 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypothesis *
 
 	h->next = 0;
 
-	// XXX paper line 33 uses intersect symbol, probably meant union?
-	// also should use dec->indices rather than edge->indices
 	if(!dec_saw_indices(dec, indices))
 	{
 		dec->nindices++;
@@ -211,7 +209,6 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank)
 	{
 		int idx[2] = {hyp->indices[0], hyp->indices[1]};
 		idx[i]++;
-		// XXX line 20 of paper says "if (indices \in edge.indices) then continue", but should consider hyp->decompositions->indices
 		if(!dec_saw_indices(hyp->dec, idx))
 		{
 			struct hypothesis *rhs[2];

@@ -126,7 +126,7 @@ void add_agenda_lrule(int x, struct rule *rule)
 		}
 	}
 	//printf("sadly, have to add `%s' at prio? %d\n", rule->name, prio);
-	add_agenda(epsilon_edge(rule, x, 0));
+	add_agenda(epsilon_edge(rule, x, 0, 0));
 }
 
 void	allow_edge_inflr_route(struct edge	*e, int nrules, int *rules)

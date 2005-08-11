@@ -17,23 +17,21 @@ void print_mef(struct maxent_feature *f);
 
 static struct hash	*mem;
 
+#define MAXENT_NOISE(fmt, ...)
 
-float	maxent_score(char *lhs, char *rhs1, char *rhs2)
+float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl)
 {
 	float ret = 0;
-	int found = 0;
 
-	//printf("scoring [%s %s %s]\n", lhs, rhs1, rhs2?:"(null)");
+	MAXENT_NOISE("scoring [%s %s %s]\n", lhs, rhs1, rhs2?:"(null)");
 	void visitor(struct maxent_feature *feat)
 	{
-		if(found)return;
 		if(!rhs2)
 		{
 			if(feat->rhs[1])return;
 			if(strcasecmp(rhs1, feat->rhs[0]))return;
-			found = 1;
-			ret = feat->score;
-			//printf("MAXENT feature fired: "); print_mef(feat);
+			ret += feat->score;
+			MAXENT_NOISE("MAXENT feature fired: "); print_mef(feat);
 		}
 		else
 		{
@@ -41,23 +39,21 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2)
 			{
 				if(strcasecmp(rhs1, feat->rhs[0]))return;
 				if(strcasecmp(rhs2, feat->rhs[1]))return;
-				found = 1;
-				ret = feat->score;
-				//printf("MAXENT feature fired: "); print_mef(feat);
+				ret += feat->score;
+				MAXENT_NOISE("MAXENT feature fired: "); print_mef(feat);
 			}
 			else
 			{
-				// backoff
-				if(strcasecmp(rhs1, feat->rhs[0]) &&
-					strcasecmp(rhs2, feat->rhs[0]))return;
-				// don't set 'found=1', we want to keep looking for a real match
-				ret += feat->score;	// accumulate all the backoff scores that match
+				// backoff; only match KEY rhs element
+				if(!rtl && strcasecmp(rhs1, feat->rhs[0]))return;
+				if(rtl && strcasecmp(rhs2, feat->rhs[0]))return;
+				ret += feat->score;
 			}
 		}
 	}
 	if(mem)hash_visit_key(mem, lhs, (void(*)(void*))visitor);
 	else printf("WARNING: maxent_score() invoked with no max-ent model loaded\n");
-	//printf(" ... %f\n", ret);
+	MAXENT_NOISE(" ... %f\n", ret);
 	return ret;
 }
 

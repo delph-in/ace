@@ -24,8 +24,7 @@ struct irule
 extern int		nirules;
 extern struct irule	**irules;
 
-int		add_lexemes_to_chart(int	nwords, char	**words);
-int		add_lexemes_to_chart_for_form(int	x, char	*form, int nrules, int *rules);
+int		lexical_lookup(int	nwords, char	**words);
 char	*inflect(struct irule	*ir, char	*str);
 void	setup_morpho(char	*line);
 int		load_inflr();

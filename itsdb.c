@@ -103,7 +103,11 @@ capi_print_derivations(int nwords, char **words)
 			if(e->have)
 				for(i=0;i<e->have;i++)
 					capi_print_tree0(e->daughters[i]);
-			else DER_PRINTF(" (\\\"%s\\\" %d %d)", words[e->from], e->from, e->to);
+			else
+			{
+				// XXX fix for MWEs
+				DER_PRINTF(" (\\\"%s\\\" %d %d)", words[e->from], e->from, e->to);
+			}
 			DER_PRINTF(")");
 		}
 		if(itsdb_report_derivations && id>=itsdb_report_derivations)return;

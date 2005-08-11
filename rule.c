@@ -9,6 +9,20 @@
 #include	"rule.h"
 #include	"chart.h"
 
+/* from erg/lkb/globas.lsp:
+(setf *gen-ignore-rules*
+  '(punct_bang_rule punct_semicol_rule punct_colon_rule
+    punct_rparen_rule punct_lparen_rule punct_dqright_rule punct_dqleft_rule
+    punct_sqright_rule punct_sqleft_rule punct_hyphen_rule
+    punct_comma_informal_rule)) */
+
+char *gen_ignore_rules[] = {"punct_bang_rule", "punct_semicol_rule", "punct_colon_rule",
+							"punct_rparen_rule", "punct_lparen_rule", "punct_dqright_rule", "punct_dqleft_rule",
+							"punct_sqright_rule", "punct_sqleft_rule", "punct_hyphen_rule", "punct_comma_informal_rule",
+							"fillhead_non_wh" // XXX woodley added
+							};
+int ngen_ignore_rules = sizeof(gen_ignore_rules) / sizeof(char*);
+
 struct rule	**rules;
 int		nrules;
 
@@ -128,7 +142,7 @@ void	setup_rule_filter()
 	lex_filter_rules();
 }
 
-struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
+struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, int copy)
 {
 	struct edge	*e = slab_alloc(sizeof(struct edge));
 	extern int	__qc_use_heap;
@@ -146,7 +160,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl)
 		fprintf(stderr, "epsilon_edge: bad frozen grammar! rule `%s' has no dg!\n", r->name);
 		exit(-1);
 	}
-	//e->dg = copy_dg(e->dg);
+	if(copy)e->dg = copy_dg(e->dg);
 	e->rtl = rtl;
 
 	if(!ruleqc)ruleqc = calloc(sizeof(struct qc*), nrules);
@@ -264,7 +278,7 @@ void	agenda_rules(int	count)
 						nlf++;
 						continue;
 					}
-					add_agenda(epsilon_edge(rules[j], i, rtl));
+					add_agenda(epsilon_edge(rules[j], i, rtl, 0));
 				}
 			}
 		}
@@ -275,6 +289,7 @@ void	agenda_rules(int	count)
 void	add_rule(char	*name, struct dg	*dg, int	num)
 {
 	struct rule	*r = calloc(sizeof(struct rule), 1);
+	int			i;
 
 #ifdef	ERG
 	static int	rnamef = -1;
@@ -301,7 +316,13 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 	r->rnum = nrules-1;
 	r->rtl = rule_is_rtl(r);
 
-	add_semantic_index(r, dg, 1);
+	r->gen_ignore = 0;
+	for(i=0;i<ngen_ignore_rules;i++)
+		if(!strcmp(r->name, gen_ignore_rules[i]))
+			r->gen_ignore = 1;
+
+	if(!r->gen_ignore)
+		add_semantic_index(r, dg, 1);
 
 	//printf("rule %s [%d]:  ", name, num);
 	//print_dg(dg);

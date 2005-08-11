@@ -54,16 +54,9 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 
 	//edge->dg = copy_dg(edge->dg);
 	edge->id = next_eid();
-	if(g_mode == GENERATING)
-	{
-		edge->from = edge->to = 0;
-		edge->ep_span = 1<<i;
-	}
-	else // (g_mode == PARSING)
-	{
-		edge->from = i;
-		edge->to = i+len;
-	}
+	edge->from = i;
+	edge->to = i+len;
+	edge->ep_span = 0;
 	edge->lex = lex;
 	edge->qc = extract_qc(edge->dg);
 	edge->prio = LEX_PRIO;
@@ -172,35 +165,6 @@ void	visit_lexicon(char	*stem, void (*visitor)(struct lexeme *lex))
 		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
 			visitor(lexemes[i]);
 	}
-}
-
-void	skolemize_arg(struct dg	*dg, char	*arg, struct dg	*inst)
-{
-	dg = dg_hop(dg, lookup_fname(arg));
-	if(dg)add_dg_feature(dg, "INSTLOC", inst);
-}
-
-void	skolemize_rel_as(struct dg	*rel, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3)
-{
-	if(a0)skolemize_arg(rel, "ARG0", a0);
-	if(a1)skolemize_arg(rel, "ARG1", a1);
-	if(a2)skolemize_arg(rel, "ARG2", a2);
-	if(a3)skolemize_arg(rel, "ARG3", a3);
-}
-
-void	skolemize_as(struct dg	*dg, struct dg	*a0, struct dg	*a1, struct dg	*a2, struct dg	*a3)
-{
-	struct dg	*rel=0;
-
-	if(dg)dg = dg_hop(dg, lookup_fname("SYNSEM"));
-	/*if(dg)dg = dg_hop(dg, lookup_fname("LOCAL"));
-	if(dg)dg = dg_hop(dg, lookup_fname("CONT"));
-	if(dg)dg = dg_hop(dg, lookup_fname("RELS"));
-	if(dg)dg = dg_hop(dg, lookup_fname("LIST"));
-	if(dg)rel = dg_hop(dg, lookup_fname("FIRST"));*/
-	if(dg)dg = dg_hop(dg, lookup_fname("LKEYS"));
-	if(dg)rel = dg_hop(dg, lookup_fname("KEYREL"));
-	if(rel)skolemize_rel_as(rel, a0, a1, a2, a3);
 }
 
 void	dump_parts_of_speech()

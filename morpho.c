@@ -89,7 +89,7 @@ void add_mwe_routes(struct edge *e, struct ochart_edge *pre, struct ochart_edge 
 			}
 }
 
-int	add_lexemes_to_chart(int	nwords, char	**words)
+int	lexical_lookup(int	nwords, char	**words)
 {
 	struct ochart	*charts = slab_alloc(sizeof(struct ochart)*nwords);
 	int				i, j, k;

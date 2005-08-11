@@ -21,7 +21,9 @@ struct mrs_ep
 		char			*name;
 		struct mrs_var	*value;
 	}	*args;
-	int		nargs;
+	int			nargs:15;
+	int			active:1;	// used in semantic lookup enumeration stage
+	unsigned	epnum:16;	// so we can just pass mrs_ep's around and know their ids
 };
 
 struct mrs_hcons
@@ -55,3 +57,4 @@ struct mrs
 
 struct mrs	*read_mrs(FILE	*f);
 void		free_mrs(struct mrs	*m);
+void		semantic_lookup(struct mrs	*mrs);

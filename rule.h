@@ -5,11 +5,12 @@ struct rule
 {
 	char		*name;
 	struct dg	*dg;
-	int		ndaughters;
 	struct irule	*inflr;
-	int		lexical;
-	int		rnum;
-	int		rtl;
+	int		rnum:16;
+	int		ndaughters:4;
+	int		lexical:4;
+	int		rtl:4;
+	int		gen_ignore:4;
 };
 
 #include	"dag.h"
@@ -17,7 +18,7 @@ struct rule
 
 int			load_rules_conf();
 void		rule_stats();
-struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl);
+struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, int copy);
 void		print_rule(char	*name);
 void		setup_rule_filter();
 void		lex_filter_rules();

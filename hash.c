@@ -80,6 +80,16 @@ void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitor)(void *value))
 	}
 }
 
+void		*hash_find(struct hash	*ht, char	*key)
+{
+	unsigned h = hash_code(ht, key);
+	struct hash_bucket	*bucket;
+	
+	for(bucket=ht->buckets[h];bucket;bucket=bucket->next)
+		if(!strcmp(bucket->key, key))return bucket->value;
+	return 0;
+}
+
 struct hash	*freeze_hash(struct hash	*ht)
 {
 extern char	*freeze_string(char	*str);

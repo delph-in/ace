@@ -318,7 +318,12 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			e->inflr_routes = 0;
 		}
 	}
-	else e->lex = 0;
+	else
+	{
+		e->lex = 0;
+		e->ninflr_routes = 0;
+		e->inflr_routes = 0;
+	}
 
 	e->ep_span = a->ep_span | b->ep_span;
 	e->npack=0;
@@ -623,6 +628,27 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	return 0;
 }
 
+int identical_inflr_routes(struct edge *a, struct edge *b)
+{
+	struct inflr_route *ra, *rb;
+	int					i, n = a->ninflr_routes;
+
+	if(a->ninflr_routes != b->ninflr_routes)return 0;
+	int inflr_route_cmp(const struct inflr_route *ra, const struct inflr_route *rb)
+	{
+		int i;
+		if(ra->len != rb->len)return ra->len-rb->len;
+		return memcmp(ra->rules, rb->rules, sizeof(int)*ra->len);
+	}
+	// XXX should keep these sorted ahead of time
+	qsort(a->inflr_routes, n, sizeof(struct inflr_route), (int(*)(const void*, const void*))inflr_route_cmp);
+	qsort(b->inflr_routes, n, sizeof(struct inflr_route), (int(*)(const void*, const void*))inflr_route_cmp);
+	for(i=0;i<n;i++)
+		if(inflr_route_cmp(a->inflr_routes+i, b->inflr_routes+i))
+			return 0;
+	return 1;
+}
+
 static void record_packing(struct edge *host, struct edge *e)
 {
 	host->npack++;
@@ -640,12 +666,9 @@ int	pack_edge(struct edge	*edge)
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	struct edge			*h;
 	int			i, ssd;
-	//extern const int	qcbytes;
 
-	// since we're taking first-parse-only, this is ok perhaps.
 	for(i=0;i<c->p_nedges && (h=c->p_edges[i]);i++)
-		if(!h->lex // XXX think about this carefully
-		&& h->have != -1
+		if(h->have != -1
 //#ifdef	BIDIR_SS	// XXX think about this carefully
 		&& h->age == edge->age
 //#endif
@@ -656,6 +679,8 @@ int	pack_edge(struct edge	*edge)
 #ifdef	COPY_COUNTS
 			packtry++;
 #endif
+
+			if(!identical_inflr_routes(h, edge))continue;
 
 			if(!edge->dg)
 				if(recall_hyper(edge))return 0;
@@ -678,9 +703,10 @@ int	pack_edge(struct edge	*edge)
 #endif
 
 			ssd = equivalent_dg(h->dg, edge->dg);
+			if(ssd && h->lex || edge->lex)printf("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
 			if(ssd == 1)
 			{
-				//fprintf(stderr, "packed #%d in #%d!\n", edge->id, h->id);
+				//printf("packed #%d `%s' in #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
 				//printf("host: "); print_dg(h->dg); printf("\n");
 				//printf("pack: "); print_dg(edge->dg); printf("\n");
 				//printf("EQUIV = %d\n", equivalent_dg(h->dg, edge->dg));
@@ -690,7 +716,7 @@ int	pack_edge(struct edge	*edge)
 #ifdef	BIDIR_SS
 			else if(ssd == -1)
 			{
-				//fprintf(stderr, "reverse packed #%d in #%d!\n", h->id, edge->id);
+				//printf("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
 				//printf("host: "); print_dg(edge->dg); printf("\n");
 				//printf("pack: "); print_dg(h->dg); printf("\n");
 				edge->npack = h->npack;
@@ -716,7 +742,7 @@ static int	parse_process_edge(struct edge	*e)
 
 	/*if(e->have==e->need)
 		e->dg->xtype = lookup_type("*top*");*/
-	if(!inhibit_pack && e->have == e->need && !e->lex)
+	if(!inhibit_pack && e->have == e->need)
 	{
 		pack = pack_edge(e);
 #ifdef	COPY_COUNTS
@@ -797,7 +823,7 @@ char	*show_orth_leaves(struct edge	*e)
 	{
 		if(e->lex)
 		{
-			// XXX fix me
+			// XXX fix me for MWEs
 			ret = strdup(e->lex->stem[0]->name+1);
 			ret[strlen(ret)-1] = 0;
 			return ret;
@@ -830,25 +856,6 @@ char	*show_orth_leaves(struct edge	*e)
 	}
 }
 
-void	skolemize_rel(struct dg	*rel, struct mrs_ep	*p, struct mrs_vlist *vlist, struct dg **sk)
-{
-	extern void	skolemize_arg(struct dg	*dg, char	*arg, struct dg	*inst);
-	int	i, j;
-
-	for(i=0;i<p->nargs;i++)
-	{
-		for(j=0;j<vlist->nvars;j++)
-			if(vlist->vars[j] == p->args[i].value)break;
-		if(j==vlist->nvars)
-		{
-			fprintf(stderr, "ERROR: skolemize_rel unable to find an MRS variable\n");
-			continue;
-		}
-		// XXX need to skolemize the value's properties in as well
-		skolemize_arg(rel, p->args[i].name, sk[j]);
-	}
-}
-
 int	nfinal, last_mem_bytes;
 
 int	parse(int	nwords, char	*words[], char	*sentence)
@@ -861,7 +868,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	// setup the chart
 	clear_chart(nwords+1);
-	if(add_lexemes_to_chart(nwords, words))return -1;
+	if(lexical_lookup(nwords, words))return -1;
 	if(reduce_chart(nwords))return -1;
 
 	//if(rtried)free(rtried);
