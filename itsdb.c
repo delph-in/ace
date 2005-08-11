@@ -105,6 +105,7 @@ capi_print_derivations(int nwords, char **words)
 					capi_print_tree0(e->daughters[i]);
 			else
 			{
+				// XXX this won't work for generation; should use equivalent of show_orth_leaves().
 				int i;
 				DER_PRINTF(" (\\\"");
 				for(i=e->from;i<e->to;i++)
