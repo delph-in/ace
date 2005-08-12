@@ -43,9 +43,8 @@ struct edge	*sentential = 0;
 int	cancel_parse;
 
 #define	MAX_CHUNKS	2560	// when to give up on a parse
-//#define	MAX_CHUNKS	680	// when to give up on a parse
+//#define	MAX_CHUNKS	1280	// when to give up on a parse
 //#define	MAX_CHUNKS	71	// when to give up on a parse
-//#define	FIRST_ONLY
 
 //#define	EXCURSION
 
@@ -152,12 +151,16 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	nneed = a->need;
 	if(nhave == nneed)
 	{
+		static struct type *signtype = 0;
+		if(!signtype)signtype = lookup_type("sign");
+
 		// building passive
 		if(a->dg && b->dg && !spanning && 0)
 		{
 			// hyperpassive
 			hyperactive = 1;
 			__qc_use_heap = 1;
+			dg->type = signtype;
 			hqc = extract_qc_arg(dg, -1);
 			__qc_use_heap = 0;
 			forget_tmp();
@@ -178,6 +181,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
 #endif
 			if(!u)return -1;	// cycles might happen, check for them.
+			u->type = u->xtype = signtype;
 			qc = extract_qc_arg(u, -1);
 		}
 		e = slab_alloc(sizeof(struct edge));
@@ -333,12 +337,14 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	{
 		if(g_mode == GENERATING)
 		{
-			printf("generated #%d %d/%d from #%d, #%d for [%8.8X] with rule %s: ", e->id, e->have, e->need, a->id, b->id, e->ep_span, e->rule->name);
+			printf("generated #%d %d/%d from #%d, #%d for [%8.8X] with rule %s: ",
+				e->id, e->have, e->need, a->id, b->id, e->ep_span, e->rule->name);
 			printf("%s\n", show_orth_leaves(e));
 		}
 		else // (g_mode == PARSING)
 		{
-			printf("generated #%d %d/%d for [%d-%d] with rule %s: ", e->id, e->have, e->need, e->from, e->to, e->rule->name);
+			printf("generated #%d %d/%d from #%d, #%d for [%d-%d] with rule %s: ",
+				e->id, e->have, e->need, a->id, b->id, e->from, e->to, e->rule->name);
 			printf("%s\n", show_orth_leaves(e));
 		}
 		if(e->have==e->need && trace>1){print_dg(u); printf("\n\n");}
@@ -446,7 +452,7 @@ static void	hyperactive_excursion(struct edge	*e)
 }
 #endif
 
-static inline int	recall_hyper(struct edge	*b)
+int	recall_hyper(struct edge	*b)
 {
 #ifdef	TIM
 	struct timeval	tv1, tv2;
@@ -628,122 +634,6 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	return 0;
 }
 
-int identical_inflr_routes(struct edge *a, struct edge *b)
-{
-	struct inflr_route *ra, *rb;
-	int					i, n = a->ninflr_routes;
-
-	if(a->ninflr_routes != b->ninflr_routes)return 0;
-	int inflr_route_cmp(const struct inflr_route *ra, const struct inflr_route *rb)
-	{
-		int i;
-		if(ra->len != rb->len)return ra->len-rb->len;
-		return memcmp(ra->rules, rb->rules, sizeof(int)*ra->len);
-	}
-	// XXX should keep these sorted ahead of time
-	qsort(a->inflr_routes, n, sizeof(struct inflr_route), (int(*)(const void*, const void*))inflr_route_cmp);
-	qsort(b->inflr_routes, n, sizeof(struct inflr_route), (int(*)(const void*, const void*))inflr_route_cmp);
-	for(i=0;i<n;i++)
-		if(inflr_route_cmp(a->inflr_routes+i, b->inflr_routes+i))
-			return 0;
-	return 1;
-}
-
-static void record_packing(struct edge *host, struct edge *e)
-{
-	host->npack++;
-	host->pack = slab_realloc(host->pack, (host->npack-1)*sizeof(struct edge*), host->npack*sizeof(struct edge*));
-	host->pack[host->npack-1] = e;
-}
-
-#ifdef	COPY_COUNTS
-static long long packcount = 0, packtry = 0;
-extern long long copycount, copytraverse;
-#endif
-
-int	pack_edge(struct edge	*edge)
-{
-	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
-	struct edge			*h;
-	int			i, ssd;
-
-	// XXX woodley is seeing what happens if all passive edges are type `sign'
-	//despecialize_sign(edge->dg);
-
-#define PACKBUG(fmt,...) do {} while(0)
-
-	PACKBUG("trying to pack #%d `%s' somewhere\n", edge->id, show_orth_leaves(edge));
-
-	for(i=0;i<c->p_nedges && (h=c->p_edges[i]);i++)
-		if(h->have != -1
-		&& (g_mode != GENERATING || h->ep_span == edge->ep_span)
-		&& !equiv_quickcheck(h->qc, edge->qc)
-			)
-		{
-#ifdef	COPY_COUNTS
-			packtry++;
-#endif
-
-			PACKBUG("would like to pack #%d `%s' and #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
-			if(!identical_inflr_routes(h, edge))continue;
-
-			if(!edge->dg)
-				if(recall_hyper(edge))return 0;
-			if(!h->dg)
-				if(recall_hyper(h))continue;
-
-#ifdef	RULE_STATS
-			if(edge->ntries==0)
-			{
-				if(edge->rule)nptries[edge->rule->rnum]++;
-				else nptries[nrules]++;
-			}
-			edge->ntries++;
-			if(h->ntries==0)
-			{
-				if(h->rule)nptries[h->rule->rnum]++;
-				else nptries[nrules]++;
-			}
-			h->ntries++;
-#endif
-
-			ssd = equivalent_dg(h->dg, edge->dg);
-			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
-			if(ssd == 1)
-			{
-				PACKBUG("packed #%d `%s' in #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
-				//printf("host: "); print_dg(h->dg); printf("\n");
-				//printf("pack: "); print_dg(edge->dg); printf("\n");
-				//printf("EQUIV = %d\n", equivalent_dg(h->dg, edge->dg));
-				record_packing(h, edge);
-				return 1;
-			}
-#ifdef	BIDIR_SS
-			else if(ssd == -1 && h->age == edge->age)
-			{
-				PACKBUG("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
-				//printf("host: "); print_dg(edge->dg); printf("\n");
-				//printf("pack: "); print_dg(h->dg); printf("\n");
-				edge->npack = h->npack;
-				edge->pack = h->pack;
-				h->npack = 0;
-				h->pack = 0;
-				record_packing(edge, h);
-				c->p_edges[i] = edge;
-				return 2;	// tell caller the edge is in the chart but requires further processing
-			}
-			/*else if(ssd == -1)printf("would have reverse packed but ages differ\n");
-			else
-			{
-				printf(" ... no subsumption relation\n");
-				printf("host: "); print_dg(h->dg); printf("\n");
-				printf("edge: "); print_dg(edge->dg); printf("\n");
-			}*/
-#endif
-		}
-	return 0;
-}
-
 static int	parse_process_edge(struct edge	*e)
 {
 	int			i, j, remain, pack = 0;
@@ -757,9 +647,6 @@ static int	parse_process_edge(struct edge	*e)
 	if(!inhibit_pack && e->have == e->need)
 	{
 		pack = pack_edge(e);
-#ifdef	COPY_COUNTS
-		packcount++;
-#endif
 		if(pack==1)
 			return 0;	// big savings! woohoo!
 	}
@@ -911,9 +798,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	//capi_print_derivations();
 
 	// show analyses
-//#ifdef	FIRST_ONLY
 	if(!exhaustive && sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
-//#endif
 	num_entries = cells[chart_size-1].p_nedges;
 	for(i=0;i<num_entries;i++)
 	{
@@ -957,9 +842,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 			if(!question)printf("\n\n");
 			fflush(stdout);
 		}
-//#ifdef	FIRST_ONLY
 		if(!exhaustive)break;
-//#endif
 	}
 
 	if(!inhibit_results)
@@ -992,10 +875,7 @@ visit_roots(void (*visitor)(struct edge *e))
 
 void	final_chart_stats()
 {
-#ifdef	COPY_COUNTS
-	fprintf(stderr, "NOTE: %lld packings (%.1f%% success), %lld / %lld = %.1f%% copies\n", packcount, 100*(float)packcount / packtry,
-		copycount, copytraverse, 100*(float)copycount / copytraverse);
-#endif
+	packing_report();
 #ifdef TIM
 	fprintf(stderr, "NOTE: unify was %.4fs\n", base_unify_time);
 	fprintf(stderr, "NOTE: finalize was %.4fs\n", base_finalize_time);

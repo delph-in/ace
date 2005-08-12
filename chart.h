@@ -65,24 +65,35 @@ struct forest
 
 #define	LEX_PRIO	10
 
-int		parse(int	nwords, char	*words[], char	*sentence);
+// general chart processing equipment
+int		combine(struct edge	*a, struct edge	*b);
 void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge);
 void	add_edge_to_chart(struct edge	*edge);
-int		combine(struct edge	*a, struct edge	*b);
-int		pack_edge(struct edge	*edge);
+int		recall_hyper(struct edge	*b);
 void	clear_chart(int	size);
 void	free_edge(struct edge	*edge);
 int		next_eid();
-int		reduce_chart(int	length);
+
+// parser
+int		parse(int	nwords, char	*words[], char	*sentence);
+
+// display
 void	output_lui(char	*words[]);
 void	final_chart_stats();
 char	*show_orth_leaves(struct edge	*e);
 
-void	clear_agenda();
-void	add_agenda(struct edge	*e);
+// agenda
 struct edge	*next_agenda(int	from_start);
+void		clear_agenda();
+void		add_agenda(struct edge	*e);
+int			reduce_chart(int	length);
+
+// packing
+int			pack_edge(struct edge	*edge);
+struct dg	*restrict_copy_dg(struct dg	*dg, int for_generation);
 
 extern struct chart_cell	*cells;
+extern int					chart_size;
 extern unsigned int			require_ep_span;
 
 #define PARSING 1
