@@ -1011,6 +1011,7 @@ struct dg	*trim_args(struct dg	*d)
 			narc++;
 	copy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*narc);
 	*copy = *d;
+
 	copy->narcs = narc;
 	cpy_arcs = DARCS(copy);//slab_alloc(sizeof(struct dg) * narc);
 	narc = 0;
@@ -1020,4 +1021,13 @@ struct dg	*trim_args(struct dg	*d)
 			cpy_arcs[narc++] = arcs[i];
 	}
 	return copy;
+}
+
+void despecialize_sign(struct dg *dg)
+{
+	static struct type *sign = 0;
+
+	// XXX woodley is hacking around to get more packing:
+	if(!sign)sign = lookup_type("sign");
+	dg->xtype = dg->type = sign;
 }

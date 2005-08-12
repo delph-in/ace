@@ -64,7 +64,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	edge->inflr_routes = 0;
 	edge->age = 0;
 
-	if(trace)
+	if(trace && g_mode==PARSING)
 	{
 		printf("added lexeme `%s' = #%d\n", lex->word, edge->id);
 		if(trace>1){print_dg(edge->dg); printf("\n\n");}

@@ -31,7 +31,7 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl)
 			if(feat->rhs[1])return;
 			if(strcasecmp(rhs1, feat->rhs[0]))return;
 			ret += feat->score;
-			MAXENT_NOISE("MAXENT feature fired: "); print_mef(feat);
+			//MAXENT_NOISE("MAXENT feature fired: "); print_mef(feat);
 		}
 		else
 		{
@@ -40,7 +40,7 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl)
 				if(strcasecmp(rhs1, feat->rhs[0]))return;
 				if(strcasecmp(rhs2, feat->rhs[1]))return;
 				ret += feat->score;
-				MAXENT_NOISE("MAXENT feature fired: "); print_mef(feat);
+				//MAXENT_NOISE("MAXENT feature fired: "); print_mef(feat);
 			}
 			else
 			{
@@ -156,6 +156,7 @@ void	*freeze_stochastic_model()
 
 void	recover_stochastic_model(void *_frozen)
 {
+	extern int debug_level;
 	mem = _frozen;
-	if(mem)printf("NOTE: max-ent model hash contains %d entries in %d slots\n", mem->entries, mem->size);
+	if(mem && debug_level)printf("NOTE: max-ent model hash contains %d entries in %d slots\n", mem->entries, mem->size);
 }

@@ -667,11 +667,15 @@ int	pack_edge(struct edge	*edge)
 	struct edge			*h;
 	int			i, ssd;
 
+	// XXX woodley is seeing what happens if all passive edges are type `sign'
+	//despecialize_sign(edge->dg);
+
+#define PACKBUG(fmt,...) do {} while(0)
+
+	PACKBUG("trying to pack #%d `%s' somewhere\n", edge->id, show_orth_leaves(edge));
+
 	for(i=0;i<c->p_nedges && (h=c->p_edges[i]);i++)
 		if(h->have != -1
-//#ifdef	BIDIR_SS	// XXX think about this carefully
-		&& h->age == edge->age
-//#endif
 		&& (g_mode != GENERATING || h->ep_span == edge->ep_span)
 		&& !equiv_quickcheck(h->qc, edge->qc)
 			)
@@ -680,6 +684,7 @@ int	pack_edge(struct edge	*edge)
 			packtry++;
 #endif
 
+			PACKBUG("would like to pack #%d `%s' and #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
 			if(!identical_inflr_routes(h, edge))continue;
 
 			if(!edge->dg)
@@ -703,10 +708,10 @@ int	pack_edge(struct edge	*edge)
 #endif
 
 			ssd = equivalent_dg(h->dg, edge->dg);
-			if(ssd && h->lex || edge->lex)printf("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
+			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
 			if(ssd == 1)
 			{
-				//printf("packed #%d `%s' in #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
+				PACKBUG("packed #%d `%s' in #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
 				//printf("host: "); print_dg(h->dg); printf("\n");
 				//printf("pack: "); print_dg(edge->dg); printf("\n");
 				//printf("EQUIV = %d\n", equivalent_dg(h->dg, edge->dg));
@@ -714,9 +719,9 @@ int	pack_edge(struct edge	*edge)
 				return 1;
 			}
 #ifdef	BIDIR_SS
-			else if(ssd == -1)
+			else if(ssd == -1 && h->age == edge->age)
 			{
-				//printf("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
+				PACKBUG("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
 				//printf("host: "); print_dg(edge->dg); printf("\n");
 				//printf("pack: "); print_dg(h->dg); printf("\n");
 				edge->npack = h->npack;
@@ -727,6 +732,13 @@ int	pack_edge(struct edge	*edge)
 				c->p_edges[i] = edge;
 				return 2;	// tell caller the edge is in the chart but requires further processing
 			}
+			/*else if(ssd == -1)printf("would have reverse packed but ages differ\n");
+			else
+			{
+				printf(" ... no subsumption relation\n");
+				printf("host: "); print_dg(h->dg); printf("\n");
+				printf("edge: "); print_dg(edge->dg); printf("\n");
+			}*/
 #endif
 		}
 	return 0;
@@ -950,7 +962,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 //#endif
 	}
 
-	if(debug_level)
+	if(!inhibit_results)
 	{
 		fprintf(stderr, "NOTE: %d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
 					num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);

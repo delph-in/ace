@@ -36,9 +36,6 @@ struct edge
 		int len;
 		int *rules;
 	}	*inflr_routes;
-	// 1 for allowed inflr's, 0 for disallowed
-	//char		*inflr_allow;
-	//int		allow_no_inflr;
 
 	struct unpack_info *unpack;
 

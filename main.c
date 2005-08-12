@@ -13,7 +13,7 @@
 #include	"preprocessor.h"
 #include	"mrs.h"
 
-int	debug_level = 1, export_parts = 0, do_itsdb = 0;
+int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0, *load_mem_path = 0;
 char	*sentence_path = 0;

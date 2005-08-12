@@ -7,7 +7,7 @@
 #include "lexicon.h"
 #include "chart.h"
 
-extern int	question, exhaustive, lui_chart, inhibit_pack, trace;
+extern int	question, exhaustive, lui_chart, inhibit_pack, trace, debug_level;
 
 unsigned int	require_ep_span = 0;
 
@@ -141,8 +141,11 @@ int	generate(struct mrs	*mrs)
 
 	clear_chart(1);
 
-	printf("trying to generate from MRS:\n");
-	print_mrs(mrs); printf("\n");
+	if(debug_level)
+	{
+		printf("trying to generate from MRS:\n");
+		print_mrs(mrs); printf("\n");
+	}
 
 	if(mrs->nrels > 32)
 	{

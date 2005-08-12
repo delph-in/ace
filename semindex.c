@@ -290,8 +290,11 @@ void	*freeze_semantic_index()
 
 void	recover_semantic_index(void *frozen)
 {
+	extern int debug_level;
 	sindex = frozen;
-	printf("NOTE: semantic index hash contains %d entries in %d slots\n", sindex->entries, sindex->size);
+	if(debug_level)
+		printf("NOTE: semantic index hash contains %d entries in %d slots\n",
+					sindex->entries, sindex->size);
 }
 
 
@@ -465,6 +468,7 @@ int evacuate(int nvaclex, char **vaclex)
 
 void semantic_lookup(struct mrs	*mrs)
 {
+	extern int debug_level;
 	struct spn_list	*active = 0, *walk;
 	int				i, count = 0;
 
@@ -482,34 +486,5 @@ void semantic_lookup(struct mrs	*mrs)
 	// finally, add vacuous entities
 	count += evacuate(mrs->ntriggers, mrs->triggers);
 
-	printf("added %d grammar entities\n", count);
-
-	/*
-
-	// add vacuous lexemes which trigger rules specify
-	int trigger(struct edge	*e, struct lexeme *lex)
-	{
-		int	i;
-		for(i=0;i<mrs->ntriggers;i++)
-		{
-			if(!strcmp(lex->word, mrs->triggers[i]))
-			{
-				printf("GEN-add `%s'\n", lex->word);
-				e->ep_span = 0;
-				return 0;
-			}
-		}
-		return -1;
-	}
-	add_lexemes_for_relation(-1, VACUOUS, trigger);
-
-	int ryes(struct edge *e, struct rule *rule)
-	{
-		int i;
-		for(i=0;i<ngen_ignore_rules;i++)	// XXX should really just store a bit on `struct rule' for whether the generator ignores it
-			if(!strcmp(rule->name, gen_ignore_rules[i]))
-				return -1;
-		return 0;
-	}
-	add_rules_for_relation(VACUOUS, ryes);*/
+	if(debug_level)printf("added %d grammar entities\n", count);
 }
