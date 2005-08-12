@@ -122,6 +122,11 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 			//printf(" { prop `%s' value `%s' }\n", prop->name, prop->value);
 		}
 	}
+	else
+	{
+		var.type = calloc(1,2);
+		var.type[0] = var.name[0];
+	}
 
 	// done parsing, check for reentrancies
 	for(i=0;i<vlist->nvars;i++)

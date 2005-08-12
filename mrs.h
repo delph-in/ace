@@ -10,6 +10,8 @@ struct mrs_var
 	}			*props;
 	short		nprops:15, is_const:1;
 	short		refs;
+
+	struct dg	*dg;
 };
 
 struct mrs_ep
@@ -24,6 +26,8 @@ struct mrs_ep
 	int			nargs:15;
 	int			active:1;	// used in semantic lookup enumeration stage
 	unsigned	epnum:16;	// so we can just pass mrs_ep's around and know their ids
+
+	struct dg	*dg;
 };
 
 struct mrs_hcons
