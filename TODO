@@ -1,5 +1,10 @@
 TODO:
 
+make quickcheck used for packing ignore packing restrictor (!!!)
+figure out whether despecialize()'ing edges is right or not
+	- it causes significantly more packing, especially in generation,
+		but slows down parsing slightly.
+
 unpacking + statistical parse selection
 	- fix maxent scoring to be completely additive
 
