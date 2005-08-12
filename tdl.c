@@ -418,7 +418,7 @@ static void coreference(struct dagify_record	*R, char	*name)
 	R->corefs[R->ncorefs-1].name = strdup(name);
 }
 
-static struct dg *add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
+struct dg *add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
 {
 	int	i;
 	struct dg *step, *ret = d;

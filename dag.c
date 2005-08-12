@@ -198,7 +198,7 @@ char		**fnames;
 
 int	subsume_forward, subsume_backward;
 
-#define	SUBS_IGNORE(label)	((label>=16 && label<=20))
+#define	SUBS_IGNORE(label)	0	//((label>=16 && label<=20))
 
 // make sure 'copy' is either null or self-referential all the way through 'a's arcs
 int	subsume_same_dg(struct dg	*a)
@@ -374,6 +374,15 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 }
 
 int		*introduce;	// what type introduced this fname?
+
+struct dg	*wellform_dg(struct dg	*dg)
+{
+	struct dg	*wfee;
+	// slight trick: wellform() only applies to stuff inside its argument, not to the top level.
+	wfee = atomic_dg("*top*"); wfee = add_dg_hop(wfee, 1, dg);
+	wellform(wfee, "mrs variable");
+	return dg_hop(wfee, 1);
+}
 
 struct type	*most_general_type_for_dg(struct dg	*d)
 {

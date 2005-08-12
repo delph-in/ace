@@ -1,4 +1,4 @@
-// implementation of Tomabechi's (not SS yet) Quasi-Destructive Unifier (1992)
+// implementation of Tomabechi's SS Quasi-Destructive Unifier
 
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -12,7 +12,11 @@ extern int	g_loaded;
 
 static int	cont_fnum, hcons_fnum;
 //#define SHOULD_TRIM(label)		(label==0 || (label>=5 && label<=15) || label==cont_fnum || label==hcons_fnum)
+
 #define SHOULD_TRIM(label)		(label==0 || (label>=5 && label<=15))
+
+int copy_restrict = 0;
+#define PACKING_RESTRICTOR(label)	(copy_restrict && (label>=16 && label<=20) && (label!=17 || copy_restrict!=2))
 
 // global generation counter for invalidating quasi-destructive operations
 unsigned int	generation = 10;
@@ -312,7 +316,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 	}
 }
 
-static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
+struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
 	struct darc	*aptr, *optr;
@@ -366,6 +370,8 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 	newcopy->forward = (void*)1;
 	for(i=0;i<dg->narcs;i++)
 	{
+		if(PACKING_RESTRICTOR(optr->label))
+			{ optr++; newcopy->narcs--; continue; }
 		aptr->label = optr->label;
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
 		//		fnames[aptr->label], newcopy->type->name, optr->dest);
@@ -378,6 +384,8 @@ static struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 	{
 		for(i=0;i<dg->ncarcs;i++)
 		{
+			if(PACKING_RESTRICTOR(dg->carcs[i].label))
+				{ newcopy->ncarcs--; continue; }
 			aptr->label = dg->carcs[i].label;
 			//fprintf(stderr, "copying comp `%s' arc from %s to %p\n",
 			//	fnames[aptr->label], newcopy->type->name, dg->carcs[i].dest);
@@ -596,7 +604,7 @@ struct dg	*get_extra_type_dg(struct type	*t)
 	return extra;
 }
 
-static int	unify1(struct dg	*dg1, struct dg	*dg2)
+int	unify1(struct dg	*dg1, struct dg	*dg2)
 {
 	int	i, j, k;
 	unsigned char	news[32], nn=0;
@@ -706,7 +714,6 @@ static int	unify1(struct dg	*dg1, struct dg	*dg2)
 #endif
 	}
 	for(;i<dg2->ncarcs;i++)newcs[nc++] = i;
-	
 
 	// add remaining dg2 arcs and comps arcs to dg1's comps arcs
 	if(nn+nc > 0)
@@ -1021,13 +1028,4 @@ struct dg	*trim_args(struct dg	*d)
 			cpy_arcs[narc++] = arcs[i];
 	}
 	return copy;
-}
-
-void despecialize_sign(struct dg *dg)
-{
-	static struct type *sign = 0;
-
-	// XXX woodley is hacking around to get more packing:
-	if(!sign)sign = lookup_type("sign");
-	dg->xtype = dg->type = sign;
 }

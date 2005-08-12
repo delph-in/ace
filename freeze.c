@@ -90,14 +90,9 @@ struct rule	*freeze_rule(struct rule	*rin)
 	struct rule	*rout = slab_alloc(sizeof(struct rule));
 
 	*rout = *rin;
-#ifdef	ERG
-	// in the ERG, non-inflectional rules are completely defined by types.
-	// don't bother to make a copy of the type.
-	/*if(!rin->inflr)rout->dg = rin->dg->xtype->dg;
-	else */rout->dg = copy_dg(rin->dg);
-#else
 	rout->dg = copy_dg(rin->dg);
-#endif
+	rout->packdg = copy_dg(rin->packdg);
+	rout->gpackdg = copy_dg(rin->gpackdg);
 	rout->name = freeze_string(rin->name);
 	strcpy(rout->name, rin->name);
 
@@ -248,6 +243,8 @@ int	freeze_grammar()
 
 	for(i=0;i<ntypes;i++)patch_dg(types[i]->dg);
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->dg);
+	for(i=0;i<nrules;i++)patch_dg(rules[i]->packdg);
+	for(i=0;i<nrules;i++)patch_dg(rules[i]->gpackdg);
 	for(i=0;i<nlexemes;i++)
 	{
 		if(lexemes[i]->dg)patch_dg(lexemes[i]->dg);
