@@ -5,7 +5,6 @@
 
 int	invert_ipat(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem, int type);
 struct lexeme	*proper_noun_lex(char	*name);
-struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len);
 
 extern int	wcap[1024];
 
@@ -145,7 +144,7 @@ int	lexical_lookup(int	nwords, char	**words)
 						sprintf(stemcmp, "\"%s\"", f->form);
 						if(!strcasecmp(stemcmp, last) && is_type_only_oedge(f, ir_suffix))
 						{
-							le = lexical_edge(lex, i, lex->stemlen);
+							le = lexical_edge(lex, i, lex->stemlen, 0);
 							add_mwe_routes(le, e, f);
 							break;
 						}
@@ -153,7 +152,7 @@ int	lexical_lookup(int	nwords, char	**words)
 				}
 				else
 				{
-					le = lexical_edge(lex, i, lex->stemlen);
+					le = lexical_edge(lex, i, lex->stemlen, 0);
 					le->ninflr_routes = e->ninflr_routes;
 					le->inflr_routes = e->inflr_routes;
 				}

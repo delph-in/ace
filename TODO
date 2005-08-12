@@ -1,14 +1,12 @@
 TODO:
 
-make quickcheck used for packing ignore packing restrictor (!!!)
-figure out whether despecialize()'ing edges is right or not
-	- it causes significantly more packing, especially in generation,
-		but slows down parsing slightly.
+speedup shtinkin' grammar generation
+make freezer report how much ram each component took
+
+pack active edges?
 
 unpacking + statistical parse selection
 	- fix maxent scoring to be completely additive
-
-allow packing in lexical rules
 
 improve MRS extractor
 	- perhaps into mrs.c's format

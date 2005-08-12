@@ -17,10 +17,11 @@ extern unsigned int	generation;
 extern int trace;
 extern unsigned int require_ep_span;
 
-//#define	FULL_LEXICON
 #define		SIMPLE_LEXICON
 
-struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
+struct dg	*constrain_lex_rels(struct dg *dg, struct dg *rels);
+
+struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 {
 	struct edge	*edge = slab_alloc(sizeof(struct edge));
 	struct dg	*ldg;
@@ -35,22 +36,20 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 
 	bzero(edge, sizeof(struct edge));
 
-#ifdef	FULL_LEXICON
-	edge->dg = lex->dg;
-#else
 #ifdef	SIMPLE_LEXICON
 	ldg = expand_lexeme(lex);
 #else
 	ldg = lex->dg;
 #endif
+	if(rels)ldg = constrain_lex_rels(ldg, rels);
 	edge->dg = unify_dg(ldg, lex->lextype->dg, -1);
 	if(!edge->dg)
 	{
-		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed delayed unification\n", lex->word);
+		if(rels)return 0;
+		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed construction\n", lex->word);
 		exit(-1);
 	}
-	wellform(edge->dg, lex->word);
-#endif
+	wellform(edge->dg, lex->word); // XXX I don't think this is necessary, since lextype is already well formed
 
 	//edge->dg = copy_dg(edge->dg);
 	edge->id = next_eid();
@@ -64,7 +63,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len)
 	edge->inflr_routes = 0;
 	edge->age = 0;
 
-	if(trace && g_mode==PARSING)
+	if(trace)
 	{
 		printf("added lexeme `%s' = #%d\n", lex->word, edge->id);
 		if(trace>1){print_dg(edge->dg); printf("\n\n");}
@@ -127,10 +126,6 @@ struct lexeme	*proper_noun_lex(char	*name)
 	lex->stem[0] = ty;
 	lex->lextype = extra->type;
 	lex->dg = extra;
-
-#ifdef	FULL_LEXICON
-#error	fix proper_noun_lex() to support FULL_LEXICON, please
-#endif
 
 	return lex;
 }
@@ -223,6 +218,7 @@ void	dump_parts_of_speech()
 }
 
 static int	stemfeat = -1, rfeat = 2, ffeat = 1, synsemfeat, lkeysfeat, keyrelfeat, predfeat, compkeyfeat, ocompkeyfeat, phonfeat, onsetfeat;
+static int	localfeat, contfeat, relsfeat;
 static struct type	*predsort, *con, *voc;
 
 int	nsimpleform = 0;
@@ -231,6 +227,9 @@ void	init_fnums()
 {
 	stemfeat = lookup_fname("STEM");
 	synsemfeat = lookup_fname("SYNSEM");
+	localfeat = lookup_fname("LOCAL");
+	contfeat = lookup_fname("CONT");
+	relsfeat = lookup_fname("RELS");
 	lkeysfeat = lookup_fname("LKEYS");
 	keyrelfeat = lookup_fname("KEYREL");
 	predfeat = lookup_fname("PRED");
@@ -241,6 +240,15 @@ void	init_fnums()
 	predsort = lookup_type("predsort");
 	con = lookup_type("con");
 	voc = lookup_type("voc");
+}
+
+struct dg	*constrain_lex_rels(struct dg *dg, struct dg *rels)
+{
+	if(stemfeat==-1)
+		init_fnums();
+
+	{ int path[4] = {synsemfeat, localfeat, contfeat, relsfeat};
+		return add_dg_path(dg, path, 4, rels); }
 }
 
 struct type *predict_onset(char *form)
@@ -450,9 +458,6 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 		return -1;
 	}
 	wellform(fulldg, name);
-#ifdef	FULL_LEXICON
-	dg = fulldg;
-#endif
 
 	add_lexeme(name, dg, t, fulldg);
 

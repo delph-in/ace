@@ -47,87 +47,70 @@ int	gen_process_edge(struct edge	*e)
 	return 0;
 }
 
-// instantiation
+// ep, var, and rels-list dg construction
 
-static struct dg	**skunk;
-struct mrs_vlist	*vlist;
-
-struct dg *constrain_role(struct dg *dg, struct mrs_var *var)
+void	dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem)
 {
-	struct dg	*skolem, *newrole;
-	static int instlocf = -1;
-	int i;
+	struct dg	*dg;
+	char		*type = "individual";
+	int			i, path[16], len;
 
-	for(i=0;i<vlist->nvars;i++)
-		if(vlist->vars[i] == var)break;
-	if(i==vlist->nvars)
+	if(var->is_const)
 	{
-		fprintf(stderr, "ERROR: constrain_role unable to find an MRS variable\n");
-		return 0;
+		fprintf(stderr, "ERROR: generator doesn't handle CARG's yet\n");
+		exit(-1);
 	}
-	else skolem = skunk[i];
 
-	//printf("place of constraint: "); print_dg(dg); printf("\n");
+	switch(var->type[0]) {
+		case	'e': type = "event";			break;
+		case	'x': type = "event_or_index";	break;
+		case	'u': type = "event_or_index";	break;
+		case	'h': type = "handle";			break;
+	}
 
-	if(instlocf == -1)instlocf = lookup_fname("INSTLOC");
-	newrole = add_dg_hop(dg, instlocf, skolem);
-
-	// XXX need to specialize the value's properties in as well
-	return newrole;
+	dg = atomic_dg(type);
+	for(i=0;i<var->nprops;i++)
+	{
+		char	*vtype = var->props[i].value, *str = strdup(var->props[i].name), *p = str, *p2;
+		len = 0; do
+		{
+			p2 = strchr(p, '.');
+			if(p2)*p2 = 0;
+			path[len++] = lookup_fname(p);
+			p = p2?(p2+1):0;
+		} while(p);
+		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
+	}
+	if(var->type[0]=='e' || var->type[0]=='u' || var->type[0]=='x')dg = add_dg_feature(dg, "INSTLOC", skolem);
+	var->dg = wellform_dg(dg);
 }
 
-int	constrain_rel(struct dg	*rel, struct mrs_ep	*p)
+void dagify_mrs_ep(struct mrs_ep *ep)
 {
-	int	i;
+	struct dg	*dg = atomic_dg("relation");
+	int			i;
 
-	for(i=0;i<p->nargs;i++)
-	{
-		struct dg *role = dg_hop(rel, lookup_fname(p->args[i].name));
-		struct dg *newrole;
-		if(!role)
-		{
-			fprintf(stderr, "ERROR: constraint site lacked role `%s'\n", p->args[i].name);
-			return -1;
-		}
-		newrole = constrain_role(role, p->args[i].value);
-		if(newrole == 0)return -1;
-		if(newrole != role)
-		{
-			//printf(" ... had to change REL's pointer to role `%s'\n", p->args[i].name);
-			add_dg_feature(rel, p->args[i].name, newrole);
-		}
-	}
-	return 0;
+	dg = add_dg_feature(dg, "PRED", atomic_dg(ep->pred));
+	//if(ep->lbl)dg = add_dg_feature(dg, "LBL", ep->lbl->dg);	// XXX something funny about the grammar.  you *can't* skolemize LBL.
+	for(i=0;i<ep->nargs;i++)
+		dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
+	ep->dg = wellform_dg(dg);
+	//printf("ep dag: "); print_dg(ep->dg); printf("\n\n");
 }
 
-int constrain_gen_edge(struct edge *e, struct dg	*cont, int	neps, struct mrs_ep	*eps[])
+struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[])
 {
-	int 		i;
-	static int	savef[3] = {-1,-1,-1};
-	struct dg	*rels, *rel;
+	struct dg	*last = atomic_dg("*top*"), *list = last;
+	struct dg	*rels = add_dg_feature(atomic_dg("*top*"), "LAST", last);
+	int			i;
 
-	//printf("`%s' aligns as", e->lex?e->lex->word:e->rule->name);
-	//for(i=0;i<neps;i++)printf(" /%d %s", eps[i]->epnum, eps[i]->pred);
-	//printf("\n");
-
-	// visit each relation in the edge's dag
-	rels = walk_dg(cont, savef, "RELS", "LIST", 0);
-	for(i=0;rels && i<neps;i++,rels=dg_hop(rels, 2 /* REST */))
+	for(i=0;i<neps;i++)
 	{
-		if(! (rel = dg_hop(rels, 1 /* FIRST */)) )break;
-		//printf("should skolemize REL: "); print_dg(rel);
-		//printf(" using ep %d = %s\n", eps[i]->epnum, eps[i]->pred);
-		if(constrain_rel(rel, eps[i]) != 0)break;
-		// mark ep coverage provided by this edge
-		e->ep_span |= (1<<eps[i]->epnum);
+		struct dg *cons = atomic_dg("*top*");
+		cons = add_dg_hop(cons, 2, list);
+		list = cons = add_dg_hop(cons, 1, eps[i]->dg);
 	}
-
-	if(i!=neps)
-	{
-		printf("edge skolemization or specialization failed\n");
-		return 0;
-	}
-	return 1;
+	return add_dg_feature(rels, "LIST", list);
 }
 
 // driver
@@ -154,15 +137,17 @@ int	generate(struct mrs	*mrs)
 	}
 	require_ep_span = (1<<mrs->nrels)-1;
 
-	// set up the skolem constants we'll need.
-	skunk = malloc(sizeof(struct dg*) * mrs->vlist.nvars);
+	// set up the skolemization and specialization dags we'll need.
 	for(i=0;i<mrs->vlist.nvars;i++)
 	{
 		extern struct type	**strings;
-		skunk[i] = atomic_dg("*top*");
-		skunk[i]->type = skunk[i]->xtype = strings[i];
+		struct dg			*skolem;
+		skolem = atomic_dg("*top*");
+		skolem->type = skolem->xtype = strings[i];
+		dagify_mrs_var(mrs->vlist.vars[i], skolem);
 	}
-	vlist = &mrs->vlist;
+	for(i=0;i<mrs->nrels;i++)
+		dagify_mrs_ep(mrs->rels+i);
 
 	// set up some lexemes and rules for the generator to play with
 	semantic_lookup(mrs);
@@ -185,6 +170,7 @@ int	generate(struct mrs	*mrs)
 		for(i=0;i<cells->p_nedges;i++)
 		{
 			edge = cells->p_edges[i];
+			if(edge->id == 146)printf("checking 146 for rootness (need epspan %8.8X)\n", require_ep_span);
 			if(edge->ep_span == require_ep_span && is_root(edge->dg))
 			{
 				show:

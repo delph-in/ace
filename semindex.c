@@ -183,54 +183,6 @@ void	add_semantic_index(struct lexeme *l, struct dg *full, int which)
 	else entity_add_semantic_index(which?RULE:LEXEME, 0, l, 0, 0);
 }
 
-/*
-int	add_lexemes_for_relation(int	x, char	*rel, int (*skolemize)(struct edge	*e, struct lexeme	*lex))
-{
-	int	i, count = 0;
-
-	void visitor(struct semindex_pred_node *n)
-	{
-		struct edge	*e;
-		struct slab_state tmpstate;
-	
-		get_slabstate(&tmpstate);
-		e = lexical_edge(l, x, 1);
-		if(!skolemize(e, l))
-		{
-			add_agenda(e);
-			count++;
-		}
-		else set_slabstate(&tmpstate);
-	}
-
-	hash_visit_key(sindex, rel, (void (*)(void*))visitor);
-	return count;
-}
-
-int	add_rules_for_relation(char	*rel, int (*skolemize)(struct edge	*e, struct rule	*rule))
-{
-	int	i, count = 0;
-
-	void visitor(struct rule *r)
-	{
-		struct edge	*e;
-		struct slab_state tmpstate;
-		
-		get_slabstate(&tmpstate);
-		e = epsilon_edge(r, 0, r->rtl);
-		if(!skolemize(e, r))
-		{
-			add_agenda(e);
-			count++;
-		}
-		else set_slabstate(&tmpstate);
-	}
-
-	hash_visit_key(ruindex, rel, (void (*)(void*))visitor);
-	return count;
-}
-*/
-
 void	freeze_ge(struct grammar_entity *n, struct grammar_entity	*ge)
 {
 	int						i;
@@ -359,35 +311,42 @@ struct spn_list	*activate_semindex(struct mrs_ep *ep, struct spn_list	*rest)
 // enumeration
 
 int	enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int ai, int ei, struct mrs_ep	*align[]);
-int constrain_gen_edge(struct edge *e, struct dg	*cont, int	neps, struct mrs_ep	*eps[]);
+//int constrain_gen_edge(struct edge *e, struct dg	*cont, int	neps, struct mrs_ep	*eps[]);
+struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[]);
 
 int enumerate_alignments(struct grammar_entity	*e, int ei, struct mrs_ep	*align[])
 {
 	if(ei == e->nextra_preds)
 	{
 		// we have produced a complete alignment of 'e' against the input semantics.
-		struct edge	*edge;
-		struct dg	*cont;
+		struct edge	*edge = 0;
+		struct dg	*rels = dagify_rels_from_eps(1+e->nextra_preds, align);
 		int			result;
 		struct slab_state slab;
 
 		get_slabstate(&slab);
 		if(e->what == LEXEME)
 		{
-			edge = lexical_edge(e->lex, 0, 0);
-			cont = walk_dg(edge->dg, savef, "SYNSEM", "LOCAL", "CONT", 0);
+			edge = lexical_edge(e->lex, 0, 0, rels);
+			//cont = walk_dg(edge->dg, savef, "SYNSEM", "LOCAL", "CONT", 0);
 		}
 		if(e->what == RULE)
 		{
-			edge = epsilon_edge(e->rule, 0, e->rule->rtl, 1);	// NOTE: last argument means make a copy of the rule's dg, so we can skolemize it!
-			cont = walk_dg(edge->dg, rsavef, "C-CONT", 0);
+			edge = epsilon_edge(e->rule, 0, e->rule->rtl, rels);
+			//cont = walk_dg(edge->dg, rsavef, "C-CONT", 0);
 		}
 		assert(edge || !"Unknown entity type");
-
-		result = constrain_gen_edge(edge, cont, e->nextra_preds+1, align);
-		if(!result)set_slabstate(&slab);
-		else add_agenda(edge);
-		return result?1:0;
+		//result = constrain_gen_edge(edge, cont, e->nextra_preds+1, align);
+		//if(!result)set_slabstate(&slab);
+		if(!edge)set_slabstate(&slab);
+		else
+		{
+			int i;
+			for(i=0;i<=e->nextra_preds;i++)
+				edge->ep_span |= 1<<align[i]->epnum;
+			add_agenda(edge);
+		}
+		return edge?1:0;
 	}
 	else
 	{
@@ -457,7 +416,7 @@ int evacuate(int nvaclex, char **vaclex)
 			for(j=0;j<nvaclex;j++)
 				if(!strcmp(vaclex[j], e->lex->word))break;
 			if(j==nvaclex)continue;
-			add_agenda(lexical_edge(e->lex, 0, 0));
+			add_agenda(lexical_edge(e->lex, 0, 0, 0));
 			count++;
 		}
 	}

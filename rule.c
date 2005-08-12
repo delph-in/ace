@@ -22,6 +22,7 @@ char *gen_ignore_rules[] = {"punct_bang_rule", "punct_semicol_rule", "punct_colo
 							"fillhead_non_wh" // XXX woodley added
 							};
 int ngen_ignore_rules = sizeof(gen_ignore_rules) / sizeof(char*);
+struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels);
 
 struct rule	**rules;
 int		nrules;
@@ -29,7 +30,7 @@ int		nrules;
 char	*rule_filter;
 int	*nhactive, *nactive, *npassive, *nrecomb, *nused, *nptries, *natries;
 int	used_total = 0, pused_total = 0;
-extern int nfinal, trace;
+extern int nfinal, trace, inhibit_pack;
 
 extern unsigned int generation;
 
@@ -142,7 +143,7 @@ void	setup_rule_filter()
 	lex_filter_rules();
 }
 
-struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, int copy)
+struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 {
 	struct edge	*e = slab_alloc(sizeof(struct edge));
 	extern int	__qc_use_heap;
@@ -153,14 +154,17 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, int copy)
 	e->id = next_eid();
 	e->rule = r;
 	e->need = r->ndaughters;
-	//printf("add rule `%s' as edge #%d\n", r->name, e->id);
-	e->dg = r->dg;
+	e->dg = inhibit_pack?r->dg:((g_mode==PARSING)?r->packdg:r->gpackdg);
 	if(!e->dg)
 	{
 		fprintf(stderr, "epsilon_edge: bad frozen grammar! rule `%s' has no dg!\n", r->name);
 		exit(-1);
 	}
-	if(copy)e->dg = copy_dg(e->dg);
+	if(rels)
+	{
+		e->dg = constrain_rule_rels(e->dg, rels);
+		if(!e->dg)return 0;
+	}
 	e->rtl = rtl;
 
 	if(!ruleqc)ruleqc = calloc(sizeof(struct qc*), nrules);
@@ -176,9 +180,38 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, int copy)
 	e->prio = rprio[r->rnum];
 	if(r->lexical && e->prio==0)e->prio = 9;
 
-	if(trace>1)printf("epsilon [%d] of %s is #%d prio %d\n", x, r->name, e->id, e->prio);
+	if(trace>1)
+	{
+		printf("epsilon [%d] of %s is #%d prio %d\n", x, r->name, e->id, e->prio);
+		print_dg(e->dg); printf("\n\n");
+	}
 
 	return e;
+}
+
+// return a copy of 'dg' with 'rels' unified into the C-CONT RELS slot
+struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels)
+{
+	extern long top_copies;
+	struct slab_state	slab;
+	struct dg			*target;
+	get_slabstate(&slab);
+	target = dg_hop(dg, lookup_fname("C-CONT"));
+	if(0 != unify1(target, rels))
+	{ fail:
+		set_slabstate(&slab);
+		return 0;
+	}
+	dg = copy_dg_with_comp_arcs(dg);
+	generation++;
+	if(generation==MAX_GEN)
+	{
+		fprintf(stderr, "ERROR: generation overflowed!\n");
+		exit(-1);
+	}
+	if(!dg)goto fail;
+	top_copies++;
+	return dg;
 }
 
 int	load_rules_conf()
@@ -310,6 +343,8 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 
 	r->name = strdup(name);
 	r->dg = dg;
+	r->packdg = restrict_copy_dg(dg, 0);
+	r->gpackdg = restrict_copy_dg(dg, 1);
 	r->ndaughters = num;
 	r->inflr = 0;
 	r->lexical = 0;

@@ -4,7 +4,9 @@
 struct rule
 {
 	char		*name;
-	struct dg	*dg;
+	struct dg	*dg;		// full form of the dag
+	struct dg	*packdg;	// packing-restricted form of the dag
+	struct dg	*gpackdg;	// generation-packing-restricted form of the dag
 	struct irule	*inflr;
 	int		rnum:16;
 	int		ndaughters:4;
@@ -18,7 +20,7 @@ struct rule
 
 int			load_rules_conf();
 void		rule_stats();
-struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, int copy);
+struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels);
 void		print_rule(char	*name);
 void		setup_rule_filter();
 void		lex_filter_rules();
