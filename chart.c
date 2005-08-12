@@ -119,7 +119,7 @@ void	add_edge_to_chart(struct edge	*edge)
 	add_edge_to_chart_cell(cells+k, edge);
 }
 
-int	trace = 1, gen_qc = 0;
+int	trace = 0, gen_qc = 0;
 
 //#define TIM
 //double base_unify_time = 0, base_finalize_time = 0;
