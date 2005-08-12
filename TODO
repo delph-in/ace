@@ -6,12 +6,15 @@ make freezer report how much ram each component took
 pack active edges?
 
 unpacking + statistical parse selection
-	- fix maxent scoring to be completely additive
+	- selective unpacker should combine all the roots
+	- fix maxent scoring to be score lexemes properly
 
 improve MRS extractor
 	- perhaps into mrs.c's format
 
 record ersatzing
+
+fix proper noun support (I believe the new morphology system broke it)
 
 OPTIMIZATIONS:
 
