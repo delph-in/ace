@@ -170,7 +170,6 @@ int	generate(struct mrs	*mrs)
 		for(i=0;i<cells->p_nedges;i++)
 		{
 			edge = cells->p_edges[i];
-			if(edge->id == 146)printf("checking 146 for rootness (need epspan %8.8X)\n", require_ep_span);
 			if(edge->ep_span == require_ep_span && is_root(edge->dg))
 			{
 				show:
