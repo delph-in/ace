@@ -141,6 +141,7 @@ void	allow_edge_inflr_route(struct edge	*e, int nrules, int *rules)
 
 int	reduce_chart(int	length)
 {
+	extern int debug_level;
 	struct task	*t1, *t2;
 	struct queue	*lag = &agenda[LEX_PRIO];
 	char		cover[length];
@@ -183,7 +184,7 @@ int	reduce_chart(int	length)
 	for(i=0;i<length;i++)
 		if(!cover[i])
 		{
-			fprintf(stderr, "NOTE: lexemes do not span position %d!\n", i);
+			if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d!\n", i);
 			return -1;
 		}
 

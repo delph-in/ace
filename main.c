@@ -21,7 +21,7 @@ int	question = 0, exhaustive = 0, lui_chart = 0, inhibit_pack = 0;
 
 int g_mode = PARSING;
 
-extern int	g_loaded, inhibit_results;
+extern int	g_loaded, inhibit_results, trace;
 extern long long	accum_ram_usage;
 
 char	*current_sentence = "(not initialized)";
@@ -36,7 +36,7 @@ void	parse_args(int	argc, char	*argv[])
 	while((ch=getopt(argc, argv, "hvplxcg:G:m:qtRM:e"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-x] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
-		case	'v':	debug_level++;	break;
+		case	'v':	if(debug_level)trace++; debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
 		case	'M':	load_mem_path = optarg;		break;
 		case	'G':	save_grammar_path = optarg;	break;
@@ -169,7 +169,7 @@ int	main(int	argc, char	*argv[])
 	while(!die && !feof(fin) && fgets(line, 10240, fin))
 	{
 		num_parses = parse_line(line);
-		if(num_parses==-1)fprintf(stderr, "NOTE: ignore\n");
+		if(num_parses==-1) { if(!inhibit_results)fprintf(stderr, "NOTE: ignore\n"); }
 		else if(num_parses>0)success++;
 		else if(num_parses==0)fail++;
 		if(num_parses>=0)count++;

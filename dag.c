@@ -384,6 +384,12 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 	for(i=0;i<d->narcs;i++)
 	{
 		k = introduce[arcs[i].label];
+		if(k==-1)
+		{
+			fprintf(stderr, "ERROR: tried to wellform a dag containing feature `%s', "
+					"which was never introduced in the type heirarchy\n", fnames[arcs[i].label]);
+			exit(-1);
+		}
 		th = types[k];
 		/*if(k>intro)
 		{
