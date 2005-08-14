@@ -44,7 +44,7 @@ unsigned int	thash(char	*name)
 	while(*name)
 	{
 		h <<= 1;
-		h ^= *name++;
+		h ^= tolower(*name++);
 	}
 	return h;
 }
@@ -71,8 +71,11 @@ struct type	*th_look(char	*name)
 	if(!typehash)return 0;
 
 	for(i=0;i<THSIZE;i++)
+	{
 		if(typehash[(h+i)%THSIZE] && !strcasecmp(typehash[(h+i)%THSIZE]->name, name))
 			return typehash[(h+i)%THSIZE];
+		if(!typehash[(h+i)%THSIZE])return 0;
+	}
 	return 0;
 }
 
@@ -192,8 +195,9 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 	struct type	*t;
 	int		i, pari;
 
-	for(i=0;i<ntypes;i++)
-		if(!strcasecmp(types[i]->name, name))
+	if(th_look(name))
+	/*for(i=0;i<ntypes;i++)
+		if(!strcasecmp(types[i]->name, name))*/
 		{
 			fprintf(stderr, "type: `%s' already declared, go away!\n", name);
 			return -1;
@@ -219,9 +223,15 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 	//fprintf(stderr, " - linking\n");
 	t->tnum = ntypes-1;
 	for(i=0;i<ntypes-1;i++)
+	{
 		for(pari=0;pari<npar;pari++)
-			if(descendent_of(par[pari]->tnum, types[i]) && !descendent_of(ntypes-1, types[i]))
-				add_descendent(types[i], ntypes-1);
+			if(descendent_of(par[pari]->tnum, types[i]))
+			{
+				if(!descendent_of(ntypes-1, types[i]))
+					add_descendent(types[i], ntypes-1);
+				break;
+			}
+	}
 	add_descendent(t, ntypes-1);
 	//fprintf(stderr, " - done adding\n");
 
@@ -298,22 +308,30 @@ void	fix_glbs()
 	if(fixes)free(fixes);
 }
 
-#define	CSTSIZE	16384
-static char	csthashres[CSTSIZE];
+#define	CSTSIZE	(16384*2-1)
+//static char	csthashres[CSTSIZE];
 static struct type	*csthasha[CSTSIZE];
 static struct type	*csthashb[CSTSIZE];
+int					ncsthash_collisions = 0, ncsthash_requests = 0;
 
 int	find_common_subtypes(struct type	*a, struct type	*b, unsigned short	*_glb_common)
 {
-	int	_glb_ncommon = 0, ia, ib;
-	unsigned int	h = ((unsigned int)a ^ ((unsigned int)b>>6)) % CSTSIZE;
+	int	_glb_ncommon = 0, ia, ib, and, bnd;
+	unsigned short *ad, *bd;
+	unsigned int	h = (((unsigned int)a<<5) ^ ((unsigned int)b>>5)) % (CSTSIZE);
 
-	if(csthasha[h]==a && csthashb[h]==b && !csthashres[h])return 0;
+	ncsthash_requests++;
+	for(ia=0;ia<4;ia++)
+		if(csthasha[(h+17*ia)%CSTSIZE]==a && csthashb[(h+17*ia)%CSTSIZE]==b)return 0;// && !csthashres[h])return 0;
 
 	ia = ib = 0;
-	while(ia < a->ndescendents && ib < b->ndescendents)
+	and = a->ndescendents;
+	bnd = b->ndescendents;
+	ad = a->descendents;
+	bd = b->descendents;
+	while(ia < and && ib < bnd)
 	{
-		if(a->descendents[ia] == b->descendents[ib])
+		if(*ad == *bd)
 		{
 			//if(ia==0 || ib==0)return -1;	// one type is a descendent of the other
 			if((_glb_ncommon+1) >= 10000)
@@ -321,17 +339,23 @@ int	find_common_subtypes(struct type	*a, struct type	*b, unsigned short	*_glb_co
 				fprintf(stderr, "too many common types for our buffer!\n");
 				exit(-1);
 			}
-			_glb_common[_glb_ncommon++] = a->descendents[ia];
-			ia++;
-			ib++;
+			_glb_common[_glb_ncommon++] = *ad;
+			ia++;ad++;
+			ib++;bd++;
 		}
-		else if(a->descendents[ia] < b->descendents[ib])ia++;
-		else ib++;
+		else if(*ad < *bd){ia++;ad++;}
+		else {ib++;bd++;}
 	}
 
+	// try to find a free hash slot
+	for(ia=0;ia<4;ia++)
+		if(!csthasha[(h+17*ia)%CSTSIZE])break;
+	if(ia==4)ia=0;
+	h = (h+17*ia)%CSTSIZE;
+	if(csthasha[h])ncsthash_collisions++;
 	csthasha[h] = a;
 	csthashb[h] = b;
-	csthashres[h] = _glb_ncommon?1:0;
+	//csthashres[h] = _glb_ncommon?1:0;
 	return _glb_ncommon;
 }
 
@@ -397,13 +421,17 @@ int	check_for_glb(struct type	*a, struct type	*b)
 		// relocate 'descendents' of everybody who pointed at someone who got moved
 		for(i=0;i<ntypes;i++)
 		{
+			unsigned short ndesc, ntm1, *desc;
 			g = types[i];
 			if(i>mi)g->tnum++;
 			resort = 0;
-			for(ia=0;ia<g->ndescendents;ia++)
+			desc = g->descendents;
+			ndesc = g->ndescendents;
+			ntm1 = ntypes-1;
+			for(ia=0;ia<ndesc;ia++,desc++)
 			{
-				if(g->descendents[ia]==ntypes-1){resort=1;resort_key = ia;g->descendents[ia]=mi;}
-				else if(g->descendents[ia]>=mi)g->descendents[ia]++;
+				if(*desc==ntm1){resort=1;resort_key = ia;*desc=mi;}
+				else if(*desc>=mi)(*desc)++;
 			}
 			if(resort && g->ndescendents>1)
 			{
@@ -450,6 +478,7 @@ int	make_glbs()
 			}
 		}
 	}
+	//printf("%d cst hash collisions / %d R  ", ncsthash_collisions, ncsthash_requests);
 	return 0;
 }
 
