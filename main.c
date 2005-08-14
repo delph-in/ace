@@ -126,7 +126,7 @@ int	main(int	argc, char	*argv[])
 
 	//build_lr_filter();
 	//print_rule("hspec");
-	//print_type("v_np*_trans_le");
+	//print_type("v_atrans_le");
 	//print_rule("adjh_i_ques");
 	//print_type("adj_head_int_ques_phrase");
 	//print_type("basic_adj_head_phrase");

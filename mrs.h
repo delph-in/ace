@@ -62,3 +62,4 @@ struct mrs
 struct mrs	*read_mrs(FILE	*f);
 void		free_mrs(struct mrs	*m);
 void		semantic_lookup(struct mrs	*mrs);
+struct mrs	*extract_mrs(struct dg	*root);
