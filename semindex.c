@@ -335,9 +335,6 @@ int enumerate_alignments(struct grammar_entity	*e, int ei, struct mrs_ep	*align[
 			edge = epsilon_edge(e->rule, 0, e->rule->rtl, rels);
 			//cont = walk_dg(edge->dg, rsavef, "C-CONT", 0);
 		}
-		assert(edge || !"Unknown entity type");
-		//result = constrain_gen_edge(edge, cont, e->nextra_preds+1, align);
-		//if(!result)set_slabstate(&slab);
 		if(!edge)set_slabstate(&slab);
 		else
 		{

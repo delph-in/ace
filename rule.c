@@ -154,7 +154,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 	e->id = next_eid();
 	e->rule = r;
 	e->need = r->ndaughters;
-	e->dg = inhibit_pack?r->dg:((g_mode==PARSING)?r->packdg:r->gpackdg);
+	e->dg = inhibit_pack?r->dg:((g_mode==PARSING)?r->packdg:r->gpackdg);	// XXX we don't want two versions of packing restrictors; but constrain_rule_rels() breaks if RELS is restricted
 	if(!e->dg)
 	{
 		fprintf(stderr, "epsilon_edge: bad frozen grammar! rule `%s' has no dg!\n", r->name);
@@ -197,6 +197,7 @@ struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels)
 	struct dg			*target;
 	get_slabstate(&slab);
 	target = dg_hop(dg, lookup_fname("C-CONT"));
+	if(target)target = dg_hop(target, lookup_fname("RELS"));
 	if(0 != unify1(target, rels))
 	{ fail:
 		set_slabstate(&slab);
@@ -482,29 +483,26 @@ char	*type_filter_rule(struct rule	*r, int arg, struct qc **typeqc)
 	int	i, j, count = 0, res;
 
 	table = calloc(sizeof(char), ntypes);
-	for(i=0;i<ntypes;i++)
+
+	// bottom up, since most types will succeed and we can check if subtypes did
+	for(i=ntypes-1;i>=0;i--)
 	{
 		struct type *t = types[i];
-		// XXX hack
-		if(generation > MAX_GEN_RESET)generation = 11;
-		// XXX hack
 
-		if(table[i] == 2 || !t->dg)
-		{
-			table[i] = 0;
-			continue;
-		}
+		if(generation > MAX_GEN_RESET)generation = 11; // XXX hack
+
+		if(!t->dg)continue;
+		// check descendents to see if more-specific types than me have been shown compatible
+		for(j=1;j<16 && j<t->ndescendents;j++)
+			if(table[t->descendents[j]])
+				goto yes;
 		if(quickcheck(rqc, typeqc[i]) != 0)
-		{
-			if(t->ndescendents < 16)
-				for(j=1;j<t->ndescendents;j++)
-					table[t->descendents[j]] = 2;
 			continue;
-		}
 		res = unify_dg_tmp(t->dg, r->dg, arg);
 		forget_tmp();
 		if(res==0)
 		{
+			yes:
 			table[i] = 1;
 			count++;
 		}
