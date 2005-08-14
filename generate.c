@@ -6,6 +6,7 @@
 #include "mrs.h"
 #include "lexicon.h"
 #include "chart.h"
+#include "unpack.h"
 
 extern int	question, exhaustive, lui_chart, inhibit_pack, trace, debug_level;
 
@@ -159,28 +160,16 @@ int	generate(struct mrs	*mrs)
 		if(gen_process_edge(edge)){/*printf("terminated!\n");break;*/}
 	}
 
-	/*if(sentential)
+	void show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
 	{
-		i = cells->p_nedges+1;
-		edge = sentential;
-		goto show;
+		// XXX check that `mrs' subsumes `mrs_res'.
+		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->dec->edge->id);
+		if(trace>1){print_dg(hyp->dg); printf("\n");}
+		printf("%s\n", hyp->string);
+		free_mrs(mrs_res);
 	}
-	else*/
-	{
-		for(i=0;i<cells->p_nedges;i++)
-		{
-			edge = cells->p_edges[i];
-			if(edge->ep_span == require_ep_span && is_root(edge->dg))
-			{
-				show:
-				if(trace>0)printf("edge #%d is sentential\n", edge->id);
-				if(trace>1){print_dg(edge->dg); printf("\n");}
-				printf("%s\n", str = show_orth_leaves(edge));
-				free(str);
-				count++;
-			}
-		}
-	}
+	iterate_cell_root_hypotheses(cells, show_result, 0);
+
 	printf("NOTE: %d passive, %d active edges in final generation chart\n",
 		cells->p_nedges, cells->al_nedges + cells->ar_nedges);
 	if(lui_chart)
