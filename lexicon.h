@@ -23,6 +23,7 @@ void	dump_parts_of_speech();
 int		load_lexicon();
 struct dg	*expand_lexeme(struct lexeme	*l);
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels);
+struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels);
 
 // semantic index
 void	add_semantic_index(struct lexeme *l, struct dg *full, int which);

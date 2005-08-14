@@ -21,10 +21,29 @@ extern unsigned int require_ep_span;
 
 struct dg	*constrain_lex_rels(struct dg *dg, struct dg *rels);
 
+struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
+{
+	struct dg	*ldg, *dg;
+#ifdef	SIMPLE_LEXICON
+	ldg = expand_lexeme(lex);
+#else
+	ldg = lex->dg;
+#endif
+	if(rels)ldg = constrain_lex_rels(ldg, rels);
+	dg = unify_dg(ldg, lex->lextype->dg, -1);
+	if(!dg)
+	{
+		if(rels)return 0;
+		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed construction\n", lex->word);
+		exit(-1);
+	}
+	wellform(dg, lex->word); // XXX I don't think this is necessary, since lextype is already well formed. see XXX in study_lexeme
+	return dg;
+}
+
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 {
 	struct edge	*edge = slab_alloc(sizeof(struct edge));
-	struct dg	*ldg;
 
 #define RECORD_LEXICAL_ACCESS
 #ifdef RECORD_LEXICAL_ACCESS
@@ -35,33 +54,13 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 #endif
 
 	bzero(edge, sizeof(struct edge));
-
-#ifdef	SIMPLE_LEXICON
-	ldg = expand_lexeme(lex);
-#else
-	ldg = lex->dg;
-#endif
-	if(rels)ldg = constrain_lex_rels(ldg, rels);
-	edge->dg = unify_dg(ldg, lex->lextype->dg, -1);
-	if(!edge->dg)
-	{
-		if(rels)return 0;
-		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed construction\n", lex->word);
-		exit(-1);
-	}
-	wellform(edge->dg, lex->word); // XXX I don't think this is necessary, since lextype is already well formed
-
-	//edge->dg = copy_dg(edge->dg);
+	edge->dg = lexical_dg(lex, rels);
 	edge->id = next_eid();
 	edge->from = i;
 	edge->to = i+len;
-	edge->ep_span = 0;
 	edge->lex = lex;
 	edge->qc = extract_qc(edge->dg);
 	edge->prio = LEX_PRIO;
-	edge->ninflr_routes = 0;
-	edge->inflr_routes = 0;
-	edge->age = 0;
 
 	if(trace)
 	{
@@ -457,7 +456,8 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 		fprintf(stderr, "study_lexeme `%s': dag incompatible with type `%s'\n", name, t->name);
 		return -1;
 	}
-	wellform(fulldg, name);
+	wellform(fulldg, name);	// XXX I don't think this is necessary; t->dg is already wellformed.
+							// however, turning it off changes the grammar.dat file by 2k, so it does something...
 
 	add_lexeme(name, dg, t, fulldg);
 
