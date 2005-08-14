@@ -1,30 +1,14 @@
 TODO:
 
-speedup shtinkin' grammar generation
-make freezer report how much ram each component took
-
-pack active edges?
-
-unpacking + statistical parse selection
-	- selective unpacker should combine all the roots
-	- fix maxent scoring to be score lexemes properly
-
-improve MRS extractor
-	- perhaps into mrs.c's format
-
 record ersatzing
 
+pack active edges?
+	- makes hyperactive difficult
+	- figure out a way to pack and do hyper?
+		- that would make hyperpassive worthwhile too...
+		- unfortunately seems impossible.
+
 fix proper noun support (I believe the new morphology system broke it)
-
-OPTIMIZATIONS:
-
-kill RELS & HCONS while parsing, reconstruct when unpacking
-	- this won't increase packing; we already
-		ignore everything under these features
-		for subsumption checking
-	- but reduces memory usage significantly
-		on long sentences
-
 
 (considered)
 + pick cleverly between dg1 and dg2 as target in unify1
