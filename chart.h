@@ -14,7 +14,7 @@ struct edge
 	struct rule	*rule;
 	signed char		have, need, from, to;
 	struct edge	**daughters;
-	int		id, age;
+	int		id, age:16, built_on:16;
 
 	struct lexeme	*lex;		// non-null if this is a lexical edge
 
@@ -54,13 +54,6 @@ struct chart_cell
 	struct edge	**al_edges;
 	int		ar_nedges;
 	struct edge	**ar_edges;
-};
-
-struct forest
-{
-	int 		ntrees;
-	struct edge **trees;
-	float		*scores;
 };
 
 #define	LEX_PRIO	10

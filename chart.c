@@ -12,6 +12,7 @@
 #include	"freeze.h"
 #include	"morpho.h"
 #include	"mrs.h"
+#include	"unpack.h"
 
 int	inhibit_results = 0;
 
@@ -258,6 +259,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	e->need = nneed;
 	e->have = nhave;
 	e->rule = a->rule;
+	e->built_on = 0;
+	b->built_on = 1;
 	//printf("new edge qc %p\n", e->qc);
 
 	if(!a->have && !a->used){a->used = 1;used_edges++;}
@@ -798,7 +801,34 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	//capi_print_derivations();
 
 	// show analyses
-	if(!exhaustive && sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
+	void show_result(struct hypothesis	*hyp, struct mrs	*mrs)
+	{
+		struct dg	*root = hyp->dg, *sem;
+		if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->dec->edge->id);
+		if(trace>1){print_dg(hyp->dg); printf("\n");}
+		if(!inhibit_results)
+		{
+			if(sentence && !question)printf("SENT: %s\n", sentence);
+			print_mrs(mrs);
+			/*sem = dg_hop(root, lookup_fname("SYNSEM"));
+			if(sem)sem = dg_hop(sem, lookup_fname("LOCAL"));
+			if(sem)sem = dg_hop(sem, lookup_fname("CONT"));
+			if(!sem)
+			{
+				fprintf(stderr, "parse result had no semantics!\n");
+				exit(-1);
+			}
+			if(sentence && !question)printf("SENT: %s\n", sentence);
+
+			print_sem(sem);
+			if(!question)printf("\n\n");*/
+			fflush(stdout);
+		}
+		free_mrs(mrs);
+	}
+	num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, 0);
+
+	/*if(!exhaustive && sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
 	num_entries = cells[chart_size-1].p_nedges;
 	for(i=0;i<num_entries;i++)
 	{
@@ -818,7 +848,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 		if(!inhibit_results)
 		{
-#define SELECTIVE
+//#define SELECTIVE
 #ifdef SELECTIVE
 			extern struct forest *selectively_unpack(struct edge *e, int n);
 			struct forest *f = selectively_unpack(edge, 10);
@@ -843,7 +873,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 			fflush(stdout);
 		}
 		if(!exhaustive)break;
-	}
+	}*/
 
 	if(!inhibit_results)
 	{

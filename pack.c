@@ -5,6 +5,9 @@
 #include	"chart.h"
 #include	"lexicon.h"
 
+#define PACKBUG(fmt,...) do {} while(0)
+//#define PACKBUG printf
+
 struct dg	*restrict_copy_dg(struct dg	*dg, int for_generation)
 {
 	struct dg *copy;
@@ -53,20 +56,17 @@ extern long long copycount, copytraverse;
 int	pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
-	struct edge			*h;
-	int			i, ssd;
+	struct edge			*h, **candidates = (edge->have==edge->need)?c->p_edges:(edge->rule->rtl?c->ar_edges:c->al_edges);
+	int			i, ssd, ncandidates = (edge->have==edge->need)?c->p_nedges:(edge->rule->rtl?c->ar_nedges:c->al_nedges);
 
 #ifdef	COPY_COUNTS
 	packcount++;
 #endif
 
-#define PACKBUG(fmt,...) do {} while(0)
-//#define PACKBUG printf
-
 	PACKBUG("trying to pack #%d `%s' somewhere\n", edge->id, show_orth_leaves(edge));
 
-	for(i=0;i<c->p_nedges && (h=c->p_edges[i]);i++)
-		if(h->have != -1
+	for(i=0;i<ncandidates && (h=candidates[i]);i++)
+		if( h->have == edge->have && h->need == edge->need
 		&& (g_mode != GENERATING || h->ep_span == edge->ep_span)
 		&& !equiv_quickcheck(h->qc, edge->qc)
 			)
@@ -110,7 +110,7 @@ int	pack_edge(struct edge	*edge)
 				return 1;
 			}
 #ifdef	BIDIR_SS
-			else if(ssd == -1 && h->age == edge->age)
+			else if(ssd == -1 && h->age == edge->age && !h->built_on)	// XXX could kill built_on requirement and do upwards frosting?
 			{
 				PACKBUG("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
 				//printf("host: "); print_dg(edge->dg); printf("\n");
