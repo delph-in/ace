@@ -11,7 +11,7 @@ CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -DERG -mcpu=7400 -mdynamic-no
 
 CFLAGS+=${DELPHIN_CFLAGS}
 
-OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o ppdfa.o transducer.o lrfilt.o glb.o semindex.o hash.o mrs.o itsdb.o pack.o unpack.o maxent.o generate.o
+OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o ppdfa.o transducer.o lrfilt.o glb.o semindex.o hash.o mrs.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o
 all: ${OBJ}
 	${CC} ${CFLAGS} main.c ${OBJ} -o parser ${DELPHIN_LIBS}
 
