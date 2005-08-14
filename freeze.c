@@ -213,6 +213,18 @@ char	**freeze_rftc(char	**ptr)
 	return ref;
 }
 
+static void freezer_note(char *designation)
+{
+	extern int slab_usage();
+	static int last_bytes = 0;
+	int			size = slab_usage() - last_bytes;
+	last_bytes = slab_usage();
+	if(size<8192)printf(" %s: %d", designation, size);
+	else if(size<1024*1024)printf(" %s: %dK", designation, (size+512)/1024);
+	else if(size<1024*1024*1024)printf(" %s: %.1fM", designation, ((float)size+512*1024)/(1024*1024));
+	else printf(" %s: %.1fG", designation, ((float)size+512*1024*1024)/(1024*1024*1024));
+}
+
 int	freeze_grammar()
 {
 	int		i, j;
@@ -235,11 +247,11 @@ int	freeze_grammar()
 	null_generation();
 
 	for(i=0;i<ntypes;i++)types[i] = freeze_type(types[i]);
-	//fprintf(stderr, "froze types.\n");
+	freezer_note("types");
 
 	for(i=0;i<nstrings;i++)strings[i] = freeze_type(strings[i]);
-	//fprintf(stderr, "froze strings.\n");
 	strtype = lookup_type("string");
+	freezer_note("strings");
 
 	for(i=0;i<ntypes;i++)patch_dg(types[i]->dg);
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->dg);
@@ -261,12 +273,12 @@ int	freeze_grammar()
 		irules[i]->rule = rules[irules[i]->rule->rnum];
 
 	for(i=0;i<nirules;i++)irules[i] = freeze_irule(irules[i]);
-	//fprintf(stderr, "froze rules.\n");
+	freezer_note("rules");
 
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 
 	for(i=0;i<nlexemes;i++)lexemes[i] = freeze_lexeme(lexemes[i]);
-	//fprintf(stderr, "froze lexemes.\n");
+	freezer_note("lex-info");
 
 	for(i=0;i<nroots;i++)roots[i] = copy_dg(roots[i]);
 
@@ -281,6 +293,7 @@ int	freeze_grammar()
 	rule_filter = freeze_block(rule_filter, sizeof(char)*nrules*nrules);
 	type_rftc = freeze_rftc(type_rftc);
 	type_rltc = freeze_rftc(type_rltc);
+	freezer_note("\n miscellaneous");
 
 	// freeze lexicon dgs -- this isn't done earlier so that the
 	// 	'struct lexemes' will all be quickly accessible without
@@ -293,6 +306,7 @@ int	freeze_grammar()
 
 		if(lexemes[i]->dg)lexemes[i]->dg = copy_dg(lexemes[i]->dg);
 	}
+	freezer_note("lex-dgs");
 
 	G->rule_filter = rule_filter;
 	G->ntypes = ntypes;
@@ -315,13 +329,15 @@ int	freeze_grammar()
 	G->type_rftc = type_rftc;
 	G->type_rltc = type_rltc;
 	G->semindex = freeze_semantic_index();
+	freezer_note("sem-index");
 	G->stochmodel = freeze_stochastic_model();
+	freezer_note("stochastic-model");
 	strcpy(G->message, "frozen grammar file\n");
 	strcat(G->message, "english resource grammar (erg)\n");
 
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 
-	commit_slab();
+	printf("\n ... "); commit_slab();
 	return 0;
 }
 
