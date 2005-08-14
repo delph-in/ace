@@ -44,13 +44,13 @@ void	commit_slab()
 {
 	if(freeze_next)
 	{
-		fprintf(stderr, "freezing %.1fM to file map %p\n", (float)slabu/1024/1024, freeze_point);
+		printf("freezing %.1fM to file map %p\n", (float)slabu/1024/1024, freeze_point);
 		if(ftruncate(freeze_fd, slabu)) { perror("ftruncate to final length"); exit(-1); }
 		if(msync(freeze_point, slabu, MS_ASYNC)) { perror("msync"); exit(-1); }
 		close(freeze_fd);
 		freeze_next = 0;
 	}
-	else if(debug_level) { fprintf(stderr, "permanent "); print_slab_stats(); }
+	else if(debug_level) { printf("permanent "); print_slab_stats(); }
 	currslabsize = SLAB_SIZE;
 	noldslabs = 0;
 	aoldslabs = 0;
