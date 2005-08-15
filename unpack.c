@@ -8,6 +8,7 @@
 #include "lexicon.h"
 #include "maxent.h"
 #include "unpack.h"
+#include "mrs.h"
 
 static inline char* edge_sign(struct edge *e)
 {
