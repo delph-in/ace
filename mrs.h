@@ -10,8 +10,9 @@ struct mrs_var
 	}			*props;
 	short		nprops:15, is_const:1;
 	short		refs;
+	int			vnum;
 
-	struct dg	*dg;
+	struct dg		*dg;
 };
 
 struct mrs_ep
@@ -62,4 +63,8 @@ struct mrs
 struct mrs	*read_mrs(FILE	*f);
 void		free_mrs(struct mrs	*m);
 void		semantic_lookup(struct mrs	*mrs);
+int			mrs_subsumes(struct mrs	*in, struct mrs	*out);
 struct mrs	*extract_mrs(struct dg	*root);
+void		dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem);
+void		dagify_mrs_ep(struct mrs_ep *ep);
+struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[]);

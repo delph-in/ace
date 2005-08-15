@@ -2,7 +2,10 @@
 #include	<stdlib.h>
 #include	<string.h>
 
+#include	"type.h"
 #include	"mrs.h"
+
+// mrs IO
 
 void	free_mrs_var(struct mrs_var	*v)
 {
@@ -146,6 +149,7 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 	V->name = strdup(V->name);
 	V->refs = 1;
 
+	V->vnum = vlist->nvars;
 	vlist->nvars++;
 	vlist->vars = realloc(vlist->vars, sizeof(struct mrs_var*) * vlist->nvars);
 	vlist->vars[vlist->nvars-1] = V;
@@ -355,4 +359,106 @@ void	print_mrs(struct mrs	*mrs)
 		print_mrs_var(hc->lo);
 	}
 	printf(" > ]\n");
+}
+
+// mrs testing
+
+int mrs_subsumes(struct mrs	*in, struct mrs	*out)
+{
+	int	i;
+	int	vmap[in->vlist.nvars];
+	char used[out->nrels];
+	if(in->nrels != out->nrels)return 0;
+	if(in->nhcons != out->nhcons)return 0;
+	for(i=0;i<in->vlist.nvars;i++)vmap[i] = -1;
+	bzero(used, out->nrels);
+	return mrs_subsumes0(in, out, 0, vmap, used);
+}
+
+int pred_subsumes(char *in, char *out)
+{
+	extern struct type *strtype;
+	struct type *tin, *tout;
+	if(!strcasecmp(in, out))return 1;
+	if(in[0]=='"')return 0;
+	tin = lookup_type(in);
+	if(out[0]=='"')return descendent_of(strtype->tnum, tin);
+	tout = lookup_type(out);
+	return descendent_of(tout->tnum, tin);
+}
+
+int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
+{
+	int vnin = in->vnum, i, j;
+	if(vmap[vnin]!=-1)
+		return vmap[vnin] == out->vnum;
+	// make sure no input vars are already mapped to this output var;
+	//   we don't allow accidental correferencing.
+	// skolemization should block this, but just in case something funny happened
+	//   (e.g. the grammar didn't do its job right with packing turned on)
+	for(i=0;i<nv;i++) if(vmap[i] == out->vnum)return 0;
+
+	// make sure variable type is subsumed
+	switch(in->type[0])
+	{
+		case	'i':	break;
+		case	'u':	if(out->type[0]=='h' || out->type[0]=='i')return 0;	break;
+		default:		if(out->type[0]!=in->type[0])return 0;	break;
+	}
+
+	// make sure variable properties are subsumed
+	for(i=0;i<in->nprops;i++)
+	{
+		for(j=0;j<out->nprops;j++)
+			if(!strcasecmp(in->props[i].name, out->props[j].name))break;
+		if(j==out->nprops)return 0;
+		// XXX do property values have a heirarchy?
+		if(strcasecmp(in->props[i].value, out->props[j].value))return 0;
+	}
+
+	// compatible.  establish a mapping and succeed.
+	vmap[vnin] = out->vnum;
+	return 1;
+}
+
+int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *used)
+{
+	// try to match epi of in with some ep in out, and recurse
+	struct mrs_ep	*ep = in->rels+epi, *op;
+	int				vm[in->vlist.nvars];
+	int				i, j, k;
+
+	if(epi == in->nrels)
+	{
+		// XXX check up on the HCONS
+		return 1;
+	}
+
+	for(i=0;i<out->nrels;i++) if(!used[i])
+	{
+		op = out->rels+i;
+		if(!pred_subsumes(ep->pred, op->pred))continue;
+		memcpy(vm, vmap, sizeof(int)*in->vlist.nvars);
+		if(!var_subsume(ep->lbl, op->lbl, vm, in->vlist.nvars))continue;
+		for(j=0;j<ep->nargs;j++)
+		{
+			for(k=0;k<op->nargs;k++)
+				if(!strcasecmp(ep->args[j].name, op->args[k].name))break;
+			if(k==op->nargs)break;
+			if(!var_subsume(ep->args[j].value, op->args[j].value, vm, in->vlist.nvars))continue;
+		}
+		if(j<ep->nargs)continue;
+
+		//printf("in %d <=> out %d\n", epi, i);
+
+		// we found an alignment for epi; recurse.
+		used[i] = 1;
+		if(mrs_subsumes0(in, out, epi+1, vm, used))
+		{
+			used[i] = 0;
+			return 1;
+		}
+		used[i] = 0;
+	}
+	return 0;
 }
