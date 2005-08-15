@@ -260,6 +260,11 @@ struct mrs	*parse_mrs(char	*buffer)
 	struct mrs_vlist	vlist = {0,0};
 	struct mrs			mrs, *M;
 
+	// trim off outer []'s
+	if(*buffer)buffer[strlen(buffer)-1] = 0;
+	if(*buffer)buffer++;
+	else return 0;
+
 	bzero(&mrs, sizeof(mrs));
 	p = buffer;
 	while(*p)
@@ -314,8 +319,7 @@ struct mrs	*read_mrs(FILE	*f)
 		free(buffer);
 		return 0;
 	}
-	buffer[lbuf-1] = 0;
-	mrs = parse_mrs(buffer+1);
+	mrs = parse_mrs(buffer);
 	free(buffer);
 	return mrs;
 }
