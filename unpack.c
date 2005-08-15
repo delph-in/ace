@@ -10,6 +10,8 @@
 #include "unpack.h"
 #include "mrs.h"
 
+extern int debug_level;
+
 static inline char* edge_sign(struct edge *e)
 {
 	if(!e)return 0;
@@ -445,6 +447,6 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, void (*process)(struct
 		}
 		else g_checkup++;	// mark that we need to look for subfailures before hypothesizing
 	}
-	printf("%d hyps / %d readings\n", nhyp, count);
+	if(debug_level)printf("%d hyps / %d readings\n", nhyp, count);
 	return count;
 }
