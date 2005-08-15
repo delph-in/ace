@@ -48,72 +48,6 @@ int	gen_process_edge(struct edge	*e)
 	return 0;
 }
 
-// ep, var, and rels-list dg construction
-
-void	dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem)
-{
-	struct dg	*dg;
-	char		*type = "individual";
-	int			i, path[16], len;
-
-	if(var->is_const)
-	{
-		fprintf(stderr, "ERROR: generator doesn't handle CARG's yet\n");
-		exit(-1);
-	}
-
-	switch(var->type[0]) {
-		case	'e': type = "event";			break;
-		case	'x': type = "event_or_index";	break;
-		case	'u': type = "event_or_index";	break;
-		case	'h': type = "handle";			break;
-	}
-
-	dg = atomic_dg(type);
-	for(i=0;i<var->nprops;i++)
-	{
-		char	*vtype = var->props[i].value, *str = strdup(var->props[i].name), *p = str, *p2;
-		len = 0; do
-		{
-			p2 = strchr(p, '.');
-			if(p2)*p2 = 0;
-			path[len++] = lookup_fname(p);
-			p = p2?(p2+1):0;
-		} while(p);
-		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
-	}
-	if(var->type[0]=='e' || var->type[0]=='u' || var->type[0]=='x')dg = add_dg_feature(dg, "INSTLOC", skolem);
-	var->dg = wellform_dg(dg);
-}
-
-void dagify_mrs_ep(struct mrs_ep *ep)
-{
-	struct dg	*dg = atomic_dg("relation");
-	int			i;
-
-	dg = add_dg_feature(dg, "PRED", atomic_dg(ep->pred));
-	//if(ep->lbl)dg = add_dg_feature(dg, "LBL", ep->lbl->dg);	// XXX something funny about the grammar.  you *can't* skolemize LBL.
-	for(i=0;i<ep->nargs;i++)
-		dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
-	ep->dg = wellform_dg(dg);
-	//printf("ep dag: "); print_dg(ep->dg); printf("\n\n");
-}
-
-struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[])
-{
-	struct dg	*last = atomic_dg("*top*"), *list = last;
-	struct dg	*rels = add_dg_feature(atomic_dg("*top*"), "LAST", last);
-	int			i;
-
-	for(i=0;i<neps;i++)
-	{
-		struct dg *cons = atomic_dg("*top*");
-		cons = add_dg_hop(cons, 2, list);
-		list = cons = add_dg_hop(cons, 1, eps[i]->dg);
-	}
-	return add_dg_feature(rels, "LIST", list);
-}
-
 // driver
 
 int	generate(struct mrs	*mrs)
@@ -162,7 +96,11 @@ int	generate(struct mrs	*mrs)
 
 	void show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
 	{
-		// XXX check that `mrs' subsumes `mrs_res'.
+		if(!mrs_subsumes(mrs, mrs_res))
+		{
+			//printf("NICE TRY! `%s' has incompatible semantics.\n", hyp->string);
+			return;
+		}
 		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->dec->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
 		printf("%s\n", hyp->string);

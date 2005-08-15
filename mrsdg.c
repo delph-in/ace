@@ -11,6 +11,8 @@ static int name;
 static char	*ep_drop[] = {"WLINK", "LBL", "CTO", "CFROM", "PARAMS", "PRED", 0};
 static char	*var_drop[] = {"--TPC", "--PSV", "STATIVE", "SORT", "INSTLOC", 0};
 
+// dag to mrs conversion
+
 void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 {
 	extern char **fnames;
@@ -80,6 +82,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 			add_var_feats(var, arcs[i].label, arcs[i].dest);
 		var->is_const = 0;
 		var->refs = 0;
+		var->vnum = vlist->nvars;
 		vlist->nvars++;
 		vlist->vars = realloc(vlist->vars, sizeof(struct mrs_var*)*vlist->nvars);
 		vlist->vars[vlist->nvars-1] = var;
@@ -218,4 +221,70 @@ struct mrs	*extract_mrs(struct dg	*root)
 	struct dg	*cont = walk_dg(root, savef, "SYNSEM", "LOCAL", "CONT", 0);
 	assert(cont || !"extract_mrs: no SYNSEM.LOCAL.CONT!\n");
 	return cont_to_mrs(cont);
+}
+
+// mrs to dag conversion
+
+void	dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem)
+{
+	struct dg	*dg;
+	char		*type = "individual";
+	int			i, path[16], len;
+
+	if(var->is_const)
+	{
+		fprintf(stderr, "ERROR: generator doesn't handle CARG's yet\n");
+		exit(-1);
+	}
+
+	switch(var->type[0]) {
+		case	'e': type = "event";			break;
+		case	'x': type = "event_or_index";	break;
+		case	'u': type = "event_or_index";	break;
+		case	'h': type = "handle";			break;
+	}
+
+	dg = atomic_dg(type);
+	for(i=0;i<var->nprops;i++)
+	{
+		char	*vtype = var->props[i].value, *str = strdup(var->props[i].name), *p = str, *p2;
+		len = 0; do
+		{
+			p2 = strchr(p, '.');
+			if(p2)*p2 = 0;
+			path[len++] = lookup_fname(p);
+			p = p2?(p2+1):0;
+		} while(p);
+		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
+	}
+	if(var->type[0]=='e' || var->type[0]=='u' || var->type[0]=='x')dg = add_dg_feature(dg, "INSTLOC", skolem);
+	var->dg = wellform_dg(dg);
+}
+
+void dagify_mrs_ep(struct mrs_ep *ep)
+{
+	struct dg	*dg = atomic_dg("relation");
+	int			i;
+
+	dg = add_dg_feature(dg, "PRED", atomic_dg(ep->pred));
+	//if(ep->lbl)dg = add_dg_feature(dg, "LBL", ep->lbl->dg);	// XXX something funny about the grammar.  you *can't* skolemize LBL.
+	for(i=0;i<ep->nargs;i++)
+		dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
+	ep->dg = wellform_dg(dg);
+	//printf("ep dag: "); print_dg(ep->dg); printf("\n\n");
+}
+
+struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[])
+{
+	struct dg	*last = atomic_dg("*top*"), *list = last;
+	struct dg	*rels = add_dg_feature(atomic_dg("*top*"), "LAST", last);
+	int			i;
+
+	for(i=0;i<neps;i++)
+	{
+		struct dg *cons = atomic_dg("*top*");
+		cons = add_dg_hop(cons, 2, list);
+		list = cons = add_dg_hop(cons, 1, eps[i]->dg);
+	}
+	return add_dg_feature(rels, "LIST", list);
 }
