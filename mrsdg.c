@@ -218,7 +218,7 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 struct mrs	*extract_mrs(struct dg	*root)
 {
 	static int savef[4] = {-1,-1,-1,-1};
-	struct dg	*cont = walk_dg(root, savef, "SYNSEM", "LOCAL", "CONT", 0);
+	struct dg	*cont = walk_dg(root, savef, "SYNSEM", "LOCAL", "CONT", NULL);
 	assert(cont || !"extract_mrs: no SYNSEM.LOCAL.CONT!\n");
 	return cont_to_mrs(cont);
 }
@@ -230,12 +230,6 @@ void	dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem)
 	struct dg	*dg;
 	char		*type = "individual";
 	int			i, path[16], len;
-
-	if(var->is_const)
-	{
-		fprintf(stderr, "ERROR: generator doesn't handle CARG's yet\n");
-		exit(-1);
-	}
 
 	switch(var->type[0]) {
 		case	'e': type = "event";			break;
@@ -268,8 +262,18 @@ void dagify_mrs_ep(struct mrs_ep *ep)
 
 	dg = add_dg_feature(dg, "PRED", atomic_dg(ep->pred));
 	for(i=0;i<ep->nargs;i++)
-		if(ep->args[i].value->type[0]!='h')	// XXX maybe some day we'll be allowed to skolemize handles
-			dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
+	{
+		if(ep->args[i].value->is_const == 0)
+		{
+			if(ep->args[i].value->type[0]!='h')	// XXX maybe some day we'll be allowed to skolemize handles
+				dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
+		}
+		else
+		{
+			struct dg *k = atomic_dg(ep->args[i].value->name);
+			dg = add_dg_feature(dg, ep->args[i].name, k);
+		}
+	}
 	ep->dg = wellform_dg(dg);
 }
 

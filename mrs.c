@@ -328,6 +328,7 @@ void	print_mrs_var(struct mrs_var	*var)
 {
 	if(!var) { printf("(null)"); return; }
 	printf("%s", var->name);
+	if(var->is_const) printf("_K");
 	if(var->nprops)
 	{
 		int	i;
