@@ -48,6 +48,17 @@ int	gen_process_edge(struct edge	*e)
 	return 0;
 }
 
+float timer()
+{
+	float ret;
+	static struct timeval tvstart = {0,0}, tv;
+	if(!tvstart.tv_sec)gettimeofday(&tvstart, 0);
+	gettimeofday(&tv, 0);
+	ret = tv.tv_sec - tvstart.tv_sec + 0.000001 * (tv.tv_usec - tvstart.tv_usec);
+	tvstart = tv;
+	return ret;
+}
+
 // driver
 
 int	generate(struct mrs	*mrs)
@@ -57,6 +68,7 @@ int	generate(struct mrs	*mrs)
 	char		*str;
 	int			i, count = 0;
 
+	timer();
 	clear_chart(1);
 
 	if(debug_level)
@@ -83,9 +95,11 @@ int	generate(struct mrs	*mrs)
 	}
 	for(i=0;i<mrs->nrels;i++)
 		dagify_mrs_ep(mrs->rels+i);
+	if(debug_level)printf("mrs-to-dg %.4f\n", timer());
 
 	// set up some lexemes and rules for the generator to play with
 	semantic_lookup(mrs);
+	if(debug_level)printf("semlook %.4f\n", timer());
 
 	sentential = 0;
 	while( (edge = next_agenda(0)) )
@@ -93,6 +107,7 @@ int	generate(struct mrs	*mrs)
 		//printf("... process %p = #%d\n", edge, edge->id);
 		if(gen_process_edge(edge)){/*printf("terminated!\n");break;*/}
 	}
+	if(debug_level)printf("packed %.4f\n", timer());
 
 	void show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
 	{
@@ -104,9 +119,11 @@ int	generate(struct mrs	*mrs)
 		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->dec->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
 		printf("%s\n", hyp->string);
+		count++;
 		free_mrs(mrs_res);
 	}
 	iterate_cell_root_hypotheses(cells, show_result, 0);
+	if(debug_level)printf("unpacked %.4f\n", timer());
 
 	printf("NOTE: %d passive, %d active edges in final generation chart\n",
 		cells->p_nedges, cells->al_nedges + cells->ar_nedges);

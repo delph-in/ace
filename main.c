@@ -24,8 +24,6 @@ int g_mode = PARSING;
 extern int	g_loaded, inhibit_results, trace;
 extern long long	accum_ram_usage;
 
-char	*current_sentence = "(not initialized)";
-
 int	parse_line(char	*line);
 
 void	parse_args(int	argc, char	*argv[])
@@ -68,9 +66,8 @@ void broken_pipe_handler(int sig) { die = 1; }
 
 int	main(int	argc, char	*argv[])
 {
-	int	num_parses, success = 0, fail = 0, count = 0;
+	int	success = 0, fail = 0, count = 0;
 	struct timeval	tv1, tv2;
-	char	line[10240];
 	FILE	*fin;
 
 	parse_args(argc, argv);
@@ -133,21 +130,6 @@ int	main(int	argc, char	*argv[])
 	//print_type("phrasal");
 	//print_lexeme("delete_v2");
 
-	if(g_mode == GENERATING)
-	{
-		struct mrs	*mrs = read_mrs(stdin);
-		if(mrs)
-		{
-			gettimeofday(&tv1, 0);
-			generate(mrs);
-			free_mrs(mrs);
-			count = 1;
-			gettimeofday(&tv2, 0);
-			goto report;
-		}
-		else fprintf(stderr, "NOTE: unable to read an input MRS\n");
-	}
-
 	if(!sentence_path)return 0;
 	if(!strcmp(sentence_path, "-"))fin = stdin;
 	else
@@ -166,13 +148,26 @@ int	main(int	argc, char	*argv[])
 	signal(SIGBUS, print_current_sentence);
 	signal(SIGPIPE, broken_pipe_handler);
 	gettimeofday(&tv1, 0);
-	while(!die && !feof(fin) && fgets(line, 10240, fin))
+	while(!die && !feof(fin))
 	{
-		num_parses = parse_line(line);
-		if(num_parses==-1) { if(!inhibit_results)fprintf(stderr, "NOTE: ignore\n"); }
-		else if(num_parses>0)success++;
-		else if(num_parses==0)fail++;
-		if(num_parses>=0)count++;
+		int num_results;
+		if(g_mode == PARSING)
+		{
+			char	line[10240];
+			if(!fgets(line, 10240, fin))break;
+			num_results = parse_line(line);
+		}
+		else
+		{
+			struct mrs	*mrs = read_mrs(fin);
+			if(!mrs && feof(fin))break;
+			num_results = generate(mrs);
+			free(mrs);
+		}
+		if(num_results==-1) { if(!inhibit_results)fprintf(stderr, "NOTE: ignore\n"); }
+		else if(num_results>0)success++;
+		else if(num_results==0)fail++;
+		if(num_results>=0)count++;
 	}
 	gettimeofday(&tv2, 0);
 	restore_stderr();
@@ -183,7 +178,7 @@ int	main(int	argc, char	*argv[])
 		tv2.tv_sec -= tv1.tv_sec;
 		tv2.tv_usec -= tv1.tv_usec;
 		clear_slab();
-		fprintf(stderr, "NOTE: parsed %d / %d sentences, avg %dk, time %.5fs\n",
+		fprintf(stderr, "NOTE: %s %d / %d sentences, avg %dk, time %.5fs\n", (g_mode==PARSING)?"parsed":"generated",
 			success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
 	}
 	rule_stats();
@@ -194,80 +189,4 @@ int	main(int	argc, char	*argv[])
 
 	if(success<=0 && count>0)return -1;
 	else return 0;
-}
-
-int	wcap[1024];
-
-int	parse_line(char	*line)
-{
-	char	copy[10240];
-	int	nparse = 0;
-	/*char	*p, *w;
-	char	*words[100];
-	int	nwords = 0;*/
-	int	nwords = 0, i, j;
-	char	**words;
-
-	current_sentence = "(preparing)";
-	while(line[0] && line[strlen(line)-1] == '\n')line[strlen(line)-1] = 0;
-	if(!*line)return -1;
-	if(!strncmp(line, "<DOC", 4))
-	{
-		printf("%s\n", line);
-		return -1;
-	}
-	//if(!strcmp(line, "All rights reserved."))return -1;	// not interesting.
-	if(!strcmp(line, "@reloadrules@"))
-	{
-		load_rules_conf();
-		return -1;
-	}
-
-	strcpy(copy, line);
-	// break up into words, normalize capitalization
-	/*w = p = copy;
-	while(*p)
-	{
-		if(*p>='A' && *p<='Z')(*p) += 32;
-		switch(*p)
-		{
-			case	' ': case '\t': case '.': case '\n':
-			case	',': case '?': case '!':
-				if(nwords>=100) { fprintf(stderr, "NOTE: 0 readings. Too many words (100+)\n"); return 0; }
-				*p = 0;
-				if(w != p)words[nwords++] = w;
-				w = p+1;
-				break;
-		}
-		p++;
-	}*/
-
-	if(preprocess_line(copy, &nwords, &words))
-	{
-		fprintf(stderr, "NOTE: preprocessor failed!\n");
-		return -1;
-	}
-	//if(nwords<=1)return -1;	// experience shows short "sentences" to not usually be interesting
-	if(nwords>60)
-	{
-		fprintf(stderr, "NOTE: 0 readings. Too many words (60+)\n");
-		return 0;	// trying to parse long sentences is a waste of time. we have lots of short ones.
-	}
-
-	//printf("%d words\n", nwords);
-	for(j=0;j<nwords;j++)
-	{
-		wcap[j] = isupper(words[j][0]);
-		for(i=0;words[j][i];i++)
-		{
-			words[j][i] = tolower(words[j][i]);
-		}
-	}
-	current_sentence = line;//(char*)trim_string(line);
-	nparse = parse(nwords, words, current_sentence);
-	if(do_itsdb)itsdb_report(nwords, words, nparse);
-	clear_slab();
-	for(i=0;i<nwords;i++)free(words[i]);
-	free(words);
-	return nparse;
 }

@@ -267,11 +267,10 @@ void dagify_mrs_ep(struct mrs_ep *ep)
 	int			i;
 
 	dg = add_dg_feature(dg, "PRED", atomic_dg(ep->pred));
-	//if(ep->lbl)dg = add_dg_feature(dg, "LBL", ep->lbl->dg);	// XXX something funny about the grammar.  you *can't* skolemize LBL.
 	for(i=0;i<ep->nargs;i++)
-		dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
+		if(ep->args[i].value->type[0]!='h')	// XXX maybe some day we'll be allowed to skolemize handles
+			dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
 	ep->dg = wellform_dg(dg);
-	//printf("ep dag: "); print_dg(ep->dg); printf("\n\n");
 }
 
 struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[])

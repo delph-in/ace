@@ -40,7 +40,6 @@ static int process_item(int i_id, char *i_input, int parse_id,
 		int edges, int nanalyses, int nderivations, int interactive)
 {
 	extern int total_edges, real_edges, passive_edges;
-	extern int last_mem_bytes;
 	int readings, msec;
 	struct timeval tv1, tv2;
 	clock_t	c0, c1;

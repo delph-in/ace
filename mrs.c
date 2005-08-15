@@ -288,11 +288,11 @@ struct mrs	*parse_mrs(char	*buffer)
 
 struct mrs	*read_mrs(FILE	*f)
 {
-	char	*buffer = malloc(1024);
 	int		abuf = 1024, lbuf = 0, balance = 0;
+	char	*buffer = malloc(abuf);
 	struct mrs	*mrs;
 
-	while(!feof(f) || balance || !lbuf)
+	while(!feof(f) && (balance || !lbuf))
 	{
 		int ch = fgetc(f);
 		if(ch==' ' || ch=='\t' || ch=='\n' || ch=='\r')ch=' ';
@@ -308,6 +308,12 @@ struct mrs	*read_mrs(FILE	*f)
 		if(ch==']')balance--;
 	}
 
+	if(balance || !lbuf)
+	{
+		if(balance)fprintf(stderr, "NOTE: couldn't read a complete mrs\n");
+		free(buffer);
+		return 0;
+	}
 	buffer[lbuf-1] = 0;
 	mrs = parse_mrs(buffer+1);
 	free(buffer);
