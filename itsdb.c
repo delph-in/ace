@@ -9,6 +9,7 @@
 #include	"chart.h"
 #include	"rule.h"
 #include	"lexicon.h"
+#include	"mrs.h"
 
 extern int inhibit_results;
 
@@ -43,6 +44,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 	int readings, msec;
 	struct timeval tv1, tv2;
 	clock_t	c0, c1;
+	char	*error = 0;
 
 	if(nanalyses == 0)
 	{
@@ -62,12 +64,28 @@ static int process_item(int i_id, char *i_input, int parse_id,
 
 	gettimeofday(&tv1, 0);
 	c0 = clock();
-	readings = parse_line(i_input);
+	if(g_mode == PARSING)
+		readings = parse_line(i_input);
+	else
+	{
+		struct mrs *m = parse_mrs(i_input);
+		if(!m)
+		{
+			readings = -1;
+			error = "unable to parse mrs input";
+		}
+		else
+		{
+			readings = generate(m);
+			free_mrs(m);
+		}
+	}
 	gettimeofday(&tv2, 0);
 	c1 = clock();
 	msec = 1000*(tv2.tv_sec - tv1.tv_sec) + 0.001*(tv2.tv_usec - tv1.tv_usec);
 
 	capi_printf(" (:total . %d) (:treal . %d) (:tcpu . %d)", msec, msec, (int)((c1-c0)*0.001));
+	if(error)capi_printf(" (:error \"%s\")", error);
 }
 
 itsdb_report(int nwords, char **words, int readings)
