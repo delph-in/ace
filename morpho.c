@@ -13,6 +13,7 @@ extern int	wcap[1024];
 #include	"morpho.h"
 #include	"tdl.h"
 #include	"lexicon.h"
+#include	"freeze.h"
 
 #define	MAX_ORTH_RULES	5
 
@@ -256,7 +257,7 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 		chart->nedges++;
 		chart->edges = slab_realloc(chart->edges, sizeof(struct ochart_edge*)*(chart->nedges-1), sizeof(struct ochart_edge)*chart->nedges);
 		edge = chart->edges[chart->nedges-1] = slab_alloc(sizeof(struct ochart_edge));
-		edge->form = (char*)freeze_string(form);
+		edge->form = freeze_string(form);
 		edge->ninflr_routes = 0;
 		edge->inflr_routes = 0;
 		edge->nparents = 0;

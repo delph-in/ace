@@ -6,6 +6,7 @@
 
 #include	"dag.h"
 #include	"hash.h"
+#include	"freeze.h"
 
 struct hash	*hash_new(char	*name)
 {
@@ -92,7 +93,6 @@ void		*hash_find(struct hash	*ht, char	*key)
 
 struct hash	*freeze_hash(struct hash	*ht)
 {
-extern char	*freeze_string(char	*str);
 	struct hash	*nh = slab_alloc(sizeof(struct hash));
 	struct hash_bucket	*buck, **Bp, *walk;
 	int				i;

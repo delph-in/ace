@@ -55,6 +55,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 
 	bzero(edge, sizeof(struct edge));
 	edge->dg = lexical_dg(lex, rels);
+	if(edge->dg == 0)return 0;
 	edge->id = next_eid();
 	edge->from = i;
 	edge->to = i+len;

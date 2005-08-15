@@ -5,6 +5,7 @@
 #include	"dag.h"
 #include	"chart.h"
 #include	"hash.h"
+#include	"freeze.h"
 
 struct maxent_feature
 {
@@ -145,9 +146,9 @@ void	*freeze_stochastic_model()
 		{
 			struct maxent_feature *fi = walk->value;
 			struct maxent_feature *fo = slab_alloc(sizeof(struct maxent_feature));
-			fo->head = (char*)freeze_string(fi->head);
-			fo->rhs[0] = (char*)freeze_string(fi->rhs[0]);
-			fo->rhs[1] = (char*)freeze_string(fi->rhs[1]);
+			fo->head = freeze_string(fi->head);
+			fo->rhs[0] = freeze_string(fi->rhs[0]);
+			fo->rhs[1] = freeze_string(fi->rhs[1]);
 			fo->score = fi->score;
 			walk->value = fo;
 		}

@@ -7,6 +7,7 @@
 #include	"lexicon.h"
 #include	"hash.h"
 #include	"mrs.h"
+#include	"freeze.h"
 
 #define	VACUOUS	"vacuous"
 
@@ -160,8 +161,8 @@ void	add_semantic_index(struct lexeme *l, struct dg *full, int which)
 	int			pidx = 0;
 	struct dg	*rels, *Rels;
 
-	if(!which)rels = walk_dg(full, savef, "SYNSEM", "LOCAL", "CONT", "RELS", "LIST", 0);
-	else rels = walk_dg(full, rsavef, "C-CONT", "RELS", "LIST", 0);
+	if(!which)rels = walk_dg(full, savef, "SYNSEM", "LOCAL", "CONT", "RELS", "LIST", NULL);
+	else rels = walk_dg(full, rsavef, "C-CONT", "RELS", "LIST", NULL);
 
 	Rels = rels;
 	if(!sindex)init_index();
@@ -201,7 +202,7 @@ struct semindex_pred_node	*freeze_spn(struct semindex_pred_node	*old)
 	struct semindex_pred_node	*node = (struct semindex_pred_node*)old->activation;
 	int							i;
 
-	node->pred = (char*)freeze_string(old->pred);
+	node->pred = freeze_string(old->pred);
 	node->activation = 0;
 
 	node->nrelatives = old->nrelatives;
@@ -328,12 +329,12 @@ int enumerate_alignments(struct grammar_entity	*e, int ei, struct mrs_ep	*align[
 		if(e->what == LEXEME)
 		{
 			edge = lexical_edge(e->lex, 0, 0, rels);
-			//cont = walk_dg(edge->dg, savef, "SYNSEM", "LOCAL", "CONT", 0);
+			//cont = walk_dg(edge->dg, savef, "SYNSEM", "LOCAL", "CONT", NULL);
 		}
 		if(e->what == RULE)
 		{
 			edge = epsilon_edge(e->rule, 0, e->rule->rtl, rels);
-			//cont = walk_dg(edge->dg, rsavef, "C-CONT", 0);
+			//cont = walk_dg(edge->dg, rsavef, "C-CONT", NULL);
 		}
 		if(!edge)set_slabstate(&slab);
 		else

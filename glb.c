@@ -25,19 +25,20 @@ void	init_glb_cache()
 
 struct type	*glb(struct type	*a, struct type	*b)
 {
-	unsigned int	h;
+	unsigned long	h;
 	int		i, j, mi = 0, min = 0x3fff0000;
 	register struct glb_hashent	*ht = htab;
 
 	if(a==b)return a;
 	if(a>b)
 	{
-		h = (unsigned int)a;
+		struct type *tmp;
+		tmp = a;
 		a = b;
-		b = (struct type*)h;
+		b = tmp;
 	}
 
-	h = (((unsigned int)a>>6) ^ ((unsigned int)b>>0)) & (HSIZE-1);
+	h = (((unsigned long)a>>6) ^ ((unsigned long)b>>0)) & (HSIZE-1);
 
 	// check for a,b in 
 	for(j=0;j<ROLLOVER;j++)

@@ -60,6 +60,7 @@ struct mrs
 	int				ntriggers;
 };
 
+struct mrs	*parse_mrs(char	*buffer);
 struct mrs	*read_mrs(FILE	*f);
 void		free_mrs(struct mrs	*m);
 void		semantic_lookup(struct mrs	*mrs);

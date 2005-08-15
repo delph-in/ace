@@ -318,7 +318,7 @@ int	find_common_subtypes(struct type	*a, struct type	*b, unsigned short	*_glb_co
 {
 	int	_glb_ncommon = 0, ia, ib, and, bnd;
 	unsigned short *ad, *bd;
-	unsigned int	h = (((unsigned int)a<<5) ^ ((unsigned int)b>>5)) % (CSTSIZE);
+	unsigned long	h = (((unsigned long)a<<5) ^ ((unsigned long)b>>5)) % (CSTSIZE);
 
 	ncsthash_requests++;
 	for(ia=0;ia<4;ia++)
