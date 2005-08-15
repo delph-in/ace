@@ -393,9 +393,13 @@ int pred_subsumes(char *in, char *out)
 	return descendent_of(tout->tnum, tin);
 }
 
+int prop_subsumes(char *in, char *out) { return pred_subsumes(in, out); }
+
 int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 {
 	int vnin = in->vnum, i, j;
+
+	//printf(" subsume? %s <=> %s  ;; in->%d and out=%d\n", in->name, out->name, vmap[vnin], out->vnum);
 	if(vmap[vnin]!=-1)
 		return vmap[vnin] == out->vnum;
 	// make sure no input vars are already mapped to this output var;
@@ -407,8 +411,8 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 	// make sure variable type is subsumed
 	switch(in->type[0])
 	{
-		case	'i':	break;
-		case	'u':	if(out->type[0]=='h' || out->type[0]=='i')return 0;	break;
+		case	'u':	break;
+		case	'i':	if(out->type[0]=='h' || out->type[0]=='u')return 0;	break;
 		default:		if(out->type[0]!=in->type[0])return 0;	break;
 	}
 
@@ -418,8 +422,7 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 		for(j=0;j<out->nprops;j++)
 			if(!strcasecmp(in->props[i].name, out->props[j].name))break;
 		if(j==out->nprops)return 0;
-		// XXX do property values have a heirarchy?
-		if(strcasecmp(in->props[i].value, out->props[j].value))return 0;
+		if(!prop_subsumes(in->props[i].value, out->props[j].value))return 0;
 	}
 
 	// compatible.  establish a mapping and succeed.
@@ -436,8 +439,9 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 
 	if(epi == in->nrels)
 	{
-		// XXX check up on the HCONS
-		return 1;
+		char	hused[in->nhcons];
+		bzero(hused, in->nhcons);
+		return mrs_subsumes1(in, out, 0, vmap, hused);
 	}
 
 	for(i=0;i<out->nrels;i++) if(!used[i])
@@ -451,7 +455,7 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 			for(k=0;k<op->nargs;k++)
 				if(!strcasecmp(ep->args[j].name, op->args[k].name))break;
 			if(k==op->nargs)break;
-			if(!var_subsume(ep->args[j].value, op->args[j].value, vm, in->vlist.nvars))continue;
+			if(!var_subsume(ep->args[j].value, op->args[k].value, vm, in->vlist.nvars))continue;
 		}
 		if(j<ep->nargs)continue;
 
@@ -460,6 +464,36 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 		// we found an alignment for epi; recurse.
 		used[i] = 1;
 		if(mrs_subsumes0(in, out, epi+1, vm, used))
+		{
+			used[i] = 0;
+			return 1;
+		}
+		used[i] = 0;
+	}
+	return 0;
+}
+
+int mrs_subsumes1(struct mrs *in, struct mrs *out, int hci, int *vmap, char *used)
+{
+	// try to match hci of in with some hc in out, and recurse
+	struct mrs_hcons	*hc = in->hcons+hci, *oh;
+	int				vm[in->vlist.nvars], i;
+
+	if(hci == in->nhcons)
+		return 1;
+
+	for(i=0;i<out->nhcons;i++) if(!used[i])
+	{
+		oh = out->hcons+i;
+		if(hc->type != oh->type)return 0;
+		memcpy(vm, vmap, sizeof(int)*in->vlist.nvars);
+		if(!var_subsume(hc->hi, oh->hi, vm, in->vlist.nvars))continue;
+		if(!var_subsume(hc->lo, oh->lo, vm, in->vlist.nvars))continue;
+
+		//printf("in hc %d <=> out hc %d\n", hci, i);
+		// we found an alignment for hci; recurse.
+		used[i] = 1;
+		if(mrs_subsumes1(in, out, hci+1, vm, used))
 		{
 			used[i] = 0;
 			return 1;
