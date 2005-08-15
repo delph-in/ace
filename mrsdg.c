@@ -48,14 +48,14 @@ void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 
 struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 {
-	static struct type *event = 0, *ref_ind, *handle, *index;
+	static struct type *event = 0, *ref_ind, *handle, *individual;
 
 	if(!event)
 	{
 		event = lookup_type("event");
 		ref_ind = lookup_type("ref-ind");
 		handle = lookup_type("handle");
-		index = lookup_type("index");
+		individual = lookup_type("individual");
 	}
 
 	if(!dg)return 0;
@@ -69,7 +69,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		if(dg->type == event)type='e';
 		else if(dg->type == handle)type='h';
 		else if(dg->type == ref_ind)type='x';
-		else if(dg->type == index)type='i';
+		else if(dg->type == individual)type='i';
 		else type='u';
 
 		var->dg = dg;
