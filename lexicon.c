@@ -29,11 +29,18 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 #else
 	ldg = lex->dg;
 #endif
-	if(rels)ldg = constrain_lex_rels(ldg, rels);
+
+	if(rels)ldg = constrain_lex_rels(lex->dg?copy_dg(ldg):ldg, rels);
 	dg = unify_dg(ldg, lex->lextype->dg, -1);
 	if(!dg)
 	{
-		if(rels)return 0;
+		if(rels)
+		{
+#ifdef UNIFY_PATHS
+			//printf("specialization of `%s' failed: ", lex->word); unify_backtrace();
+#endif
+			return 0;
+		}
 		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed construction\n", lex->word);
 		exit(-1);
 	}

@@ -163,7 +163,11 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 	if(rels)
 	{
 		e->dg = constrain_rule_rels(e->dg, rels);
-		if(!e->dg)return 0;
+		if(!e->dg)
+		{
+			//printf("failed to constrain rule; "); unify_backtrace();
+			return 0;
+		}
 	}
 	e->rtl = rtl;
 
@@ -193,14 +197,20 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels)
 {
 	extern long top_copies;
+	extern int	upathl;
 	struct slab_state	slab;
 	struct dg			*target;
 	get_slabstate(&slab);
 	target = dg_hop(dg, lookup_fname("C-CONT"));
 	if(target)target = dg_hop(target, lookup_fname("RELS"));
+
+#ifdef UNIFY_PATHS
+	upathl = 0;
+#endif
 	if(0 != unify1(target, rels))
 	{ fail:
 		set_slabstate(&slab);
+		generation++;
 		return 0;
 	}
 	dg = copy_dg_with_comp_arcs(dg);

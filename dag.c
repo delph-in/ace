@@ -450,10 +450,10 @@ void	unify_backtrace()
 	int	i;
 
 	fflush(stdout);
-	fprintf(stderr, "unify failed at path: ");
-	for(i=0;i<upathl;i++)fprintf(stderr, "%s ", fnames[upath[i]]);
-	fprintf(stderr, "\n");
-	fflush(stderr);
+	fprintf(stdout, "unify failed at path: ");
+	for(i=0;i<upathl;i++)fprintf(stdout, "%s ", fnames[upath[i]]);
+	fprintf(stdout, "\n");
+	fflush(stdout);
 }
 #endif
 
