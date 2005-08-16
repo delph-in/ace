@@ -339,12 +339,13 @@ struct mrs	*read_mrs(FILE	*f)
 void	print_mrs_var(struct mrs_var	*var)
 {
 	if(!var) { printf("(null)"); return; }
-	printf("%s.%d", var->name, var->vnum);
-	if(var->is_const) printf("_K");
+	printf("%s", var->name);
+	//printf("%s.%d", var->name, var->vnum);
+	//if(var->is_const) printf("_K");
 	if(var->nprops)
 	{
 		int	i;
-		printf(" [");
+		printf(" [ %c", var->type[0]);
 		for(i=0;i<var->nprops;i++)
 			{ printf(" %s: %s", var->props[i].name, var->props[i].value); }
 		printf(" ]");
