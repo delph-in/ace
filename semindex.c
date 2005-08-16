@@ -179,6 +179,7 @@ void	add_semantic_index(struct lexeme *l, struct dg *full, int which)
 			if(!pred)continue;
 			predn = pred->xtype->name;
 			entity_add_semantic_index(which?RULE:LEXEME, pred, l, Rels, pidx++);
+			break;
 		}
 	}
 	else entity_add_semantic_index(which?RULE:LEXEME, 0, l, 0, 0);
@@ -278,7 +279,7 @@ void print_spn_activation(struct semindex_pred_node	*node)
 
 struct spn_list	*activate_semindex_node(struct semindex_pred_node *node, struct mrs_ep *ep, struct spn_list	*rest)
 {
-	struct ep_list				*epl = slab_alloc(sizeof(struct ep_list));
+	struct ep_list				*epl;
 	struct spn_list				*spnl;
 
 	// if this node hasn't been activated yet, record it in our list of activated nodes
@@ -291,9 +292,15 @@ struct spn_list	*activate_semindex_node(struct semindex_pred_node *node, struct 
 	}
 
 	// add the relevant ep to the activation record
-	epl->ep = ep;
-	epl->next = node->activation;
-	node->activation = epl;
+	for(epl=node->activation;epl;epl=epl->next)
+		if(epl->ep == ep)break;
+	if(!epl)
+	{
+		epl = slab_alloc(sizeof(struct ep_list));
+		epl->ep = ep;
+		epl->next = node->activation;
+		node->activation = epl;
+	}
 
 	return spnl;
 }
@@ -322,17 +329,21 @@ int enumerate_alignments(struct grammar_entity	*e, int ei, struct mrs_ep	*align[
 		// we have produced a complete alignment of 'e' against the input semantics.
 		struct edge	*edge = 0;
 		struct dg	*rels = dagify_rels_from_eps(1+e->nextra_preds, align);
-		int			result;
+		int			result, i;
 		struct slab_state slab;
 
 		get_slabstate(&slab);
 		if(e->what == LEXEME)
 		{
+			//printf("aligned `%s' to eps ", e->lex->word);
+			//for(i=0;i<=e->nextra_preds;i++)printf(" %d", align[i]->epnum); printf("\n");
 			edge = lexical_edge(e->lex, 0, 0, rels);
 			//cont = walk_dg(edge->dg, savef, "SYNSEM", "LOCAL", "CONT", NULL);
 		}
 		if(e->what == RULE)
 		{
+			//printf("aligned `%s' to eps ", e->rule->name);
+			//for(i=0;i<=e->nextra_preds;i++)printf(" %d", align[i]->epnum); printf("\n");
 			edge = epsilon_edge(e->rule, 0, e->rule->rtl, rels);
 			//cont = walk_dg(edge->dg, rsavef, "C-CONT", NULL);
 		}
