@@ -53,6 +53,7 @@ struct grammar
 	int		*introduce;
 	void	*semindex;
 	void	*stochmodel;
+	void	*typehash;
 };
 
 extern void	*slab_alloc(int	len);
@@ -323,6 +324,7 @@ int	freeze_grammar()
 	G->roots = slab_alloc(sizeof(void*) * G->nroots);	memcpy(G->roots, roots, sizeof(void*) * G->nroots);
 	G->fnames = slab_alloc(sizeof(void*) * G->nfnames);	memcpy(G->fnames, fnames, sizeof(char*) * G->nfnames);
 	G->strings = slab_alloc(sizeof(void*) * G->nstrings);	memcpy(G->strings, strings, sizeof(void*) * G->nstrings);
+	G->typehash = freeze_typehash();
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
@@ -376,6 +378,7 @@ static int	load_freeze()
 	type_rftc = G->type_rftc;
 	type_rltc = G->type_rltc;
 
+	recover_typehash(G->typehash);
 	recover_semantic_index(G->semindex);
 	recover_stochastic_model(G->stochmodel);
 

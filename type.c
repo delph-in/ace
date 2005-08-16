@@ -64,6 +64,21 @@ void	th_add(char	*name, struct type	*t)
 	fprintf(stderr, "typehash: table full!\n");
 }
 
+void *freeze_typehash()
+{
+	int i;
+	typehash = slab_alloc(sizeof(struct type*) * THSIZE);
+
+	bzero(typehash, sizeof(struct type*)*THSIZE);
+	for(i=0;i<ntypes;i++)th_add(types[i]->name, types[i]);
+	return typehash;
+}
+
+void recover_typehash(void *frozen)
+{
+	typehash = frozen;
+}
+
 struct type	*th_look(char	*name)
 {
 	unsigned int	h = thash(name), i;
