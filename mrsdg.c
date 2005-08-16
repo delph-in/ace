@@ -52,10 +52,10 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 
 	if(!event)
 	{
-		event = lookup_type("event");
-		ref_ind = lookup_type("ref-ind");
-		handle = lookup_type("handle");
-		individual = lookup_type("individual");
+		assert(event = lookup_type("event"));
+		assert(ref_ind = lookup_type("ref-ind"));
+		assert(handle = lookup_type("handle"));
+		assert(individual = lookup_type("individual"));
 	}
 
 	if(!dg)return 0;
@@ -228,14 +228,14 @@ struct mrs	*extract_mrs(struct dg	*root)
 void	dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem)
 {
 	struct dg	*dg;
-	char		*type = "individual";
+	char		*type = "basic_semarg";
 	int			i, path[16], len;
 
 	switch(var->type[0]) {
-		case	'e': type = "event";			break;
-		case	'x': type = "event_or_index";	break;
-		case	'u': type = "event_or_index";	break;
-		case	'h': type = "handle";			break;
+		case	'e': type = "event";	break;
+		case	'x': type = "ref-ind";	break;
+		case	'i': type = "individual";	break;
+		case	'h': type = "handle";	break;
 	}
 
 	dg = atomic_dg(type);
@@ -251,7 +251,7 @@ void	dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem)
 		} while(p);
 		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
 	}
-	if(var->type[0]=='e' || var->type[0]=='u' || var->type[0]=='x')dg = add_dg_feature(dg, "INSTLOC", skolem);
+	dg = add_dg_feature(dg, "INSTLOC", skolem);
 	var->dg = wellform_dg(dg);
 }
 
@@ -265,7 +265,7 @@ void dagify_mrs_ep(struct mrs_ep *ep)
 	{
 		if(ep->args[i].value->is_const == 0)
 		{
-			if(ep->args[i].value->type[0]!='h')	// XXX maybe some day we'll be allowed to skolemize handles
+			//if(ep->args[i].value->type[0]!='h')	// XXX maybe some day we'll be allowed to skolemize handles
 				dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
 		}
 		else
@@ -283,7 +283,7 @@ struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[])
 	struct dg	*rels = add_dg_feature(atomic_dg("*top*"), "LAST", last);
 	int			i;
 
-	for(i=0;i<neps;i++)
+	for(i=neps-1;i>=0;i--)
 	{
 		struct dg *cons = atomic_dg("*top*");
 		cons = add_dg_hop(cons, 2, list);

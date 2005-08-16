@@ -72,7 +72,7 @@ static char	*parse_word(char	**P, int advance)
 		//printf("sord `%s'\n", ret);
 		return ret;
 	}
-	if(*p==' ')p++;
+	while(*p==' ')p++;
 	ret = p;
 	while(*p && *p!=' ')p++;
 	if(*p==' '){*p=0;p++;}
@@ -90,6 +90,7 @@ struct mrs_var	*parse_mrs_const(char	**P)
 	struct mrs_var *var = calloc(sizeof(struct mrs_var), 1);
 	var->is_const = 1;
 	var->name = strdup(c);
+	var->vnum = 0;
 	return var;
 }
 
@@ -138,6 +139,7 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 			if(defined)
 			{
 				var.name = vlist->vars[i]->name;
+				var.vnum = i;
 				*vlist->vars[i] = var;
 			}
 			vlist->vars[i]->refs++;
@@ -200,9 +202,9 @@ struct mrs_hcons	*parse_mrs_hcons(struct mrs_vlist	*vlist, char **P, int	*Nhcons
 		hc->hi = parse_mrs_var(vlist, P);
 		word = parse_word(P, 1);
 		if(!word)FAIL("hcons lacks type");
-		if(!strcmp(word, "qeq"))hc->type = hcons_qeq;
-		else if(!strcmp(word, "leq"))hc->type = hcons_leq;
-		else if(!strcmp(word, "geq"))hc->type = hcons_geq;
+		if(!strcasecmp(word, "qeq"))hc->type = hcons_qeq;
+		else if(!strcasecmp(word, "leq"))hc->type = hcons_leq;
+		else if(!strcasecmp(word, "geq"))hc->type = hcons_geq;
 		else FAIL("hcons type unrecognized");
 		hc->lo = parse_mrs_var(vlist, P);
 	}
@@ -261,9 +263,18 @@ struct mrs	*parse_mrs(char	*buffer)
 	struct mrs			mrs, *M;
 
 	// trim off outer []'s
-	if(*buffer)buffer[strlen(buffer)-1] = 0;
-	if(*buffer)buffer++;
-	else return 0;
+	while(*buffer && *buffer==' ' || *buffer=='\t' || *buffer=='\n')buffer++;
+	p = buffer+strlen(buffer)-1;
+	while(p>buffer && *p!=']')p--;
+	if(p<=buffer)return 0;
+	if(*p!=']' || *buffer!='[')
+	{
+		fprintf(stderr, "no []'s around mrs");
+		return 0;
+	}
+	*p = 0;
+	buffer++;
+	for(p=buffer;*p;p++)if(*p=='\t' || *p=='\n')*p=' ';
 
 	bzero(&mrs, sizeof(mrs));
 	p = buffer;
@@ -281,7 +292,7 @@ struct mrs	*parse_mrs(char	*buffer)
 			mrs.rels = parse_mrs_rels(&vlist, &p, &mrs.nrels);
 		if(!strcasecmp(fname, "HCONS:"))
 			mrs.hcons = parse_mrs_hcons(&vlist, &p, &mrs.nhcons);
-		if(!strcasecmp(fname, "TRIGGER:"))
+		if(!strcasecmp(fname, "TRIGGER:") || !strcasecmp(fname, "VCS:"))
 			mrs.triggers = parse_mrs_trigger(&p, &mrs.ntriggers);
 	}
 
@@ -302,7 +313,7 @@ struct mrs	*read_mrs(FILE	*f)
 		int ch = fgetc(f);
 		if(ch==' ' || ch=='\t' || ch=='\n' || ch=='\r')ch=' ';
 		if(ch!='[' && lbuf==0)continue;
-		if(lbuf && buffer[lbuf-1]==' ' && ch==' ')continue;
+		//if(lbuf && buffer[lbuf-1]==' ' && ch==' ')continue;
 		if(lbuf+2 > abuf)
 		{
 			abuf *= 2;
@@ -319,6 +330,7 @@ struct mrs	*read_mrs(FILE	*f)
 		free(buffer);
 		return 0;
 	}
+	buffer[lbuf] = 0;
 	mrs = parse_mrs(buffer);
 	free(buffer);
 	return mrs;
@@ -327,7 +339,7 @@ struct mrs	*read_mrs(FILE	*f)
 void	print_mrs_var(struct mrs_var	*var)
 {
 	if(!var) { printf("(null)"); return; }
-	printf("%s", var->name);
+	printf("%s.%d", var->name, var->vnum);
 	if(var->is_const) printf("_K");
 	if(var->nprops)
 	{
@@ -404,7 +416,10 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 {
 	int vnin = in->vnum, i, j;
 
-	//printf(" subsume? %s <=> %s  ;; in->%d and out=%d\n", in->name, out->name, vmap[vnin], out->vnum);
+	if(in->is_const)
+		return !strcmp(in->name, out->name);
+
+	//printf(" subsume? %s <=> %s  ;; in.%d->%d and out=%d\n", in->name, out->name, vnin, vmap[vnin], out->vnum);
 	if(vmap[vnin]!=-1)
 		return vmap[vnin] == out->vnum;
 	// make sure no input vars are already mapped to this output var;
@@ -429,6 +444,7 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 		if(j==out->nprops)return 0;
 		if(!prop_subsumes(in->props[i].value, out->props[j].value))return 0;
 	}
+	
 
 	// compatible.  establish a mapping and succeed.
 	vmap[vnin] = out->vnum;

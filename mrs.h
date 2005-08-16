@@ -60,6 +60,8 @@ struct mrs
 	int				ntriggers;
 };
 
+void		print_mrs(struct mrs	*mrs);
+void		print_mrs_var(struct mrs_var	*var);
 struct mrs	*parse_mrs(char	*buffer);
 struct mrs	*read_mrs(FILE	*f);
 void		free_mrs(struct mrs	*m);
