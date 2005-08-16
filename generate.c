@@ -8,7 +8,7 @@
 #include "chart.h"
 #include "unpack.h"
 
-extern int	question, exhaustive, lui_chart, inhibit_pack, trace, debug_level;
+extern int	question, exhaustive, lui_chart, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb;
 
 unsigned int	require_ep_span = 0;
 
@@ -113,16 +113,21 @@ int	generate(struct mrs	*mrs)
 	{
 		if(!mrs_subsumes(mrs, mrs_res))
 		{
-			//printf("NICE TRY! `%s' has incompatible semantics.\n", hyp->string);
+			//printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
+			//print_mrs(mrs_res); printf("\n");
 			return;
 		}
 		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->dec->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
-		printf("%s\n", hyp->string);
+		if(!inhibit_results)printf("%s\n", hyp->string);
+		if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, count);
 		count++;
 		free_mrs(mrs_res);
 	}
+	if(do_itsdb)itsdb_start_results();
 	iterate_cell_root_hypotheses(cells, show_result, 0);
+	if(do_itsdb)itsdb_end_results();
+	if(do_itsdb)itsdb_report_gen(count);
 	if(debug_level)printf("unpacked %.4f\n", timer());
 
 	printf("NOTE: %d passive, %d active edges in final generation chart\n",

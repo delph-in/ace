@@ -397,6 +397,38 @@ int instantiate_hypothesis(struct hypothesis *h)
 	return 0;
 }
 
+void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
+{
+	void print_tree0(struct hypothesis *hyp)
+	{
+		int i;
+		struct edge *e = hyp->dec->edge;
+		print(" (%d %s %f %d %d", e->id, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), hyp->score, -1, -1);
+		if(e->have)
+			for(i=0;i<e->have;i++)
+				print_tree0(hyp->rhs[i]);
+		else if(e->lex)
+		{
+			// XXX the inflection is specified higher on the tree
+			int i;
+			char word[256];
+			struct lexeme *l = e->lex;
+			print(" (\\\"");
+			for(i=0;i<l->stemlen;i++)
+			{
+				if(l->stem[i]->name[0]=='"')
+					strcpy(word, l->stem[i]->name+1);
+				else strcpy(word, l->stem[i]->name+0);
+				if(*word && word[strlen(word)-1]=='"')word[strlen(word)-1] = 0;
+				print("%s%s", (i==l->stemlen)?"":" ", word);
+			}
+			print("\\\" %d %d)", -1, -1);
+		}
+		print(")");
+	}
+	print_tree0(hyp);
+}
+
 int iterate_cell_root_hypotheses(struct chart_cell *cell, void (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest)
 {
 	int	i, j, count = 0, nhyp = 0;
@@ -439,6 +471,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, void (*process)(struct
 			if(is_root(rhyp->dg))
 			{
 				struct mrs	*m = extract_mrs(rhyp->dg);
+				//printf("\n"); print_hypothesis(rhyp, printf); printf("\n");
 				process(rhyp, m);
 				count++;
 				if(nbest && count>=nbest)break;

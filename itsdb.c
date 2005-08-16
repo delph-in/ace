@@ -10,6 +10,7 @@
 #include	"rule.h"
 #include	"lexicon.h"
 #include	"mrs.h"
+#include	"unpack.h"
 
 extern int inhibit_results;
 
@@ -76,6 +77,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 		}
 		else
 		{
+			print_mrs(m);
 			readings = generate(m);
 			free_mrs(m);
 		}
@@ -102,6 +104,40 @@ itsdb_report(int nwords, char **words, int readings)
 	capi_print_derivations(nwords, words);
 
 	return 0;
+}
+
+itsdb_report_gen(int readings)
+{
+	extern int total_edges, real_edges, passive_edges, slab_usage();
+
+	capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
+		readings, passive_edges, real_edges - passive_edges);
+
+	capi_printf("(:others . %d) ", slab_usage());
+
+	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
+}
+
+itsdb_start_results() { capi_printf("(:results . ("); }
+itsdb_end_results() { capi_printf(")) "); }
+
+itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
+{
+	char		*esc = malloc(strlen(hyp->string)*2+1), *p, *q;
+
+	capi_printf("((:result-id . %d) (:derivation . \"", id++);
+	print_hypothesis(hyp, capi_printf);
+	capi_printf("\") ");
+
+	for(q=esc,p=hyp->string;*p;p++)
+	{
+		if(*p=='"' && *p=='\\')*q++ = '\\';
+		*q++ = *p;
+	}
+	*q=0;
+	capi_printf("(:tree . \"%s\") ", esc);
+	free(esc);
+	capi_printf("(:score . %f)) ", hyp->score);
 }
 
 #define DER_PRINTF capi_printf
