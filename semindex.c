@@ -50,7 +50,7 @@ struct semindex_pred_node
 	}	*entities;
 };
 
-struct semindex_pred_node	*lookup_semindex(char *predn);
+struct semindex_pred_node	*lookup_semindex(char *predn, int alloc);
 void						add_relative_to_spn(struct semindex_pred_node *rel, struct semindex_pred_node *node);
 
 static struct hash	*sindex;
@@ -59,7 +59,7 @@ int							nstrpars;
 struct semindex_pred_node	**strpars;
 
 extern struct type *strtype;
-static int predfnum;
+static int predfnum, cargfnum;
 
 void init_index()
 {
@@ -69,29 +69,30 @@ void init_index()
 #define	GLB_TYPE(t)	(t->name[0]=='G' && t->name[1]=='(')	/* XXX crude hack to detect GLB types */
 
 	predfnum = lookup_fname("PRED");
+	cargfnum = lookup_fname("CARG");
 	sindex = hash_new("semantic index");
 	for(i=0;i<predsort->ndescendents;i++)
 	{
 		struct type	*t = types[predsort->descendents[i]];
 		if(GLB_TYPE(t))continue;
-		struct semindex_pred_node *node = lookup_semindex(t->name);
+		struct semindex_pred_node *node = lookup_semindex(t->name, 1);
 
 		for(j=1;j<t->ndescendents;j++) if(!GLB_TYPE(types[t->descendents[j]]))
-			add_relative_to_spn(node, lookup_semindex(types[t->descendents[j]]->name));
+			add_relative_to_spn(node, lookup_semindex(types[t->descendents[j]]->name, 1));
 
 		if(descendent_of(strtype->tnum, t))
 		{
 			nstrpars++;
 			strpars = realloc(strpars, sizeof(struct type*) * nstrpars);
-			strpars[nstrpars-1] = lookup_semindex(t->name);
+			strpars[nstrpars-1] = lookup_semindex(t->name, 1);
 		}
 	}
 }
 
-struct semindex_pred_node	*lookup_semindex(char *predn)
+struct semindex_pred_node	*lookup_semindex(char *predn, int alloc)
 {
 	struct semindex_pred_node	*node = hash_find(sindex, predn);
-	if(!node)
+	if(!node && alloc)
 	{
 		node = calloc(sizeof(struct semindex_pred_node), 1);
 		node->pred = predn;
@@ -119,7 +120,7 @@ void	add_entity_to_spn(struct grammar_entity *e, struct semindex_pred_node *node
 {
 }
 
-void	entity_add_semantic_index(short what, struct dg *indpred, void *entity, struct dg *rels, int pidx)
+void	entity_add_semantic_index(short what, struct dg *indpred, char *indkey, void *entity, struct dg *rels, int pidx)
 {
 	int							nextras = 0, i;
 	struct semindex_pred_node	*node, **extras = 0;
@@ -132,10 +133,10 @@ void	entity_add_semantic_index(short what, struct dg *indpred, void *entity, str
 		pred = dg_hop(rel, predfnum);
 		if(!pred || pred==indpred)continue;
 		extras = realloc(extras, sizeof(char*)*(nextras+1));
-		extras[nextras++] = lookup_semindex(pred->xtype->name);
+		extras[nextras++] = lookup_semindex(pred->xtype->name, 1);
 	}
 
-	node = lookup_semindex(indpred?indpred->xtype->name:VACUOUS);
+	node = lookup_semindex(indkey, 1);
 	// 'e' only gets added to 'node', not to 'node's relatives.
 	if(node->nentities+1 >= node->aentities)
 	{
@@ -171,18 +172,22 @@ void	add_semantic_index(struct lexeme *l, struct dg *full, int which)
 	{
 		for(;rels;rels = dg_hop(rels, 2 /* REST */ ))
 		{
-			struct dg	*pred, *rel = dg_hop(rels, 1 /* FIRST */);
-			char		*predn;
+			struct dg	*pred, *rel = dg_hop(rels, 1 /* FIRST */), *carg;
+			char		*predn, *cargn;
 			int			i;
 			if(!rel)break;
+			carg = dg_hop(rel, cargfnum);
+			if(carg)cargn = carg->xtype->name;
+			else cargn = 0;
 			pred = dg_hop(rel, predfnum);
 			if(!pred)continue;
 			predn = pred->xtype->name;
-			entity_add_semantic_index(which?RULE:LEXEME, pred, l, Rels, pidx++);
+
+			entity_add_semantic_index(which?RULE:LEXEME, pred, cargn?cargn:pred->xtype->name, l, Rels, pidx++);
 			break;
 		}
 	}
-	else entity_add_semantic_index(which?RULE:LEXEME, 0, l, 0, 0);
+	else entity_add_semantic_index(which?RULE:LEXEME, 0, VACUOUS, l, 0, 0);
 }
 
 void	freeze_ge(struct grammar_entity *n, struct grammar_entity	*ge)
@@ -305,14 +310,32 @@ struct spn_list	*activate_semindex_node(struct semindex_pred_node *node, struct 
 	return spnl;
 }
 
+char *ep_has_carg(struct mrs_ep *ep)
+{
+	int i;
+	for(i=0;i<ep->nargs;i++)
+		if(!strcasecmp(ep->args[i].name, "CARG"))
+			return ep->args[i].value->name;
+	return 0;
+}
+
 struct spn_list	*activate_semindex(struct mrs_ep *ep, struct spn_list	*rest)
 {
-	struct semindex_pred_node	*node = lookup_semindex(ep->pred);
+	char						*carg = ep_has_carg(ep);
+	struct semindex_pred_node	*node = lookup_semindex(ep->pred, 0), *cnode;
 	int							i;
 
+	if(!node)return rest;
 	ep->active = 0;
 	for(i=0;i<node->nrelatives;i++)
 		rest = activate_semindex_node(node->relatives[i], ep, rest);
+	if(carg)
+	{
+		// grammar entities with CARG's aren't put into their pred's index slot, but into the carg's index slot.
+		// go looking for those.
+		cnode = lookup_semindex(carg, 0);
+		if(cnode)rest = activate_semindex_node(cnode, ep, rest);
+	}
 	return activate_semindex_node(node, ep, rest);
 }
 
@@ -407,7 +430,7 @@ int enumerate_semindex(struct semindex_pred_node *node)
 
 int evacuate(int nvaclex, char **vaclex)
 {
-	struct semindex_pred_node	*vac = lookup_semindex(VACUOUS);
+	struct semindex_pred_node	*vac = lookup_semindex(VACUOUS, 0);
 	struct grammar_entity		*e;
 	int							i, count = 0;
 
