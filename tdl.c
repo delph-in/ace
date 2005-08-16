@@ -448,7 +448,6 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 	int		nr = 0;
 
 	if(!R->ncorefs)return 0;
-	coref_template = atomic_dg("*top*");
 	for(i=0;i<256;i++)
 	{
 		reentrancies[i] = 0;
@@ -465,23 +464,24 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 			rnames[j] = R->corefs[i].name;
 			nr++;
 		}
-		/*printf("coref %d: %s = ", i, R->corefs[i].name);
-		for(j=0;j<R->corefs[i].pathlen;j++)printf("%d ", R->corefs[i].path[j]);
-		printf("\n");*/
-
-		coref_template = add_dg_path(coref_template, R->corefs[i].path, R->corefs[i].pathlen, dg);
+		//printf("coref %d: %s = ", i, R->corefs[i].name);
+		//for(j=0;j<R->corefs[i].pathlen;j++)printf("%d ", R->corefs[i].path[j]);
+		//printf("\n");
 	}
-	//printf("coref template:\n"); print_dg(coref_template); printf("\n");
-	if(unify_dg_infrom(target, coref_template))
+	for(j=0;j<nr;j++)
 	{
-		//printf("patch failed\n");
-		return -1;
+		coref_template = atomic_dg("*top*");
+		for(i=0;i<R->ncorefs;i++) if(!strcmp(rnames[j], R->corefs[i].name))
+			coref_template = add_dg_path(coref_template, R->corefs[i].path, R->corefs[i].pathlen, reentrancies[j]);
+		//printf("coref template:\n"); print_dg(coref_template); printf("\n");
+		if(unify_dg_infrom(target, coref_template))
+		{
+			//printf("patch failed\n");
+			return -1;
+		}
 	}
-	else
-	{
-		//printf("patch succeeded\n");
-		return 0;
-	}
+	//printf("patch succeeded\n");
+	return 0;
 }
 
 static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*building_type);
