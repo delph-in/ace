@@ -11,6 +11,7 @@
 #include	"morpho.h"
 #include	"lexicon.h"
 #include	"maxent.h"
+#include	"mrs.h"
 #include	"freeze.h"
 
 extern void		**oldslabs;
@@ -54,6 +55,7 @@ struct grammar
 	void	*semindex;
 	void	*stochmodel;
 	void	*typehash;
+	void	*vpm;
 };
 
 extern void	*slab_alloc(int	len);
@@ -325,6 +327,7 @@ int	freeze_grammar()
 	G->fnames = slab_alloc(sizeof(void*) * G->nfnames);	memcpy(G->fnames, fnames, sizeof(char*) * G->nfnames);
 	G->strings = slab_alloc(sizeof(void*) * G->nstrings);	memcpy(G->strings, strings, sizeof(void*) * G->nstrings);
 	G->typehash = freeze_typehash();
+	G->vpm = freeze_vpm();
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
@@ -379,6 +382,7 @@ static int	load_freeze()
 	type_rltc = G->type_rltc;
 
 	recover_typehash(G->typehash);
+	recover_vpm(G->vpm);
 	recover_semantic_index(G->semindex);
 	recover_stochastic_model(G->stochmodel);
 

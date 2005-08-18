@@ -339,7 +339,7 @@ struct mrs	*read_mrs(FILE	*f)
 void	print_mrs_var(struct mrs_var	*var)
 {
 	if(!var) { printf("(null)"); return; }
-	printf("%s", var->name);
+	printf("%s%d", var->type, var->vnum);
 	//printf("%s.%d", var->name, var->vnum);
 	//if(var->is_const) printf("_K");
 	if(var->nprops)
@@ -406,12 +406,26 @@ int pred_subsumes(char *in, char *out)
 	if(!strcasecmp(in, out))return 1;
 	if(in[0]=='"')return 0;
 	tin = lookup_type(in);
+	if(!tin)
+	{
+		fprintf(stderr, "no such predicate type `%s'\n", in);
+		exit(-1);
+	}
 	if(out[0]=='"')return descendent_of(strtype->tnum, tin);
 	tout = lookup_type(out);
+	if(!tout)
+	{
+		fprintf(stderr, "no such predicate type `%s'\n", out);
+		exit(-1);
+	}
 	return descendent_of(tout->tnum, tin);
 }
 
-int prop_subsumes(char *in, char *out) { return pred_subsumes(in, out); }
+int prop_subsumes(char *in, char *out)
+{
+	if(!strcasecmp(in, out))return 1;
+	return pred_subsumes(in, out);
+}
 
 int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 {
@@ -477,7 +491,7 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 			for(k=0;k<op->nargs;k++)
 				if(!strcasecmp(ep->args[j].name, op->args[k].name))break;
 			if(k==op->nargs)break;
-			if(!var_subsume(ep->args[j].value, op->args[k].value, vm, in->vlist.nvars))continue;
+			if(!var_subsume(ep->args[j].value, op->args[k].value, vm, in->vlist.nvars))break;
 		}
 		if(j<ep->nargs)continue;
 

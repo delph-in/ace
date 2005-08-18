@@ -71,3 +71,7 @@ struct mrs	*extract_mrs(struct dg	*root);
 void		dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem);
 void		dagify_mrs_ep(struct mrs_ep *ep);
 struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[]);
+void		*freeze_vpm();
+void		recover_vpm(void *vpm);
+struct mrs_var	*internal_to_external_mrs_var(struct mrs_var	*vin);
+struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin);

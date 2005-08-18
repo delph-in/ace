@@ -9,7 +9,7 @@
 static int name;
 
 static char	*ep_drop[] = {"WLINK", "LBL", "CTO", "CFROM", "PARAMS", "PRED", 0};
-static char	*var_drop[] = {"--TPC", "--PSV", "STATIVE", "SORT", "INSTLOC", 0};
+static char	*var_drop[] = {"--TPC", "--PSV", "SORT", "INSTLOC", 0};
 
 // dag to mrs conversion
 
@@ -48,34 +48,22 @@ void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 
 struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 {
-	static struct type *event = 0, *ref_ind, *handle, *individual;
+	static struct type *basic_semarg = 0;
 
-	if(!event)
-	{
-		assert(event = lookup_type("event"));
-		assert(ref_ind = lookup_type("ref-ind"));
-		assert(handle = lookup_type("handle"));
-		assert(individual = lookup_type("individual"));
-	}
+	if(!basic_semarg)
+		assert(basic_semarg = lookup_type("basic_semarg"));
 
 	if(!dg)return 0;
 	if(dg->gen != 1)
 	{
 		struct darc	*arcs = DARCS(dg);
-		struct mrs_var	*var = malloc(sizeof(struct mrs_var));
-		char type, str[16];
+		struct mrs_var	*var = malloc(sizeof(struct mrs_var)), *vnew;
 		extern char **fnames;
 		int i;
-		if(dg->type == event)type='e';
-		else if(dg->type == handle)type='h';
-		else if(dg->type == ref_ind)type='x';
-		else if(dg->type == individual)type='i';
-		else type='u';
 
 		var->dg = dg;
-		//sprintf(str, "%c%d", type, ++name[type-'a']); var->name = strdup(str);
-		sprintf(str, "%c%d", type, ++name); var->name = strdup(str);
-		str[0]=type;str[1]=0; var->type = strdup(str);
+		var->type = strdup(dg->type->name);
+		var->name = strdup(dg->type->name);
 		var->props = 0;
 		var->nprops = 0;
 		for(i=0;i<dg->narcs;i++)
@@ -83,6 +71,10 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		var->is_const = 0;
 		var->refs = 0;
 		var->vnum = vlist->nvars;
+
+		vnew = internal_to_external_mrs_var(var);
+		free_mrs_var(var); var = vnew;
+
 		vlist->nvars++;
 		vlist->vars = realloc(vlist->vars, sizeof(struct mrs_var*)*vlist->nvars);
 		vlist->vars[vlist->nvars-1] = var;
@@ -225,20 +217,15 @@ struct mrs	*extract_mrs(struct dg	*root)
 
 // mrs to dag conversion
 
-void	dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem)
+void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 {
 	struct dg	*dg;
+	struct mrs_var *var;
 	char		*type = "basic_semarg";
 	int			i, path[16], len;
 
-	switch(var->type[0]) {
-		case	'e': type = "event";	break;
-		case	'x': type = "ref-ind";	break;
-		case	'i': type = "individual";	break;
-		case	'h': type = "handle";	break;
-	}
-
-	dg = atomic_dg(type);
+	var = external_to_internal_mrs_var(evar);
+	dg = atomic_dg(var->type);
 	for(i=0;i<var->nprops;i++)
 	{
 		char	*vtype = var->props[i].value, *str = strdup(var->props[i].name), *p = str, *p2;
@@ -252,7 +239,9 @@ void	dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem)
 		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
 	}
 	dg = add_dg_feature(dg, "INSTLOC", skolem);
-	var->dg = wellform_dg(dg);
+	evar->dg = wellform_dg(dg);
+
+	free_mrs_var(var);
 }
 
 void dagify_mrs_ep(struct mrs_ep *ep)
@@ -265,8 +254,7 @@ void dagify_mrs_ep(struct mrs_ep *ep)
 	{
 		if(ep->args[i].value->is_const == 0)
 		{
-			//if(ep->args[i].value->type[0]!='h')	// XXX maybe some day we'll be allowed to skolemize handles
-				dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
+			dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->dg);
 		}
 		else
 		{

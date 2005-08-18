@@ -981,6 +981,8 @@ int	load_grammar()
 	setup_rule_filter();
 	g_loaded = 0;
 
+	load_vpm("../erg/mrs.vpm");
+
 	if(debug_level)
 		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d irules, %d roots, %d strings, %d features\n",
 				ntypes, glb_type_count, nlexemes, nrules, nirules, nroots, nstrings, nfnames);
