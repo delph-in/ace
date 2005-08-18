@@ -643,9 +643,15 @@ char	*show_orth_leaves(struct edge	*e)
 	{
 		if(e->lex)
 		{
-			// XXX fix me for MWEs
-			ret = strdup(e->lex->stem[0]->name+1);
-			ret[strlen(ret)-1] = 0;
+			int len = 0, i;
+			for(i=0;i<e->lex->stemlen;i++)len += strlen(e->lex->stem[i]->name) + 1 - 2;
+			ret = malloc(len+2); *ret = 0;
+			for(i=0;i<e->lex->stemlen;i++)
+			{
+				if(i)strcat(ret, " ");
+				strcat(ret, e->lex->stem[i]->name+1);
+				ret[strlen(ret)-1] = 0;
+			}
 			return ret;
 		}
 		else return strdup("[null]");
@@ -658,7 +664,7 @@ char	*show_orth_leaves(struct edge	*e)
 			//printf("applying inflr `%s' to `%s'\n", e->rule->name, sub);
 			ret = inflect(e->rule->inflr, sub);
 			free(sub);
-			return ret;
+			return strdup(ret);	// higher-up show_orth_leaves() might want to free what we return... blah.
 		}
 		else return sub;
 	}

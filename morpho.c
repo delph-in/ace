@@ -384,10 +384,12 @@ char	*inflect(struct irule	*ir, char	*str)
 
 	for(i=0;i<ir->nirregs;i++)
 		if(!strcmp(str, ir->irregs[i].stem))
-			{res = strdup(ir->irregs[i].form);break;}
+			{res = freeze_string(ir->irregs[i].form);break;}
 	if(!res)
 	{
-		res = malloc(strlen(str) + 10);
+		int slen = strlen(str)+10;
+		if(slen%4)slen = (slen&~3)+4;
+		res = slab_alloc(slen);
 		strcpy(res, str);
 		for(i=ir->nsub-1;i>=0;i--)
 		{

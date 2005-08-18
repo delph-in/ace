@@ -21,13 +21,10 @@ static inline char* edge_sign(struct edge *e)
 
 void score_decomposition(struct decomposition *d)
 {
-	if(!d->edge->have)
-	{
-		// leaf node
-		// XXX make this work for MWEs
-		d->score = maxent_score(edge_sign(d->edge), d->edge->lex->stem[0]->name, 0, 0);
-	}
-	else d->score = maxent_score(edge_sign(d->edge), edge_sign(d->rhs[0]), edge_sign(d->rhs[1]), d->edge->rule->rtl);
+	if(d->edge->have)
+		d->score = maxent_score(edge_sign(d->edge), edge_sign(d->rhs[0]),
+						edge_sign(d->rhs[1]), d->edge->rule->rtl);
+	else d->score = 0; // we have to score leaf nodes later since their surface form changes around
 }
 
 struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
@@ -143,7 +140,30 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypothesis *
 	h->score = dec->score + rhs[0]->score;
 	h->dg = 0; h->string = 0;
 	h->checkup = 0;
-	if(dec->edge && dec->edge->have>1)h->score += rhs[1]->score;
+	if(dec->edge)
+	{
+		if(dec->edge->have>1)h->score += rhs[1]->score;
+		if(dec->edge->lex)
+		{
+			assert(dec->edge->have==1);	// lexical rules are unary
+			if(dec->edge->rule->inflr)
+			{
+				h->string = inflect(dec->edge->rule->inflr, rhs[0]->string);
+				if(!h->string)h->string = "(failed to inflect)";	// packing might make us try something silly here
+			}
+			else h->string = rhs[0]->string;
+		}
+		else for(i=0;i<dec->edge->have;i++) if(rhs[i]->dec->edge->lex)
+		{
+			// syntax edge with lexical daughter.
+			// this is the first place in the hypothesis tree where we
+			// know for sure what the surface form under us is, so add the maxent score
+			char surf[512];
+			assert(rhs[i]->string);
+			sprintf(surf, "\"%s\"", rhs[i]->string);
+			h->score += maxent_score(rhs[i]->dec->edge->lex->lextype->name, surf, 0, 0);
+		}
+	}
 
 	h->next = 0;
 
@@ -154,13 +174,26 @@ struct hypothesis *leaf_hypothesis(struct edge *e)
 {
 	struct decomposition *dec = slab_alloc(sizeof(struct decomposition));
 	struct hypothesis *hyp = slab_alloc(sizeof(struct hypothesis));
+	int	i, slen = 0;
 	dec->edge = e;
 	dec->rhs[0] = dec->rhs[1] = 0;
 	dec->ni2 = 0;
 	dec->seeni1 = 0;
 	score_decomposition(dec);
 	hyp->dec = dec;
-	hyp->string = 0;
+
+	for(i=0;i<e->lex->stemlen;i++)slen += strlen(e->lex->stem[i]->name) + 1 - 2;
+	if(slen%4)slen = (slen&~3)+4;
+	hyp->string = slab_alloc(slen); hyp->string[0]=0;
+	for(i=0;i<e->lex->stemlen;i++)
+	{
+		char	single[256];
+		if(i)strcat(hyp->string, " ");
+		strcpy(single, e->lex->stem[i]->name+1);
+		if(*single)single[strlen(single)-1] = 0;
+		strcat(hyp->string, single);
+	}
+
 	hyp->dg = 0;
 	hyp->checkup = -1;
 	hyp->score = dec->score;
@@ -311,48 +344,6 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank)
 	return hyp;
 }
 
-char	*show_h_orth_leaves(struct hypothesis	*h)
-{
-	int		i;
-	char	*sub, *ret;
-
-	if(!h->dec->edge->have)
-	{
-		if(h->dec->edge->lex)
-		{
-			// XXX fix me for MWEs
-			ret = strdup(h->dec->edge->lex->stem[0]->name+1);
-			ret[strlen(ret)-1] = 0;
-			return ret;
-		}
-		else return strdup("[null]");
-	}
-	if(h->dec->edge->have==1)
-	{
-		sub = show_h_orth_leaves(h->rhs[0]);
-		if(h->dec->edge->rule->inflr)
-		{
-			//printf("applying inflr `%s' to `%s'\n", e->rule->name, sub);
-			ret = inflect(h->dec->edge->rule->inflr, sub);
-			free(sub);
-			return ret;
-		}
-		else return sub;
-	}
-	else
-	{
-		for(ret=calloc(1,1),i=0;i<2;i++)
-		{
-			sub = show_h_orth_leaves(h->rhs[i]);
-			ret = realloc(ret, strlen(ret) + strlen(sub) + 2);
-			if(i)strcat(ret, " ");
-			strcat(ret, sub);
-			free(sub);
-		}
-		return ret;
-	}
-}
-
 int instantiate_hypothesis(struct hypothesis *h)
 {
 	int arity = h->dec->edge?h->dec->edge->have:1, i;
@@ -375,7 +366,19 @@ int instantiate_hypothesis(struct hypothesis *h)
 			h->dg = (void*)1;
 			return -1;
 		}
-	h->string = show_h_orth_leaves(h); // XXX not quite; want inflected forms even before rules happen, and this should have already been computed by this point... to score it
+	if(!h->string)
+	{
+		// combine the strings of daughters
+		int slen = 0, i;
+		for(i=0;i<arity;i++)slen += strlen(h->rhs[i]->string) + 1;
+		if(slen%4)slen = (slen&~3)+4;
+		h->string = slab_alloc(slen+1); h->string[0] = 0;
+		for(i=0;i<arity;i++)
+		{
+			if(i)strcat(h->string, " ");
+			strcat(h->string, h->rhs[i]->string);
+		}
+	}
 
 	if(!arity)
 	{
@@ -404,34 +407,33 @@ int instantiate_hypothesis(struct hypothesis *h)
 
 void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 {
-	void print_tree0(struct hypothesis *hyp)
+	int print_tree0(struct hypothesis *hyp, char *surf, int from, int quiet)
 	{
-		int i;
+		int i, len = 0;
 		struct edge *e = hyp->dec->edge;
-		print(" (%d %s %f %d %d", e->id, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), hyp->score, -1, -1);
+		if(e && e->lex && !surf)
+			surf = hyp->string;	// grab tree-top string and pass it down till we get to the lexeme
+
+		// first silently traverse subtree and compute its word length
 		if(e->have)
 			for(i=0;i<e->have;i++)
-				print_tree0(hyp->rhs[i]);
-		else if(e->lex)
+				len += print_tree0(hyp->rhs[i], surf, from+len, 1);
+		else if(e->lex) len = e->lex->stemlen;
+
+		// now possibly actually print out the edge, with span information
+		if(!quiet)
 		{
-			// XXX the inflection is specified higher on the tree
-			int i;
-			char word[256];
-			struct lexeme *l = e->lex;
-			print(" (\\\"");
-			for(i=0;i<l->stemlen;i++)
-			{
-				if(l->stem[i]->name[0]=='"')
-					strcpy(word, l->stem[i]->name+1);
-				else strcpy(word, l->stem[i]->name+0);
-				if(*word && word[strlen(word)-1]=='"')word[strlen(word)-1] = 0;
-				print("%s%s", (i==l->stemlen)?"":" ", word);
-			}
-			print("\\\" %d %d)", -1, -1);
+			print(" (%d %s %f %d %d", e->id, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), hyp->score, from, from+len);
+			if(e->have)
+				for(len=i=0;i<e->have;i++)
+					len += print_tree0(hyp->rhs[i], surf, from+len, 0);
+			else if(e->lex)
+				print(" (\\\"%s\\\" %d %d)", surf, from, from+len);
+			print(")");
 		}
-		print(")");
+		return len;
 	}
-	print_tree0(hyp);
+	print_tree0(hyp, 0, 0, 0);
 }
 
 int iterate_cell_root_hypotheses(struct chart_cell *cell, void (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest)

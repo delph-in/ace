@@ -19,6 +19,7 @@ void print_mef(struct maxent_feature *f);
 static struct hash	*mem;
 
 #define MAXENT_NOISE(fmt, ...)
+//#define MAXENT_NOISE printf
 
 float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl)
 {
