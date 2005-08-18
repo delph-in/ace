@@ -1,5 +1,10 @@
 TODO:
 
+fix proper noun support (I believe the new morphology system broke it)
+	- also for generation
+
+better max-ent hash keys
+
 record ersatzing
 
 pack active edges?
@@ -7,8 +12,6 @@ pack active edges?
 	- figure out a way to pack and do hyper?
 		- that would make hyperpassive worthwhile too...
 		- unfortunately seems impossible.
-
-fix proper noun support (I believe the new morphology system broke it)
 
 (considered)
 + pick cleverly between dg1 and dg2 as target in unify1
