@@ -9,19 +9,6 @@
 #include	"rule.h"
 #include	"chart.h"
 
-/* from erg/lkb/globas.lsp:
-(setf *gen-ignore-rules*
-  '(punct_bang_rule punct_semicol_rule punct_colon_rule
-    punct_rparen_rule punct_lparen_rule punct_dqright_rule punct_dqleft_rule
-    punct_sqright_rule punct_sqleft_rule punct_hyphen_rule
-    punct_comma_informal_rule)) */
-
-char *gen_ignore_rules[] = {"punct_bang_rule", "punct_semicol_rule", "punct_colon_rule",
-							"punct_rparen_rule", "punct_lparen_rule", "punct_dqright_rule", "punct_dqleft_rule",
-							"punct_sqright_rule", "punct_sqleft_rule", "punct_hyphen_rule", "punct_comma_informal_rule",
-							"fillhead_non_wh" // XXX woodley added
-							};
-int ngen_ignore_rules = sizeof(gen_ignore_rules) / sizeof(char*);
 struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels);
 
 struct rule	**rules;
@@ -363,12 +350,8 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 	r->rtl = rule_is_rtl(r);
 
 	r->gen_ignore = 0;
-	for(i=0;i<ngen_ignore_rules;i++)
-		if(!strcmp(r->name, gen_ignore_rules[i]))
-			r->gen_ignore = 1;
-
-	if(!r->gen_ignore)
-		add_semantic_index(r, dg, 1);
+	if(temporary_expedient(r->name))r->gen_ignore = 1;
+	else add_semantic_index(r, dg, 1);
 
 	//printf("rule %s [%d]:  ", name, num);
 	//print_dg(dg);

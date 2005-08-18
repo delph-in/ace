@@ -445,13 +445,44 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 	simplify_lexeme(l);
 #endif
 
-	add_semantic_index(l, fulldg, 0);
+	if(!temporary_expedient(l->word))
+		add_semantic_index(l, fulldg, 0);
 
 	//printf("lexeme %s has %d-long stem starting %s\n", word, l->stemlen, l->stem[0]->name);
 	if(nlexemes%100 == 0)printf("lexeme %s             \r", word); fflush(stdout);
 	/*printf("lexeme %s  --> ", word);
 	print_dg(dg);
 	printf("\n");*/
+}
+
+int temporary_expedient(char *sign)
+{
+	int i;
+	static int nexpedients = -1;
+	static char **expedients = 0;
+
+	if(nexpedients == -1)
+	{
+		FILE	*f = fopen("../erg/ace/temporary-expedient", "r");
+		nexpedients = 0;
+		if(f)
+		{
+			char	exp[1024];
+			while(fgets(exp, 1023, f) != NULL)
+			{
+				if(*exp && exp[strlen(exp)-1]=='\n')
+					exp[strlen(exp)-1] = 0;
+				nexpedients++;
+				expedients = realloc(expedients, sizeof(char*)*nexpedients);
+				expedients[nexpedients-1] = strdup(exp);
+			}
+			fclose(f);
+		}
+		else fprintf(stderr, "warning: unable to load ../erg/ace/temporary-expedient\n");
+	}
+	for(i=0;i<nexpedients;i++)
+		if(!strcmp(sign, expedients[i]))return 1;
+	return 0;
 }
 
 int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
