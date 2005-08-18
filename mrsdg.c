@@ -57,23 +57,23 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 	if(dg->gen != 1)
 	{
 		struct darc	*arcs = DARCS(dg);
-		struct mrs_var	*var = malloc(sizeof(struct mrs_var)), *vnew;
+		struct mrs_var	*var = calloc(sizeof(struct mrs_var), 1), *vnew;
 		extern char **fnames;
 		int i;
 
+		if(!descendent_of(dg->type->tnum, basic_semarg)) var->is_const = 1;
 		var->dg = dg;
 		var->type = strdup(dg->type->name);
 		var->name = strdup(dg->type->name);
-		var->props = 0;
-		var->nprops = 0;
-		for(i=0;i<dg->narcs;i++)
-			add_var_feats(var, arcs[i].label, arcs[i].dest);
-		var->is_const = 0;
-		var->refs = 0;
 		var->vnum = vlist->nvars;
+		if(!var->is_const)
+		{
+			for(i=0;i<dg->narcs;i++)
+				add_var_feats(var, arcs[i].label, arcs[i].dest);
 
-		vnew = internal_to_external_mrs_var(var);
-		free_mrs_var(var); var = vnew;
+			vnew = internal_to_external_mrs_var(var);
+			free_mrs_var(var); var = vnew;
+		}
 
 		vlist->nvars++;
 		vlist->vars = realloc(vlist->vars, sizeof(struct mrs_var*)*vlist->nvars);

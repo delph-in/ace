@@ -1,5 +1,5 @@
 DELPHIN_CFLAGS=-isystem /logon/sweagles/delphin/lkb/include
-DELPHIN_LIBS=-L/logon/sweagles/delphin/lkb/lib/linux.x86.32 -litsdb -lpvm3
+DELPHIN_LIBS=-L/logon/sweagles/delphin/lkb/lib/linux.x86.64 /logon/sweagles/delphin/lkb/lib/linux.x86.64/libitsdb.a -lpvm3
 
 CC=gcc
 #CFLAGS=-Wall -O6 -fomit-frame-pointer -funsigned-char -DERG -mcpu=7400 -mdynamic-no-pic
@@ -11,7 +11,7 @@ CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -DERG -falign-loops=32 -funro
 
 CFLAGS+=${DELPHIN_CFLAGS}
 
-OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o ppdfa.o transducer.o lrfilt.o glb.o semindex.o hash.o mrs.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o
+OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o ppdfa.o transducer.o lrfilt.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o
 all: ${OBJ}
 	${CC} ${CFLAGS} main.c ${OBJ} -o parser ${DELPHIN_LIBS}
 
