@@ -301,7 +301,12 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank)
 			sizeof(struct hypothesis*) * onum,
 			sizeof(struct hypothesis*) * e->unpack->ahypotheses);
 	}
-	assert(e->unpack->nhypotheses == rank+1);
+	if(e->unpack->nhypotheses != rank+1)
+	{
+		fprintf(stderr, "unpack(): asked for rank %d, but next is actually rank %d\n",
+					rank, e->unpack->nhypotheses-1);
+		assert(0);
+	}
 	e->unpack->hypotheses[rank] = hyp;
 	return hyp;
 }
