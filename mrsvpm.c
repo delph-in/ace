@@ -1,6 +1,7 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
+#include	<assert.h>
 
 #include	"freeze.h"
 #include	"mrs.h"
@@ -345,11 +346,13 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 
 struct mrs_var	*internal_to_external_mrs_var(struct mrs_var	*vin)
 {
+	assert(v);
 	return convert_mrs_var(v, vin);
 }
 
 struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin)
 {
+	assert(v);
 	if(!vinv)vinv = invert_vpm(v);
 	return convert_mrs_var(vinv, vin);
 }
