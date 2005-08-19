@@ -32,11 +32,6 @@ void	print_glb_stats();
 void recover_typehash(void *frozen);
 void *freeze_typehash();
 
-
-
-
-
-
 struct type	*glb(struct type	*a, struct type	*b);
 
 #endif

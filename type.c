@@ -98,13 +98,12 @@ struct type	*lookup_type(char	*name)
 {
 	int	i;
 
-	if(name[0]=='"' && name[strlen(name)-1]=='"')
+	if(name[0]=='"' || name[0]=='\'')
 	{
 		if(!strcmp(name, "\"\\\"\""))strcpy(name, "\"\"\"");
-		/*for(i=nstrings-1;i>=0;i--)
-			if(!strcasecmp(strings[i]->name, name))
-				return strings[i];*/
 
+		if(name[0]=='\'')
+			name[0]='"';	// elsewhere in the code we assume strings start with ".
 		// auto-add strings. this does a lookup too.
 		return add_string(name);
 	}
@@ -195,6 +194,7 @@ struct type	*add_string(char	*name)
 	t->descendents = 0;
 	t->dg = 0;
 	t->tnum = -1;//nstrings-1;
+
 	return t;
 }
 
