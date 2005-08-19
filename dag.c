@@ -146,7 +146,7 @@ struct dg	*atomic_dg(char	*name)
 
 	if(!type)
 	{
-		fprintf(stderr, "tdl: no such type as `%s'\n", name);
+		fprintf(stderr, "atomic_dg: no such type as `%s'\n", name);
 		return 0;
 	}
 
@@ -464,6 +464,7 @@ struct dg	*add_dg_feature(struct dg	*d, char	*label, struct dg	*value)
 
 int	init_fnames()
 {
+	extern char *stemfname;
 	nfnames = 21;
 	fnames = malloc(sizeof(char*)*nfnames);
 	introduce = malloc(sizeof(int)*nfnames);
@@ -487,7 +488,7 @@ int	init_fnames()
 	fnames[14] = strdup("DTR1");
 	fnames[15] = strdup("DTR2");
 
-	fnames[16] = strdup("STEM");
+	fnames[16] = strdup(stemfname);
 	fnames[17] = strdup("RELS");
 	fnames[18] = strdup("HCONS");
 	fnames[19] = strdup("RNAME");

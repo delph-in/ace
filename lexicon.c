@@ -111,9 +111,9 @@ struct lexeme	*proper_noun_lex(char	*name)
 
 	// make a skeletal dag for our lexeme
 
-	stem = atomic_dg("*cons*");
+	stem = atomic_dg(g_cons_type);
 	stem = add_dg_feature(stem, "FIRST", ty->dg);
-	stem = add_dg_feature(stem, "REST", atomic_dg("*null*"));
+	stem = add_dg_feature(stem, "REST", atomic_dg(g_null_type));
 
 	kr = add_dg_feature(atomic_dg("*top*"), "CARG", ty->dg);
 	lk = add_dg_feature(atomic_dg("*top*"), "KEYREL", kr);
@@ -224,15 +224,25 @@ void	dump_parts_of_speech()
 	pclose(f);
 }
 
-static int	stemfeat = -1, rfeat = 2, ffeat = 1, synsemfeat, lkeysfeat, keyrelfeat, predfeat, compkeyfeat, ocompkeyfeat, phonfeat, onsetfeat;
+static int	stemfeat = -1, rfeat = 2, ffeat = 1, synsemfeat, lkeysfeat, keyrelfeat, predfeat, compkeyfeat, ocompkeyfeat, phonfeat, onsetfeat, listfeat;
 static int	localfeat, contfeat, relsfeat;
 static struct type	*predsort, *con, *voc;
 
 int	nsimpleform = 0;
 
+#ifdef	JACY
+char	*stemfname = "ORTH";
+int		stem_is_difflist = 1;
+#endif
+
+#ifdef	ERG
+char	*stemfname = "STEM";
+int		stem_is_difflist = 0;
+#endif
+
 void	init_fnums()
 {
-	stemfeat = lookup_fname("STEM");
+	stemfeat = lookup_fname(stemfname);
 	synsemfeat = lookup_fname("SYNSEM");
 	localfeat = lookup_fname("LOCAL");
 	contfeat = lookup_fname("CONT");
@@ -244,6 +254,7 @@ void	init_fnums()
 	ocompkeyfeat = lookup_fname("--+OCOMPKEY");
 	phonfeat = lookup_fname("PHON");
 	onsetfeat = lookup_fname("ONSET");
+	listfeat = lookup_fname("LIST");
 	predsort = lookup_type("predsort");
 	con = lookup_type("con");
 	voc = lookup_type("voc");
@@ -411,18 +422,17 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 
 	//if(!strcmp(word, "hand_v1")) { printf("hand_v1...\n"); print = 1; }
 
-	for(stem = dg_hop(fulldg, stemfeat);stem;stem = dg_hop(stem, rfeat))
+	stem = dg_hop(fulldg, stemfeat);
+	if(stem_is_difflist)
+		stem = dg_hop(stem, listfeat);
+
+	for(;stem;stem = dg_hop(stem, rfeat))
 	{
-		if(!strcasecmp(stem->type->name, "*null*"))break;
 		str = dg_hop(stem, ffeat);
-		if(!str)
-		{
-			fprintf(stderr, "lexicon: lexeme `%s' has no FIRST in STEM[%d]\n", word, l->stemlen);
-			exit(-1);
-		}
+		if(!str)break;	// end of list.
 		if(str->type->name[0] != '"')
 		{
-			fprintf(stderr, "lexicon: STEM[%d] in word `%s' is not a string\n", l->stemlen, word);
+			fprintf(stderr, "lexicon: %s[%d] in word `%s' is not a string\n", stemfname, l->stemlen, word);
 			exit(-1);
 		}
 		l->stemlen++;
@@ -437,7 +447,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 	}
 	if(!stem)
 	{
-		fprintf(stderr, "lexeme `%s' has open ended STEM list!\n", word);
+		fprintf(stderr, "lexeme `%s' has open ended %s list!\n", word, stemfname);
 		exit(-1);
 	}
 

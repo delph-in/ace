@@ -2,6 +2,7 @@
 #include	<assert.h>
 
 #include	"dag.h"
+#include	"tdl.h"
 
 /* essentially, QC extracts a skeleton type tree from a dag
  * and performs *tree*-unification on that skeleton before
@@ -232,7 +233,7 @@ struct qc	*extract_qc(struct dg	*d)
 		assert(_1list);
 		_0dlist = lookup_type("0-dlist");
 		assert(_0dlist);
-		null = lookup_type("*null*");
+		null = lookup_type(g_null_type);
 		assert(null);
 	}
 	lp = labels;
