@@ -52,12 +52,6 @@ void	parse_args(int	argc, char	*argv[])
 	if(optind<argc-1)goto usage;
 	if(optind<argc)sentence_path = argv[optind];
 	else if(!save_grammar_path)sentence_path = "-";
-
-	if(load_grammar_path && save_grammar_path)
-	{
-		fprintf(stderr, "use cp(1) for duplicating grammars.\n");
-		exit(-1);
-	}
 }
 
 int	die = 0;
@@ -74,30 +68,21 @@ int	main(int	argc, char	*argv[])
 	setup_carcs_stack();
 	init_glb_cache();
 
-	if(load_grammar_path)load_frozen_grammar(load_grammar_path);
+	if(!save_grammar_path)load_frozen_grammar(load_grammar_path);
 	else
 	{
+		char *vpm_path = 0;
+		if(!load_grammar_path)
+		{
+			load_grammar_path = "../erg/english.tdl";
+			vpm_path = "../erg/mrs.vpm";
+		}
 		gettimeofday(&tv1, 0);
-		load_grammar();
+		load_grammar(load_grammar_path, vpm_path, load_mem_path);
 		gettimeofday(&tv2, 0);
 		tv2.tv_sec -= tv1.tv_sec;
 		tv2.tv_usec -= tv1.tv_usec;
 		fprintf(stderr, "loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
-	}
-
-	if(load_mem_path)
-	{
-		gettimeofday(&tv1, 0);
-		if(0 != load_mem(load_mem_path))
-		{
-			fprintf(stderr, "couldn't load max-ent model `%s'\n", load_mem_path);
-			return -1;
-		}
-		gettimeofday(&tv2, 0);
-		tv2.tv_sec -= tv1.tv_sec;
-		tv2.tv_usec -= tv1.tv_usec;
-		fprintf(stderr, "%sloaded max-ent model in %.5fs\n",
-			load_grammar_path?"NOTE: ":"", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
 	}
 
 	if(save_grammar_path)

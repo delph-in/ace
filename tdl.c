@@ -6,10 +6,25 @@
 #include	"rule.h"
 #include	"lexicon.h"
 #include	"dag.h"
+#include	"hash.h"
 
 int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	load_tdl(char	*path);
+
+#ifdef	JACY
+char	*g_cons_type = "cons";
+char	*g_list_type = "list";
+char	*g_null_type = "null";
+char	*g_diff_list_type = "diff-list";
+#endif
+
+#ifdef ERG
+char	*g_cons_type = "*cons*";
+char	*g_list_type = "*list*";
+char	*g_null_type = "*null*";
+char	*g_diff_list_type = "*diff-list*";
+#endif
 
 void show_task_name(char *task)
 {
@@ -38,9 +53,11 @@ struct tdl_line
 	int		lnum;
 };
 
-int				ntdllines;
+long			ntdllines;
 struct tdl_line	*tdllines;
 char			*tdlstatus = 0;
+
+struct hash	*tdl_hash;
 
 int	loud_noises = 0;
 
@@ -57,15 +74,32 @@ void	add_tdlline(char	*lhs, char	*rhs, char	*idef, int	lnum, char	*path)
 		fprintf(stderr, "tdlstatus must be set before definitions\n");
 		exit(-1);
 	}
-	ntdllines++;
-	tdllines = realloc(tdllines, sizeof(struct tdl_line)*ntdllines);
-	tdllines[ntdllines-1].processed = 0;
-	tdllines[ntdllines-1].lhs = strdup(lhs);
-	tdllines[ntdllines-1].rhs = strdup(rhs);
-	tdllines[ntdllines-1].filename = path;
-	tdllines[ntdllines-1].status = tdlstatus;
-	tdllines[ntdllines-1].idef = (*idef)?strdup(idef):0;
-	tdllines[ntdllines-1].lnum = lnum;
+
+	char	key[256];
+	sprintf(key, "%s %s", tdlstatus, lhs);
+	long	had = (long)hash_find(tdl_hash, key);
+	struct tdl_line	*tdl;
+
+
+	if(had != 0)
+	{
+		tdl = tdllines + had-1;
+		fprintf(stderr, "warning: %s:%d redefines type `%s' from %s:%d\n", path, lnum, lhs, tdl->filename, tdl->lnum);
+	}
+	else
+	{
+		ntdllines++;
+		tdllines = realloc(tdllines, sizeof(struct tdl_line)*ntdllines);
+		tdl = tdllines + ntdllines-1;
+		tdl->lhs = strdup(lhs);
+		hash_add(tdl_hash, strdup(key), (void*)ntdllines);
+	}
+	tdl->processed = 0;
+	tdl->rhs = strdup(rhs);
+	tdl->filename = path;
+	tdl->status = tdlstatus;
+	tdl->idef = (*idef)?strdup(idef):0;
+	tdl->lnum = lnum;
 }
 
 char	*g_inflr_def;
@@ -147,13 +181,14 @@ int	process_colon_command(char	*parent, char	*cmd)
 			p = dirpath + strlen(dirpath) - 1;
 			while(p>dirpath && *p!='/')p--;
 			*p = 0;
-			sprintf(iname, "%s%s%s.tdl", dirpath, dirpath[0]?"/":"", what);
-			if(!tdlstatus && !strcmp(what, "roots"))
+			sprintf(iname, "%s%s%s", dirpath, dirpath[0]?"/":"", what);
+			if(!strstr(what, ".tdl"))strcat(iname, ".tdl");
+			if(!tdlstatus && !strstr(what, "root"))
 			{
 				fprintf(stderr, "WARNING: implicitly setting tdl status to `root'\n");
 				tdlstatus = "root";
 			}
-			if(!tdlstatus && !strcmp(what, "parse-nodes"))
+			if(!tdlstatus && !strstr(what, "parse-nodes"))
 			{
 				fprintf(stderr, "WARNING: implicitly setting tdl status to `parse-node'\n");
 				tdlstatus = "parse-node";
@@ -330,7 +365,7 @@ struct type	*find_type(char	*name, int	constrain)
 	struct type	*type = lookup_type(name);
 	int		i;
 
-	if(!type || (name[0]!='"' && constrain && !type->dg))
+	if(!type || (name[0]!='"' && name[0]!='\'' && constrain && !type->dg))
 	{
 		// try to find constraint for this type before returning it
 		if(type && name[0]=='G' && name[1]=='(')
@@ -387,7 +422,7 @@ struct dg	*type_dg(char		*name)
 	struct type	*type = find_type(name, 1);
 	struct dg	*ret;
 
-	if(!type)return 0;
+	if(!type)exit(-1);
 	if(!type->dg)return atomic_dg(name);
 	ret = copy_dg(type->dg);
 	if(!ret) { fprintf(stderr, "type_dg(%s) couldn't copy %p\n", name, type->dg); exit(-1); }
@@ -520,18 +555,18 @@ static struct dg	*listify(struct dagify_record	*R, char	*str, struct dg	**last)
 
 	if(*str==0)
 	{
-		lp = type_dg(last?"*list*":"*null*");
+		lp = type_dg(last?g_list_type:g_null_type);
 		if(last)*last = lp;
 		return lp;
 	}
 	if(!strcmp(str, "..."))
 	{
-		lp = type_dg("*list*");
+		lp = type_dg(g_list_type);
 		if(last)*last = lp;
 		return lp;
 	}
 
-	lp = dg = type_dg("*cons*");
+	lp = dg = type_dg(g_cons_type);
 	if(!dg)return 0;
 
 	while(*str)
@@ -570,16 +605,16 @@ static struct dg	*listify(struct dagify_record	*R, char	*str, struct dg	**last)
 			else if(!strcmp(str, "..."))
 			{
 				*str = 0;
-				nlp = type_dg("*list*");
+				nlp = type_dg(g_list_type);
 			}
-			else nlp = type_dg("*cons*");
+			else nlp = type_dg(g_cons_type);
 		}
 		else
 		{
 			item = str;
 			str = item+strlen(item);
-			if(last)nlp = type_dg("*list*");	// dlists need to be open-ended
-			else nlp = type_dg("*null*");
+			if(last)nlp = type_dg(g_list_type);	// dlists need to be open-ended
+			else nlp = type_dg(g_null_type);
 		}
 
 		//printf("list item `%s'\n", item);
@@ -611,7 +646,7 @@ static struct dg	*dlistify(struct dagify_record	*R, char	*str)
 	R->current_pathlen--;
 	if(!list)return 0;
 
-	dg = type_dg("*diff-list*");
+	dg = type_dg(g_diff_list_type);
 	dg = add_dg_feature(dg, "LIST", list);
 	dg = add_dg_feature(dg, "LAST", last);
 	return dg;
@@ -959,12 +994,13 @@ void run_task(char *task, int (*worker)())
 	}
 }
 
-int	load_grammar()
+int	load_grammar(char *toptdl, char *vpm, char *mem)
 {
 	clear_slab();
 	init_fnames();
+	tdl_hash = hash_new("tdl type definitions");
 
-	load_tdl("../erg/english.tdl");
+	load_tdl(toptdl);
 	tdlstatus = "lex-entry";
 	//load_tdl("special-lex.tdl");
 	tdlstatus = 0;
@@ -977,15 +1013,22 @@ int	load_grammar()
 	free_tdl();
 
 	number_strings();
-	g_loaded = 1;	// make unify shut up about failures
-	setup_rule_filter();
-	g_loaded = 0;
-
-	load_vpm("../erg/mrs.vpm");
 
 	if(debug_level)
 		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d irules, %d roots, %d strings, %d features\n",
 				ntypes, glb_type_count, nlexemes, nrules, nirules, nroots, nstrings, nfnames);
+
+	// extra cool stuff
+	if(vpm)load_vpm(vpm);
+	g_loaded = 1;	// make unify shut up about failures
+	setup_rule_filter();
+	g_loaded = 0;
+
+	if(mem && 0 != load_mem(mem))
+	{
+		fprintf(stderr, "couldn't load max-ent model `%s'\n", mem);
+		return -1;
+	}
 
 	// make sure none of the grammar is auto-freed when parse is over
 	commit_slab();
