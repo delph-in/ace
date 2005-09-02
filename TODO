@@ -6,8 +6,9 @@ try to prove/analyze interesting things at grammar compile time
 	- e.g. the INFLECTD is monotonic, '-' becomes '+'
 		- this would help rule out applying inflectional rules like non3sg_fin_verb when 3sg_fin_verb is on the orth-agenda
 		- might be lots of other such features we could find
-	- auto pick quickcheck paths
 	- auto pick packing restrictor
+	- auto pick quickcheck paths
+		- make quickcheck used for packing ignore packing restrictor
 	- auto set / load deleted daughters / packing restrictor feature sets
 
 rename inflr to ortho
