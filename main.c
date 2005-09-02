@@ -17,7 +17,7 @@ int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0, *load_mem_path = 0;
 char	*sentence_path = 0;
-int	question = 0, exhaustive = 0, lui_chart = 0, inhibit_pack = 0;
+int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 
 int g_mode = PARSING;
 
@@ -28,21 +28,29 @@ int	parse_line(char	*line);
 
 void	parse_args(int	argc, char	*argv[])
 {
-	char	*prog = argv[0];
+	char	*prog = argv[0], *tla;
 	unsigned char ch;
 
-	while((ch=getopt(argc, argv, "hvplxcg:G:m:qtRM:e"))!=255)switch(ch)
+	tla = prog + strlen(prog) - 3;
+	if(tla >= prog)
 	{
-		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-x] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
+		if(!strcmp(tla, "ape"))g_mode = PARSING;
+		if(!strcmp(tla, "age"))g_mode = GENERATING;
+	}
+
+	while((ch=getopt(argc, argv, "hvpPlXg:G:m:qtRM:e1"))!=255)switch(ch)
+	{
+		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
 		case	'M':	load_mem_path = optarg;		break;
 		case	'G':	save_grammar_path = optarg;	break;
-		case	'l':	export_parts = 1;		break;
+		case	'P':	export_parts = 1;		break;
 		case	'm':	connect_to_master(optarg);	break;
 		case	'q':	question = 1;			break;
-		case	'x':	exhaustive = 1;			break;
-		case	'c':	lui_chart = 1;			break;
+		case	'X':	exhaustive = 0;			break;
+		case	'1':	best_only = 1;			break;
+		case	'l':	lui_mode = 1;			break;
 		case	'p':	inhibit_pack = 1;		break;
 		case	'R':	inhibit_results = 1;		break;
 		case	't':	do_itsdb = 1;			break;
@@ -68,7 +76,11 @@ int	main(int	argc, char	*argv[])
 	setup_carcs_stack();
 	init_glb_cache();
 
-	if(!save_grammar_path)load_frozen_grammar(load_grammar_path);
+	if(!save_grammar_path)
+	{
+		load_frozen_grammar(load_grammar_path);
+		load_conf();		// XXX freeze
+	}
 	else
 	{
 		char *vpm_path = 0;
@@ -86,11 +98,12 @@ int	main(int	argc, char	*argv[])
 	}
 
 	if(save_grammar_path)
+	{
 		setup_save_frozen_grammar(save_grammar_path);
-	if(!load_grammar_path)
 		freeze_grammar();
+	}
 
-	load_rules_conf();
+	load_rules_conf();	// XXX freeze
 
 	if(save_grammar_path)
 		exit(0);
@@ -106,7 +119,6 @@ int	main(int	argc, char	*argv[])
 		return 0;
 	}
 
-	//build_lr_filter();
 	//print_rule("hspec");
 	//print_type("v_atrans_le");
 	//print_rule("adjh_i_ques");
@@ -171,6 +183,7 @@ int	main(int	argc, char	*argv[])
 	final_chart_stats();
 
 	shutdown_net();
+	wait_for_lui();
 
 	if(success<=0 && count>0)return -1;
 	else return 0;
