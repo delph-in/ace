@@ -18,7 +18,7 @@ struct hypothesis
 	float				score;
 	int					checkup;
 
-	struct hypothesis *next;
+	struct hypothesis *left, *right;
 };
 
 struct unpack_info
@@ -29,5 +29,5 @@ struct unpack_info
 };
 
 struct mrs;
-int iterate_cell_root_hypotheses(struct chart_cell *cell, void (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest);
+int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest);
 struct hypothesis *hypothesize_edge(struct edge *e, int rank);

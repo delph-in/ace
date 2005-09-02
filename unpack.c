@@ -10,7 +10,7 @@
 #include "unpack.h"
 #include "mrs.h"
 
-extern int debug_level;
+extern int debug_level, inhibit_pack;
 
 static inline char* edge_sign(struct edge *e)
 {
@@ -29,7 +29,7 @@ void score_decomposition(struct decomposition *d)
 
 struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 {
-	int	n = 1, i, j;
+	int	n = 1, i, j, orign;
 	struct decomposition *dec, *d;
 
 	for(i=0;i<edge->have;i++)n *= edge->daughters[i]->npack + 1;
@@ -42,25 +42,36 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 		dec[i].ni2 = 0;
 	}
 
+	orign = n; n = 0;
 	if(edge->have == 1)
 	{
 		for(i=-1;i<edge->daughters[0]->npack;i++)
 		{
-			d->rhs[0] = (i!=-1)?edge->daughters[0]->pack[i]:edge->daughters[0];
+			struct edge *r1 = (i!=-1)?edge->daughters[0]->pack[i]:edge->daughters[0];
+			// check rule filter to see if this particular local unpacking can be ruled out
+			if(r1->rule && !check_rf(edge->rule, r1->rule, 0))continue;
+			d->rhs[0] = r1;
 			d->rhs[1] = 0;
-			d++;
+			d++; n++;
 		}
 	}
 	else
 	{
 		d = dec;
 		for(i=-1;i<edge->daughters[0]->npack;i++)
+		{
+			struct edge *r1 = (i!=-1)?edge->daughters[0]->pack[i]:edge->daughters[0];
+			// check rule filter to see if this particular local unpacking can be ruled out
+			if(r1->rule && !check_rf(edge->rule, r1->rule, 0))continue;
 			for(j=-1;j<edge->daughters[1]->npack;j++)
 			{
-				d->rhs[0] = (i!=-1)?edge->daughters[0]->pack[i]:edge->daughters[0];
-				d->rhs[1] = (j!=-1)?edge->daughters[1]->pack[j]:edge->daughters[1];
-				d++;
+				struct edge *r2 = (j!=-1)?edge->daughters[1]->pack[j]:edge->daughters[1];
+				if(r2->rule && !check_rf(edge->rule, r2->rule, 1))continue;
+				d->rhs[0] = r1;
+				d->rhs[1] = r2;
+				d++; n++;
 			}
+		}
 	}
 
 	for(i=0;i<n;i++)
@@ -68,27 +79,19 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 		//printf("edge #%d dec %p #%d+#%d\n", edge->id, dec+i, dec[i].rhs[0]->id, dec[i].rhs[1]?dec[i].rhs[1]->id:0);
 		score_decomposition(dec+i);
 	}
+	//if(orign!=n)printf("decompose #%d: xprod %d, rf %d\n", edge->id, orign, n);
 	*Ndecompositions = n;
 	return dec;
 }
 
-int dec_check_indices(struct decomposition	*dec, int indices[2])
+static inline int dec_check_indices(struct decomposition	*dec, int indices[2])
 {
-	int i;
+	int ret;
 
-	assert(indices[1]>=0 && indices[0]>=0);
-	if(indices[1] > dec->ni2)return 0;
-	if(indices[1] == dec->ni2)
-	{
-		if(indices[0] == 0)return 0;	// haven't seen but should consider
-		else return 2;	// haven't seen but shouldn't add to agenda
-	}
-
-	if(indices[0] > dec->seeni1[indices[1]]+1)
-		return 2;	// haven't seen but shouldn't add to agenda
-	else if(indices[0] == dec->seeni1[indices[1]]+1)
-		return 0;	// haven't seen but should consider
-	else return 1;	// have already seen
+#define DEC_SEEN(x, y)	(x<0 || y<0 || (y<dec->ni2 && x<=dec->seeni1[y]))
+	ret = !(DEC_SEEN(indices[0]-1, indices[1]) && DEC_SEEN(indices[0], indices[1]-1));
+	//printf("dec_check on %p [%d %d] = %d;   ni2 = %d\n", dec, indices[0], indices[1], ret, dec->ni2);
+	return ret;
 }
 
 int dec_add_indices(struct decomposition	*dec, int indices[2])
@@ -111,19 +114,37 @@ int dec_add_indices(struct decomposition	*dec, int indices[2])
 	}
 }
 
-// insert 'h' into 'edge's agenda, in sorted order
+print_heap(struct hypothesis *h, int indent)
+{
+	int i;
+	if(!h){printf("(null)\n");return 0;}
+	for(i=0;i<indent;i++)printf("  ");
+	printf("hyp %p score %f\n", h, h->score);
+	if(h->left)print_heap(h->left, indent+1);
+	if(h->right)print_heap(h->right, indent+1);
+}
+
+// insert 'h' into 'edge's agenda, a heap structure
 void add_uagenda(struct hypothesis **A, struct hypothesis *h)
 {
 	struct hypothesis *w = *A, **W = A;
 
-	while(w && w->score > h->score)
+	while(w && w->score >= h->score)
 	{
-		W = &w->next;
-		w = w->next;
+		if(!w->left || (w->right && rand()%2))
+		{
+			W = &w->left;
+			w = w->left;
+		}
+		else
+		{
+			W = &w->right;
+			w = w->right;
+		}
 	}
 
-	h->next = w;
 	*W = h;
+	if(w)add_uagenda(W, w);
 }
 
 struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypothesis **agenda, struct hypothesis *rhs[2], int indices[2])
@@ -131,7 +152,7 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypothesis *
 	struct hypothesis	*h = slab_alloc(sizeof(struct hypothesis));
 	int					i;
 
-	//printf("hypothesize at dec %p [%d %d]\n", dec, indices[0], indices[1]);
+	//printf("hypothesize %p at dec %p [%d %d]\n", h, dec, indices[0], indices[1]);
 	h->dec = dec;
 	h->rhs[0] = rhs[0];
 	h->rhs[1] = rhs[1];
@@ -165,7 +186,8 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypothesis *
 		}
 	}
 
-	h->next = 0;
+	h->left = 0;
+	h->right = 0;
 
 	add_uagenda(agenda, h);
 }
@@ -194,6 +216,9 @@ struct hypothesis *leaf_hypothesis(struct edge *e)
 		strcat(hyp->string, single);
 	}
 
+	hyp->left = 0;
+	hyp->right = 0;
+
 	hyp->dg = 0;
 	hyp->checkup = -1;
 	hyp->score = dec->score;
@@ -207,7 +232,7 @@ static int indent = 0;
 static int g_checkup;
 static inline void checkup(struct hypothesis *h)
 {
-	if(h->dg==(void*)1)return;
+	if(h->dg)return; // if we already know failure/success status, don't recurse
 	if(h->checkup>=0 && h->checkup < g_checkup)
 	{
 		int i, arity = h->dec->edge?h->dec->edge->have:1;
@@ -226,12 +251,42 @@ static inline void checkup(struct hypothesis *h)
 
 struct hypothesis *process_hypagenda(struct hypothesis **A)
 {
-	struct hypothesis	*hyp;
+	struct hypothesis	*hyp, **W, *l, *r;
 	int					arity, i, j;
 
 again:
 	if(!*A)return 0;
-	hyp = *A; *A = hyp->next;
+
+	// pop max from the agenda heap
+	hyp = *A;
+
+	for(l=hyp->left,r=hyp->right,W=A;l && r;)
+	{
+		struct hypothesis *tmp;
+		if(l->score > r->score)
+		{
+			// promote left
+			*W = l;
+			tmp = l->right;
+			l->right = r;
+			W = &l->left;
+			l = l->left;
+			r = tmp;
+		}
+		else
+		{
+			// promote right
+			*W = r;
+			tmp = r->left;
+			r->left = l;
+			W = &r->right;
+			r = r->right;
+			l = tmp;
+		}
+	}
+	if(l)*W = l;
+	else *W = r;
+
 	if(hyp->dec->edge)arity = hyp->dec->edge->have;
 	else arity = 1;
 
@@ -313,7 +368,11 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank)
 			struct decomposition *dec = decs+i;
 			struct hypothesis *rhs[2];
 			for(j=0;j<e->have;j++)
+			{
 				rhs[j] = hypothesize_edge(dec->rhs[j], 0);
+				if(!rhs[j])break;
+			}
+			if(j<e->have)continue;	// failed to hypothesize even the 0'th unpacking of this decomposition
 			new_hypothesis(dec, &e->unpack->agenda, rhs, idx);
 		}
 		indent--;
@@ -380,27 +439,40 @@ int instantiate_hypothesis(struct hypothesis *h)
 		}
 	}
 
-	if(!arity)
+	if(g_mode == GENERATING || !inhibit_pack || 1)	// XXX fixme, this should work...
 	{
-		// lexeme.  don't put the specialized RELS list in.
-		h->dg = lexical_dg(h->dec->edge->lex, 0);
-	}
-	else if(h->dec->edge)
-	{
-		h->dg = copy_dg(h->dec->edge->rule->dg);
-		for(i=0;i<arity;i++)
+		if(!arity)
 		{
-			h->dg = unify_dg(h->rhs[i]->dg, h->dg, i);
-			if(!h->dg)
+			// lexeme.  don't put the specialized RELS list in.
+			h->dg = lexical_dg(h->dec->edge->lex, 0);
+		}
+		else if(h->dec->edge)
+		{
+			struct dg *rdg = h->dec->edge->rule->dg;
+			for(i=0;i<arity;i++)
+				if(unify_dg_tmp(h->rhs[i]->dg, rdg, i))
+				{
+					//printf("when combining edges #%d and #%d under rule %s\n",
+					//	h->dec->edge->id, h->rhs[i]->dec->edge->id, h->dec->edge->rule->name);
+					//unify_backtrace();
+					forget_tmp();
+					h->dg = (void*)1;
+					return -1;
+				}
+			h->dg = finalize_tmp(rdg, 1);
+			if(!h->dg)	// cycle failure can occur
 			{
-				//printf("when combining edges #%d and #%d\n", h->dec->edge->id, h->rhs[i]->dec->edge->id);
-				//unify_backtrace();
 				h->dg = (void*)1;
 				return -1;
 			}
 		}
+		// else this is the fake super-root node, and will be ignored
 	}
-	// else this is the fake super-root node, and will be ignored
+	else
+	{
+		// no need to unspecialize or reconstruct; we already have a full dag.
+		h->dg = h->dec->edge?h->dec->edge->dg:0;
+	}
 
 	return 0;
 }
@@ -423,7 +495,7 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 		// now possibly actually print out the edge, with span information
 		if(!quiet)
 		{
-			print(" (%d %s %f %d %d", e->id, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), hyp->score, from, from+len);
+			print(" (%d %p %s %f %d %d", e->id, hyp, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), hyp->score, from, from+len);
 			if(e->have)
 				for(len=i=0;i<e->have;i++)
 					len += print_tree0(hyp->rhs[i], surf, from+len, 0);
@@ -436,7 +508,7 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 	print_tree0(hyp, 0, 0, 0);
 }
 
-int iterate_cell_root_hypotheses(struct chart_cell *cell, void (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest)
+int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest)
 {
 	int	i, j, count = 0, nhyp = 0;
 	struct hypothesis	*agenda = 0, *hyp;
@@ -462,7 +534,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, void (*process)(struct
 
 				int idx[2] = {0,0};
 				struct hypothesis *rhs[2] = { hypothesize_edge(e, 0), 0 };
-				new_hypothesis(rootdec, &agenda, rhs, idx);
+				if(rhs[0])new_hypothesis(rootdec, &agenda, rhs, idx);
 			}
 		}
 	}
@@ -472,15 +544,14 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, void (*process)(struct
 		struct hypothesis	*rhyp;
 		rhyp = hyp->rhs[0];
 		nhyp++;
-		//printf("\ntry a hyp score %f ind %d on edge #%d\n", rhyp->score, hyp->indices[0], rhyp->dec->edge->id);
+		//printf("try a hyp %d / %d score %f ind %d on edge #%d\n", nhyp, count, rhyp->score, hyp->indices[0], rhyp->dec->edge->id);
 		if(0 == instantiate_hypothesis(rhyp))
 		{
 			if(is_root(rhyp->dg))
 			{
 				struct mrs	*m = extract_mrs(rhyp->dg);
 				//printf("\n"); print_hypothesis(rhyp, printf); printf("\n");
-				process(rhyp, m);
-				count++;
+				count += process(rhyp, m);
 				if(nbest && count>=nbest)break;
 			}
 			//else printf("... wasn't root after unpacking\n");
