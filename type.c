@@ -5,6 +5,7 @@
 
 #include	"tdl.h"
 #include	"type.h"
+#include	"freeze.h"
 
 int		ntypes;
 struct type	**types;
@@ -184,7 +185,13 @@ struct type	*add_string(char	*name)
 	t = calloc(sizeof(struct type), 1);
 	nstrings++;
 
-	strings = realloc(strings, sizeof(struct type*) * nstrings);
+	if(FROZEN(strings))
+	{
+		struct type **str = malloc(sizeof(struct type*)*nstrings);
+		memcpy(str, strings, sizeof(struct type*)*(nstrings-1));
+		strings = str;
+	}
+	else strings = realloc(strings, sizeof(struct type*) * nstrings);
 
 	memmove(strings+i+1, strings+i, sizeof(struct type*) * (nstrings-1-i));
 	strings[i] = t;
