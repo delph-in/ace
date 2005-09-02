@@ -201,6 +201,7 @@ int	load_vpm(char	*path)
 
 void	*freeze_vpm()
 {
+	if(!v)return 0;
 	struct vpm	*vpm = freeze_block(v, sizeof(*v));
 	struct vpm_context *ctx, *fctx;
 	struct vpm_rule	*r, *fr;
@@ -346,13 +347,13 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 
 struct mrs_var	*internal_to_external_mrs_var(struct mrs_var	*vin)
 {
-	assert(v);
+	if(!v) { vin->refs++; return vin; }
 	return convert_mrs_var(v, vin);
 }
 
 struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin)
 {
-	assert(v);
+	if(!v) { vin->refs++; return vin; }
 	if(!vinv)vinv = invert_vpm(v);
 	return convert_mrs_var(vinv, vin);
 }
