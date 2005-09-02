@@ -16,8 +16,5 @@ OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.
 all: ${OBJ}
 	${CC} ${CFLAGS} main.c ${OBJ} -o ace ${DELPHIN_LIBS} -lpthread
 
-#dag.o: dag.c dag.h type.h
-#	gcc ${CFLAGS_HACK} dag.c -c -o dag.o
-
 clean:
 	rm -f ${OBJ} ace
