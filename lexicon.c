@@ -8,13 +8,14 @@
 #include	"lexicon.h"
 #include	"chart.h"
 #include	"morpho.h"
+#include	"conf.h"
 
 struct lexeme	**lexemes;
 int		nlexemes;
 
 extern unsigned int	generation;
 
-extern int trace;
+extern int trace, gen_qc;
 extern unsigned int require_ep_span;
 
 #define		SIMPLE_LEXICON
@@ -67,7 +68,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 	edge->from = i;
 	edge->to = i+len;
 	edge->lex = lex;
-	edge->qc = extract_qc(edge->dg);
+	edge->qc = gen_qc?0:extract_qc(edge->dg);
 	edge->prio = LEX_PRIO;
 
 	if(trace)
@@ -137,6 +138,41 @@ struct lexeme	*proper_noun_lex(char	*name)
 	return lex;
 }
 
+struct lexeme	*unknown_lexeme(char	*name)
+{
+	struct lexeme	*lex;
+	struct dg		*extra, *stem, *ss, *lk, *kr;
+	char			*ncopy;
+	int				nlen;
+	extern struct type	**strings;
+
+	// make a skeletal dag for our lexeme
+	//extra = atomic_dg("basic_unknown_word");
+	extra = atomic_dg("n_intr_count_nale");
+	//extra = atomic_dg("v_np*_trans_pres3sg_nale");
+	assert(extra);
+
+	// define the lexeme
+	lex = slab_alloc(sizeof(struct lexeme));
+	bzero(lex, sizeof(*lex));
+	lex->word = name;
+	lex->stemlen = 1;
+	lex->stem = slab_alloc(sizeof(struct type*)*1);
+	lex->stem[0] = strings[0];
+	lex->lextype = extra->type;
+	lex->dg = extra;
+
+	return lex;
+}
+
+struct edge	*unknown_lexical_edge(int	i, char	*word)
+{
+	struct edge *e = lexical_edge(unknown_lexeme(word), i, 1, 0);
+	e->ninflr_routes = -1;
+	e->inflr_routes = 0;
+	return e;
+}
+
 int	wstrcmp(char	*a, char	*b)
 {
 	while(*a)if(*b++!=*a++)return a[-1]-b[-1];
@@ -144,7 +180,7 @@ int	wstrcmp(char	*a, char	*b)
 	return 0;
 }
 
-void	visit_lexicon(char	*stem, void (*visitor)(struct lexeme *lex))
+int	visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex))
 {
 	int		num=0;
 	char		stemcmp[1024];
@@ -163,10 +199,11 @@ void	visit_lexicon(char	*stem, void (*visitor)(struct lexeme *lex))
 	{
 		i=k;
 		for(i=k;i<nlexemes && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
-			visitor(lexemes[i]);
+			num += visitor(lexemes[i]);
 		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
-			visitor(lexemes[i]);
+			num += visitor(lexemes[i]);
 	}
+	return num;
 }
 
 void	dump_parts_of_speech()
@@ -224,29 +261,18 @@ void	dump_parts_of_speech()
 	pclose(f);
 }
 
-static int	stemfeat = -1, rfeat = 2, ffeat = 1, synsemfeat, lkeysfeat, keyrelfeat, predfeat, compkeyfeat, ocompkeyfeat, phonfeat, onsetfeat, listfeat;
-static int	localfeat, contfeat, relsfeat;
+static int	stemfeat = -1, rfeat = 2, ffeat = 1, synsemfeat = -1, lkeysfeat, keyrelfeat,
+			predfeat, compkeyfeat, ocompkeyfeat, phonfeat, onsetfeat, listfeat;
 static struct type	*predsort, *con, *voc;
 
 int	nsimpleform = 0;
 
-#ifdef	JACY
-char	*stemfname = "ORTH";
-int		stem_is_difflist = 1;
-#endif
-
-#ifdef	ERG
-char	*stemfname = "STEM";
-int		stem_is_difflist = 0;
-#endif
-
 void	init_fnums()
 {
-	stemfeat = lookup_fname(stemfname);
+#ifdef	ERG
+	stemfeat = lookup_fname("STEM");
+#endif
 	synsemfeat = lookup_fname("SYNSEM");
-	localfeat = lookup_fname("LOCAL");
-	contfeat = lookup_fname("CONT");
-	relsfeat = lookup_fname("RELS");
 	lkeysfeat = lookup_fname("LKEYS");
 	keyrelfeat = lookup_fname("KEYREL");
 	predfeat = lookup_fname("PRED");
@@ -262,11 +288,7 @@ void	init_fnums()
 
 struct dg	*constrain_lex_rels(struct dg *dg, struct dg *rels)
 {
-	if(stemfeat==-1)
-		init_fnums();
-
-	{ int path[4] = {synsemfeat, localfeat, contfeat, relsfeat};
-		return add_dg_path(dg, path, 4, rels); }
+	return dg_path_add(dg, lex_rels_path, rels);
 }
 
 struct type *predict_onset(char *form)
@@ -278,6 +300,7 @@ struct type *predict_onset(char *form)
 
 void	simplify_lexeme(struct lexeme	*l)
 {
+#ifdef	ERG
 	struct dg	*dg = l->dg, *ss, *lk, *kr, *pr, *ph, *on;
 
 	// check for most common structures and just store parameters for them
@@ -316,14 +339,18 @@ void	simplify_lexeme(struct lexeme	*l)
 	//printf("`%s' has simple form\n", l->word);
 	nsimpleform++;
 	l->dg = 0;
+#else
+	return;
+#endif
 }
 
 struct dg	*expand_lexeme(struct lexeme	*l)
 {
 	struct dg	*dg, *ss, *lk, *kr, *pr, *st, *f, *ph, *on;
 
-	if(stemfeat==-1)init_fnums();
 	if(l->dg)return l->dg;
+#ifdef	ERG
+	if(stemfeat==-1)init_fnums();
 
 	pr = atomic_dg("*top*");
 	pr->xtype = pr->type = l->pred;
@@ -347,6 +374,9 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 	//print_dg(dg);printf("\n");
 
 	return dg;
+#else
+	assert(!"Not reached (simple lexeme for non-ERG)");
+#endif
 }
 
 void print_lexeme(char *name)
@@ -374,7 +404,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 
 	//wellform(dg, word);
 
-	if(stemfeat==-1)init_fnums();
+	if(synsemfeat==-1)init_fnums();
 	nlexemes++;
 	lexemes = realloc(lexemes, sizeof(struct lexeme)*nlexemes);
 	lexemes[nlexemes-1] = l;
@@ -420,11 +450,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 		}
 	}
 
-	//if(!strcmp(word, "hand_v1")) { printf("hand_v1...\n"); print = 1; }
-
-	stem = dg_hop(fulldg, stemfeat);
-	if(stem_is_difflist)
-		stem = dg_hop(stem, listfeat);
+	stem = dg_path(fulldg, lex_stem_path);
 
 	for(;stem;stem = dg_hop(stem, rfeat))
 	{
@@ -432,7 +458,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 		if(!str)break;	// end of list.
 		if(str->type->name[0] != '"')
 		{
-			fprintf(stderr, "lexicon: %s[%d] in word `%s' is not a string\n", stemfname, l->stemlen, word);
+			fprintf(stderr, "lexicon: stem[%d] in word `%s' is not a string\n", l->stemlen, word);
 			exit(-1);
 		}
 		l->stemlen++;
@@ -447,7 +473,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 	}
 	if(!stem)
 	{
-		fprintf(stderr, "lexeme `%s' has open ended %s list!\n", word, stemfname);
+		fprintf(stderr, "lexeme `%s' has open ended stem list!\n", word);
 		exit(-1);
 	}
 
@@ -473,7 +499,11 @@ int temporary_expedient(char *sign)
 
 	if(nexpedients == -1)
 	{
-		FILE	*f = fopen("../erg/ace/temporary-expedient", "r");
+		FILE	*f = 0;
+		char	fname[256];
+		extern char *grammar_dir;
+		sprintf(fname, "%s/ace/temporary-expedient", grammar_dir);
+		f = fopen(fname, "r");
 		nexpedients = 0;
 		if(f)
 		{
@@ -488,7 +518,7 @@ int temporary_expedient(char *sign)
 			}
 			fclose(f);
 		}
-		else fprintf(stderr, "warning: unable to load ../erg/ace/temporary-expedient\n");
+		else fprintf(stderr, "warning: unable to load %s\n", fname);
 	}
 	for(i=0;i<nexpedients;i++)
 		if(!strcmp(sign, expedients[i]))return 1;
