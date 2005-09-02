@@ -55,6 +55,7 @@ void		setup_extra_type_dgs();
 void		setup_carcs_stack();
 struct dg	*wellform_dg(struct dg	*dg);
 struct dg	*walk_dg(struct dg	*dg, int *save, ...);
+void		output_lui_dg(struct dg	*dg, char *wtitle);
 
 // internal operations
 int			unify1(struct dg	*dg1, struct dg	*dg2);
