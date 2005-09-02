@@ -1,0 +1,196 @@
+#include	<stdio.h>
+#include	<unistd.h>
+#include	<stdlib.h>
+#include	<string.h>
+#include	<pthread.h>
+
+#include	"chart.h"
+#include	"dag.h"
+#include	"rule.h"
+#include	"lexicon.h"
+#include	"mrs.h"
+#include	"unpack.h"
+
+static int lui_rfd = -1, lui_wfd;
+static FILE		*lui_write, *lui_read;
+static int chart_id = 0;
+
+void	browse_lui(int eid, char *what);
+
+void	*lui_listener(void *foo)
+{
+	while(!ferror(lui_read))
+	{
+		char	line[1024], *lp;
+		if(fgets(line, 1023, lui_read))
+		{
+			int	len;
+			lp = line; while(*lp==' ' || *lp=='\n' || *lp=='\r' || *lp=='' || *lp=='\t')lp++;
+			len = strlen(lp);
+			while(len && lp[len-1]=='\n' || lp[len-1]=='' || lp[len-1]==' ')len--;
+			lp[len] = 0;
+			if(!strncmp(lp, "browse ", 7))
+			{
+				int cid, eid;
+				char what[256];
+				sscanf(lp, "browse %d %d %s\n", &cid, &eid, what);
+				if(cid != chart_id)
+					fprintf(stderr, "LUI: out-of-date chart %d requested\n", cid);
+				else browse_lui(eid, what);
+			}
+			else fprintf(stderr, "LUI: unknown `%s'\n", lp);
+		}
+	}
+	fprintf(stderr, "LUI: exited\n");
+	lui_rfd = -1;
+	return 0;
+}
+
+void wait_for_lui() { while(lui_rfd != -1)usleep(200000); }
+
+int lui_initialize()
+{
+	int rfd[2], wfd[2];
+	if(lui_rfd != -1)return 0;
+
+	pipe(rfd); pipe(wfd);
+	if(fork())
+	{
+		static pthread_t	pth;
+		lui_wfd = wfd[1]; close(wfd[0]);
+		lui_rfd = rfd[0]; close(rfd[1]);
+		lui_write = fdopen(lui_wfd, "w");
+		lui_read = fdopen(lui_rfd, "r");
+		pthread_create(&pth, 0, lui_listener, 0);
+		return 0;
+	}
+	else
+	{
+		close(0); close(1);
+		close(wfd[1]); close(rfd[0]);
+		dup2(wfd[0], 0); dup2(rfd[1], 1);
+		execlp("yzlui", "yzlui", "-p", 0);
+		fprintf(stderr, "unable to launch yzlui!\n");
+		exit(-1);
+	}
+}
+
+void	output_lui_chart(char	*words[])
+{
+	int	i, j, k, l;
+	struct edge	*e, *esave;
+	extern char	*current_sentence;
+
+	lui_initialize();
+
+	if(g_mode == GENERATING)
+		chart_size++;
+	fprintf(lui_write, "chart %d %d \"%s\"", ++chart_id, chart_size-1, current_sentence);
+	for(i=0;i<chart_size-1;i++)
+		fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -i-1, -i-1, i, i+1, words[i]);
+	if(g_mode == GENERATING)
+		chart_size--;
+
+	for(i=0;i<chart_size;i++)
+		for(j=0;j<chart_size;j++)
+			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
+			{
+				e = cells[j*chart_size + i].p_edges[k];
+				//if(e->id == 1155)esave = e;
+				if(e->rule)
+				{
+					fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, j, i, e->rule->name, e->rule->name);
+					for(l=0;l<e->have;l++)
+						fprintf(lui_write, " %d", e->daughters[l]->id);
+					fprintf(lui_write, "]");
+				}
+				else if(e->lex)
+				{
+					fprintf(lui_write, " #E[%d %d %d %d %s %s [] %d]", e->id, e->id, j, j, e->lex->word, e->lex->word, -1-j);
+				}
+			}
+	fprintf(lui_write, "\n");
+	fflush(lui_write);
+	//print_dg(esave->dg); printf("\n\n");
+}
+
+void	output_lui_dg(struct dg	*dg, char *wtitle)
+{
+	static int dagid = 0;
+	int	tmp = dup(1);
+	lui_initialize();
+	close(1);
+	dup2(lui_wfd, 1);
+
+	fprintf(lui_write, "avm %d ", ++dagid); fflush(lui_write);
+	print_dg(dg); fflush(stdout);
+	fprintf(lui_write, " \"%s\"\n", wtitle?wtitle:"ACE DAG"); fflush(lui_write);
+
+	close(1);
+	dup2(tmp, 1);
+	close(tmp);
+
+	fprintf(stderr, "LUI: wrote out a dag `%p'\n", dg);
+}
+
+void	browse_lui(int eid, char *what)
+{
+	int i, j, k, l;
+	struct edge *e, *E;
+
+	fprintf(stderr, "LUI: browse edge %d's %s\n", eid, what);
+	for(i=0;i<chart_size;i++)
+		for(j=0;j<chart_size;j++)
+			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
+			{
+				E = cells[j*chart_size + i].p_edges[k];
+				for(l=-1;l<E->npack;l++)
+				{
+					e = (l==-1)?E:E->pack[l];
+					if(e->id != eid)continue;
+					if(!strcmp(what, "avm"))output_lui_dg(e->dg, "edge");
+					else fprintf(stderr, "LUI: don't understand `%s'\n", what);
+				}
+			}
+}
+
+void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only)
+{
+	int	count;
+	lui_initialize();
+	int counter(struct hypothesis	*hyp, struct mrs	*mrs) { return 1; }
+	count = iterate_cell_root_hypotheses(c, counter, best_only);
+	fprintf(lui_write, "group %d \"%s\"\n", count, sent);
+
+	count = 0;
+	int show_tree(struct hypothesis	*hyp, struct mrs	*mrs)
+	{
+		void rtree(struct hypothesis *h, char *surf)
+		{
+			struct edge *e = h->dec->edge;
+			char	*sign = e->rule?e->rule->name:e->lex->word;
+			char	*label = label_dag(h->dg, sign);
+			int arity = e->have, i;
+
+			if(!surf && e->lex)surf = h->string;
+			if(!arity)
+				fprintf(lui_write, " #T[%d %s \"%s\" %d %s",
+					e->id, label, surf, e->id, sign);
+			else
+			{
+				fprintf(lui_write, " #T[%d %s %s %d %s",
+					e->id, label, "nil", e->id, sign);
+				for(i=0;i<arity;i++)
+					rtree(h->rhs[i], surf);
+			}
+			fprintf(lui_write, "]");
+		}
+		fprintf(lui_write, "tree %d", chart_id);
+		rtree(hyp, 0);
+		fprintf(lui_write, " \"%s\"\n", sent);
+		return 1;
+	}
+	chart_id++;
+	iterate_cell_root_hypotheses(c, show_tree, best_only);
+	fflush(lui_write);
+}
