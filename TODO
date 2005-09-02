@@ -1,5 +1,35 @@
 TODO:
 
+make STEM actually be updated by ortho rules; apparently some grammars depend on it.
+
+try to prove/analyze interesting things at grammar compile time
+	- e.g. the INFLECTD is monotonic, '-' becomes '+'
+		- this would help rule out applying inflectional rules like non3sg_fin_verb when 3sg_fin_verb is on the orth-agenda
+		- might be lots of other such features we could find
+	- auto pick quickcheck paths
+	- auto pick packing restrictor
+	- auto set / load deleted daughters / packing restrictor feature sets
+
+rename inflr to ortho
+	- there are many infl-rules that aren't orthographemic,
+		and the "inflr" machinery in the code only applies to orthographemics
+
+generalize rule filter
+	| rule filter is the only source of unrestricted dag information when parsing with packing.
+	| can provide useful local information about when unpacking will fail
+	+ combine() needs to check all packed edges, not just representative
+		- BUT this only works if combine() only is called after all packing into b has occurred
+		- i.e. enforce proper bottom-up parsing order?
+		+ temporarily we have no rule filter at all.  generation suffers.
+			+ countered by not packing PUNCT, either in gen or parse
+				- so we get less packing, but we don't hypothesize stupid things
+	+ also, make decompose_edge() check rule filter
+
+unicode support for preprocessor and morphology
+
+deprecate or freeze rules.conf into a grammar file
+deprecate old mrs output
+
 fix proper noun support (I believe the new morphology system broke it)
 	- also for generation
 
