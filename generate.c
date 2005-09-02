@@ -8,7 +8,7 @@
 #include "chart.h"
 #include "unpack.h"
 
-extern int	question, exhaustive, lui_chart, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb;
+extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
 
 unsigned int	require_ep_span = 0;
 
@@ -109,13 +109,13 @@ int	generate(struct mrs	*mrs)
 	}
 	if(debug_level)printf("packed %.4f\n", timer());
 
-	void show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
+	int show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
 	{
 		if(!mrs_subsumes(mrs, mrs_res))
 		{
 			//printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
 			//print_mrs(mrs_res); printf("\n");
-			return;
+			return 0;
 		}
 		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->dec->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
@@ -123,20 +123,24 @@ int	generate(struct mrs	*mrs)
 		if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, count);
 		count++;
 		free_mrs(mrs_res);
+		return 1;
 	}
 	if(do_itsdb)itsdb_start_results();
-	iterate_cell_root_hypotheses(cells, show_result, 0);
+	iterate_cell_root_hypotheses(cells, show_result, best_only);
 	if(do_itsdb)itsdb_end_results();
 	if(do_itsdb)itsdb_report_gen(count);
 	if(debug_level)printf("unpacked %.4f\n", timer());
 
 	printf("NOTE: %d passive, %d active edges in final generation chart\n",
 		cells->p_nedges, cells->al_nedges + cells->ar_nedges);
-	if(lui_chart)
+
+	/*if(lui_chart)
 	{
 		char	*words[] = {"generate"};
-		output_lui(words);
-	}
+		output_lui_chart(words);
+	}*/
+	if(lui_mode)
+		output_lui_trees(cells, "Generation Results", best_only);
 
 	return count;
 }
