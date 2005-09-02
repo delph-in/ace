@@ -4,7 +4,8 @@
 #include	<stdlib.h>
 #include	<time.h>
 
-#include	<itsdb.h>
+//#include	<itsdb.h>
+#define capi_printf(fmt,...)
 
 #include	"chart.h"
 #include	"rule.h"
@@ -125,9 +126,11 @@ itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 {
 	char		*esc = malloc(strlen(hyp->string)*2+1), *p, *q;
 
+#ifndef capi_printf
 	capi_printf("((:result-id . %d) (:derivation . \"", id++);
 	print_hypothesis(hyp, capi_printf);
 	capi_printf("\") ");
+#endif
 
 	for(q=esc,p=hyp->string;*p;p++)
 	{
@@ -190,7 +193,7 @@ void itsdb_mode()
 	int fd;
 	close(1);
 	dup2(fd = open("/tmp/answer.itsdb", O_WRONLY | O_CREAT, 0600), 1);
-	if(!capi_register(create_test_run, process_item, reconstruct_item, complete_test_run))
-		slave();
+	/*if(!capi_register(create_test_run, process_item, reconstruct_item, complete_test_run))
+		slave();*/
 	close(fd);
 }
