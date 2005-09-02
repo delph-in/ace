@@ -28,7 +28,7 @@ char	*trims[] = {
 #define	STEM	"STEM"
 #endif
 char	*ppack[] = {STEM, "RELS", "HCONS", "RNAME", 0};
-char	*gpack[] = {STEM, "HCONS", "RNAME", "PUNCT", 0};
+char	*gpack[] = {STEM, "RELS", "HCONS", "RNAME", "PUNCT", 0};
 
 struct dg	*dg_path(struct dg	*dg, struct path	p)
 {
