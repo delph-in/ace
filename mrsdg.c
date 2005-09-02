@@ -5,6 +5,7 @@
 
 #include	"dag.h"
 #include	"mrs.h"
+#include	"conf.h"
 
 static int name;
 
@@ -48,10 +49,10 @@ void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 
 struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 {
-	static struct type *basic_semarg = 0;
+	static struct type *semarg = 0;
 
-	if(!basic_semarg)
-		assert(basic_semarg = lookup_type("basic_semarg"));
+	if(!semarg)
+		assert(semarg = lookup_type(semarg_type));
 
 	if(!dg)return 0;
 	if(dg->gen != 1)
@@ -61,11 +62,12 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		extern char **fnames;
 		int i;
 
-		if(!descendent_of(dg->type->tnum, basic_semarg)) var->is_const = 1;
+		if(!descendent_of(dg->type->tnum, semarg)) var->is_const = 1;
 		var->dg = dg;
 		var->type = strdup(dg->type->name);
 		var->name = strdup(dg->type->name);
 		var->vnum = vlist->nvars;
+		var->refs = 1;
 		if(!var->is_const)
 		{
 			for(i=0;i<dg->narcs;i++)
@@ -73,6 +75,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 
 			vnew = internal_to_external_mrs_var(var);
 			free_mrs_var(var); var = vnew;
+			var->refs = 1;
 		}
 
 		vlist->nvars++;
@@ -80,6 +83,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		vlist->vars[vlist->nvars-1] = var;
 		dg->copy = (void*)var;
 		dg->gen = 1;
+		return var;
 	}
 	((struct mrs_var*)dg->copy)->refs++;
 	return (struct mrs_var*)dg->copy;
@@ -221,7 +225,6 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 {
 	struct dg	*dg;
 	struct mrs_var *var;
-	char		*type = "basic_semarg";
 	int			i, path[16], len;
 
 	var = external_to_internal_mrs_var(evar);
