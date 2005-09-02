@@ -4,8 +4,11 @@
 #include	<stdlib.h>
 #include	<time.h>
 
-//#include	<itsdb.h>
+#ifdef	TSDB
+#include	<itsdb.h>
+#else
 #define capi_printf(fmt,...)
+#endif
 
 #include	"chart.h"
 #include	"rule.h"
@@ -193,7 +196,9 @@ void itsdb_mode()
 	int fd;
 	close(1);
 	dup2(fd = open("/tmp/answer.itsdb", O_WRONLY | O_CREAT, 0600), 1);
-	/*if(!capi_register(create_test_run, process_item, reconstruct_item, complete_test_run))
-		slave();*/
+#ifdef TSDB
+	if(!capi_register(create_test_run, process_item, reconstruct_item, complete_test_run))
+		slave();
+#endif
 	close(fd);
 }
