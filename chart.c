@@ -14,6 +14,7 @@
 #define GENERALIZE_TYPES
 
 int	inhibit_results = 0;
+extern int inhibit_pack;
 
 int			chart_size;
 struct chart_cell	*cells;
