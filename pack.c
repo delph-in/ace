@@ -8,14 +8,25 @@
 #define PACKBUG(fmt,...) do {} while(0)
 //#define PACKBUG printf
 
+static int	same_cell_daughter(struct edge *par, struct edge *dtr)
+{
+	int i;
+
+	if(par==dtr)return 1;
+	if(g_mode==GENERATING && (par->ep_span != dtr->ep_span))return 0;
+	if(g_mode==PARSING && (par->from != dtr->from || par->to != dtr->to))return 0;
+	for(i=0;i<par->have;i++)
+		if(same_cell_daughter(par->daughters[i], dtr))return 1;
+	return 0;
+}
+
 struct dg	*restrict_copy_dg(struct dg	*dg, int for_generation)
 {
 	struct dg *copy;
-	extern int copy_restrict;
 
-	copy_restrict = for_generation?2:1;
+	enable_packing(for_generation?2:1);
 	copy = copy_dg(dg);
-	copy_restrict = 0;
+	enable_packing(0);
 
 	return copy;
 }
@@ -26,6 +37,7 @@ int identical_inflr_routes(struct edge *a, struct edge *b)
 	int					i, n = a->ninflr_routes;
 
 	if(a->ninflr_routes != b->ninflr_routes)return 0;
+	if(a->ninflr_routes == -1)return 1;
 	int inflr_route_cmp(const struct inflr_route *ra, const struct inflr_route *rb)
 	{
 		int i;
@@ -53,6 +65,8 @@ static long long packcount = 0, packtry = 0;
 extern long long copycount, copytraverse;
 #endif
 
+extern int gen_qc;
+
 int	pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
@@ -68,7 +82,7 @@ int	pack_edge(struct edge	*edge)
 	for(i=0;i<ncandidates && (h=candidates[i]);i++)
 		if( h->have == edge->have && h->need == edge->need
 		&& (g_mode != GENERATING || h->ep_span == edge->ep_span)
-		&& !equiv_quickcheck(h->qc, edge->qc)
+		&& (gen_qc || !equiv_quickcheck(h->qc, edge->qc))
 			)
 		{
 #ifdef	COPY_COUNTS
@@ -102,6 +116,11 @@ int	pack_edge(struct edge	*edge)
 			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
 			if(ssd == 1)
 			{
+				if(same_cell_daughter(edge, h))
+				{
+					//printf("blocked same-cell-daughter packing\n");
+					continue;
+				}
 				PACKBUG("packed #%d `%s' in #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
 				//printf("host: "); print_dg(h->dg); printf("\n");
 				//printf("pack: "); print_dg(edge->dg); printf("\n");
@@ -112,6 +131,11 @@ int	pack_edge(struct edge	*edge)
 #ifdef	BIDIR_SS
 			else if(ssd == -1 && h->age == edge->age && !h->built_on)	// XXX could kill built_on requirement and do upwards frosting?
 			{
+				if(same_cell_daughter(h, edge))
+				{
+					//printf("blocked same-cell-daughter packing\n");
+					continue;
+				}
 				PACKBUG("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
 				//printf("host: "); print_dg(edge->dg); printf("\n");
 				//printf("pack: "); print_dg(h->dg); printf("\n");
