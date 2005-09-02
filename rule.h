@@ -8,11 +8,11 @@ struct rule
 	struct dg	*packdg;	// packing-restricted form of the dag
 	struct dg	*gpackdg;	// generation-packing-restricted form of the dag
 	struct irule	*inflr;
-	int		rnum:16;
-	int		ndaughters:4;
-	int		lexical:4;
-	int		rtl:4;
-	int		gen_ignore:4;
+	int				rnum:16;
+	unsigned int	ndaughters:4;
+	int				lexical:4;
+	int				rtl:4;
+	int				gen_ignore:4;
 };
 
 #include	"dag.h"

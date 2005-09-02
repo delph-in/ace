@@ -8,6 +8,7 @@
 #include	"type.h"
 #include	"rule.h"
 #include	"chart.h"
+#include	"conf.h"
 
 struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels);
 
@@ -20,6 +21,7 @@ int	used_total = 0, pused_total = 0;
 extern int nfinal, trace, inhibit_pack;
 
 extern unsigned int generation;
+extern int gen_qc;
 
 int	rprio[1000], rnohyper[1000];
 
@@ -141,7 +143,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 	e->id = next_eid();
 	e->rule = r;
 	e->need = r->ndaughters;
-	e->dg = inhibit_pack?r->dg:((g_mode==PARSING)?r->packdg:r->gpackdg);	// XXX we don't want two versions of packing restrictors; but constrain_rule_rels() breaks if RELS is restricted
+	e->dg = inhibit_pack?r->dg:((g_mode==PARSING)?r->packdg:r->gpackdg);
 	if(!e->dg)
 	{
 		fprintf(stderr, "epsilon_edge: bad frozen grammar! rule `%s' has no dg!\n", r->name);
@@ -149,7 +151,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 	}
 	if(rels)
 	{
-		e->dg = constrain_rule_rels(e->dg, rels);
+		e->dg = constrain_rule_rels(r->dg, rels);
 		if(!e->dg)
 		{
 			//printf("failed to constrain rule; "); unify_backtrace();
@@ -160,7 +162,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 
 	if(!ruleqc)ruleqc = calloc(sizeof(struct qc*), nrules);
 
-	if(!ruleqc[r->rnum])
+	if(!ruleqc[r->rnum] && !gen_qc)
 	{
 		__qc_use_heap = 1;
 		if(rtl)ruleqc[r->rnum] = extract_qc_arg(r->dg, r->ndaughters-1);
@@ -188,8 +190,8 @@ struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels)
 	struct slab_state	slab;
 	struct dg			*target;
 	get_slabstate(&slab);
-	target = dg_hop(dg, lookup_fname("C-CONT"));
-	if(target)target = dg_hop(target, lookup_fname("RELS"));
+
+	target = dg_path(dg, rule_rels_path);
 
 #ifdef UNIFY_PATHS
 	upathl = 0;
@@ -200,7 +202,10 @@ struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels)
 		generation++;
 		return 0;
 	}
+	// the unification succeeded; copy out the result, applying the packing restrictor
+	enable_packing(2);
 	dg = copy_dg_with_comp_arcs(dg);
+	enable_packing(0);
 	generation++;
 	if(generation==MAX_GEN)
 	{
@@ -253,21 +258,8 @@ int	load_rules_conf()
 		rprio[i] = prio;
 	}
 
-//	for(i=0;i<nrules;i++)
-//		printf("rule `%s' inflr %p\n", rules[i]->name, rules[i]->inflr);
-
 	fclose(f);
 	return 0;
-}
-
-int nonempty_ccont(struct dg	*dg)
-{
-	if(dg)dg = dg_hop(dg, lookup_fname("C-CONT"));
-	if(dg)dg = dg_hop(dg, lookup_fname("RELS"));
-	if(dg)dg = dg_hop(dg, lookup_fname("LIST"));
-	if(dg)dg = dg_hop(dg, lookup_fname("FIRST"));
-	if(dg)return 1;
-	else return 0;
 }
 
 void	agenda_rules(int	count)
@@ -317,12 +309,8 @@ void	agenda_rules(int	count)
 	//fprintf(stderr, "NOTE: lex-filtered %d epsilon-edges\n", nlf);
 }
 
-void	add_rule(char	*name, struct dg	*dg, int	num)
+void	install_rule_name(struct dg	*dg, char *name)
 {
-	struct rule	*r = calloc(sizeof(struct rule), 1);
-	int			i;
-
-#ifdef	ERG
 	static int	rnamef = -1;
 	struct dg	*rnamedg;
 
@@ -333,7 +321,14 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 		dg->xtype->dg = add_dg_hop(dg->xtype->dg, rnamef, rnamedg);
 		//printf("added rule name `%s' to rule type `%s'\n", rnamedg->xtype->name, dg->xtype->name);
 	}
-#endif
+}
+
+void	add_rule(char	*name, struct dg	*dg, int	num)
+{
+	struct rule	*r = calloc(sizeof(struct rule), 1);
+	int			i;
+
+	install_rule_name(dg, name);
 
 	nrules++;
 	rules = realloc(rules, sizeof(struct rule*)*nrules);
@@ -363,6 +358,8 @@ int	study_rule(char	*name, struct dg	*dg)
 	int	num = 0;
 	struct dg	*p;
 
+	wellform(dg, name);
+
 	p = dg_hop(dg, 0);	// ARGS
 	while(p)
 	{
@@ -391,6 +388,8 @@ int	study_lrule(char	*name, struct dg	*dg)
 	struct dg	*p;
 	extern char	*g_inflr_def;
 
+	wellform(dg, name);
+
 	p = dg_hop(dg, 0);	// ARGS
 	while(p)
 	{
@@ -406,12 +405,7 @@ int	study_lrule(char	*name, struct dg	*dg)
 
 int	load_rules()
 {
-#ifdef	ERG
-	//if(iterate_tdl_dgs("../erg/constructions.tdl", study_rule))
 	if(process_tdl_dgs_status("rule", study_rule))
-#else
-	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/rules.tdl", study_rule))
-#endif
 	{
 		fprintf(stderr, "rules: unable to load constructions.tdl, bailing out.\n");
 		exit(-1);
@@ -506,6 +500,8 @@ char	*type_filter_rule(struct rule	*r, int arg, struct qc **typeqc)
 void	lex_filter_rules()
 {
 	char **type_rf_t, **type_rl_t;
+
+	if(gen_qc)return;
 
 	int build_rule_filter_transitive_closure()
 	{
