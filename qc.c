@@ -199,6 +199,7 @@ int	__qc_use_heap = 0;
 const int	qcbytes = sizeof(struct type*)*QC_SIZE;
 
 static struct type	*olist, *minus, *_1list, *_0dlist, *null;
+extern int gen_qc;
 
 struct qc	*extract_qc(struct dg	*d)
 {
@@ -210,6 +211,8 @@ struct qc	*extract_qc(struct dg	*d)
 	extern unsigned int	generation;
 	struct dg	*stack[64];
 	static int	labels[1024];
+
+	if(gen_qc)return 0;
 
 	if(!init)
 	{
@@ -361,6 +364,7 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 
 struct qc	*copy_qc(struct qc	*in)
 {
+	if(!in)return 0;
 	struct qc	*out = slab_alloc(sizeof(struct qc));
 	*out = *in;
 	return out;
