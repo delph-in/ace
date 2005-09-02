@@ -207,8 +207,10 @@ static inline int	lexlast(struct type	*lt, int	rule)
 
 int	lexrulefilt_f(int	x, int	rule)
 {
+	extern char	**type_rftc;
 	struct task	*t;
 
+	if(!type_rftc)return 0;
 	for(t=lstart[x];t;t=t->next)
 	{
 		if(!(t->edge->from==x && t->edge->lex))break;
@@ -219,9 +221,11 @@ int	lexrulefilt_f(int	x, int	rule)
 
 int	lexrulefilt_l(int	x, int	rule)
 {
+	extern char	**type_rltc;
 	struct task	*t;
 	int			s;
 
+	if(!type_rltc)return 0;
 	// for each starting position
 	for(s=0;s<x;s++)
 	{
