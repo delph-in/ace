@@ -92,10 +92,11 @@ void add_mwe_routes(struct edge *e, struct ochart_edge *pre, struct ochart_edge 
 int	lexical_lookup(int	nwords, char	**words)
 {
 	struct ochart	*charts = slab_alloc(sizeof(struct ochart)*nwords);
-	int				i, j, k;
+	int				i, j, k, cover[nwords];
 
 	// compute all the orthography variations
 	bzero(charts, sizeof(struct ochart)*nwords);
+	bzero(cover, sizeof(int)*nwords);
 	for(i=0;i<nwords;i++)
 	{
 		add_ochart_edge(0, charts+i, words[i], 0);
@@ -122,7 +123,7 @@ int	lexical_lookup(int	nwords, char	**words)
 		{
 			struct ochart_edge *e = charts[i].edges[j];
 
-			void lex_adder(struct lexeme *lex)
+			int lex_adder(struct lexeme *lex)
 			{
 				int k;
 				struct edge			*le = 0;
@@ -130,14 +131,14 @@ int	lexical_lookup(int	nwords, char	**words)
 				{
 					char *last = lex->stem[lex->stemlen-1]->name;
 					char stemcmp[1024];
-					if(!is_type_only_oedge(e, ir_prefix))return;
-					if(lex->stemlen + i > nwords)return;
+					if(!is_type_only_oedge(e, ir_prefix))return 0;
+					if(lex->stemlen + i > nwords)return 0;
 					for(k=1;k<lex->stemlen-1;k++)
 					{
 						sprintf(stemcmp, "\"%s\"", words[i+k]);
 						// no inflection allowed on inner elements of MWEs
 						if(strcasecmp(lex->stem[k]->name, stemcmp))
-							return;
+							return 0;
 					}
 					for(k=0;k<charts[i+lex->stemlen-1].nedges;k++)
 					{
@@ -159,12 +160,25 @@ int	lexical_lookup(int	nwords, char	**words)
 				}
 				if(le)
 				{
+					for(k=0;k<lex->stemlen;k++)
+						cover[i+k]++;
 					add_agenda(le);
 					add_inflrs(le);
 					//printf("added lexeme `%s' at %d\n", lex->word, i);
+					return 1;
 				}
+				else return 0;
 			}
 			visit_lexicon(e->form, lex_adder);
+		}
+	}
+
+	for(i=0;i<nwords;i++)
+	{
+		if(cover[i] == 0)
+		{
+			struct edge *le = unknown_lexical_edge(i, words[i]);
+			add_agenda(le);
 		}
 	}
 
@@ -251,18 +265,16 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 		}
 
 	//printf(".. `%s' is new\n", form);
-	if(!edge)
-	{
-		// completely new edge; add it to the chart
-		chart->nedges++;
-		chart->edges = slab_realloc(chart->edges, sizeof(struct ochart_edge*)*(chart->nedges-1), sizeof(struct ochart_edge)*chart->nedges);
-		edge = chart->edges[chart->nedges-1] = slab_alloc(sizeof(struct ochart_edge));
-		edge->form = freeze_string(form);
-		edge->ninflr_routes = 0;
-		edge->inflr_routes = 0;
-		edge->nparents = 0;
-		edge->parents = 0;
-	}
+	// completely new edge; add it to the chart
+	chart->nedges++;
+	chart->edges = slab_realloc(chart->edges, sizeof(struct ochart_edge*)*(chart->nedges-1), sizeof(struct ochart_edge)*chart->nedges);
+	edge = chart->edges[chart->nedges-1] = slab_alloc(sizeof(struct ochart_edge));
+	edge->form = freeze_string(form);
+	edge->ninflr_routes = 0;
+	edge->inflr_routes = 0;
+	edge->nparents = 0;
+	edge->parents = 0;
+
 	add_oparent(edge, parent, rule);
 
 	// this edge is at least partly new; try to combine it with all the orthographemic rules
@@ -396,10 +408,12 @@ char	*inflect(struct irule	*ir, char	*str)
 			struct irule_sub *sub = ir->sub+i;
 			if(!invert_ipat(sub->rep, sub->repl, sub->pat, sub->patl, str, strl, res, ir->type))
 			{
-				//printf("applied (%s %s)\n", pat, rep);
+				//printf("applied (%s %s)\n", sub->pat, sub->rep);
 				break;
 			}
 		}
+		if(i<0)res=0;
+		if(!ir->nsub)res = freeze_string(str);
 	}
 	//printf("inflected[%s] `%s' to `%s'\n", ir->rule->name, str, res);
 	return res;
@@ -659,32 +673,21 @@ int	load_irregulars(char	*path)
 
 int	load_inflr()
 {
+	char		fname[256];
+	extern char	*grammar_dir;
 	extern int	study_lrule(char	*name, struct dg	*dg);
 
-#ifndef	ERG
-	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/lrules.tdl", study_lrule))
-	{
-		fprintf(stderr, "rules: unable to load lexrinst.tdl, bailing out.\n");
-		exit(-1);
-	}
-#endif
-#ifdef	ERG
-	//if(iterate_tdl_dgs("../erg/inflr.tdl", study_lrule) || iterate_tdl_dgs("../erg/lexrinst.tdl", study_lrule))
 	if(process_tdl_dgs_status("lex-rule", study_lrule))
-#else
-	if(iterate_tdl_dgs("../smallgrammars/esslli2k-grammar9/inflr.tdl", study_lrule))
-#endif
 	{
 		fprintf(stderr, "inflr: unable to load, bailing out.\n");
 		exit(-1);
 	}
 
-#ifdef	ERG
-	if(load_irregulars("../erg/irregs.tab"))
+	sprintf(fname, "%s/irregs.tab", grammar_dir);
+	if(load_irregulars(fname))
 	{
-		fprintf(stderr, "inflr: unable to load irregulars table.\n");
+		fprintf(stderr, "inflr: unable to load irregulars table `%s'.\n", fname);
 		exit(-1);
 	}
-#endif
 	return 0;
 }
