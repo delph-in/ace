@@ -198,8 +198,6 @@ char		**fnames;
 
 int	subsume_forward, subsume_backward;
 
-#define	SUBS_IGNORE(label)	0	//((label>=16 && label<=20))
-
 // make sure 'copy' is either null or self-referential all the way through 'a's arcs
 int	subsume_same_dg(struct dg	*a)
 {
@@ -229,11 +227,7 @@ int	subsume_same_dg(struct dg	*a)
 
 	arcs = DARCS(a);
 	for(i=0;i<a->narcs;i++)
-	{
-		if(SUBS_IGNORE(arcs[i].label))
-			continue;
 		if(!subsume_same_dg(arcs[i].dest))return 0;
-	}
 	return 1;
 }
 
@@ -289,20 +283,12 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		// well-formedness and sortedness conditions guarantee that since
 		// types match exactly, arc labels match exactly...
 		for(i=0;i<a->narcs;i++)
-		{
-			if(SUBS_IGNORE(aarcs[i].label))
-				continue;
 			if(!subsume_dg1(aarcs[i].dest, barcs[i].dest))return 0;
-		}
 	}
 	else if(subsume_forward) // b is subtype of a, so has strict superset of features
 	{
 		for(i=j=0;i<b->narcs;i++)
 		{
-			if(SUBS_IGNORE(barcs[i].label))
-				continue;
-			while(j<a->narcs && SUBS_IGNORE(aarcs[j].label))
-				j++;
 			if(j>=a->narcs)break;
 			if(aarcs[j].label == barcs[i].label)
 			{
@@ -315,10 +301,6 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	{
 		for(i=j=0;i<a->narcs;i++)
 		{
-			if(SUBS_IGNORE(aarcs[i].label))
-				continue;
-			while(j<b->narcs && SUBS_IGNORE(barcs[j].label))
-				j++;
 			if(j>=b->narcs)break;
 			if(aarcs[i].label == barcs[j].label)
 			{
@@ -408,12 +390,27 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 			intro = k;
 		}*/
 		if(!up)up = th;
-		else up = glb(up, th);
+		else
+		{
+			struct type *nup;
+			nup = glb(up, th);
+			if(!up)
+			{
+				fprintf(stderr, "type inference:  no glb for `%s' and `%s'\n", up->name, th->name);
+				exit(-1);
+			}
+			up = nup;
+		}
 	}
 	//if(intro==-1)return d->type;
-	if(!up)return d->type;
+	if(!up)
+	{
+		//if(d->narcs)printf("type inferred for %d features [%s ...] = null\n", d->narcs, fnames[arcs[0].label]);
+		return d->type;
+	}
 	else
 	{
+		//printf("type inferred for %d features = %s\n", d->narcs, up->name);
 		return glb(d->type, up);
 		//return glb(d->type, types[intro]);
 		//if(descendent_of(d->type->tnum, types[intro]))return d->type;
@@ -430,6 +427,8 @@ void	introduce_feature(int	label, int	type)
 	}
 }
 
+int reload_restrictors = 1;
+
 int	lookup_fname(char	*label)
 {
 	int	i;
@@ -441,6 +440,7 @@ int	lookup_fname(char	*label)
 	fnames[i] = strdup(label);
 	introduce = realloc(introduce, sizeof(int) * nfnames);
 	introduce[i] = -1;
+	reload_restrictors = 1;
 	return i;
 }
 
@@ -464,8 +464,7 @@ struct dg	*add_dg_feature(struct dg	*d, char	*label, struct dg	*value)
 
 int	init_fnames()
 {
-	extern char *stemfname;
-	nfnames = 21;
+	nfnames = 3;
 	fnames = malloc(sizeof(char*)*nfnames);
 	introduce = malloc(sizeof(int)*nfnames);
 	memset(introduce, -1, sizeof(int)*nfnames);
@@ -473,26 +472,61 @@ int	init_fnames()
 	fnames[0] = strdup("ARGS");
 	fnames[1] = strdup("FIRST");
 	fnames[2] = strdup("REST");
-	fnames[3] = strdup("SEM");		//expired
-	fnames[4] = strdup("HEAD");
-
-	fnames[5] = strdup("HD-DTR");
-	fnames[6] = strdup("NH-DTR");
-	fnames[7] = strdup("LCONJ-DTR");
-	fnames[8] = strdup("RCONJ-DTR");
-	fnames[9] = strdup("DTR");
-	fnames[10] = strdup("MOD-DTR");		//expired
-	fnames[11] = strdup("NONMOD-DTR");	//expired
-	fnames[12] = strdup("DTRA");
-	fnames[13] = strdup("DTRB");
-	fnames[14] = strdup("DTR1");
-	fnames[15] = strdup("DTR2");
-
-	fnames[16] = strdup(stemfname);
-	fnames[17] = strdup("RELS");
-	fnames[18] = strdup("HCONS");
-	fnames[19] = strdup("RNAME");
-	fnames[20] = strdup("PUNCT");
 
 	return 0;
+}
+
+// array saying for each feature whether to drop it during unification / copying
+char	*copy_restrictor;
+char	*unify_restrictor;
+
+char	*deleted_daughters, *parsing_packing, *generating_packing;
+
+void print_restrictor(char *name, char *restr)
+{
+	int i;
+
+	printf("%s:", name);
+	for(i=0;i<nfnames;i++)
+		if(restr[i])printf(" %s", fnames[i]);
+	printf("\n");
+}
+
+void load_restrictors()
+{
+	extern char *trims[], *ppack[], *gpack[];
+	int		i;
+
+	for(i=0;trims[i];i++)
+		lookup_fname(trims[i]);
+	for(i=0;ppack[i];i++)
+		lookup_fname(ppack[i]);
+	for(i=0;gpack[i];i++)
+		lookup_fname(gpack[i]);
+	deleted_daughters = calloc(nfnames, 1);
+	parsing_packing = calloc(nfnames, 1);
+	generating_packing = calloc(nfnames, 1);
+	for(i=0;trims[i];i++)
+		deleted_daughters[lookup_fname(trims[i])] = 1;
+	for(i=0;ppack[i];i++)
+		parsing_packing[lookup_fname(ppack[i])] = 1;
+	for(i=0;gpack[i];i++)
+		generating_packing[lookup_fname(gpack[i])] = 1;
+
+	reload_restrictors = 0;
+}
+
+void enable_trim(int trim)
+{
+	if(reload_restrictors)load_restrictors();
+	if(trim)copy_restrictor = deleted_daughters;
+	else copy_restrictor = 0;
+}
+
+void enable_packing(int how)
+{
+	if(reload_restrictors)load_restrictors();
+	if(how==0)unify_restrictor = 0;
+	else if(how==1)unify_restrictor = parsing_packing;
+	else if(how==2)unify_restrictor = generating_packing;
 }

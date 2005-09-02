@@ -8,15 +8,13 @@
 #include	"freeze.h"
 
 extern char	**fnames;
+extern char	*unify_restrictor, *copy_restrictor;
+void enable_trim(int trim);
+
 extern int	g_loaded;
 
-static int	cont_fnum, hcons_fnum;
-//#define SHOULD_TRIM(label)		(label==0 || (label>=5 && label<=15) || label==cont_fnum || label==hcons_fnum)
-
-#define SHOULD_TRIM(label)		(label==0 || (label>=5 && label<=15))
-
-int copy_restrict = 0;
-#define PACKING_RESTRICTOR(label)	(copy_restrict && (label>=16 && label<=20) && (label!=17 || copy_restrict!=2))
+#define SHOULD_TRIM(label)			(copy_restrictor && copy_restrictor[label])
+#define PACKING_RESTRICTOR(label)	(unify_restrictor && unify_restrictor[label])
 
 // global generation counter for invalidating quasi-destructive operations
 unsigned int	generation = 10;
@@ -152,7 +150,7 @@ static void print_copy_path(char	*name)
 	fprintf(stderr, "\n");
 }
 
-static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, int trim)
+static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 {
 	struct dg	*dg;
 	struct darc	xarc, *aptr, *optr;
@@ -228,7 +226,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 		for(i=0;i<dg->narcs;i++)
 		{
 			aptr->label = optr->label;
-			if(trim && SHOULD_TRIM(aptr->label))
+			if(SHOULD_TRIM(aptr->label))
 			{
 				newcopy->narcs--;
 				optr++;
@@ -243,7 +241,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 #ifdef	COPY_PATHS
 			copypath[copypathp++] = optr->label;
 #endif
-			aptr->dest = copy_dg_with_comp_arcs_ss(optr->dest, &ch, trim);
+			aptr->dest = copy_dg_with_comp_arcs_ss(optr->dest, &ch);
 #ifdef	COPY_PATHS
 			copypathp--;
 #endif
@@ -265,7 +263,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 		else if(i<dg->narcs)xarc = optr[(int)i++];
 		else xarc = dg->carcs[(int)j++];
 		aptr->label = xarc.label;
-		if(trim && SHOULD_TRIM(aptr->label))
+		if(SHOULD_TRIM(aptr->label))
 		{
 			newcopy->narcs--;
 			st=1;
@@ -278,7 +276,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret, 
 #ifdef	COPY_PATHS
 		copypath[copypathp++] = xarc.label;
 #endif
-		aptr->dest = copy_dg_with_comp_arcs_ss(xarc.dest, &ch, trim);
+		aptr->dest = copy_dg_with_comp_arcs_ss(xarc.dest, &ch);
 #ifdef	COPY_PATHS
 		copypathp--;
 #endif
@@ -562,12 +560,14 @@ void	setup_carcs_stack()
 void	setup_extra_type_dgs()
 {
 	clear_slab();
+#ifdef	ERG
 	ocons = lookup_type("*ocons*");
 	extra_ocons = copy_dg(ocons->dg);
 	substcons = lookup_type("*substcons*");
 	extra_substcons = copy_dg(substcons->dg);
 	anti_synsem = lookup_type("anti_synsem");
 	extra_anti_synsem = copy_dg(anti_synsem->dg);
+#endif
 	commit_slab();
 }
 
@@ -816,14 +816,9 @@ struct dg	*finalize_tmp(struct dg	*d, int trim)
 {
 	char		ch = 0;
 	struct dg	*res;
-	
-	if(!cont_fnum)
-	{
-		cont_fnum = lookup_fname("RELS");
-		hcons_fnum = lookup_fname("HCONS");
-		//printf("cont = %d\n", cont_fnum);
-	}
-	res = copy_dg_with_comp_arcs_ss(d, &ch, trim);
+
+	enable_trim(trim);
+	res = copy_dg_with_comp_arcs_ss(d, &ch);
 
 	if(!res)set_slabstate(&tmpstate);
 	generation++;
@@ -834,7 +829,6 @@ struct dg	*finalize_tmp(struct dg	*d, int trim)
 	}
 
 	top_copies++;
-	//if(res && trim)return trim_args(res);
 	return res;
 }
 
@@ -944,7 +938,12 @@ static void	rprint_dg(struct dg	*d)
 
 	//printf("(%p) ", d);
 	if(!d->narcs)
-		printf("%s", (d->gen==generation?d->type:d->xtype)->name);
+	{
+		char	*tname = (d->gen==generation?d->type:d->xtype)->name;
+		if(tname[0]=='"' && tname[strlen(tname)-1]!='"')
+			printf("'%s", tname+1);	// funny types 'foo get internally stored as "foo
+		else printf("%s", tname);
+	}
 	else
 	{
 		printf("#D[%s", (d->gen==generation?d->type:d->xtype)->name);
@@ -1002,30 +1001,4 @@ void	print_dg(struct dg	*d)
 	generation++;
 	dgreset_r(d);
 	generation++;
-}
-
-//char	*trims[] = {ARGS HEAD-DTR NON-HEAD-DTR LCONJ-DTR RCONJ-DTR DTR MOD-DTR NONMOD-DTR DTR1 DTR2 DTRA DTRB};
-
-// clone top node of the dg, and don't include trim'd features
-struct dg	*trim_args(struct dg	*d)
-{
-	int		i, narc = 0;
-	struct dg	*copy;
-	struct darc	*arcs = DARCS(d), *cpy_arcs;
-
-	for(i=0;i<d->narcs;i++)
-		if(!SHOULD_TRIM(arcs[i].label))
-			narc++;
-	copy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*narc);
-	*copy = *d;
-
-	copy->narcs = narc;
-	cpy_arcs = DARCS(copy);//slab_alloc(sizeof(struct dg) * narc);
-	narc = 0;
-	for(i=0;i<d->narcs;i++)
-	{
-		if(!SHOULD_TRIM(arcs[i].label))
-			cpy_arcs[narc++] = arcs[i];
-	}
-	return copy;
 }
