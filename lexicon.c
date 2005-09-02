@@ -148,7 +148,7 @@ struct lexeme	*unknown_lexeme(char	*name)
 
 	// make a skeletal dag for our lexeme
 	//extra = atomic_dg("basic_unknown_word");
-	extra = atomic_dg("n_intr_count_nale");
+	extra = atomic_dg("n_intr_mass_nale");
 	//extra = atomic_dg("v_np*_trans_pres3sg_nale");
 	assert(extra);
 
