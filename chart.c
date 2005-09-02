@@ -11,6 +11,8 @@
 #include	"lexicon.h"
 #include	"freeze.h"
 
+#define GENERALIZE_TYPES
+
 int	inhibit_results = 0;
 
 int			chart_size;
@@ -156,7 +158,9 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			// hyperpassive
 			hyperactive = 1;
 			__qc_use_heap = 1;
+#ifdef	GENERALIZE_TYPES
 			dg->type = signtype;
+#endif
 			hqc = extract_qc_arg(dg, -1);
 			__qc_use_heap = 0;
 			forget_tmp();
@@ -177,7 +181,9 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
 #endif
 			if(!u)return -1;	// cycles might happen, check for them.
+#ifdef	GENERALIZE_TYPES
 			u->type = u->xtype = signtype;
+#endif
 			qc = extract_qc_arg(u, -1);
 		}
 		e = slab_alloc(sizeof(struct edge));
@@ -349,11 +355,6 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	}
 	if(e->need==e->have)
 	{
-		// just finished a constituent
-		// chop off ARGS et al
-		// actually, finalize_tmp() does this for us now.
-		//e->dg = trim_args(e->dg);
-
 		//printf("\n generated %d/%d for [%d-%d] %s with rule %s\n", e->have, e->need, e->from, e->to, u->xtype->name, e->rule->name);
 		//print_dg(u);
 		//printf("\n");
@@ -483,7 +484,7 @@ int	recall_hyper(struct edge	*b)
 
 inline int	combine(struct edge	*a, struct edge	*b)
 {
-	int	arg, force_noha = 0, res;
+	int	i, arg, force_noha = 0, res;
 	struct dg	*rdg, *pdg;
 #ifdef	TIM
 	struct timeval	tv1, tv2;
@@ -492,6 +493,8 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(a->hex == b)return 0;	// already did this
 	if(a->have==-1)return 0;	// ghosted hyperactive edge -- got kicked out of the chart for a latent cycle
 	if(b->have==-1)return 0;	// ghosted hyperpassive edge -- got hicked out of the chart for a latent cycle
+
+	if(b->lex && b->ninflr_routes==-1 && a->need==1)return 0;	// unknown-word edges may not undergo unaries
 
 	//printf("FR: [%d-%d] + [%d-%d]?\n", a->from, a->to, b->from, b->to);
 	//printf("    <%d/%d> + <%d/%d>\n", a->have, a->need, b->have, b->need);
@@ -504,9 +507,8 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	{
 		if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
 		// if 'a' is inflectional, make sure it's the right one
-		if(a->rule->inflr && g_mode == PARSING)
+		if(a->rule->inflr && g_mode == PARSING && b->ninflr_routes != -1)
 		{
-			int i;
 			// look at each route 'b' allows and see if this is the first rule on it
 			for(i=0;i<b->ninflr_routes;i++)
 			{
@@ -515,11 +517,11 @@ inline int	combine(struct edge	*a, struct edge	*b)
 					break;
 			}
 			if(i==b->ninflr_routes)return 0;
+			//printf(" #%d admits rule %s as a next inflection\n", b->id, a->rule->name);
 		}
 	}
 	else if(b->lex && g_mode == PARSING)
 	{
-		int i;
 		// 'b' is lexical but 'a' is a syntax rule; see if 'b' might be done with its inflection
 		for(i=0;i<b->ninflr_routes;i++)
 			if(b->inflr_routes[i].len == 0)break;
@@ -529,7 +531,19 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
 
-	if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter rejected this combination
+	if(inhibit_pack && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
+
+/*
+	// XXX this doesn't play fair if we allow edges to be packed into b after we try to combine b with other stuff :(
+	// if we can force the right chart traversal order somehow, this will help reduce spurious rule applications.
+	for(i=-1;i<b->npack;i++)
+	{
+		struct edge *B = (i>=0)?b->pack[i]:b;
+		if(!B->rule || check_rf(a->rule, B->rule, arg))break;
+	}
+	if(!b->npack && i==b->npack)return 0;	// all packed 'b's were rejected by rule filter
+*/
+
 	if(!gen_qc && quickcheck(a->qc, b->qc))return 0;	// quickcheck rejected this combination
 
 	//rtried[a->rule->rnum]++;
@@ -611,6 +625,17 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	gettimeofday(&tv2, 0);
 	base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
 #endif
+
+	if(!res && a->rule->inflr)
+	{
+		// check whether orthographemic component accepts
+		// XXX this is sooo slow.
+		char *sub = show_orth_leaves(b), *foo;
+		foo = inflect(a->rule->inflr, sub);
+		free(sub);
+		if(!foo)res = -1;
+	}
+
 	if(!res)
 	{
 		if(build_edge(a, b, arg, rdg, force_noha) == -2)return -1;
@@ -943,43 +968,4 @@ void	print_rel(struct dg	*rel)
 		//fprintf(stderr, "REL had no ARGs\n");
 	}
 	else printf("\n");
-}
-
-void	output_lui(char	*words[])
-{
-	int	i, j, k, l;
-	struct edge	*e, *esave;
-	extern char	*current_sentence;
-	FILE	*lf = popen("yzlui", "w");
-
-	if(g_mode == GENERATING)
-		chart_size++;
-	fprintf(lf, "chart 1 %d \"%s\"", chart_size-1, current_sentence);
-	for(i=0;i<chart_size-1;i++)
-		fprintf(lf, " #E[%d %d %d %d \"%s\" orth [ ]]", -i-1, -i-1, i, i+1, words[i]);
-	if(g_mode == GENERATING)
-		chart_size--;
-
-	for(i=0;i<chart_size;i++)
-		for(j=0;j<chart_size;j++)
-			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
-			{
-				e = cells[j*chart_size + i].p_edges[k];
-				//if(e->id == 1155)esave = e;
-				if(e->rule)
-				{
-					fprintf(lf, " #E[%d %d %d %d %s %s []", e->id, e->id, j, i, e->rule->name, e->rule->name);
-					for(l=0;l<e->have;l++)
-						fprintf(lf, " %d", e->daughters[l]->id);
-					fprintf(lf, "]");
-				}
-				else if(e->lex)
-				{
-					fprintf(lf, " #E[%d %d %d %d %s %s [] %d]", e->id, e->id, j, j, e->lex->word, e->lex->word, -1-j);
-				}
-			}
-	fprintf(lf, "\n");
-	fflush(lf);
-	pclose(lf);
-	//print_dg(esave->dg); printf("\n\n");
 }
