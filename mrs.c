@@ -4,6 +4,7 @@
 
 #include	"type.h"
 #include	"mrs.h"
+#include	"dag.h"
 
 // mrs IO
 
@@ -14,6 +15,9 @@ void	free_mrs_var(struct mrs_var	*v)
 	if(!v)return;
 	v->refs--;
 	if(v->refs>0)return;
+	if(v->dg && v->dg->gen == 1 && v->dg->copy == (void*)v)
+		v->dg->gen = 2;
+
 	for(i=0;i<v->nprops;i++)
 	{
 		free(v->props[i].name);
@@ -128,8 +132,11 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 	}
 	else
 	{
-		var.type = calloc(1,2);
-		var.type[0] = var.name[0];
+		// assume name up to number is type
+		for(i=0;var.name[i]>'9';i++) {}
+		var.type = malloc(i+1);
+		memcpy(var.type, var.name, i);
+		var.type[i] = 0;
 	}
 
 	// done parsing, check for reentrancies
@@ -339,13 +346,14 @@ struct mrs	*read_mrs(FILE	*f)
 void	print_mrs_var(struct mrs_var	*var)
 {
 	if(!var) { printf("(null)"); return; }
-	printf("%s%d", var->type, var->vnum);
+	if(var->is_const)printf("%s", var->type);
+	else printf("%s%d", var->type, var->vnum);
 	//printf("%s.%d", var->name, var->vnum);
 	//if(var->is_const) printf("_K");
 	if(var->nprops)
 	{
 		int	i;
-		printf(" [ %c", var->type[0]);
+		printf(" [ %s", var->type);
 		for(i=0;i<var->nprops;i++)
 			{ printf(" %s: %s", var->props[i].name, var->props[i].value); }
 		printf(" ]");
