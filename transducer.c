@@ -16,8 +16,10 @@ int	preprocess_line(char	*line, int	*nwordsP, char	***wordsP)
 	for(i=0;i<npprules;i++)
 	{
 		if(pprules[i].type != rtReplace)continue;
+#ifndef JACY
 		if(process_string(line, out, pprules+i, 0))
 			strcpy(line, out);
+#endif
 	}
 	//printf("line `%s'\n", line);
 
@@ -31,7 +33,11 @@ int	preprocess_line(char	*line, int	*nwordsP, char	***wordsP)
 			{
 				nwords++;
 				words = realloc(words, sizeof(char*)*nwords);
+#ifndef	JACY
 				words[nwords-1] = process_word(wptr);
+#else
+				words[nwords-1] = strdup(wptr);
+#endif
 			}
 			wptr = 0;
 		}
