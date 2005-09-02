@@ -11,7 +11,7 @@
 #include	"unpack.h"
 
 extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trace, used_total, pused_total;
-extern int	question, exhaustive, lui_chart, inhibit_pack, inhibit_results, do_itsdb;
+extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only;
 
 static int	parse_process_edge(struct edge	*e)
 {
@@ -133,7 +133,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	//capi_print_derivations();
 
 	// show analyses
-	void show_result(struct hypothesis	*hyp, struct mrs	*mrs)
+	int show_result(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
 		struct dg	*root = hyp->dg, *sem;
 		if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->dec->edge->id);
@@ -145,8 +145,9 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 			fflush(stdout);
 		}
 		free_mrs(mrs);
+		return 1;
 	}
-	num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, 0);
+	num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
 
 	/*if(!exhaustive && sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
 	num_entries = cells[chart_size-1].p_nedges;
@@ -184,13 +185,12 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		if(!exhaustive)break;
 	}*/
 
-	if(!inhibit_results)
-	{
-		fprintf(stderr, "NOTE: %d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
-					num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
-		print_slab_stats();
-		if(lui_chart)output_lui(words);
-	}
+	fprintf(stderr, "NOTE: %d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
+		num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
+	print_slab_stats();
+	if(lui_mode)
+		output_lui_trees(cells+chart_size-1, sentence, best_only);
+
 	used_total += used_edges;
 	pused_total += pused_edges;
 
