@@ -7,24 +7,11 @@
 #include	"lexicon.h"
 #include	"dag.h"
 #include	"hash.h"
+#include	"conf.h"
 
 int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	load_tdl(char	*path);
-
-#ifdef	JACY
-char	*g_cons_type = "cons";
-char	*g_list_type = "list";
-char	*g_null_type = "null";
-char	*g_diff_list_type = "diff-list";
-#endif
-
-#ifdef ERG
-char	*g_cons_type = "*cons*";
-char	*g_list_type = "*list*";
-char	*g_null_type = "*null*";
-char	*g_diff_list_type = "*diff-list*";
-#endif
 
 void show_task_name(char *task)
 {
@@ -183,12 +170,12 @@ int	process_colon_command(char	*parent, char	*cmd)
 			*p = 0;
 			sprintf(iname, "%s%s%s", dirpath, dirpath[0]?"/":"", what);
 			if(!strstr(what, ".tdl"))strcat(iname, ".tdl");
-			if(!tdlstatus && !strstr(what, "root"))
+			if(!tdlstatus && strstr(what, "root"))
 			{
 				fprintf(stderr, "WARNING: implicitly setting tdl status to `root'\n");
 				tdlstatus = "root";
 			}
-			if(!tdlstatus && !strstr(what, "parse-nodes"))
+			if(!tdlstatus && strstr(what, "parse-nodes"))
 			{
 				fprintf(stderr, "WARNING: implicitly setting tdl status to `parse-node'\n");
 				tdlstatus = "parse-node";
@@ -994,22 +981,33 @@ void run_task(char *task, int (*worker)())
 	}
 }
 
+char	*grammar_dir;
+
 int	load_grammar(char *toptdl, char *vpm, char *mem)
 {
 	clear_slab();
 	init_fnames();
+
 	tdl_hash = hash_new("tdl type definitions");
+
+	grammar_dir = strdup(toptdl);
+	if(strrchr(grammar_dir, '/') > grammar_dir)
+		*strrchr(grammar_dir, '/') = 0;
+	else grammar_dir = ".";
 
 	load_tdl(toptdl);
 	tdlstatus = "lex-entry";
 	//load_tdl("special-lex.tdl");
 	tdlstatus = 0;
 
+	load_conf();		// XXX freeze
+
 	if(load_types())exit(-1);
 	if(load_rules())exit(-1);
 	if(load_roots())exit(-1);
 	if(load_inflr())exit(-1);
 	if(load_lexicon())exit(-1);
+	if(load_labels())exit(-1);
 	free_tdl();
 
 	number_strings();
