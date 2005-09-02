@@ -19,6 +19,9 @@ extern int		noldslabs, aoldslabs, currslabsize;
 
 extern int debug_level;
 
+void	recover_labels(void	*ls);
+void	*freeze_labels();
+
 // copy all grammar objects to flat blocks
 extern int	ntypes, nlexemes, nrules, nirules, nroots, nfnames, nstrings;
 extern struct type	**types;
@@ -56,6 +59,7 @@ struct grammar
 	void	*stochmodel;
 	void	*typehash;
 	void	*vpm;
+	void	*labels;
 };
 
 extern void	*slab_alloc(int	len);
@@ -187,6 +191,12 @@ void	patch_dg(struct dg	*dg)
 		patch_dg(arcs[i].dest);
 }
 
+struct dg	*freeze_dg(struct dg	*dg)
+{
+	patch_dg(dg);
+	return copy_dg(dg);
+}
+
 void	*freeze_block(void	*src, int	len)
 {
 	void	*dst;
@@ -200,6 +210,7 @@ void	*freeze_block(void	*src, int	len)
 
 char	**freeze_rftc(char	**ptr)
 {
+	if(!ptr)return 0;
 	char	**ref = slab_alloc(nrules * sizeof(char*));
 	int	len;
 	char	*data;
@@ -328,6 +339,7 @@ int	freeze_grammar()
 	G->strings = slab_alloc(sizeof(void*) * G->nstrings);	memcpy(G->strings, strings, sizeof(void*) * G->nstrings);
 	G->typehash = freeze_typehash();
 	G->vpm = freeze_vpm();
+	G->labels = freeze_labels();
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
@@ -382,6 +394,7 @@ static int	load_freeze()
 	type_rltc = G->type_rltc;
 
 	recover_typehash(G->typehash);
+	recover_labels(G->labels);
 	recover_vpm(G->vpm);
 	recover_semantic_index(G->semindex);
 	recover_stochastic_model(G->stochmodel);
