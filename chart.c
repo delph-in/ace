@@ -532,7 +532,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
 
-	if(inhibit_pack && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
+	if(inhibit_pack && b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
 
 /*
 	// XXX this doesn't play fair if we allow edges to be packed into b after we try to combine b with other stuff :(
