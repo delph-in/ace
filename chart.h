@@ -4,10 +4,6 @@
 #include	"dag.h"
 #include	"morpho.h"
 
-#define	GENERATION
-
-#define	BIDIR_SS
-
 struct edge
 {
 	struct dg	*dg;
@@ -22,7 +18,7 @@ struct edge
 				// for active edges, qc vector for next daughter
 
 	unsigned	rtl:1,used:1;	// right-to-left instantiation? active been used?
-	unsigned	prio:4;
+	unsigned	prio:6;
 
 	unsigned	ha_use:4;	// how many times have we been summoned?
 	// what dg to unify in to reconstruct this edge's dg
@@ -56,8 +52,6 @@ struct chart_cell
 	struct edge	**ar_edges;
 };
 
-#define	LEX_PRIO	10
-
 // general chart processing equipment
 int		combine(struct edge	*a, struct edge	*b);
 void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge);
@@ -82,7 +76,7 @@ char	*show_orth_leaves(struct edge	*e);
 struct edge	*next_agenda(int	from_start);
 void		clear_agenda();
 void		add_agenda(struct edge	*e);
-int			reduce_chart(int	length);
+int			reduce_chart(int	length, char **words);
 
 // packing
 int			pack_edge(struct edge	*edge);

@@ -259,11 +259,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		b->gen = generation;
 	}
 
-	//if(a->xtype != b->xtype)return 0;
-	//if(a->narcs != b->narcs)return 0;
-
-	if(!descendent_of(b->xtype->tnum, a->xtype))subsume_forward = 0;
-	if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
+	if(a->xtype != b->xtype)
+	{
+		if(!descendent_of(b->xtype->tnum, a->xtype))subsume_forward = 0;
+		if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
+	}
 
 	if(a->copy == b && b->forward == a)return 1;
 	if(a->copy)subsume_forward = 0;

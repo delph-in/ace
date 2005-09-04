@@ -41,8 +41,8 @@ int		unfold_edge(struct edge	*e);
 
 struct edge	*sentential = 0;
 
-#define	MAX_CHUNKS	2560	// when to give up on a parse
-//#define	MAX_CHUNKS	1280	// when to give up on a parse
+//#define	MAX_CHUNKS	2560	// when to give up on a parse
+#define	MAX_CHUNKS	800		// when to give up on a parse
 //#define	MAX_CHUNKS	71	// when to give up on a parse
 
 //#define	EXCURSION
@@ -532,7 +532,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
 
-	if(inhibit_pack && b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
+	if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
 
 /*
 	// XXX this doesn't play fair if we allow edges to be packed into b after we try to combine b with other stuff :(

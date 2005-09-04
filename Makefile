@@ -2,7 +2,7 @@
 #DELPHIN_LIBS=-L/Users/sweaglesw/cdev/lingo/lkb/lib/macos.ppc.32 -litsdb -lpvm3
 
 #GRAM=-DJACY
-GRAM=-DERG
+GRAM=-DERG -DUNKNOWN=\"n_proper_nale\" -DSLEX
 
 CPU=
 CC=gcc

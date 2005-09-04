@@ -104,6 +104,7 @@ int	main(int	argc, char	*argv[])
 	}
 
 	load_rules_conf();	// XXX freeze
+	install_rf(inhibit_pack?((g_mode == PARSING)?1:2):0);
 
 	if(save_grammar_path)
 		exit(0);

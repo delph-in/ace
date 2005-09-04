@@ -128,8 +128,7 @@ int	pack_edge(struct edge	*edge)
 				record_packing(h, edge);
 				return 1;
 			}
-#ifdef	BIDIR_SS
-			else if(ssd == -1 && h->age == edge->age && !h->built_on)	// XXX could kill built_on requirement and do upwards frosting?
+			else if(ssd == -1/* && h->age == edge->age*/ && !h->built_on)	// XXX could kill built_on requirement and do upwards frosting?
 			{
 				if(same_cell_daughter(h, edge))
 				{
@@ -154,7 +153,6 @@ int	pack_edge(struct edge	*edge)
 				printf("host: "); print_dg(h->dg); printf("\n");
 				printf("edge: "); print_dg(edge->dg); printf("\n");
 			}*/
-#endif
 		}
 	return 0;
 }

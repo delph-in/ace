@@ -21,6 +21,8 @@ extern int debug_level;
 
 void	recover_labels(void	*ls);
 void	*freeze_labels();
+void	*freeze_rule_filter();
+void	recover_rule_filter(void *rf);
 
 // copy all grammar objects to flat blocks
 extern int	ntypes, nlexemes, nrules, nirules, nroots, nfnames, nstrings;
@@ -50,11 +52,11 @@ struct grammar
 	struct dg	**roots;
 	struct type	**strings;
 	char		**fnames;
-	char		*rule_filter;
 	char		*lgroups[256];
 	struct type	*strtype;
 	char		**type_rftc, **type_rltc;
 	int		*introduce;
+	void	*rule_filter;
 	void	*semindex;
 	void	*stochmodel;
 	void	*typehash;
@@ -304,7 +306,7 @@ int	freeze_grammar()
 		if(lgroups[i])
 			lgroups[i] = freeze_block(lgroups[i], 256);
 
-	rule_filter = freeze_block(rule_filter, sizeof(char)*nrules*nrules);
+	G->rule_filter = freeze_rule_filter();
 	type_rftc = freeze_rftc(type_rftc);
 	type_rltc = freeze_rftc(type_rltc);
 	freezer_note("\n miscellaneous");
@@ -322,7 +324,6 @@ int	freeze_grammar()
 	}
 	freezer_note("lex-dgs");
 
-	G->rule_filter = rule_filter;
 	G->ntypes = ntypes;
 	G->nrules = nrules;
 	G->nirules = nirules;
@@ -389,10 +390,10 @@ static int	load_freeze()
 	strings = G->strings;
 	strtype = G->strtype;
 
-	rule_filter = G->rule_filter;
-	type_rftc = G->type_rftc;
+	type_rftc = G->type_rftc;	// XXX these belong inside the rulefilter freezer
 	type_rltc = G->type_rltc;
 
+	recover_rule_filter(G->rule_filter);
 	recover_typehash(G->typehash);
 	recover_labels(G->labels);
 	recover_vpm(G->vpm);
