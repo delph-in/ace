@@ -345,7 +345,7 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 		//if((ta&&!tb)||(tb&&!ta))return -1;
 		//if(ta && tb && !descendent_of(tb->tnum, ta))return -1;
 
-		if(ta && tb)
+		if(ta && tb && ta!=tb)
 		{
 			g = glb(ta, tb);
 			if(g!=tb)fw = 0;
@@ -353,11 +353,7 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 		}
 		if(ta && !tb)fw = 0;
 		if(tb && !ta)bw = 0;
-#ifdef	BIDIR_SS
 		if(!fw && !bw)return -1;
-#else
-		if(!fw)return -1;
-#endif
 	}
 	return 0;
 }

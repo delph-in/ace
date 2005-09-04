@@ -640,11 +640,15 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 
 	// quasi-destructively unify the four sets of arcs together!
 
-	t = glb(t1, t2);
-	if(!t)
+	if(t1 == t2)t = t1;
+	else
 	{
-		//printf("no glb for %s and %s\n", t1->name, t2->name);
-		return -1;
+		t = glb(t1, t2);
+		if(!t)
+		{
+			//printf("no glb for %s and %s\n", t1->name, t2->name);
+			return -1;
+		}
 	}
 
 	if(dg1->gen != generation)

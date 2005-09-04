@@ -15,7 +15,7 @@ extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_its
 
 static int	parse_process_edge(struct edge	*e)
 {
-	int			i, j, remain, pack = 0;
+	int			i, j, remain, pack = 0, from = e->from, to = e->to, have = e->have;
 	struct chart_cell	*c;
 
 	//printf("processing [%d-%d] edge;    ", e->from, e->to);
@@ -35,23 +35,23 @@ static int	parse_process_edge(struct edge	*e)
 	if(e->have == e->need)
 	{
 		// passive edge
-		for(i=0;i<=e->from;i++)
+		for(i=0;i<=from;i++)
 		{
-			c = cells + e->from + i*chart_size;
+			c = cells + from + i*chart_size;
 			for(j=0;j<c->al_nedges;j++)
 			{
 				remain = c->al_edges[j]->need - c->al_edges[j]->have;
-				if(e->to + (remain-1) < chart_size)
+				if(to + (remain-1) < chart_size)
 					if(combine(c->al_edges[j], e) == -1)return -1;
 			}
 		}
-		for(i=e->to;i<chart_size;i++)
+		for(i=to;i<chart_size;i++)
 		{
-			c = cells + i + e->to*chart_size;
+			c = cells + i + to*chart_size;
 			for(j=0;j<c->ar_nedges;j++)
 			{
 				remain = c->ar_edges[j]->need - c->ar_edges[j]->have;
-				if(e->from - (remain-1) >= 0)
+				if(from - (remain-1) >= 0)
 					if(combine(c->ar_edges[j], e) == -1)return -1;
 			}
 		}
@@ -62,9 +62,9 @@ static int	parse_process_edge(struct edge	*e)
 		remain = e->need - e->have;
 		if(e->rtl)
 		{
-			for(i=0;i<=e->from;i++)
+			for(i=0;i<=from;i++)
 			{
-				c = cells + e->from + i*chart_size;
+				c = cells + from + i*chart_size;
 				for(j=0;j<c->p_nedges;j++)
 					if(c->p_edges[j]->from - (remain-1) >= 0)
 						if(combine(e, c->p_edges[j]) == -1)return -1;
@@ -72,9 +72,9 @@ static int	parse_process_edge(struct edge	*e)
 		}
 		else
 		{
-			for(i=e->to;i<chart_size;i++)
+			for(i=to;i<chart_size;i++)
 			{
-				c = cells + i + e->to*chart_size;
+				c = cells + i + to*chart_size;
 				for(j=0;j<c->p_nedges;j++)
 					if(c->p_edges[j]->to + (remain-1) < chart_size)
 						if(combine(e, c->p_edges[j]) == -1)return -1;
@@ -88,7 +88,7 @@ int	cancel_parse;
 
 void	alarm_handler(int	sig)
 {
-	fprintf(stderr, "NOTE: cancelling parse, too long\n");
+	fprintf(stderr, "NOTE: cancelling parse, taking too long\n");
 	cancel_parse = 1;
 }
 
@@ -103,7 +103,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	// setup the chart
 	clear_chart(nwords+1);
 	if(lexical_lookup(nwords, words))return -1;
-	if(reduce_chart(nwords))return -1;
+	if(reduce_chart(nwords, words))return -1;
 
 	//if(rtried)free(rtried);
 	//rtried = calloc(sizeof(int),nrules);
@@ -113,8 +113,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
 
-	//alarm(10);
-	//ualarm(100000);
+	alarm(10);	// XXX make this commandline configurable, and apply it to unpacking too
 
 	// do the actual parsing
 	while( !cancel_parse && (edge = next_agenda(0)) )
