@@ -996,9 +996,11 @@ int	load_grammar(char *toptdl, char *vpm, char *mem)
 	else grammar_dir = ".";
 
 	load_tdl(toptdl);
+#ifdef SLEX
 	tdlstatus = "lex-entry";
-	//load_tdl("special-lex.tdl");
+	load_tdl("special-lex.tdl");
 	tdlstatus = 0;
+#endif
 
 	load_conf();		// XXX freeze
 

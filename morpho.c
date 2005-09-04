@@ -173,6 +173,7 @@ int	lexical_lookup(int	nwords, char	**words)
 		}
 	}
 
+#ifdef	UNKNOWN
 	for(i=0;i<nwords;i++)
 	{
 		if(cover[i] == 0)
@@ -181,6 +182,7 @@ int	lexical_lookup(int	nwords, char	**words)
 			add_agenda(le);
 		}
 	}
+#endif
 
 	return 0;
 }
