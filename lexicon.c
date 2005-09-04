@@ -69,7 +69,6 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 	edge->to = i+len;
 	edge->lex = lex;
 	edge->qc = gen_qc?0:extract_qc(edge->dg);
-	edge->prio = LEX_PRIO;
 
 	if(trace)
 	{
@@ -138,6 +137,7 @@ struct lexeme	*proper_noun_lex(char	*name)
 	return lex;
 }
 
+#ifdef UNKNOWN
 struct lexeme	*unknown_lexeme(char	*name)
 {
 	struct lexeme	*lex;
@@ -147,9 +147,7 @@ struct lexeme	*unknown_lexeme(char	*name)
 	extern struct type	**strings;
 
 	// make a skeletal dag for our lexeme
-	//extra = atomic_dg("basic_unknown_word");
-	extra = atomic_dg("n_intr_mass_nale");
-	//extra = atomic_dg("v_np*_trans_pres3sg_nale");
+	extra = atomic_dg(UNKNOWN);
 	assert(extra);
 
 	// define the lexeme
@@ -172,6 +170,9 @@ struct edge	*unknown_lexical_edge(int	i, char	*word)
 	e->inflr_routes = 0;
 	return e;
 }
+#else
+struct edge	*unknown_lexical_edge(int	i, char	*word) { return 0; }
+#endif
 
 int	wstrcmp(char	*a, char	*b)
 {

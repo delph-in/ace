@@ -15,7 +15,12 @@ struct task
 	struct edge	*edge;
 };
 
-#define	NPRIO	11
+// WARNING: only 6 bits are currently allocated to ->prio in chart.h
+#define	NPRIO	64	//11
+
+#define	EPSILON_PRIORITY(rule)	(NPRIO-1)
+#define	EDGE_PRIORITY(edge)		(NPRIO-1 - (edge->to-edge->from))
+#define	LEX_PRIO				(NPRIO-2)
 
 static struct queue
 {
@@ -47,10 +52,9 @@ void	add_agenda(struct edge	*e)
 	e->npack = 0;
 	e->pack = 0;
 	e->unpack = 0;
-//#ifdef	BIDIR_SS
-//	if(e->prio < LEX_PRIO)
-//		e->prio = LEX_PRIO-1;
-//#endif
+
+	if(e->from==e->to)e->prio = EPSILON_PRIORITY(e->rule);
+	else e->prio = EDGE_PRIORITY(e);
 
 	if(e->prio < 0 || e->prio >= NPRIO)
 	{
@@ -110,9 +114,8 @@ struct edge	*next_agenda(int	from_start)
 
 void add_agenda_lrule(int x, struct rule *rule)
 {
-	extern int rprio[];
 	struct task	*t;
-	int			prio = rprio[rule->rnum]?:9;
+	int			prio = EPSILON_PRIORITY(rule);
 
 	for(t=agenda[prio].start;t;t=t->next)
 	{
@@ -139,7 +142,7 @@ void	allow_edge_inflr_route(struct edge	*e, int nrules, int *rules)
 	e->inflr_routes[e->ninflr_routes-1].rules = rules;
 }
 
-int	reduce_chart(int	length)
+int	reduce_chart(int	length, char **words)
 {
 	extern int debug_level;
 	struct task	*t1, *t2;
@@ -184,7 +187,7 @@ int	reduce_chart(int	length)
 	for(i=0;i<length;i++)
 		if(!cover[i])
 		{
-			if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d!\n", i);
+			if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d `%s'!\n", i, words[i]);
 			return -1;
 		}
 

@@ -2,6 +2,7 @@
 #include	<string.h>
 #include	<stdlib.h>
 #include	<sys/time.h>
+#include	<assert.h>
 
 #include	"tdl.h"
 #include	"dag.h"
@@ -9,6 +10,7 @@
 #include	"rule.h"
 #include	"chart.h"
 #include	"conf.h"
+#include	"freeze.h"
 
 struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels);
 
@@ -89,13 +91,13 @@ int	rule_is_rtl(struct rule	*r)
 	}
 }
 
-void	setup_rule_filter()
+char	*setup_rule_filter1(int pack)
 {
 	int	i, j, k;
 	struct rule	*m, *d;
 	struct dg	*mdg;
 	int	yes = 0, count = 0, res;
-	char	byte;
+	char	byte, *rule_filter;
 
 	show_task_name("rule filter...");
 	rule_filter = calloc(sizeof(char), nrules*nrules);
@@ -108,14 +110,14 @@ void	setup_rule_filter()
 			fprintf(stderr, "ERROR: rule `%s' takes %d daughters!\n", m->name, m->ndaughters);
 			exit(-1);
 		}
-		mdg = copy_dg(m->dg);	// necessary for the case when we try to unify a rule into itself!
+		mdg = copy_dg(pack?( (pack==1) ? m->packdg : m->gpackdg ) : m->dg );	// necessary for the case when we try to unify a rule into itself!
 		for(j=0;j<nrules;j++)
 		{
 			d = rules[j];
 			byte = 0;
 			for(k=0;k<m->ndaughters;k++)
 			{
-				res = unify_dg_tmp(d->dg, mdg, k);
+				res = unify_dg_tmp(pack?( (pack==1) ? d->packdg : d->gpackdg ) : d->dg , mdg, k);
 				forget_tmp();
 				//if(unify_dg(d->dg, mdg, k))
 				if(res==0)
@@ -129,7 +131,46 @@ void	setup_rule_filter()
 		}
 	}
 	printf("%.1f%% blocked\n", 100*(float)(count-yes)/count);
+	return rule_filter;
+}
+
+struct rule_filters
+{
+	char	*nopack;
+	char	*pack;
+	char	*gpack;
+}	*filters;
+
+void setup_rule_filter()
+{
+	filters = calloc(sizeof(*filters), 0);
+	filters->nopack = setup_rule_filter1(0);
+	filters->pack = setup_rule_filter1(1);
+	filters->gpack = setup_rule_filter1(2);
+	rule_filter = filters->gpack;	// XXX hack: in the current ERG, the gpack filter is the most lenient, so use it to calculate the rftc
 	lex_filter_rules();
+}
+
+void	*freeze_rule_filter()
+{
+	filters = freeze_block(filters, sizeof(*filters));
+	filters->nopack = freeze_block(filters->nopack, sizeof(char) * nrules*nrules);
+	filters->pack = freeze_block(filters->pack, sizeof(char) * nrules*nrules);
+	filters->gpack = freeze_block(filters->gpack, sizeof(char) * nrules*nrules);
+	return filters;
+}
+
+void	recover_rule_filter(void *rf)
+{
+	filters = rf;
+}
+
+void	install_rf(int what)
+{
+	if(what==0)rule_filter = filters->nopack;
+	else if(what==1)rule_filter = filters->pack;
+	else if(what==2)rule_filter = filters->gpack;
+	else assert(!"Not reached");
 }
 
 struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
@@ -170,12 +211,10 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 		__qc_use_heap = 0;
 	}
 	e->qc = ruleqc[r->rnum];
-	e->prio = rprio[r->rnum];
-	if(r->lexical && e->prio==0)e->prio = 9;
 
 	if(trace>1)
 	{
-		printf("epsilon [%d] of %s is #%d prio %d\n", x, r->name, e->id, e->prio);
+		printf("epsilon [%d] of %s is #%d\n", x, r->name, e->id);
 		print_dg(e->dg); printf("\n\n");
 	}
 
