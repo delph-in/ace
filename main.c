@@ -163,7 +163,7 @@ int	main(int	argc, char	*argv[])
 			num_results = generate(mrs);
 			free(mrs);
 		}
-		if(num_results==-1) { if(!inhibit_results)fprintf(stderr, "NOTE: ignore\n"); }
+		if(num_results==-1)fprintf(stderr, "NOTE: ignore\n");
 		else if(num_results>0)success++;
 		else if(num_results==0)fail++;
 		if(num_results>=0)count++;

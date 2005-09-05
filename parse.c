@@ -146,9 +146,9 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		return 1;
 	}
 	num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
-	printf("\n");
+	if(num_parses && !inhibit_results)printf("\n");
 
-	fprintf(stderr, "NOTE: %d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
+	fprintf(stderr, "NOTE: %d readings, added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
 		num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
 	print_slab_stats();
 	if(lui_mode)
@@ -215,7 +215,7 @@ int	parse_line(char	*line)
 	//if(nwords<=1)return -1;	// experience shows short "sentences" to not usually be interesting
 	if(nwords>60)
 	{
-		fprintf(stderr, "NOTE: 0 readings. Too many words (60+)\n");
+		fprintf(stderr, "NOTE: 0 readings, too many words (60+)\n");
 		return 0;	// trying to parse long sentences is a waste of time. we have lots of short ones.
 	}
 
