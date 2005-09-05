@@ -495,7 +495,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(a->have==-1)return 0;	// ghosted hyperactive edge -- got kicked out of the chart for a latent cycle
 	if(b->have==-1)return 0;	// ghosted hyperpassive edge -- got hicked out of the chart for a latent cycle
 
-	if(b->lex && b->ninflr_routes==-1 && a->need==1)return 0;	// unknown-word edges may not undergo unaries
+//	if(b->lex && b->ninflr_routes==-1 && a->need==1)return 0;	// unknown-word edges may not undergo unaries
 
 	//printf("FR: [%d-%d] + [%d-%d]?\n", a->from, a->to, b->from, b->to);
 	//printf("    <%d/%d> + <%d/%d>\n", a->have, a->need, b->have, b->need);
