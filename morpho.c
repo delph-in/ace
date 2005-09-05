@@ -183,7 +183,7 @@ int	lexical_lookup(int	nwords, char	**words)
 			struct edge *le;
 			while(stem[0]=='"' || stem[0]=='\'' || stem[0]=='[' || stem[0]=='(')stem++;
 			l = strlen(stem)-1;
-			while(stem[l]=='"' || stem[l]=='\'' || stem[l]==']' || stem[l]==')' || stem[l]=='?' || stem[l]=='!' || stem[l]==',' || stem[l]=='.')
+			while(l>=0 && (stem[l]=='"' || stem[l]=='\'' || stem[l]==']' || stem[l]==')' || stem[l]=='?' || stem[l]=='!' || stem[l]==',' || stem[l]=='.'))
 				l--;
 			stem[l+1] = 0;
 			if(stem[0])
