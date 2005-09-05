@@ -141,48 +141,12 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		{
 			if(sentence && !question)printf("SENT: %s\n", sentence);
 			print_mrs(mrs);
-			fflush(stdout);
 		}
 		free_mrs(mrs);
 		return 1;
 	}
 	num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
-
-	/*if(!exhaustive && sentential) { i=0;num_entries=0;edge = sentential; root = edge->dg; goto show; }
-	num_entries = cells[chart_size-1].p_nedges;
-	for(i=0;i<num_entries;i++)
-	{
-		edge = cells[chart_size-1].p_edges[i];
-		root = edge->dg;
-		if(!is_root(root))continue;
-
-		//printf("edge #%d is root\n", edge->id);
-
-		show:
-		count = 1;//unfold_edge(edge);
-		num_parses+=count;
-
-		if(!inhibit_results)
-		{
-			//print_dg(root);
-			//printf("\n\n");
-
-			sem = dg_hop(root, lookup_fname("SYNSEM"));
-			if(sem)sem = dg_hop(sem, lookup_fname("LOCAL"));
-			if(sem)sem = dg_hop(sem, lookup_fname("CONT"));
-			if(!sem)
-			{
-				//fprintf(stderr, "parse had no semantics!\n");
-				continue;
-			}
-			if(sentence && !question)printf("SENT: %s\n", sentence);
-
-			print_sem(sem);
-			if(!question)printf("\n\n");
-			fflush(stdout);
-		}
-		if(!exhaustive)break;
-	}*/
+	printf("\n");
 
 	fprintf(stderr, "NOTE: %d readings. added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
 		num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);

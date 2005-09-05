@@ -360,26 +360,28 @@ void	print_mrs_var(struct mrs_var	*var)
 	}
 }
 
+char	mrs_line_breaks = ' ', mrs_tab = ' ';
+
 void	print_mrs(struct mrs	*mrs)
 {
 	int	i;
 
 	printf("[ LTOP: "); print_mrs_var(mrs->ltop);
-	printf("\nINDEX: "); print_mrs_var(mrs->index);
-	printf("\nXARG: "); print_mrs_var(mrs->xarg);
-	printf("\nRELS: <");
+	printf("%cINDEX: ", mrs_line_breaks); print_mrs_var(mrs->index);
+	printf("%cXARG: ", mrs_line_breaks); print_mrs_var(mrs->xarg);
+	printf("%cRELS: <", mrs_line_breaks);
 	for(i=0;i<mrs->nrels;i++)
 	{
 		struct mrs_ep	*ep = mrs->rels+i;
 		int				j;
-		printf("	[ %s LBL: ", ep->pred); print_mrs_var(ep->lbl);
+		printf("%c[ %s LBL: ", mrs_tab, ep->pred); print_mrs_var(ep->lbl);
 		for(j=0;j<ep->nargs;j++)
 			{ printf(" %s: ", ep->args[j].name); print_mrs_var(ep->args[j].value); }
 		printf(" ]");
-		if(i+1 != mrs->nrels)printf("\n");
+		if(i+1 != mrs->nrels)putchar(mrs_line_breaks);
 	}
 	printf(" >");
-	printf("\nHCONS: <");
+	printf("HCONS: <", mrs_line_breaks);
 	for(i=0;i<mrs->nhcons;i++)
 	{
 		struct mrs_hcons	*hc = mrs->hcons+i;
