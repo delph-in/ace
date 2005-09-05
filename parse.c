@@ -191,7 +191,7 @@ int	parse_line(char	*line)
 	char	*words[100];
 	int	nwords = 0;*/
 	int	nwords = 0, i, j;
-	char	**words;
+	char	**words, *p, *q;
 
 	timer();
 
@@ -210,7 +210,14 @@ int	parse_line(char	*line)
 		return -1;
 	}
 
-	strcpy(copy, line);
+	// copy 'line' to 'copy', deleting space preceding suffix-punctuation marks.
+	// XXX should probably also try to attach orphaned ()'s, ""'s, []'s
+	for(p=copy,q=line;*q;q++)
+		if(! (*q==' ' && (q[1]=='.' || q[1]==',' || q[1]=='?')))
+			*p++ = *q;
+	*p = 0;
+	//strcpy(copy, line);
+
 	// break up into words, normalize capitalization
 	/*w = p = copy;
 	while(*p)
