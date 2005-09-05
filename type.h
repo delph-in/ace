@@ -28,6 +28,7 @@ void	number_strings();
 int		load_types();
 void	wellform(struct dg	*d, char	*typename);
 void	print_glb_stats();
+struct type	*temporary_string_type(char *string);
 
 void recover_typehash(void *frozen);
 void *freeze_typehash();

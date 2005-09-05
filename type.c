@@ -165,6 +165,20 @@ void	add_descendent(struct type	*anc, int	dec)
 	anc->descendents[i] = dec;
 }
 
+struct type	*temporary_string_type(char *string)
+{
+	struct type	*ty = slab_alloc(sizeof(*ty));
+
+	// make a type representing 'name'
+	bzero(ty, sizeof(*ty));
+	ty->name = string;
+	ty->dg = atomic_dg("*top*");
+	ty->dg->type = ty->dg->xtype = ty;
+	ty->tnum = 999999;	// it doesn't matter that this is reused; it's a string type, anyway
+
+	return ty;
+}
+
 struct type	*add_string(char	*name)
 {
 	struct type	*t;

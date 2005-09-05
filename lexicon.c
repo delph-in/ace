@@ -84,7 +84,7 @@ struct lexeme	*proper_noun_lex(char	*name)
 	char			*p = name;
 	struct lexeme	*lex;
 	struct dg		*extra, *stem, *ss, *lk, *kr;
-	struct type	*ty = slab_alloc(sizeof(struct type));
+	struct type	*ty = temporary_string_type(name);
 	char			*ncopy;
 	int				nlen;
 
@@ -102,15 +102,7 @@ struct lexeme	*proper_noun_lex(char	*name)
 	strcpy(ncopy, name);
 	name = ncopy;
 
-	// make a type representing 'name'
-	bzero(ty, sizeof(*ty));
-	ty->name = name;
-	ty->dg = atomic_dg("*top*");
-	ty->dg->type = ty->dg->xtype = ty;
-	ty->tnum = 999999;
-
 	// make a skeletal dag for our lexeme
-
 	stem = atomic_dg(g_cons_type);
 	stem = add_dg_feature(stem, "FIRST", ty->dg);
 	stem = add_dg_feature(stem, "REST", atomic_dg(g_null_type));
@@ -156,7 +148,7 @@ struct lexeme	*unknown_lexeme(char	*name)
 	lex->word = name;
 	lex->stemlen = 1;
 	lex->stem = slab_alloc(sizeof(struct type*)*1);
-	lex->stem[0] = strings[0];
+	lex->stem[0] = temporary_string_type(name);
 	lex->lextype = extra->type;
 	lex->dg = extra;
 
