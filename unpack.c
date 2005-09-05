@@ -10,6 +10,9 @@
 #include "unpack.h"
 #include "mrs.h"
 
+#define	MAX_UNPACK_CHUNKS	1000
+extern int noldslabs;
+
 extern int debug_level, inhibit_pack;
 
 static inline char* edge_sign(struct edge *e)
@@ -557,6 +560,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 			//else printf("... wasn't root after unpacking\n");
 		}
 		else g_checkup++;	// mark that we need to look for subfailures before hypothesizing
+		if(noldslabs >= MAX_UNPACK_CHUNKS)break;
 	}
 	if(debug_level)printf("%d hyps / %d readings\n", nhyp, count);
 	return count;
