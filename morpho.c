@@ -188,12 +188,18 @@ int	lexical_lookup(int	nwords, char	**words)
 			stem[l+1] = 0;
 			if(stem[0])
 			{
-				int j;
-				le = unknown_lexical_edge(i, stem);
-				for(j=0;j<nrules;j++)
-					if(strstr(rules[j]->name, "punct_"))
-						add_agenda_lrule(le->from, rules[j]);
-				add_agenda(le);
+				for(j=0;j<charts[i].nedges;j++)
+					if(!strcasecmp(charts[i].edges[j]->form, stem))
+						break;
+				if(j<charts[i].nedges)
+				{
+					struct ochart_edge	*e = charts[i].edges[j];
+					le = unknown_lexical_edge(i, stem);
+					le->ninflr_routes = e->ninflr_routes;
+					le->inflr_routes = e->inflr_routes;
+					add_agenda(le);
+					add_inflrs(le);
+				}
 			}
 		}
 	}
@@ -501,6 +507,7 @@ int	invert_ipat_suffix(char	*pat, int patl, char	*rep, int repl, char	*form, int
 			if(!lclear){bzero(letters, 256);lclear=1;}
 			if(appropriate_letter(let, rep[len2]))
 			{
+				//printf("`%c' is appropriate for `%c'\n", let, rep[len2]);
 				if(letters[(int)rep[len2]] == 0)
 					letters[(int)rep[len2]] = let;
 				else if(let != letters[(int)rep[len2]])
@@ -521,7 +528,7 @@ int	invert_ipat_suffix(char	*pat, int patl, char	*rep, int repl, char	*form, int
 		stem += len+1;
 		if(*pat!='*') while(*pat)
 		{
-			if(*pat != '!')
+			if(*pat != '!' || !pat[1])
 				*stem++ = *pat++;
 			else
 			{

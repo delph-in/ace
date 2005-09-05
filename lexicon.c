@@ -134,7 +134,7 @@ struct lexeme	*unknown_lexeme(char	*name)
 {
 	struct lexeme	*lex;
 	struct dg		*extra, *stem, *ss, *lk, *kr;
-	char			*ncopy;
+	char			*ncopy = malloc(strlen(name)+3);
 	int				nlen;
 	extern struct type	**strings;
 
@@ -142,13 +142,15 @@ struct lexeme	*unknown_lexeme(char	*name)
 	extra = atomic_dg(UNKNOWN);
 	assert(extra);
 
+	sprintf(ncopy, "\"%s\"", name);
+
 	// define the lexeme
 	lex = slab_alloc(sizeof(struct lexeme));
 	bzero(lex, sizeof(*lex));
 	lex->word = name;
 	lex->stemlen = 1;
 	lex->stem = slab_alloc(sizeof(struct type*)*1);
-	lex->stem[0] = temporary_string_type(name);
+	lex->stem[0] = temporary_string_type(ncopy);
 	lex->lextype = extra->type;
 	lex->dg = extra;
 

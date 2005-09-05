@@ -304,17 +304,25 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			else
 			{
 				int i;
-				e->ninflr_routes = 0;
-				e->inflr_routes = slab_alloc(sizeof(struct inflr_route)*b->ninflr_routes);
-				for(i=0;i<b->ninflr_routes;i++)
+				if(b->ninflr_routes==-1)
 				{
-					struct inflr_route *r = b->inflr_routes+i;
-					if(r->len && r->rules[0]==e->rule->rnum)
+					e->ninflr_routes = -1;
+					e->inflr_routes = 0;
+				}
+				else
+				{
+					e->ninflr_routes = 0;
+					e->inflr_routes = slab_alloc(sizeof(struct inflr_route)*b->ninflr_routes);
+					for(i=0;i<b->ninflr_routes;i++)
 					{
-						e->ninflr_routes++;
-						e->inflr_routes[e->ninflr_routes-1].len = r->len-1;
-						e->inflr_routes[e->ninflr_routes-1].rules = slab_alloc(sizeof(int)*(r->len-1));
-						memcpy(e->inflr_routes[e->ninflr_routes-1].rules, r->rules+1, sizeof(int)*(r->len-1));
+						struct inflr_route *r = b->inflr_routes+i;
+						if(r->len && r->rules[0]==e->rule->rnum)
+						{
+							e->ninflr_routes++;
+							e->inflr_routes[e->ninflr_routes-1].len = r->len-1;
+							e->inflr_routes[e->ninflr_routes-1].rules = slab_alloc(sizeof(int)*(r->len-1));
+							memcpy(e->inflr_routes[e->ninflr_routes-1].rules, r->rules+1, sizeof(int)*(r->len-1));
+						}
 					}
 				}
 				//printf("realloc %d routes down to %d\n", b->ninflr_routes, e->ninflr_routes);
