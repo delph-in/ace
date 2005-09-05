@@ -167,6 +167,7 @@ int	main(int	argc, char	*argv[])
 		else if(num_results>0)success++;
 		else if(num_results==0)fail++;
 		if(num_results>=0)count++;
+		fflush(stderr);
 	}
 	gettimeofday(&tv2, 0);
 	restore_stderr();

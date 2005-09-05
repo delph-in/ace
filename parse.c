@@ -147,6 +147,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	}
 	num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
 	if(num_parses && !inhibit_results)printf("\n");
+	fflush(stdout);
 
 	fprintf(stderr, "NOTE: %d readings, added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
 		num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
