@@ -61,7 +61,7 @@ struct path	make_path(int count, ...)
 
 	va_start(va, count);
 	p.count = count;
-	p.fnums = malloc(sizeof(short)*count);
+	p.fnums = malloc(sizeof(int)*count);
 	for(i=0;i<count;i++)
 		p.fnums[i] = lookup_fname(va_arg(va, char*));
 	va_end(va);
