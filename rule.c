@@ -353,9 +353,9 @@ void	install_rule_name(struct dg	*dg, char *name)
 	static int	rnamef = -1;
 	struct dg	*rnamedg;
 
-	if(rnamef==-1)rnamef = lookup_fname("RULE-NAME");
+	if(rnamef==-1)rnamef = lookup_fname("RNAME");
 	rnamedg = dg_hop(dg, rnamef);
-	if(rnamedg)
+	if(!rnamedg)
 	{
 		dg->xtype->dg = add_dg_hop(dg->xtype->dg, rnamef, rnamedg);
 		//printf("added rule name `%s' to rule type `%s'\n", rnamedg->xtype->name, dg->xtype->name);

@@ -99,7 +99,10 @@ void	output_lui_chart(char	*words[])
 				//if(e->id == 1155)esave = e;
 				if(e->rule)
 				{
-					fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, j, i, e->rule->name, e->rule->name);
+					struct dg *rn = dg_hop(e->rule->dg, lookup_fname("RNAME"));
+					char *symb = rn?strdup(rn->xtype->name):e->rule->name;
+					if(rn) { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
+					fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, j, i, symb, e->rule->name);
 					for(l=0;l<e->have;l++)
 						fprintf(lui_write, " %d", e->daughters[l]->id);
 					fprintf(lui_write, "]");
