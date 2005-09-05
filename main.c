@@ -38,7 +38,7 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "hvpPlXg:G:m:qtRM:e1"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvpPlXg:G:m:qtRM:e1n:"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
@@ -50,6 +50,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'q':	question = 1;			break;
 		case	'X':	exhaustive = 0;			break;
 		case	'1':	best_only = 1;			break;
+		case	'n':	best_only = atoi(optarg);	break;
 		case	'l':	lui_mode = 1;			break;
 		case	'p':	inhibit_pack = 1;		break;
 		case	'R':	inhibit_results = 1;		break;
