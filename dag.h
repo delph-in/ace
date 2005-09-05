@@ -2,6 +2,7 @@
 #define	_DAG_H
 
 #include	<stdio.h>
+#include	<assert.h>
 #include	"type.h"
 
 #define	UNIFY_PATHS
@@ -114,6 +115,8 @@ static inline	void	*slab_alloc(int	len)
 	extern void	*last, *slab;
 	extern int	slabu, currslabsize;
 	extern void	next_slab();
+
+	assert(len>=0);
 
 	// align these special cases
 	/*if(len==32)

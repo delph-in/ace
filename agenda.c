@@ -142,14 +142,28 @@ void	allow_edge_inflr_route(struct edge	*e, int nrules, int *rules)
 	e->inflr_routes[e->ninflr_routes-1].rules = rules;
 }
 
+void sanity_check_agenda(int length)
+{
+	struct task *t1;
+	struct queue	*lag = &agenda[LEX_PRIO];
+
+	for(t1=lag->start;t1;t1=t1->next)
+	{
+		printf("#%d: %p `%s' from %d to %d\n", t1->edge->id,  t1, t1->edge->lex->word, t1->edge->from, t1->edge->to);
+		assert(! (t1->edge->from<0 || t1->edge->to<0 || t1->edge->from>length || t1->edge->to>length));
+	}
+	printf("passed sanity\n");
+}
+
 int	reduce_chart(int	length, char **words)
 {
 	extern int debug_level;
 	struct task	*t1, *t2;
 	struct queue	*lag = &agenda[LEX_PRIO];
-	char		cover[length];
+	char		cover[1024];
 	int		i;
 
+	//sanity_check_agenda(length);
 	bzero(cover, length);
 	for(t1=lag->start;t1;t1=t1->next)
 	{
@@ -177,6 +191,7 @@ int	reduce_chart(int	length, char **words)
 			for(i=t1->edge->from;i<t1->edge->to;i++)
 			{
 				//printf("%s provides %d\n", t1->edge->lex->word, i);
+				//printf("`%s' from %d to %d\n", t1->edge->lex->word, t1->edge->from, t1->edge->to);
 				cover[i] = 1;
 			}
 		}

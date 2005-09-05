@@ -174,7 +174,7 @@ struct type	*temporary_string_type(char *string)
 	ty->name = string;
 	ty->dg = atomic_dg("*top*");
 	ty->dg->type = ty->dg->xtype = ty;
-	ty->tnum = 999999;	// it doesn't matter that this is reused; it's a string type, anyway
+	ty->tnum = -1;	// it doesn't matter that this is reused; it's a string type, anyway
 
 	return ty;
 }
