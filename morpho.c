@@ -178,8 +178,23 @@ int	lexical_lookup(int	nwords, char	**words)
 	{
 		if(cover[i] == 0)
 		{
-			struct edge *le = unknown_lexical_edge(i, words[i]);
-			add_agenda(le);
+			char	*stem = freeze_string(words[i]);
+			int		l;
+			struct edge *le;
+			while(stem[0]=='"' || stem[0]=='\'' || stem[0]=='[' || stem[0]=='(')stem++;
+			l = strlen(stem)-1;
+			while(stem[l]=='"' || stem[l]=='\'' || stem[l]==']' || stem[l]==')' || stem[l]=='?' || stem[l]=='!' || stem[l]==',' || stem[l]=='.')
+				l--;
+			stem[l+1] = 0;
+			if(stem[0])
+			{
+				int j;
+				le = unknown_lexical_edge(i, stem);
+				for(j=0;j<nrules;j++)
+					if(strstr(rules[j]->name, "punct_"))
+						add_agenda_lrule(le->from, rules[j]);
+				add_agenda(le);
+			}
 		}
 	}
 #endif
