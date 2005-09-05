@@ -213,9 +213,8 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 
 struct mrs	*extract_mrs(struct dg	*root)
 {
-	static int savef[4] = {-1,-1,-1,-1};
-	struct dg	*cont = walk_dg(root, savef, "SYNSEM", "LOCAL", "CONT", NULL);
-	assert(cont || !"extract_mrs: no SYNSEM.LOCAL.CONT!\n");
+	struct dg	*cont = dg_path(root, extract_mrs_path);
+	assert(cont || !"extract_mrs: no semantics in given dag!\n");
 	return cont_to_mrs(cont);
 }
 

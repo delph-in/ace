@@ -6,7 +6,7 @@
 #include	"dag.h"
 #include	"conf.h"
 
-struct path	lex_stem_path, lex_rels_path, rule_rels_path;
+struct path	lex_stem_path, lex_rels_path, rule_rels_path, extract_mrs_path;
 char		*semarg_type;
 char		*g_cons_type;
 char		*g_list_type;
@@ -93,6 +93,7 @@ int	load_conf()
 
 	lex_rels_path = make_path(4, "SYNSEM", "LOCAL", "CONT", "RELS");
 	rule_rels_path = make_path(2, "C-CONT", "RELS");
+	extract_mrs_path = make_path(3, "SYNSEM", "LOCAL", "CONT");
 
 	//printf("lex_stem_path: "); print_path(lex_stem_path); printf("\n");
 	//printf("lex_rels_path: "); print_path(lex_rels_path); printf("\n");
