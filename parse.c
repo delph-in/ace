@@ -12,6 +12,7 @@
 
 extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trace, used_total, pused_total;
 extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only;
+extern float timer();
 
 static int	parse_process_edge(struct edge	*e)
 {
@@ -96,6 +97,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 {
 	int		i, count;
 	int		num_parses = 0, num_entries;
+	float	t_setup, t_forest, t_unpack;
 	struct dg	*root;
 	struct dg	*sem;
 	struct edge	*edge;
@@ -115,9 +117,13 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	alarm(10);	// XXX make this commandline configurable, and apply it to unpacking too
 
+	t_setup = timer();
+
 	// do the actual parsing
 	while( !cancel_parse && (edge = next_agenda(0)) )
 		if(parse_process_edge(edge))break;
+
+	t_forest = timer();
 
 	alarm(0);
 
@@ -149,14 +155,27 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	if(num_parses && !inhibit_results)printf("\n");
 	fflush(stdout);
 
+	t_unpack = timer();
+
 	fprintf(stderr, "NOTE: %d readings, added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
 		num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
 	print_slab_stats();
 	if(lui_mode)
-		output_lui_trees(cells+chart_size-1, sentence, best_only);
+	{
+		if(num_parses)
+			output_lui_trees(cells+chart_size-1, sentence, best_only);
+		else output_lui_chart(words);
+	}
 
 	used_total += used_edges;
 	pused_total += pused_edges;
+
+	{
+		static FILE	*f = 0;
+		if(!f)f = fopen("/tmp/times", "w");
+		fprintf(f, "%d	%d	%f	%f	%f	%s\n", nwords, num_parses, t_setup, t_forest, t_unpack, sentence);
+		fflush(f);
+	}
 
 	return num_parses;
 }
@@ -173,6 +192,8 @@ int	parse_line(char	*line)
 	int	nwords = 0;*/
 	int	nwords = 0, i, j;
 	char	**words;
+
+	timer();
 
 	current_sentence = "(preparing)";
 	while(line[0] && line[strlen(line)-1] == '\n')line[strlen(line)-1] = 0;
