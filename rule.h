@@ -7,7 +7,7 @@ struct rule
 	struct dg	*dg;		// full form of the dag
 	struct dg	*packdg;	// packing-restricted form of the dag
 	struct dg	*gpackdg;	// generation-packing-restricted form of the dag
-	struct irule	*inflr;
+	struct orule	*orth;
 	int				rnum:16;
 	unsigned int	ndaughters:4;
 	int				lexical:4;

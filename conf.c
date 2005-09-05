@@ -94,8 +94,4 @@ int	load_conf()
 	lex_rels_path = make_path(4, "SYNSEM", "LOCAL", "CONT", "RELS");
 	rule_rels_path = make_path(2, "C-CONT", "RELS");
 	extract_mrs_path = make_path(3, "SYNSEM", "LOCAL", "CONT");
-
-	//printf("lex_stem_path: "); print_path(lex_stem_path); printf("\n");
-	//printf("lex_rels_path: "); print_path(lex_rels_path); printf("\n");
-	//printf("rule_rels_path: "); print_path(rule_rels_path); printf("\n");
 }

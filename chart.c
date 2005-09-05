@@ -267,7 +267,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 
 	if(!a->have && !a->used){a->used = 1;used_edges++;}
 	if(!b->used){b->used=1;pused_edges++;}
-	if(b->lex && a->rule->inflr)
+	if(b->lex && a->rule->orth)
 	{
 		//printf("promoted lexeme %s to word %s via rule %s\n", b->dg->xtype->name, u->xtype->name, a->rule->name);
 	}
@@ -296,50 +296,50 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		e->lex = b->lex;
 		if(g_mode == PARSING)
 		{
-			if(!e->rule->inflr)
+			if(!e->rule->orth)
 			{
-				e->ninflr_routes = b->ninflr_routes;
-				e->inflr_routes = b->inflr_routes;
+				e->north_routes = b->north_routes;
+				e->orth_routes = b->orth_routes;
 			}
 			else
 			{
 				int i;
-				if(b->ninflr_routes==-1)
+				if(b->north_routes==-1)
 				{
-					e->ninflr_routes = -1;
-					e->inflr_routes = 0;
+					e->north_routes = -1;
+					e->orth_routes = 0;
 				}
 				else
 				{
-					e->ninflr_routes = 0;
-					e->inflr_routes = slab_alloc(sizeof(struct inflr_route)*b->ninflr_routes);
-					for(i=0;i<b->ninflr_routes;i++)
+					e->north_routes = 0;
+					e->orth_routes = slab_alloc(sizeof(struct orth_route)*b->north_routes);
+					for(i=0;i<b->north_routes;i++)
 					{
-						struct inflr_route *r = b->inflr_routes+i;
+						struct orth_route *r = b->orth_routes+i;
 						if(r->len && r->rules[0]==e->rule->rnum)
 						{
-							e->ninflr_routes++;
-							e->inflr_routes[e->ninflr_routes-1].len = r->len-1;
-							e->inflr_routes[e->ninflr_routes-1].rules = slab_alloc(sizeof(int)*(r->len-1));
-							memcpy(e->inflr_routes[e->ninflr_routes-1].rules, r->rules+1, sizeof(int)*(r->len-1));
+							e->north_routes++;
+							e->orth_routes[e->north_routes-1].len = r->len-1;
+							e->orth_routes[e->north_routes-1].rules = slab_alloc(sizeof(int)*(r->len-1));
+							memcpy(e->orth_routes[e->north_routes-1].rules, r->rules+1, sizeof(int)*(r->len-1));
 						}
 					}
 				}
-				//printf("realloc %d routes down to %d\n", b->ninflr_routes, e->ninflr_routes);
-				//e->inflr_routes = slab_realloc(e->inflr_routes, sizeof(struct inflr_route)*b->ninflr_routes, sizeof(struct inflr_route)*e->ninflr_routes);
+				//printf("realloc %d routes down to %d\n", b->north_routes, e->north_routes);
+				//e->orth_routes = slab_realloc(e->orth_routes, sizeof(struct orth_route)*b->north_routes, sizeof(struct orth_route)*e->north_routes);
 			}
 		}
 		else // (g_mode == GENERATING)
 		{
-			e->ninflr_routes = 0;
-			e->inflr_routes = 0;
+			e->north_routes = 0;
+			e->orth_routes = 0;
 		}
 	}
 	else
 	{
 		e->lex = 0;
-		e->ninflr_routes = 0;
-		e->inflr_routes = 0;
+		e->north_routes = 0;
+		e->orth_routes = 0;
 	}
 
 	e->ep_span = a->ep_span | b->ep_span;
@@ -503,38 +503,38 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(a->have==-1)return 0;	// ghosted hyperactive edge -- got kicked out of the chart for a latent cycle
 	if(b->have==-1)return 0;	// ghosted hyperpassive edge -- got hicked out of the chart for a latent cycle
 
-//	if(b->lex && b->ninflr_routes==-1 && a->need==1)return 0;	// unknown-word edges may not undergo unaries
+//	if(b->lex && b->north_routes==-1 && a->need==1)return 0;	// unknown-word edges may not undergo unaries
 
 	//printf("FR: [%d-%d] + [%d-%d]?\n", a->from, a->to, b->from, b->to);
 	//printf("    <%d/%d> + <%d/%d>\n", a->have, a->need, b->have, b->need);
 	//printf("    %s   + %s\n", a->dg->xtype->name, b->dg->xtype->name);
 
-	if(trace>1)printf("[%8.8X #%d [lex %d infl %p] + %8.8X #%d [lex %p]] rule %s?\n",
-		0/*a->ep_span*/, a->id, a->rule->lexical, a->rule->inflr, 0/*b->ep_span*/, b->id, b->lex, a->rule->name);
+	if(trace>1)printf("[%8.8X #%d [lex %d orth %p] + %8.8X #%d [lex %p]] rule %s?\n",
+		0/*a->ep_span*/, a->id, a->rule->lexical, a->rule->orth, 0/*b->ep_span*/, b->id, b->lex, a->rule->name);
 
 	if(a->rule->lexical)
 	{
 		if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
-		// if 'a' is inflectional, make sure it's the right one
-		if(a->rule->inflr && g_mode == PARSING && b->ninflr_routes != -1)
+		// if 'a' is orthographemic, make sure it's the right one
+		if(a->rule->orth && g_mode == PARSING && b->north_routes != -1)
 		{
 			// look at each route 'b' allows and see if this is the first rule on it
-			for(i=0;i<b->ninflr_routes;i++)
+			for(i=0;i<b->north_routes;i++)
 			{
-				struct inflr_route *r = b->inflr_routes+i;
+				struct orth_route *r = b->orth_routes+i;
 				if(r->len && r->rules[0] == a->rule->rnum)
 					break;
 			}
-			if(i==b->ninflr_routes)return 0;
-			//printf(" #%d admits rule %s as a next inflection\n", b->id, a->rule->name);
+			if(i==b->north_routes)return 0;
+			//printf(" #%d admits rule %s as a next orthographemic\n", b->id, a->rule->name);
 		}
 	}
 	else if(b->lex && g_mode == PARSING)
 	{
-		// 'b' is lexical but 'a' is a syntax rule; see if 'b' might be done with its inflection
-		for(i=0;i<b->ninflr_routes;i++)
-			if(b->inflr_routes[i].len == 0)break;
-		if(i==b->ninflr_routes)return 0;
+		// 'b' is lexical but 'a' is a syntax rule; see if 'b' might be done with its orthographemics
+		for(i=0;i<b->north_routes;i++)
+			if(b->orth_routes[i].len == 0)break;
+		if(i==b->north_routes)return 0;
 	}
 
 	if(a->rtl)arg = a->need - a->have - 1;
@@ -635,12 +635,12 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
 #endif
 
-	if(!res && a->rule->inflr)
+	if(!res && a->rule->orth)
 	{
 		// check whether orthographemic component accepts
 		// XXX this is sooo slow.
 		char *sub = show_orth_leaves(b), *foo;
-		foo = inflect(a->rule->inflr, sub);
+		foo = inflect(a->rule->orth, sub);
 		free(sub);
 		if(!foo)res = -1;
 	}
@@ -693,10 +693,10 @@ char	*show_orth_leaves(struct edge	*e)
 	if(e->have==1)
 	{
 		sub = show_orth_leaves(e->daughters[0]);
-		if(e->rule->inflr)
+		if(e->rule->orth)
 		{
-			//printf("applying inflr `%s' to `%s'\n", e->rule->name, sub);
-			ret = inflect(e->rule->inflr, sub);
+			//printf("applying orth rule `%s' to `%s'\n", e->rule->name, sub);
+			ret = inflect(e->rule->orth, sub);
 			free(sub);
 			return strdup(ret);	// higher-up show_orth_leaves() might want to free what we return... blah.
 		}

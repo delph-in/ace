@@ -132,14 +132,14 @@ void add_agenda_lrule(int x, struct rule *rule)
 	add_agenda(epsilon_edge(rule, x, 0, 0));
 }
 
-void	allow_edge_inflr_route(struct edge	*e, int nrules, int *rules)
+void	allow_edge_orth_route(struct edge	*e, int nrules, int *rules)
 {
-	e->ninflr_routes++;
-	e->inflr_routes = slab_realloc(e->inflr_routes,
-		sizeof(struct inflr_route)*(e->ninflr_routes-1),
-		sizeof(struct inflr_route)*e->ninflr_routes);
-	e->inflr_routes[e->ninflr_routes-1].len = nrules;
-	e->inflr_routes[e->ninflr_routes-1].rules = rules;
+	e->north_routes++;
+	e->orth_routes = slab_realloc(e->orth_routes,
+		sizeof(struct orth_route)*(e->north_routes-1),
+		sizeof(struct orth_route)*e->north_routes);
+	e->orth_routes[e->north_routes-1].len = nrules;
+	e->orth_routes[e->north_routes-1].rules = rules;
 }
 
 void sanity_check_agenda(int length)

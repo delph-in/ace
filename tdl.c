@@ -35,7 +35,7 @@ struct tdl_line
 {
 	int	processed;
 	char	*lhs, *rhs;
-	char	*idef;
+	char	*odef;
 	char	*status, *filename;
 	int		lnum;
 };
@@ -53,7 +53,7 @@ int	constrain_type(char	*name, struct dg	*dg);
 
 int	enable_out_of_order = 0;
 
-void	add_tdlline(char	*lhs, char	*rhs, char	*idef, int	lnum, char	*path)
+void	add_tdlline(char	*lhs, char	*rhs, char	*odef, int	lnum, char	*path)
 {
 	if(!tdlstatus)
 	{
@@ -85,11 +85,11 @@ void	add_tdlline(char	*lhs, char	*rhs, char	*idef, int	lnum, char	*path)
 	tdl->rhs = strdup(rhs);
 	tdl->filename = path;
 	tdl->status = tdlstatus;
-	tdl->idef = (*idef)?strdup(idef):0;
+	tdl->odef = (*odef)?strdup(odef):0;
 	tdl->lnum = lnum;
 }
 
-char	*g_inflr_def;
+char	*g_orth_def;
 
 int	process_comments(char	*line, int	in_comment)
 {
@@ -198,7 +198,7 @@ int	load_tdl(char	*path)
 	FILE	*f = fopen(path, "r");
 	char	buffer[10240], *lhs, *rhs, *end;
 	char	line[10240], *lp;
-	char	idef[10240], doing[256];
+	char	odef[10240], doing[256];
 	int	in_comment = 0;
 	int	lnum = 0;
 	char	*tdlstatuses = "grammar";
@@ -224,7 +224,7 @@ int	load_tdl(char	*path)
 	//ntdllines = 0;
 
 	path = strdup(path);	// make our own copy so we can put it in tdlline records without duplicating further
-	*idef = 0;
+	*odef = 0;
 	while(fgets(line, 10239, f))
 	{
 		if(line[0]==0)break;
@@ -237,7 +237,7 @@ int	load_tdl(char	*path)
 		if(line[0]=='%')
 		{
 			if(line[1]=='(')setup_morpho(line+1);
-			else strcpy(idef, line+1);
+			else strcpy(odef, line+1);
 			continue;
 		}
 
@@ -263,7 +263,7 @@ int	load_tdl(char	*path)
 		if(lhs[0]==':')
 		{
 			if(process_colon_command(path, lhs))return -1;
-			*buffer = *idef = 0;
+			*buffer = *odef = 0;
 			continue;
 		}
 		end = strstr(lhs, ":=");
@@ -271,7 +271,7 @@ int	load_tdl(char	*path)
 		if(!end)
 		{
 			fprintf(stderr, "tdl: `%s' malformed input string, does not contain ':=' or ':<'\n", buffer);
-			*buffer = *idef = 0;
+			*buffer = *odef = 0;
 			continue;
 		}
 		*end = 0;
@@ -282,14 +282,14 @@ int	load_tdl(char	*path)
 		if(*lhs==0 || *rhs==0)
 		{
 			fprintf(stderr, "tdl: `%s := %s' malformed input string, degenerate statement\n", lhs, rhs);
-			*buffer = *idef = 0;
+			*buffer = *odef = 0;
 			continue;
 		}
 
 		//printf("tdl input: `%s'  -->  `%s'\n", lhs, rhs);
-		add_tdlline(lhs, rhs, idef, lnum, path);
+		add_tdlline(lhs, rhs, odef, lnum, path);
 		*buffer = 0;
-		*idef = 0;
+		*odef = 0;
 	}
 	fclose(f);
 	return 0;
@@ -303,8 +303,8 @@ void	free_tdl()
 	{
 		free(tdllines[i].lhs);
 		free(tdllines[i].rhs);
-		if(tdllines[i].idef)
-			free(tdllines[i].idef);
+		if(tdllines[i].odef)
+			free(tdllines[i].odef);
 	}
 	ntdllines = 0;
 	if(tdllines)free(tdllines);
@@ -323,7 +323,7 @@ int	process_tdl_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	
 		if(strcmp(status, tdllines[i].status))continue;
 		if(tdllines[i].processed)continue;
 		tdllines[i].processed = 1;
-		g_inflr_def = tdllines[i].idef;
+		g_orth_def = tdllines[i].odef;
 		if(callback(tdllines[i].lhs, tdllines[i].rhs, ref))
 		{
 			fprintf(stderr, "tdl: top-level error occured near %s:%d\n", tdllines[i].filename, tdllines[i].lnum);
@@ -957,7 +957,7 @@ int	iterate_tdl_lex(char	*path)
 }
 
 int	g_loaded = 0;
-extern int	ntypes, nlexemes, nrules, nirules, nroots, glb_type_count, debug_level, nfnames, nstrings;
+extern int	ntypes, nlexemes, nrules, norules, nroots, glb_type_count, debug_level, nfnames, nstrings;
 
 void run_task(char *task, int (*worker)())
 {
@@ -1006,17 +1006,17 @@ int	load_grammar(char *toptdl, char *vpm, char *mem)
 
 	if(load_types())exit(-1);
 	if(load_rules())exit(-1);
-	if(load_roots())exit(-1);
-	if(load_inflr())exit(-1);
+	if(load_lrules())exit(-1);
 	if(load_lexicon())exit(-1);
+	if(load_roots())exit(-1);
 	if(load_labels())exit(-1);
 	free_tdl();
 
 	number_strings();
 
 	if(debug_level)
-		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d irules, %d roots, %d strings, %d features\n",
-				ntypes, glb_type_count, nlexemes, nrules, nirules, nroots, nstrings, nfnames);
+		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d orules, %d roots, %d strings, %d features\n",
+				ntypes, glb_type_count, nlexemes, nrules, norules, nroots, nstrings, nfnames);
 
 	// extra cool stuff
 	if(vpm)load_vpm(vpm);

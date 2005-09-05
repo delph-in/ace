@@ -160,8 +160,8 @@ struct lexeme	*unknown_lexeme(char	*name)
 struct edge	*unknown_lexical_edge(int	i, char	*word)
 {
 	struct edge *e = lexical_edge(unknown_lexeme(word), i, 1, 0);
-	e->ninflr_routes = -1;
-	e->inflr_routes = 0;
+	e->north_routes = -1;
+	e->orth_routes = 0;
 	return e;
 }
 #else

@@ -1,51 +1,33 @@
 TODO:
 
-make STEM actually be updated by ortho rules; apparently some grammars depend on it.
+loading:
+	- record Version.lisp contents
+	- build and freeze ppdfa into grammar file
+	- auto set / load deleted daughters / packing restrictor feature sets
+	- freeze rules.conf into grammar file
+
+unicode support for preprocessor and morphology
+
+optimize lexicon storage; maybe use provided lexdb schema
 
 try to prove/analyze interesting things at grammar compile time
+	- auto pick quickcheck paths
+		- make quickcheck used for packing ignore packing restrictor
 	- e.g. the INFLECTD is monotonic, '-' becomes '+'
 		- this would help rule out applying inflectional rules like non3sg_fin_verb when 3sg_fin_verb is on the orth-agenda
 		- might be lots of other such features we could find
 	- auto pick packing restrictor
-	- auto pick quickcheck paths
-		- make quickcheck used for packing ignore packing restrictor
-	- auto set / load deleted daughters / packing restrictor feature sets
 
-rename inflr to ortho
-	- there are many infl-rules that aren't orthographemic,
-		and the "inflr" machinery in the code only applies to orthographemics
+make STEM actually be updated by ortho rules; apparently some grammars depend on it.
 
 generalize rule filter
 	| rule filter is the only source of unrestricted dag information when parsing with packing.
 	| can provide useful local information about when unpacking will fail
 	+ combine() needs to check all packed edges, not just representative
-		- BUT this only works if combine() only is called after all packing into b has occurred
-		- i.e. enforce proper bottom-up parsing order?
-		+ temporarily we have no rule filter at all.  generation suffers.
-			+ countered by not packing PUNCT, either in gen or parse
-				- so we get less packing, but we don't hypothesize stupid things
-	+ also, make decompose_edge() check rule filter
+		- BUT this doesn't work if new rules are allowed to pack in after combine() has been tried
 
-unicode support for preprocessor and morphology
-
-deprecate or freeze rules.conf into a grammar file
 deprecate old mrs output
-
-fix proper noun support (I believe the new morphology system broke it)
-	- also for generation
 
 better max-ent hash keys
 
 record ersatzing
-
-pack active edges?
-	- makes hyperactive difficult
-	- figure out a way to pack and do hyper?
-		- that would make hyperpassive worthwhile too...
-		- unfortunately seems impossible.
-
-(considered)
-+ pick cleverly between dg1 and dg2 as target in unify1
-+ optimize lexicon storage -- probably get down by several times in size
-+ key vs. head driven = "KEY-ARG" inside rule daughters
-- smarter ordering of agenda

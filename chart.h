@@ -26,12 +26,12 @@ struct edge
 	struct dg	*ha_dg, *ha_par;
 	struct edge	*hex;	// what edge did we try to combine with on hyperactive excursion?
 
-	int	ninflr_routes;
-	struct inflr_route
+	int	north_routes;
+	struct orth_route
 	{
 		int len;
 		int *rules;
-	}	*inflr_routes;
+	}	*orth_routes;
 
 	struct unpack_info *unpack;
 

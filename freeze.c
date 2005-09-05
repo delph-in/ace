@@ -25,11 +25,11 @@ void	*freeze_rule_filter();
 void	recover_rule_filter(void *rf);
 
 // copy all grammar objects to flat blocks
-extern int	ntypes, nlexemes, nrules, nirules, nroots, nfnames, nstrings;
+extern int	ntypes, nlexemes, nrules, norules, nroots, nfnames, nstrings;
 extern struct type	**types;
 extern struct rule	**rules;
 extern struct lexeme	**lexemes;
-extern struct irule	**irules;
+extern struct orule	**orules;
 extern struct dg	**roots;
 extern struct type	**strings;
 extern struct type	*strtype;
@@ -44,11 +44,11 @@ extern unsigned int generation;
 struct grammar
 {
 	char		message[128];
-	int		ntypes, nlexemes, nrules, nirules, nroots, nfnames, nstrings;
+	int		ntypes, nlexemes, nrules, norules, nroots, nfnames, nstrings;
 	struct type	**types;
 	struct rule	**rules;
 	struct lexeme	**lexemes;
-	struct irule	**irules;
+	struct orule	**orules;
 	struct dg	**roots;
 	struct type	**strings;
 	char		**fnames;
@@ -110,31 +110,31 @@ struct rule	*freeze_rule(struct rule	*rin)
 	return rout;
 }
 
-struct irule	*freeze_irule(struct irule	*irin)
+struct orule	*freeze_orule(struct orule	*orin)
 {
-	struct irule	*irout = slab_alloc(sizeof(struct irule));
+	struct orule	*orout = slab_alloc(sizeof(struct orule));
 	int		i;
 
-	*irout = *irin;
-	irout->rule->inflr = irout;
-	irout->sub = slab_alloc(sizeof(struct irule_sub) * irout->nsub);
-	for(i=0;i<irout->nsub;i++)
+	*orout = *orin;
+	orout->rule->orth = orout;
+	orout->sub = slab_alloc(sizeof(struct orule_sub) * orout->nsub);
+	for(i=0;i<orout->nsub;i++)
 	{
-		struct irule_sub *subi = irin->sub+i, *subo = irout->sub+i;
+		struct orule_sub *subi = orin->sub+i, *subo = orout->sub+i;
 		subo->pat = freeze_string(subi->pat);
 		subo->rep = freeze_string(subi->rep);
 		subo->patl = subi->patl;
 		subo->repl = subi->repl;
 	}
 
-	irout->irregs = slab_alloc(sizeof(struct irreg) * irout->nirregs);
-	for(i=0;i<irout->nirregs;i++)
+	orout->irregs = slab_alloc(sizeof(struct irreg) * orout->nirregs);
+	for(i=0;i<orout->nirregs;i++)
 	{
-		irout->irregs[i].stem = freeze_string(irin->irregs[i].stem);
-		irout->irregs[i].form = freeze_string(irin->irregs[i].form);
+		orout->irregs[i].stem = freeze_string(orin->irregs[i].stem);
+		orout->irregs[i].form = freeze_string(orin->irregs[i].form);
 	}
 
-	return irout;
+	return orout;
 }
 
 static struct type	*FT(struct type	*t)
@@ -285,10 +285,10 @@ int	freeze_grammar()
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 
 	for(i=0;i<nrules;i++)rules[i] = freeze_rule(rules[i]);
-	for(i=0;i<nirules;i++)
-		irules[i]->rule = rules[irules[i]->rule->rnum];
+	for(i=0;i<norules;i++)
+		orules[i]->rule = rules[orules[i]->rule->rnum];
 
-	for(i=0;i<nirules;i++)irules[i] = freeze_irule(irules[i]);
+	for(i=0;i<norules;i++)orules[i] = freeze_orule(orules[i]);
 	freezer_note("rules");
 
 	//printf("\n"); print_rule("sing_noun_infl_rule");
@@ -326,14 +326,14 @@ int	freeze_grammar()
 
 	G->ntypes = ntypes;
 	G->nrules = nrules;
-	G->nirules = nirules;
+	G->norules = norules;
 	G->nlexemes = nlexemes;
 	G->nroots = nroots;
 	G->nfnames = nfnames;
 	G->nstrings = nstrings;
 	G->types = slab_alloc(sizeof(void*) * G->ntypes);	memcpy(G->types, types, sizeof(void*) * G->ntypes);
 	G->rules = slab_alloc(sizeof(void*) * G->nrules);	memcpy(G->rules, rules, sizeof(void*) * G->nrules);
-	G->irules = slab_alloc(sizeof(void*) * G->nirules);	memcpy(G->irules, irules, sizeof(void*) * G->nirules);
+	G->orules = slab_alloc(sizeof(void*) * G->norules);	memcpy(G->orules, orules, sizeof(void*) * G->norules);
 	G->lexemes = slab_alloc(sizeof(void*) * G->nlexemes);	memcpy(G->lexemes, lexemes, sizeof(void*) * G->nlexemes);
 	G->roots = slab_alloc(sizeof(void*) * G->nroots);	memcpy(G->roots, roots, sizeof(void*) * G->nroots);
 	G->fnames = slab_alloc(sizeof(void*) * G->nfnames);	memcpy(G->fnames, fnames, sizeof(char*) * G->nfnames);
@@ -377,7 +377,7 @@ static int	load_freeze()
 	ntypes = G->ntypes;
 	nlexemes = G->nlexemes;
 	nrules = G->nrules;
-	nirules = G->nirules;
+	norules = G->norules;
 	nroots = G->nroots;
 	nfnames = G->nfnames;
 	nstrings = G->nstrings;
@@ -385,7 +385,7 @@ static int	load_freeze()
 	types = G->types;
 	lexemes = G->lexemes;
 	rules = G->rules;
-	irules = G->irules;
+	orules = G->orules;
 	roots = G->roots;
 	strings = G->strings;
 	strtype = G->strtype;
@@ -413,8 +413,8 @@ static int	load_freeze()
 	}
 
 	if(debug_level)
-		fprintf(stderr, "NOTE: %d types, %d lexemes, %d rules, %d irules, %d roots, %d strings, %d features\n",
-				ntypes, nlexemes, nrules, nirules, nroots, nstrings, nfnames);
+		fprintf(stderr, "NOTE: %d types, %d lexemes, %d rules, %d orules, %d roots, %d strings, %d features\n",
+				ntypes, nlexemes, nrules, norules, nroots, nstrings, nfnames);
 
 	//printf("root symbol:\n"); print_dg(roots[0]); printf("\n\n");
 	/*if(mlock(strings[0], sizeof(struct type)*nstrings))

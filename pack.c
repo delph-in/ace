@@ -31,24 +31,24 @@ struct dg	*restrict_copy_dg(struct dg	*dg, int for_generation)
 	return copy;
 }
 
-int identical_inflr_routes(struct edge *a, struct edge *b)
+int identical_orth_routes(struct edge *a, struct edge *b)
 {
-	struct inflr_route *ra, *rb;
-	int					i, n = a->ninflr_routes;
+	struct orth_route *ra, *rb;
+	int					i, n = a->north_routes;
 
-	if(a->ninflr_routes != b->ninflr_routes)return 0;
-	if(a->ninflr_routes == -1)return 1;
-	int inflr_route_cmp(const struct inflr_route *ra, const struct inflr_route *rb)
+	if(a->north_routes != b->north_routes)return 0;
+	if(a->north_routes == -1)return 1;
+	int orth_route_cmp(const struct orth_route *ra, const struct orth_route *rb)
 	{
 		int i;
 		if(ra->len != rb->len)return ra->len-rb->len;
 		return memcmp(ra->rules, rb->rules, sizeof(int)*ra->len);
 	}
 	// XXX should keep these sorted ahead of time
-	qsort(a->inflr_routes, n, sizeof(struct inflr_route), (int(*)(const void*, const void*))inflr_route_cmp);
-	qsort(b->inflr_routes, n, sizeof(struct inflr_route), (int(*)(const void*, const void*))inflr_route_cmp);
+	qsort(a->orth_routes, n, sizeof(struct orth_route), (int(*)(const void*, const void*))orth_route_cmp);
+	qsort(b->orth_routes, n, sizeof(struct orth_route), (int(*)(const void*, const void*))orth_route_cmp);
 	for(i=0;i<n;i++)
-		if(inflr_route_cmp(a->inflr_routes+i, b->inflr_routes+i))
+		if(orth_route_cmp(a->orth_routes+i, b->orth_routes+i))
 			return 0;
 	return 1;
 }
@@ -90,7 +90,7 @@ int	pack_edge(struct edge	*edge)
 #endif
 
 			PACKBUG("would like to pack #%d `%s' and #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
-			if(!identical_inflr_routes(h, edge))continue;
+			if(!identical_orth_routes(h, edge))continue;
 
 			if(!edge->dg)
 				if(recall_hyper(edge))return 0;

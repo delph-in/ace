@@ -323,7 +323,7 @@ void	agenda_rules(int	count)
 		for(j=0;j<nrules;j++)
 		{
 			rtl = rules[j]->rtl;
-			if(!rules[j]->inflr)	// i-rules are added separately
+			if(!rules[j]->orth)	// i-rules are added separately
 			{
 				if(	(!rtl && i+rules[j]->ndaughters <= count) ||
 					(rtl && i-rules[j]->ndaughters >= 0)	)
@@ -378,7 +378,7 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 	r->packdg = restrict_copy_dg(dg, 0);
 	r->gpackdg = restrict_copy_dg(dg, 1);
 	r->ndaughters = num;
-	r->inflr = 0;
+	r->orth = 0;
 	r->lexical = 0;
 	r->rnum = nrules-1;
 	r->rtl = rule_is_rtl(r);
@@ -425,7 +425,7 @@ int	study_lrule(char	*name, struct dg	*dg)
 {
 	int	num = 0;
 	struct dg	*p;
-	extern char	*g_inflr_def;
+	extern char	*g_orth_def;
 
 	wellform(dg, name);
 
@@ -438,7 +438,7 @@ int	study_lrule(char	*name, struct dg	*dg)
 	add_rule(name, dg, num);
 	rules[nrules-1]->lexical = 1;
 
-	if(g_inflr_def)add_inflr(rules[nrules-1], g_inflr_def);
+	if(g_orth_def)add_orule(rules[nrules-1], g_orth_def);
 	return 0;
 }
 

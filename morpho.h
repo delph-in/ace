@@ -1,12 +1,12 @@
 #ifndef	_MORPHO_H
 #define	_MORPHO_H
 
-struct irule
+struct orule
 {
 	struct rule	*rule;
-	enum { ir_suffix = 1, ir_prefix = 2 } type;
+	enum { or_suffix = 1, or_prefix = 2 } type;
 	int		nsub;
-	struct irule_sub
+	struct orule_sub
 	{
 		char		*pat;
 		int			patl;
@@ -21,13 +21,13 @@ struct irule
 	}	*irregs;
 };
 
-extern int		nirules;
-extern struct irule	**irules;
+extern int		norules;
+extern struct orule	**orules;
 
 int		lexical_lookup(int	nwords, char	**words);
-char	*inflect(struct irule	*ir, char	*str);
+char	*inflect(struct orule	*or, char	*str);
 void	setup_morpho(char	*line);
-int		load_inflr();
-void	add_inflr(struct rule	*rule, char	*def);
+int		load_lrules();
+void	add_orule(struct rule	*rule, char	*def);
 
 #endif

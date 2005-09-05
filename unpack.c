@@ -170,9 +170,9 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypothesis *
 		if(dec->edge->lex)
 		{
 			assert(dec->edge->have==1);	// lexical rules are unary
-			if(dec->edge->rule->inflr)
+			if(dec->edge->rule->orth)
 			{
-				h->string = inflect(dec->edge->rule->inflr, rhs[0]->string);
+				h->string = inflect(dec->edge->rule->orth, rhs[0]->string);
 				if(!h->string)h->string = "(failed to inflect)";	// packing might make us try something silly here
 			}
 			else h->string = rhs[0]->string;
