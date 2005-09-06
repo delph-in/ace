@@ -152,7 +152,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		return 1;
 	}
 	num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
-	if(num_parses && !inhibit_results)printf("\n");
+	if(num_parses && !inhibit_results)printf("\n\n");
 	fflush(stdout);
 
 	t_unpack = timer();

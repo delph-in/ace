@@ -1,5 +1,7 @@
 TODO:
 
+grab "spanning-only-rules" from PET common.set!!
+
 loading:
 	- build and freeze ppdfa into grammar file
 	- auto set / load deleted daughters / packing restrictor feature sets
