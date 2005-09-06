@@ -15,7 +15,7 @@
 
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;
-char	*load_grammar_path = 0, *load_mem_path = 0;
+char	*load_grammar_path = 0;
 char	*sentence_path = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 
@@ -38,12 +38,11 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "hvpPlXg:G:m:qtRM:e1n:"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvpPlXg:G:m:qtRe1n:"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
-		case	'M':	load_mem_path = optarg;		break;
 		case	'G':	save_grammar_path = optarg;	break;
 		case	'P':	export_parts = 1;		break;
 		case	'm':	connect_to_master(optarg);	break;
@@ -78,20 +77,13 @@ int	main(int	argc, char	*argv[])
 	init_glb_cache();
 
 	if(!save_grammar_path)
-	{
 		load_frozen_grammar(load_grammar_path);
-		load_conf();		// XXX freeze
-	}
 	else
 	{
-		char *vpm_path = 0;
 		if(!load_grammar_path)
-		{
-			load_grammar_path = "../erg/english.tdl";
-			vpm_path = "../erg/mrs.vpm";
-		}
+			load_grammar_path = "../erg/ace/config.tdl";
 		gettimeofday(&tv1, 0);
-		load_grammar(load_grammar_path, vpm_path, load_mem_path);
+		load_grammar(load_grammar_path);
 		gettimeofday(&tv2, 0);
 		tv2.tv_sec -= tv1.tv_sec;
 		tv2.tv_usec -= tv1.tv_usec;

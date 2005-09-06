@@ -381,7 +381,7 @@ void	print_mrs(struct mrs	*mrs)
 		if(i+1 != mrs->nrels)putchar(mrs_line_breaks);
 	}
 	printf(" >");
-	printf("HCONS: <", mrs_line_breaks);
+	printf("%cHCONS: <", mrs_line_breaks);
 	for(i=0;i<mrs->nhcons;i++)
 	{
 		struct mrs_hcons	*hc = mrs->hcons+i;

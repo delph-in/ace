@@ -1,10 +1,10 @@
 TODO:
 
 loading:
-	- record Version.lisp contents
 	- build and freeze ppdfa into grammar file
 	- auto set / load deleted daughters / packing restrictor feature sets
 	- freeze rules.conf into grammar file
+	- simpleform big lexicon
 
 unicode support for preprocessor and morphology
 
@@ -13,6 +13,7 @@ optimize lexicon storage; maybe use provided lexdb schema
 try to prove/analyze interesting things at grammar compile time
 	- auto pick quickcheck paths
 		- make quickcheck used for packing ignore packing restrictor
+		- and the shameless hack(tm) in qc.c with 0-1-lists
 	- e.g. the INFLECTD is monotonic, '-' becomes '+'
 		- this would help rule out applying inflectional rules like non3sg_fin_verb when 3sg_fin_verb is on the orth-agenda
 		- might be lots of other such features we could find

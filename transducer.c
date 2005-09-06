@@ -22,6 +22,7 @@ int	preprocess_line(char	*line, int	*nwordsP, char	***wordsP)
 #endif
 	}
 	//printf("line `%s'\n", line);
+	strcat(line, " ");
 
 	wptr = 0;
 	for(j=0;line[j];j++)

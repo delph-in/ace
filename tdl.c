@@ -1,3 +1,4 @@
+#define		_GNU_SOURCE
 #include	<stdio.h>
 #include	<string.h>
 #include	<stdlib.h>
@@ -12,6 +13,8 @@
 int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	load_tdl(char	*path);
+
+char	*grammar_version = 0;
 
 void show_task_name(char *task)
 {
@@ -52,6 +55,38 @@ struct dg	*dagify(char	*str, struct type	*building_type);
 int	constrain_type(char	*name, struct dg	*dg);
 
 int	enable_out_of_order = 0;
+
+char	*get_conf(char	*lhs)
+{
+	char	key[256];
+	sprintf(key, "%s %s", "config", lhs);
+	long	had = (long)hash_find(tdl_hash, key);
+
+	if(had != 0)return tdllines[had-1].rhs;
+	else return 0;
+}
+
+char	*get_conf_unq(char	*lhs)
+{
+	char	*q = get_conf(lhs);
+	if(q && *q=='"')
+	{
+		char	*p = strdup(q);
+		p++;
+		if(strrchr(p, '"'))
+			*strrchr(p, '"') = 0;
+		return p;
+	}
+	else return q;
+}
+
+static char	*get_conf_path(char	*dir, char	*lhs)
+{
+	char	*u = get_conf_unq(lhs), *p = 0;
+	if(!u)return 0;
+	asprintf(&p, "%s/%s", dir, u);
+	return p;
+}
 
 void	add_tdlline(char	*lhs, char	*rhs, char	*odef, int	lnum, char	*path)
 {
@@ -216,6 +251,7 @@ int	load_tdl(char	*path)
 	if(tdlstatus && !strcmp(tdlstatus, "lex-entry"))tdlstatuses = "lexical entries";
 	if(tdlstatus && !strcmp(tdlstatus, "root"))tdlstatuses = "roots";
 	if(tdlstatus && !strcmp(tdlstatus, "parse-node"))tdlstatuses = "tree labels";
+	if(tdlstatus && !strcmp(tdlstatus, "config"))tdlstatuses = "configuration";
 
 	sprintf(doing, "loading %s", tdlstatuses); show_task_name(doing);
 	printf("from `%s'\n", path);
@@ -981,14 +1017,36 @@ void run_task(char *task, int (*worker)())
 	}
 }
 
+void	load_version(char *path)
+{
+	FILE	*f = fopen(path, "r");
+	char	record[1024], *p = record, in = 0;
+
+	while(!feof(f))
+	{
+		*p = fgetc(f);
+		if(*p=='"')in = !in;
+		else if(in)p++;
+	}
+	*p = 0;
+	if(!record[0])grammar_version = "unknown";
+	else
+	{
+		grammar_version = strdup(record);
+		show_task_name("grammar version");
+		printf("%s\n", grammar_version);
+	}
+}
+
 char	*grammar_dir;
 
-int	load_grammar(char *toptdl, char *vpm, char *mem)
+int	load_grammar_top(char *toptdl)
 {
-	clear_slab();
-	init_fnames();
-
-	tdl_hash = hash_new("tdl type definitions");
+	if(!toptdl)
+	{
+		fprintf(stderr, "ERROR: config file did not specify grammar-top tdl file\n");
+		exit(-1);
+	}
 
 	grammar_dir = strdup(toptdl);
 	if(strrchr(grammar_dir, '/') > grammar_dir)
@@ -1002,35 +1060,50 @@ int	load_grammar(char *toptdl, char *vpm, char *mem)
 	tdlstatus = 0;
 #endif
 
-	load_conf();		// XXX freeze
-
 	if(load_types())exit(-1);
 	if(load_rules())exit(-1);
 	if(load_lrules())exit(-1);
 	if(load_lexicon())exit(-1);
 	if(load_roots())exit(-1);
 	if(load_labels())exit(-1);
-	free_tdl();
 
 	number_strings();
 
 	if(debug_level)
 		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d orules, %d roots, %d strings, %d features\n",
 				ntypes, glb_type_count, nlexemes, nrules, norules, nroots, nstrings, nfnames);
+	return 0;
+}
 
-	// extra cool stuff
-	if(vpm)load_vpm(vpm);
+int load_grammar(char	*path)
+{
+	char	*confdir;
+
+	confdir = strdup(path);
+	if(strrchr(confdir, '/') > confdir)
+		*strrchr(confdir, '/') = 0;
+	else confdir = ".";
+
+	clear_slab();
+	tdl_hash = hash_new("tdl type definitions");
+	tdlstatus = "config";
+	load_tdl(path);
+	tdlstatus = 0;
+
+	init_fnames();
+	load_conf();
+	load_version(get_conf_path(confdir, "version"));
+	load_expedients(get_conf_path(confdir, "generation-ignore-signs"));	// before grammar loading so the semindex knows how to build
+	load_grammar_top(get_conf_path(confdir, "grammar-top"));
+	load_vpm(get_conf_path(confdir, "variable-property-mapping"));
+	load_mem(get_conf_path(confdir, "maxent-model"));
+
 	g_loaded = 1;	// make unify shut up about failures
 	setup_rule_filter();
 	g_loaded = 0;
 
-	if(mem && 0 != load_mem(mem))
-	{
-		fprintf(stderr, "couldn't load max-ent model `%s'\n", mem);
-		return -1;
-	}
-
-	// make sure none of the grammar is auto-freed when parse is over
+	// make sure none of the grammar is auto-freed when the first parse is over
+	free_tdl();
 	commit_slab();
 	return 0;
 }

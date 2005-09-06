@@ -93,9 +93,11 @@ static char	*parse_word(char	**P)
 
 int load_mem(char *fname)
 {
-	FILE	*f = fopen(fname, "r");
+	FILE	*f;
 	char	line[1024];
 
+	if(!fname)return 0;
+	f = fopen(fname, "r");
 	if(!f) { perror(fname); return -1; }
 
 #define DEBUG(fmt, ...)

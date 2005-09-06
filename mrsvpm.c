@@ -71,12 +71,14 @@ struct vpm	*invert_vpm(struct vpm	*v)
 
 int	load_vpm(char	*path)
 {
-	FILE	*f = fopen(path, "r");
+	FILE	*f;
 	char	line[1024], *args[32], *p;
 	int		nargs, iop, i, lnum=0;
 	struct vpm_context *ctx;
 	struct vpm			vpm = {.lefth = 0, .righth = 0, .ncontexts = 0, .contexts = 0};
 
+	if(!path)return 0;
+	f = fopen(path, "r");
 	if(!f)
 	{
 		perror(path);
@@ -231,8 +233,8 @@ void	*freeze_vpm()
 			fr->direction = r->direction;
 			fr->left = slab_alloc(sizeof(char*)*ctx->nleft);
 			fr->right = slab_alloc(sizeof(char*)*ctx->nright);
-			fr->leftprops = slab_alloc(sizeof(char)*ctx->nleft);
-			fr->rightprops = slab_alloc(sizeof(char)*ctx->nright);
+			fr->leftprops = slab_alloc(sizeof(int)*ctx->nleft);	// make it big to keep alignment right
+			fr->rightprops = slab_alloc(sizeof(int)*ctx->nright);
 			for(k=0;k<ctx->nleft;k++)
 			{
 				fr->left[k] = freeze_string(r->left[k]);

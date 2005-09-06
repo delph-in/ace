@@ -9,6 +9,7 @@
 #include	"chart.h"
 #include	"morpho.h"
 #include	"conf.h"
+#include	"freeze.h"
 
 struct lexeme	**lexemes;
 int		nlexemes;
@@ -486,35 +487,40 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 	printf("\n");*/
 }
 
+int		nexpedients = 0;
+char	**expedients = 0;
+
+int	load_expedients(char	*path)
+{
+	FILE	*f = 0;
+	if(!path)return 0;
+	f = fopen(path, "r");
+	if(f)
+	{
+		char	exp[1024];
+		while(fgets(exp, 1023, f) != NULL)
+		{
+			if(*exp && exp[strlen(exp)-1]=='\n')
+				exp[strlen(exp)-1] = 0;
+			nexpedients++;
+			expedients = realloc(expedients, sizeof(char*)*(nexpedients+1));
+			expedients[nexpedients-1] = strdup(exp);
+			expedients[nexpedients] = 0;
+		}
+		fclose(f);
+		return 0;
+	}
+	else
+	{
+		fprintf(stderr, "unable to load temporary expedients from `%s'\n", path);
+		exit(-1);
+	}
+}
+
 int temporary_expedient(char *sign)
 {
 	int i;
-	static int nexpedients = -1;
-	static char **expedients = 0;
 
-	if(nexpedients == -1)
-	{
-		FILE	*f = 0;
-		char	fname[256];
-		extern char *grammar_dir;
-		sprintf(fname, "%s/ace/temporary-expedient", grammar_dir);
-		f = fopen(fname, "r");
-		nexpedients = 0;
-		if(f)
-		{
-			char	exp[1024];
-			while(fgets(exp, 1023, f) != NULL)
-			{
-				if(*exp && exp[strlen(exp)-1]=='\n')
-					exp[strlen(exp)-1] = 0;
-				nexpedients++;
-				expedients = realloc(expedients, sizeof(char*)*nexpedients);
-				expedients[nexpedients-1] = strdup(exp);
-			}
-			fclose(f);
-		}
-		else fprintf(stderr, "warning: unable to load %s\n", fname);
-	}
 	for(i=0;i<nexpedients;i++)
 		if(!strcmp(sign, expedients[i]))return 1;
 	return 0;

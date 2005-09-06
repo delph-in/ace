@@ -19,10 +19,14 @@ extern int		noldslabs, aoldslabs, currslabsize;
 
 extern int debug_level;
 
-void	recover_labels(void	*ls);
 void	*freeze_labels();
+void	recover_labels(void	*ls);
 void	*freeze_rule_filter();
 void	recover_rule_filter(void *rf);
+void	*freeze_conf();
+void	recover_conf(void	*vc);
+
+extern char	*grammar_version, *grammar_dir;
 
 // copy all grammar objects to flat blocks
 extern int	ntypes, nlexemes, nrules, norules, nroots, nfnames, nstrings;
@@ -62,6 +66,7 @@ struct grammar
 	void	*typehash;
 	void	*vpm;
 	void	*labels;
+	void	*conf;
 };
 
 extern void	*slab_alloc(int	len);
@@ -341,6 +346,7 @@ int	freeze_grammar()
 	G->typehash = freeze_typehash();
 	G->vpm = freeze_vpm();
 	G->labels = freeze_labels();
+	G->conf = freeze_conf();
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
@@ -351,7 +357,8 @@ int	freeze_grammar()
 	G->stochmodel = freeze_stochastic_model();
 	freezer_note("stochastic-model");
 	strcpy(G->message, "frozen grammar file\n");
-	strcat(G->message, "english resource grammar (erg)\n");
+	strcat(G->message, grammar_dir); strcat(G->message, "\n");
+	strcat(G->message, grammar_version); strcat(G->message, "\n");
 
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 
@@ -395,6 +402,7 @@ static int	load_freeze()
 
 	recover_rule_filter(G->rule_filter);
 	recover_typehash(G->typehash);
+	recover_conf(G->conf);
 	recover_labels(G->labels);
 	recover_vpm(G->vpm);
 	recover_semantic_index(G->semindex);
