@@ -343,6 +343,8 @@ struct mrs	*read_mrs(FILE	*f)
 	return mrs;
 }
 
+char	*marked;
+
 void	print_mrs_var(struct mrs_var	*var)
 {
 	if(!var) { printf("(null)"); return; }
@@ -350,6 +352,8 @@ void	print_mrs_var(struct mrs_var	*var)
 	else printf("%s%d", var->type, var->vnum);
 	//printf("%s.%d", var->name, var->vnum);
 	//if(var->is_const) printf("_K");
+	if(marked && marked[var->vnum])return;
+	marked[var->vnum] = 1;
 	if(var->nprops)
 	{
 		int	i;
@@ -365,6 +369,8 @@ char	mrs_line_breaks = ' ', mrs_tab = ' ';
 void	print_mrs(struct mrs	*mrs)
 {
 	int	i;
+
+	marked = calloc(sizeof(char), mrs->vlist.nvars);
 
 	printf("[ LTOP: "); print_mrs_var(mrs->ltop);
 	printf("%cINDEX: ", mrs_line_breaks); print_mrs_var(mrs->index);
@@ -393,6 +399,8 @@ void	print_mrs(struct mrs	*mrs)
 		print_mrs_var(hc->lo);
 	}
 	printf(" > ]\n");
+
+	free(marked); marked = 0;
 }
 
 // mrs testing
