@@ -1,10 +1,10 @@
-#DELPHIN_CFLAGS=-isystem /Users/sweaglesw/cdev/lingo/lkb/include
-#DELPHIN_LIBS=-L/Users/sweaglesw/cdev/lingo/lkb/lib/macos.ppc.32 -litsdb -lpvm3
+DELPHIN_CFLAGS=-isystem /Users/sweaglesw/cdev/lingo/lkb/include
+DELPHIN_LIBS=-L/Users/sweaglesw/cdev/lingo/lkb/lib/macos.ppc.32 -litsdb -lpvm3
 
 #GRAM=-DJACY
 GRAM=-DERG -DUNKNOWN=\"n_proper_le\" -DSLEX
 
-CPU=
+CPU=-DTSDB -mcpu=7400
 CC=gcc
 CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char ${GRAM} -falign-loops=32 -funroll-loops ${CPU}
 #CFLAGS=-g -pg -O2 -funsigned-char ${GRAM}

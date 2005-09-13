@@ -427,7 +427,7 @@ void	introduce_feature(int	label, int	type)
 	}
 }
 
-int reload_restrictors = 1;
+int reload_restrictors = 1, restrictor_size = 0;
 
 int	lookup_fname(char	*label)
 {
@@ -494,25 +494,24 @@ void print_restrictor(char *name, char *restr)
 
 void load_restrictors()
 {
-	extern char *trims[], *ppack[], *gpack[];
 	int		i;
+	extern int g_mode;
+	assert(g_mode == -1);
 
-	for(i=0;trims[i];i++)
-		lookup_fname(trims[i]);
-	for(i=0;ppack[i];i++)
-		lookup_fname(ppack[i]);
-	for(i=0;gpack[i];i++)
-		lookup_fname(gpack[i]);
+	if(deleted_daughters)free(deleted_daughters);
+	if(parsing_packing)free(parsing_packing);
+	if(generating_packing)free(generating_packing);
 	deleted_daughters = calloc(nfnames, 1);
 	parsing_packing = calloc(nfnames, 1);
 	generating_packing = calloc(nfnames, 1);
-	for(i=0;trims[i];i++)
-		deleted_daughters[lookup_fname(trims[i])] = 1;
-	for(i=0;ppack[i];i++)
-		parsing_packing[lookup_fname(ppack[i])] = 1;
-	for(i=0;gpack[i];i++)
-		generating_packing[lookup_fname(gpack[i])] = 1;
+	for(i=0;i<nfnames;i++)
+	{
+		deleted_daughters[i] = check_conf_list("deleted-daughters", fnames[i]);
+		parsing_packing[i] = check_conf_list("parsing-packing-restrictor", fnames[i]);
+		generating_packing[i] = check_conf_list("generation-packing-restrictor", fnames[i]);
+	}
 
+	restrictor_size = nfnames;
 	reload_restrictors = 0;
 }
 

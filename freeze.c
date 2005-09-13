@@ -209,6 +209,7 @@ void	*freeze_block(void	*src, int	len)
 	void	*dst;
 	int	alen = len;
 
+	if(!src && !len)return 0;
 	if(len%4)alen += 4-len%4;
 	dst = slab_alloc(alen);
 	memcpy(dst, src, len);

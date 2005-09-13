@@ -5,6 +5,7 @@
 
 #include	"dag.h"
 #include	"conf.h"
+#include	"rule.h"
 #include	"freeze.h"
 
 struct path	lex_stem_path, lex_rels_path, rule_rels_path, extract_mrs_path;
@@ -77,23 +78,6 @@ static struct path get_conf_path(char	*lhs)
 	return p;
 }
 
-char	*trims[] = {
-#ifdef	ERG
-						"HD-DTR", "NH-DTR",
-#else	// MATRIX
-						"HEAD-DTR", "NON-HEAD-DTR",
-#endif
-						"ARGS",	"LCONJ-DTR", "RCONJ-DTR",
-						"DTR", "DTR1", "DTR2", "DTRA", "DTRB", 0};
-
-#ifdef	JACY
-#define	STEM	"ORTH"
-#else
-#define	STEM	"STEM"
-#endif
-char	*ppack[] = {STEM, "RELS", "HCONS", "RNAME", 0};
-char	*gpack[] = {STEM, "RELS", "HCONS", "RNAME", "PUNCT", 0};
-
 struct conf
 {
 	char		*semarg_type;
@@ -105,6 +89,10 @@ struct conf
 	struct path	lex_rels_path;
 	struct path	rule_rels_path;
 	struct path	extract_mrs_path;
+
+	char	*deleted_daughters;
+	char	*parsing_packing;
+	char	*generating_packing;
 };
 
 struct path	freeze_path(struct path	p)
@@ -112,6 +100,9 @@ struct path	freeze_path(struct path	p)
 	p.fnums = freeze_block(p.fnums, sizeof(int)*p.count);
 	return p;
 }
+
+extern int reload_restrictors, restrictor_size, nfnames;
+extern char	*deleted_daughters, *parsing_packing, *generating_packing;
 
 void	*freeze_conf()
 {
@@ -125,6 +116,11 @@ void	*freeze_conf()
 	c->lex_rels_path = freeze_path(lex_rels_path);
 	c->rule_rels_path = freeze_path(rule_rels_path);
 	c->extract_mrs_path = freeze_path(extract_mrs_path);
+
+	c->deleted_daughters = freeze_block(deleted_daughters, restrictor_size);
+	c->parsing_packing = freeze_block(parsing_packing, restrictor_size);
+	c->generating_packing = freeze_block(generating_packing, restrictor_size);
+
 	return c;
 }
 
@@ -140,6 +136,11 @@ void	recover_conf(void	*vc)
 	lex_rels_path = c->lex_rels_path;
 	rule_rels_path = c->rule_rels_path;
 	extract_mrs_path = c->extract_mrs_path;
+
+	deleted_daughters = c->deleted_daughters;
+	parsing_packing = c->parsing_packing;
+	generating_packing = c->generating_packing;
+	reload_restrictors = (restrictor_size == nfnames);
 
 	//printf("types cons `%s' list `%s' null `%s' dlist `%s'\n", g_cons_type, g_list_type, g_null_type, g_diff_list_type);
 }
@@ -157,4 +158,26 @@ int	load_conf()
 	rule_rels_path = get_conf_path("rule-rels-path");
 	extract_mrs_path = get_conf_path("semantics-path");
 	recover_conf(freeze_conf());
+}
+
+int check_conf_list(char	*key, char	*word)
+{
+	char	*list = get_conf(key), *p;
+	if(!list)return 0;
+	list = strdup(list);
+	for(p=strtok(list, " \t\n");p;p=strtok(0, " \t\n"))
+		if(!strcasecmp(word,p))break;
+	free(list);
+	return p?1:0;
+}
+
+void	configure_rule(struct rule	*r)
+{
+	r->gen_ignore = 0;
+	if(temporary_expedient(r->name))r->gen_ignore = 1;
+	else add_semantic_index(r, r->dg, 1);
+
+	r->span_only = check_conf_list("spanning-only-rules", r->name);
+	r->frag_only = check_conf_list("fragment-only-rules", r->name);
+	r->pad = 0;
 }

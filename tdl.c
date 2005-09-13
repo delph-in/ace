@@ -1077,8 +1077,10 @@ int	load_grammar_top(char *toptdl)
 
 int load_grammar(char	*path)
 {
+	extern int g_mode;
 	char	*confdir;
 
+	g_mode = -1;
 	confdir = strdup(path);
 	if(strrchr(confdir, '/') > confdir)
 		*strrchr(confdir, '/') = 0;

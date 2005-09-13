@@ -1,16 +1,16 @@
 TODO:
 
-grab "spanning-only-rules" from PET common.set!!
+fix preprocessor to support \1 etc in rhs of ersatzes 
 
 loading:
 	- build and freeze ppdfa into grammar file
-	- auto set / load deleted daughters / packing restrictor feature sets
 	- freeze rules.conf into grammar file
 	- simpleform big lexicon
 
 unicode support for preprocessor and morphology
 
 optimize lexicon storage; maybe use provided lexdb schema
+maybe support lexdb
 
 try to prove/analyze interesting things at grammar compile time
 	- auto pick quickcheck paths
@@ -34,3 +34,9 @@ deprecate old mrs output
 better max-ent hash keys
 
 record ersatzing
+
+done:
++grab "spanning-only-rules" from PET common.set!!
+	27.2s, 26.8k without
+	25.5s, 23.2k with
+	24.5s, 22.2k no frag rules

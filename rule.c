@@ -383,9 +383,7 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 	r->rnum = nrules-1;
 	r->rtl = rule_is_rtl(r);
 
-	r->gen_ignore = 0;
-	if(temporary_expedient(r->name))r->gen_ignore = 1;
-	else add_semantic_index(r, dg, 1);
+	configure_rule(r);
 
 	//printf("rule %s [%d]:  ", name, num);
 	//print_dg(dg);

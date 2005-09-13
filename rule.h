@@ -12,7 +12,7 @@ struct rule
 	unsigned int	ndaughters:4;
 	int				lexical:4;
 	int				rtl:4;
-	int				gen_ignore:4;
+	int				gen_ignore:1, span_only:1, frag_only:1, pad:1;
 };
 
 #include	"dag.h"

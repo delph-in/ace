@@ -512,6 +512,12 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(trace>1)printf("[%8.8X #%d [lex %d orth %p] + %8.8X #%d [lex %p]] rule %s?\n",
 		0/*a->ep_span*/, a->id, a->rule->lexical, a->rule->orth, 0/*b->ep_span*/, b->id, b->lex, a->rule->name);
 
+	// don't allow span-only rules to finish on a non-span
+	if(g_mode == PARSING && a->have == a->need-1 && a->rule->span_only)
+		if(!( (a->from==0 || b->from==0) &&
+				(a->to==chart_size || b->to==chart_size) ))return 0;
+	if(a->rule->frag_only)return 0;	// XXX remove if we decide to accept fragments
+
 	if(a->rule->lexical)
 	{
 		if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
