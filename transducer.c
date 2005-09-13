@@ -16,10 +16,8 @@ int	preprocess_line(char	*line, int	*nwordsP, char	***wordsP)
 	for(i=0;i<npprules;i++)
 	{
 		if(pprules[i].type != rtReplace)continue;
-#ifndef JACY
 		if(process_string(line, out, pprules+i, 0))
 			strcpy(line, out);
-#endif
 	}
 	//printf("line `%s'\n", line);
 	strcat(line, " ");
@@ -34,11 +32,7 @@ int	preprocess_line(char	*line, int	*nwordsP, char	***wordsP)
 			{
 				nwords++;
 				words = realloc(words, sizeof(char*)*nwords);
-#ifndef	JACY
 				words[nwords-1] = process_word(wptr);
-#else
-				words[nwords-1] = strdup(wptr);
-#endif
 			}
 			wptr = 0;
 		}
@@ -63,8 +57,9 @@ static char	*process_word(char	*win)
 		state = dfa[state].trans[(int)*p++];
 	if(state!=-1 && *p==0 && dfa[state].accept!=-1)
 	{
-		i = dfa[state].accept;
-		return strdup(pprules[i].rep);
+		char	out[10240];
+		process_string(win, out, &pprules[dfa[state].accept], 1);
+		return strdup(out);
 	}
 	return strdup(win);
 }
@@ -82,7 +77,6 @@ static int	process_string(char	*str, char	*out, struct fspp_rule	*r, int	full)
 		p = str;
 		state = r->dfastart;
 		astate = -1;
-		ap = 0;
 		for(i=0;i<4;i++)sstart[i] = send[i] = 0;
 		while(state!=-1)
 		{
@@ -113,7 +107,12 @@ static int	process_string(char	*str, char	*out, struct fspp_rule	*r, int	full)
 						for(ap=sstart[i];ap<send[i];ap++)
 							*out++ = *ap;
 					}
-					else { fprintf(stderr, "backref %d: sstart %p, send %p\n", i+1, sstart[i], send[i]); exit(-1); }
+					else
+					{
+						fprintf(stderr, "backref %d: sstart %p [%s], send %p\n", i+1, sstart[i], sstart[i], send[i]);
+						fprintf(stderr, "pat `%s', rep `%s'\n", r->pat, r->rep);
+						exit(-1);
+					}
 					p++;
 				}
 				else *out++ = *p++;

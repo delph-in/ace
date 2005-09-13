@@ -1,13 +1,14 @@
 TODO:
 
-fix preprocessor to support \1 etc in rhs of ersatzes 
-
 loading:
 	- build and freeze ppdfa into grammar file
 	- freeze rules.conf into grammar file
 	- simpleform big lexicon
+	- load all the roots, config.tdl sets default used roots, commandline overrides
 
 unicode support for preprocessor and morphology
+
+part-of-speech tagger for unknown wordisms
 
 optimize lexicon storage; maybe use provided lexdb schema
 maybe support lexdb

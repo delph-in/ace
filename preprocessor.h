@@ -20,6 +20,7 @@ struct dfastate
 	// which nfa states are in it?
 	char	*set;
 	short	nns;
+	unsigned int hash;
 	// which vars do we start/stop saving?
 	char	start[6];
 	char	end[6];
