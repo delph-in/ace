@@ -27,21 +27,21 @@ void	*freeze_conf();
 void	recover_conf(void	*vc);
 void	*freeze_fspp();
 void	recover_fspp(void	*ptr);
+void	*freeze_instances();
+void	recover_instances(void	*ptr);
 
 extern char	*grammar_version, *grammar_dir;
 
 // copy all grammar objects to flat blocks
-extern int	ntypes, nlexemes, nrules, norules, nroots, nfnames, nstrings;
+extern int	ntypes, nlexemes, nrules, norules, ninstances, nfnames, nstrings;
 extern struct type	**types;
 extern struct rule	**rules;
 extern struct lexeme	**lexemes;
 extern struct orule	**orules;
-extern struct dg	**roots;
 extern struct type	**strings;
 extern struct type	*strtype;
 extern char		**fnames;
 extern int		*introduce;
-extern char		*rule_filter;
 extern char		*lgroups[256];
 extern char	**type_rftc, **type_rltc;
 
@@ -50,12 +50,11 @@ extern unsigned int generation;
 struct grammar
 {
 	char		message[128];
-	int		ntypes, nlexemes, nrules, norules, nroots, nfnames, nstrings;
+	int		ntypes, nlexemes, nrules, norules, nfnames, nstrings;
 	struct type	**types;
 	struct rule	**rules;
 	struct lexeme	**lexemes;
 	struct orule	**orules;
-	struct dg	**roots;
 	struct type	**strings;
 	char		**fnames;
 	char		*lgroups[256];
@@ -70,6 +69,7 @@ struct grammar
 	void	*labels;
 	void	*conf;
 	void	*fspp;
+	void	*instances;
 };
 
 extern void	*slab_alloc(int	len);
@@ -288,7 +288,6 @@ int	freeze_grammar()
 		for(j=0;j<lexemes[i]->stemlen;j++)
 			lexemes[i]->stem[j] = strings[lexemes[i]->stem[j]->tnum];
 	}
-	for(i=0;i<nroots;i++)patch_dg(roots[i]);
 	//fprintf(stderr, "patched.\n");
 
 	//printf("\n"); print_rule("sing_noun_infl_rule");
@@ -305,11 +304,8 @@ int	freeze_grammar()
 	for(i=0;i<nlexemes;i++)lexemes[i] = freeze_lexeme(lexemes[i]);
 	freezer_note("lex-info");
 
-	for(i=0;i<nroots;i++)roots[i] = copy_dg(roots[i]);
-
 	for(i=0;i<nfnames;i++)fnames[i] = freeze_string(fnames[i]);
 	introduce = freeze_block(introduce, sizeof(int) * nfnames);
-	//fprintf(stderr, "froze features and roots.\n");
 
 	for(i=0;i<256;i++)
 		if(lgroups[i])
@@ -337,14 +333,12 @@ int	freeze_grammar()
 	G->nrules = nrules;
 	G->norules = norules;
 	G->nlexemes = nlexemes;
-	G->nroots = nroots;
 	G->nfnames = nfnames;
 	G->nstrings = nstrings;
 	G->types = slab_alloc(sizeof(void*) * G->ntypes);	memcpy(G->types, types, sizeof(void*) * G->ntypes);
 	G->rules = slab_alloc(sizeof(void*) * G->nrules);	memcpy(G->rules, rules, sizeof(void*) * G->nrules);
 	G->orules = slab_alloc(sizeof(void*) * G->norules);	memcpy(G->orules, orules, sizeof(void*) * G->norules);
 	G->lexemes = slab_alloc(sizeof(void*) * G->nlexemes);	memcpy(G->lexemes, lexemes, sizeof(void*) * G->nlexemes);
-	G->roots = slab_alloc(sizeof(void*) * G->nroots);	memcpy(G->roots, roots, sizeof(void*) * G->nroots);
 	G->fnames = slab_alloc(sizeof(void*) * G->nfnames);	memcpy(G->fnames, fnames, sizeof(char*) * G->nfnames);
 	G->strings = slab_alloc(sizeof(void*) * G->nstrings);	memcpy(G->strings, strings, sizeof(void*) * G->nstrings);
 	G->typehash = freeze_typehash();
@@ -352,6 +346,7 @@ int	freeze_grammar()
 	G->labels = freeze_labels();
 	G->conf = freeze_conf();
 	G->fspp = freeze_fspp();
+	G->instances = freeze_instances();
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
@@ -390,7 +385,6 @@ static int	load_freeze()
 	nlexemes = G->nlexemes;
 	nrules = G->nrules;
 	norules = G->norules;
-	nroots = G->nroots;
 	nfnames = G->nfnames;
 	nstrings = G->nstrings;
 
@@ -398,7 +392,6 @@ static int	load_freeze()
 	lexemes = G->lexemes;
 	rules = G->rules;
 	orules = G->orules;
-	roots = G->roots;
 	strings = G->strings;
 	strtype = G->strtype;
 
@@ -408,6 +401,7 @@ static int	load_freeze()
 	recover_rule_filter(G->rule_filter);
 	recover_typehash(G->typehash);
 	recover_fspp(G->fspp);
+	recover_instances(G->instances);
 	recover_conf(G->conf);
 	recover_labels(G->labels);
 	recover_vpm(G->vpm);
@@ -427,10 +421,9 @@ static int	load_freeze()
 	}
 
 	if(debug_level)
-		fprintf(stderr, "NOTE: %d types, %d lexemes, %d rules, %d orules, %d roots, %d strings, %d features\n",
-				ntypes, nlexemes, nrules, norules, nroots, nstrings, nfnames);
+		fprintf(stderr, "NOTE: %d types, %d lexemes, %d rules, %d orules, %d instances, %d strings, %d features\n",
+				ntypes, nlexemes, nrules, norules, ninstances, nstrings, nfnames);
 
-	//printf("root symbol:\n"); print_dg(roots[0]); printf("\n\n");
 	/*if(mlock(strings[0], sizeof(struct type)*nstrings))
 		perror("unable to mlock strings");*/
 

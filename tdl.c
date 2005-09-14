@@ -90,15 +90,15 @@ static char	*get_conf_path(char	*dir, char	*lhs)
 
 void	add_tdlline(char	*lhs, char	*rhs, char	*odef, int	lnum, char	*path)
 {
-	if(!tdlstatus)
+	/*if(!tdlstatus)
 	{
 		fprintf(stderr, "error at %s:%d\n", path, lnum);
 		fprintf(stderr, "tdlstatus must be set before definitions\n");
 		exit(-1);
-	}
+	}*/
 
 	char	key[256];
-	sprintf(key, "%s %s", tdlstatus, lhs);
+	sprintf(key, "%s %s", tdlstatus?:"instance", lhs);
 	long	had = (long)hash_find(tdl_hash, key);
 	struct tdl_line	*tdl;
 
@@ -119,7 +119,7 @@ void	add_tdlline(char	*lhs, char	*rhs, char	*odef, int	lnum, char	*path)
 	tdl->processed = 0;
 	tdl->rhs = strdup(rhs);
 	tdl->filename = path;
-	tdl->status = tdlstatus;
+	tdl->status = tdlstatus?:"instance";
 	tdl->odef = (*odef)?strdup(odef):0;
 	tdl->lnum = lnum;
 }
@@ -205,11 +205,6 @@ int	process_colon_command(char	*parent, char	*cmd)
 			*p = 0;
 			sprintf(iname, "%s%s%s", dirpath, dirpath[0]?"/":"", what);
 			if(!strstr(what, ".tdl"))strcat(iname, ".tdl");
-			if(!tdlstatus && strstr(what, "root"))
-			{
-				fprintf(stderr, "WARNING: implicitly setting tdl status to `root'\n");
-				tdlstatus = "root";
-			}
 			if(!tdlstatus && strstr(what, "parse-nodes"))
 			{
 				fprintf(stderr, "WARNING: implicitly setting tdl status to `parse-node'\n");
@@ -236,7 +231,7 @@ int	load_tdl(char	*path)
 	char	odef[10240], doing[256];
 	int	in_comment = 0;
 	int	lnum = 0;
-	char	*tdlstatuses = "grammar";
+	char	*tdlstatuses = 0;
 
 	if(!f)
 	{
@@ -249,9 +244,10 @@ int	load_tdl(char	*path)
 	if(tdlstatus && !strcmp(tdlstatus, "rule"))tdlstatuses = "rules";
 	if(tdlstatus && !strcmp(tdlstatus, "lex-rule"))tdlstatuses = "lexical rules";
 	if(tdlstatus && !strcmp(tdlstatus, "lex-entry"))tdlstatuses = "lexical entries";
-	if(tdlstatus && !strcmp(tdlstatus, "root"))tdlstatuses = "roots";
 	if(tdlstatus && !strcmp(tdlstatus, "parse-node"))tdlstatuses = "tree labels";
 	if(tdlstatus && !strcmp(tdlstatus, "config"))tdlstatuses = "configuration";
+	if(tdlstatus && !strcmp(tdlstatus, "grammar"))tdlstatuses = "grammar";
+	if(!tdlstatuses)tdlstatuses = "instances";
 
 	sprintf(doing, "loading %s", tdlstatuses); show_task_name(doing);
 	printf("from `%s'\n", path);
@@ -345,7 +341,6 @@ void	free_tdl()
 	ntdllines = 0;
 	if(tdllines)free(tdllines);
 	tdllines = 0;
-	//tdlstatus = 0;
 }
 
 int	process_tdl_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	*ref), void	*ref)
@@ -977,14 +972,6 @@ int	iterate_tdl_dgs(char	*path, int	(*callback)(char	*rhs, struct dg	*dg))
 	return iterate_tdl(path, dagify_tdl_line, callback);
 }
 
-/*int	iterate_tdl_types(char	*path)
-{
-	enable_out_of_order = 1;
-
-	tdlstatus = "type";
-	return iterate_tdl(path, typify_tdl_line, 0);
-}*/
-
 int	iterate_tdl_lex(char	*path)
 {
 	enable_out_of_order = 0;
@@ -993,7 +980,7 @@ int	iterate_tdl_lex(char	*path)
 }
 
 int	g_loaded = 0;
-extern int	ntypes, nlexemes, nrules, norules, nroots, glb_type_count, debug_level, nfnames, nstrings;
+extern int	ntypes, nlexemes, nrules, norules, ninstances, glb_type_count, debug_level, nfnames, nstrings;
 
 void run_task(char *task, int (*worker)())
 {
@@ -1053,6 +1040,7 @@ int	load_grammar_top(char *toptdl)
 		*strrchr(grammar_dir, '/') = 0;
 	else grammar_dir = ".";
 
+	tdlstatus = "grammar";
 	load_tdl(toptdl);
 #ifdef SLEX
 	tdlstatus = "lex-entry";
@@ -1064,14 +1052,14 @@ int	load_grammar_top(char *toptdl)
 	if(load_rules())exit(-1);
 	if(load_lrules())exit(-1);
 	if(load_lexicon())exit(-1);
-	if(load_roots())exit(-1);
+	if(load_instances())exit(-1);
 	if(load_labels())exit(-1);
 
 	number_strings();
 
 	if(debug_level)
-		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d orules, %d roots, %d strings, %d features\n",
-				ntypes, glb_type_count, nlexemes, nrules, norules, nroots, nstrings, nfnames);
+		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d orules, %d instances, %d strings, %d features\n",
+				ntypes, glb_type_count, nlexemes, nrules, norules, ninstances, nstrings, nfnames);
 	return 0;
 }
 

@@ -1,22 +1,78 @@
 #include	<stdio.h>
 #include	<stdlib.h>
+#include	<string.h>
 
 #include	"tdl.h"
 #include	"dag.h"
 #include	"freeze.h"
+#include	"chart.h"
 
-int		nroots;
-struct dg	**roots;
+struct instance
+{
+	char		*name;
+	int			root_flag;
+	struct dg	*dg;
+}	*instances;
+int	ninstances;
+
+char	*use_roots = 0;
+
+struct instances
+{
+	struct instance	*instances;
+	int				ninstances;
+};
+
+void	*freeze_instances()
+{
+	struct instances	*in = slab_alloc(sizeof(struct instances));
+	int					i;
+	in->instances = slab_alloc(sizeof(struct instance)*ninstances);
+	in->ninstances = ninstances;
+	for(i=0;i<ninstances;i++)
+	{
+		in->instances[i].name = freeze_string(instances[i].name);
+		in->instances[i].root_flag = instances[i].root_flag;
+		in->instances[i].dg = freeze_dg(instances[i].dg);
+	}
+	return in;
+}
+
+void	recover_instances(void	*ptr)
+{
+	struct instances	*in = ptr;
+	instances = in->instances;
+	ninstances = in->ninstances;
+
+	if(use_roots)
+	{
+		int i;
+		char *p;
+		for(i=0;i<ninstances;i++)instances[i].root_flag = 0;
+		for(p=strtok(use_roots, " ");p;p=strtok(0, " "))
+		{
+			for(i=0;i<ninstances;i++)
+				if(!strcasecmp(p, instances[i].name))
+					break;
+			if(i<ninstances)instances[i].root_flag = (unsigned)-1;
+			else
+			{
+				fprintf(stderr, "roots: no such instance as `%s' available\n", p);
+				exit(-1);
+			}
+		}
+	}
+}
 
 extern int trace;
 
 int	is_root(struct dg	*dg)
 {
-	int		i, res;
+	int		i, res, flag = (g_mode == PARSING)?1:2;
 
-	for(i=0;i<nroots;i++)
+	for(i=0;i<ninstances;i++) if(instances[i].root_flag & flag)
 	{
-		res = unify_dg_tmp(dg, roots[i], -1);
+		res = unify_dg_tmp(dg, instances[i].dg, -1);
 		forget_tmp();
 		if(!res)
 			return 1;
@@ -27,25 +83,26 @@ int	is_root(struct dg	*dg)
 			unify_backtrace();
 		}
 #endif
-		//if(unify_dg(dg, roots[i], -1))	// yeah, yeah, this gets picked up by the slab free
-		//	return 1;
 	}
 	return 0;
 }
 
-int	study_roots(char	*lhs, struct dg	*dg)
+int	study_instance(char	*lhs, struct dg	*dg)
 {
-	nroots++;
-	roots = realloc(roots, sizeof(struct dg*) * nroots);
-	roots[nroots-1] = dg;
+	ninstances++;
+	instances = realloc(instances, sizeof(struct instance) * ninstances);
+	instances[ninstances-1].name = strdup(lhs);
+	instances[ninstances-1].root_flag = 1*check_conf_list("parsing-roots", lhs)
+									  | 2*check_conf_list("generation-roots", lhs);
+	instances[ninstances-1].dg = dg;
 	return 0;
 }
 
-int	load_roots()
+int	load_instances()
 {
-	if(process_tdl_dgs_status("root", study_roots))
+	if(process_tdl_dgs_status("instance", study_instance))
 	{
-		fprintf(stderr, "roots: unable to load, bailing out.\n");
+		fprintf(stderr, "instances: unable to load, bailing out.\n");
 		exit(-1);
 	}
 	return 0;
