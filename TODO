@@ -1,7 +1,14 @@
 TODO:
 
-loading:
-	- move rftc and type_rftc into `filters' freezer slot
+loading: use an instance to define configuration paths?
+
+have fun with `dot': rf, rftc, type heirarchy
+
+part-of-speech tagger for unknown wordisms
+
+deprecate old mrs output
+
+record ersatzing
 
 unicode support for preprocessor and morphology
 
@@ -15,8 +22,6 @@ use RFTC and RLTC to better advantage
 
 maybe precompute full charts above every lexical type?
 	- experiment and find out how much time is spent at each span length! very interesting.
-
-part-of-speech tagger for unknown wordisms
 
 optimize lexicon storage; maybe use provided lexdb schema
 	- make wellform-ing of lexemes faster, really should be able to just unify top level type in
@@ -42,11 +47,7 @@ generalize rule filter
 
 make unpacking support 2+-ary
 
-deprecate old mrs output
-
 better max-ent hash keys
-
-record ersatzing
 
 done:
 +grab "spanning-only-rules" from PET common.set!!

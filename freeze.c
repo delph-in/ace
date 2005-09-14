@@ -43,7 +43,6 @@ extern struct type	*strtype;
 extern char		**fnames;
 extern int		*introduce;
 extern char		*lgroups[256];
-extern char	**type_rftc, **type_rltc;
 
 extern unsigned int generation;
 
@@ -59,7 +58,6 @@ struct grammar
 	char		**fnames;
 	char		*lgroups[256];
 	struct type	*strtype;
-	char		**type_rftc, **type_rltc;
 	int		*introduce;
 	void	*rule_filter;
 	void	*semindex;
@@ -219,25 +217,6 @@ void	*freeze_block(void	*src, int	len)
 	return dst;
 }
 
-char	**freeze_rftc(char	**ptr)
-{
-	if(!ptr)return 0;
-	char	**ref = slab_alloc(nrules * sizeof(char*));
-	int	len;
-	char	*data;
-	int	i;
-
-	len = (nrules*ntypes + 3) & ~3;
-	data = slab_alloc(len);
-	for(i=0;i<nrules;i++)
-	{
-		ref[i] = data;
-		data += ntypes;
-		memcpy(ref[i], ptr[i], ntypes);
-	}
-	return ref;
-}
-
 static void freezer_note(char *designation)
 {
 	extern int slab_usage();
@@ -312,8 +291,6 @@ int	freeze_grammar()
 			lgroups[i] = freeze_block(lgroups[i], 256);
 
 	G->rule_filter = freeze_rule_filter();
-	type_rftc = freeze_rftc(type_rftc);
-	type_rltc = freeze_rftc(type_rltc);
 	freezer_note("\n miscellaneous");
 
 	// freeze lexicon dgs -- this isn't done earlier so that the
@@ -350,8 +327,6 @@ int	freeze_grammar()
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
-	G->type_rftc = type_rftc;
-	G->type_rltc = type_rltc;
 	G->semindex = freeze_semantic_index();
 	freezer_note("sem-index");
 	G->stochmodel = freeze_stochastic_model();
@@ -394,9 +369,6 @@ static int	load_freeze()
 	orules = G->orules;
 	strings = G->strings;
 	strtype = G->strtype;
-
-	type_rftc = G->type_rftc;	// XXX these belong inside the rulefilter freezer
-	type_rltc = G->type_rltc;
 
 	recover_rule_filter(G->rule_filter);
 	recover_typehash(G->typehash);

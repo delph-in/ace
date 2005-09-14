@@ -91,88 +91,6 @@ int	rule_is_rtl(struct rule	*r)
 	}
 }
 
-char	*setup_rule_filter1(int pack)
-{
-	int	i, j, k;
-	struct rule	*m, *d;
-	struct dg	*mdg;
-	int	yes = 0, count = 0, res;
-	char	byte, *rule_filter;
-
-	show_task_name("rule filter...");
-	rule_filter = calloc(sizeof(char), nrules*nrules);
-
-	for(i=0;i<nrules;i++)
-	{
-		m = rules[i];
-		if(m->ndaughters>8)
-		{
-			fprintf(stderr, "ERROR: rule `%s' takes %d daughters!\n", m->name, m->ndaughters);
-			exit(-1);
-		}
-		mdg = copy_dg(pack?( (pack==1) ? m->packdg : m->gpackdg ) : m->dg );	// necessary for the case when we try to unify a rule into itself!
-		for(j=0;j<nrules;j++)
-		{
-			d = rules[j];
-			byte = 0;
-			for(k=0;k<m->ndaughters;k++)
-			{
-				res = unify_dg_tmp(pack?( (pack==1) ? d->packdg : d->gpackdg ) : d->dg , mdg, k);
-				forget_tmp();
-				//if(unify_dg(d->dg, mdg, k))
-				if(res==0)
-				{
-					byte |= (1<<k);
-					yes++;
-				}
-			}
-			count += m->ndaughters;
-			rule_filter[i*nrules + j] = byte;
-		}
-	}
-	printf("%.1f%% blocked\n", 100*(float)(count-yes)/count);
-	return rule_filter;
-}
-
-struct rule_filters
-{
-	char	*nopack;
-	char	*pack;
-	char	*gpack;
-}	*filters;
-
-void setup_rule_filter()
-{
-	filters = calloc(sizeof(*filters), 0);
-	filters->nopack = setup_rule_filter1(0);
-	filters->pack = setup_rule_filter1(1);
-	filters->gpack = setup_rule_filter1(2);
-	rule_filter = filters->gpack;	// XXX hack: in the current ERG, the gpack filter is the most lenient, so use it to calculate the rftc
-	lex_filter_rules();
-}
-
-void	*freeze_rule_filter()
-{
-	filters = freeze_block(filters, sizeof(*filters));
-	filters->nopack = freeze_block(filters->nopack, sizeof(char) * nrules*nrules);
-	filters->pack = freeze_block(filters->pack, sizeof(char) * nrules*nrules);
-	filters->gpack = freeze_block(filters->gpack, sizeof(char) * nrules*nrules);
-	return filters;
-}
-
-void	recover_rule_filter(void *rf)
-{
-	filters = rf;
-}
-
-void	install_rf(int what)
-{
-	if(what==0)rule_filter = filters->nopack;
-	else if(what==1)rule_filter = filters->pack;
-	else if(what==2)rule_filter = filters->gpack;
-	else assert(!"Not reached");
-}
-
 struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 {
 	struct edge	*e = slab_alloc(sizeof(struct edge));
@@ -423,21 +341,139 @@ void	dot_rf(char	*fname)
 }
 
 char	**rf_tc, **rl_tc;
+char	**type_rf, **type_rl;
+char	**type_rftc, **type_rltc;
 
-// compute the set of rules which can appear as the first constituent of this rule, somewhere down the left edge of the subtree
-char	*lex_filter_rule(struct rule	*r, int arg)
+char	*setup_rule_filter1(int pack)
+{
+	int	i, j, k;
+	struct rule	*m, *d;
+	struct dg	*mdg;
+	int	yes = 0, count = 0, res;
+	char	byte, *rule_filter;
+
+	show_task_name("rule filter...");
+	rule_filter = calloc(sizeof(char), nrules*nrules);
+
+	for(i=0;i<nrules;i++)
+	{
+		m = rules[i];
+		if(m->ndaughters>8)
+		{
+			fprintf(stderr, "ERROR: rule `%s' takes %d daughters!\n", m->name, m->ndaughters);
+			exit(-1);
+		}
+		mdg = copy_dg(pack?( (pack==1) ? m->packdg : m->gpackdg ) : m->dg );	// necessary for the case when we try to unify a rule into itself!
+		for(j=0;j<nrules;j++)
+		{
+			d = rules[j];
+			byte = 0;
+			for(k=0;k<m->ndaughters;k++)
+			{
+				res = unify_dg_tmp(pack?( (pack==1) ? d->packdg : d->gpackdg ) : d->dg , mdg, k);
+				forget_tmp();
+				//if(unify_dg(d->dg, mdg, k))
+				if(res==0)
+				{
+					byte |= (1<<k);
+					yes++;
+				}
+			}
+			count += m->ndaughters;
+			rule_filter[i*nrules + j] = byte;
+		}
+	}
+	printf("%.1f%% blocked\n", 100*(float)(count-yes)/count);
+	return rule_filter;
+}
+
+struct rule_filters
+{
+	char	*nopack;
+	char	*pack;
+	char	*gpack;
+	char	**rftc, **rltc;
+	char	**type_rf, **type_rl;
+	char	**type_rftc, **type_rltc;
+}	*filters;
+
+void setup_rule_filter()
+{
+	filters = calloc(sizeof(*filters), 0);
+	filters->nopack = setup_rule_filter1(0);
+	filters->pack = setup_rule_filter1(1);
+	filters->gpack = setup_rule_filter1(2);
+	rule_filter = filters->nopack;	// type_rxtc is applied before packing starts
+	lex_filter_rules();
+}
+
+char	**freeze_rxtc(char	**ptr, int dim)
+{
+	if(!ptr)return 0;
+	char	**ref = slab_alloc(nrules * sizeof(char*));
+	int	len;
+	char	*data;
+	int	i;
+
+	len = (nrules*dim + 3) & ~3;
+	data = slab_alloc(len);
+	for(i=0;i<nrules;i++)
+	{
+		ref[i] = data;
+		data += dim;
+		memcpy(ref[i], ptr[i], dim);
+	}
+	return ref;
+}
+
+void	*freeze_rule_filter()
+{
+	filters = freeze_block(filters, sizeof(*filters));
+	filters->nopack = freeze_block(filters->nopack, sizeof(char) * nrules*nrules);
+	filters->pack = freeze_block(filters->pack, sizeof(char) * nrules*nrules);
+	filters->gpack = freeze_block(filters->gpack, sizeof(char) * nrules*nrules);
+	filters->rftc = freeze_rxtc(rf_tc, nrules);
+	filters->rltc = freeze_rxtc(rl_tc, nrules);
+	filters->type_rf = freeze_rxtc(type_rf, ntypes);
+	filters->type_rl = freeze_rxtc(type_rl, ntypes);
+	filters->type_rftc = freeze_rxtc(type_rftc, ntypes);
+	filters->type_rltc = freeze_rxtc(type_rltc, ntypes);
+	return filters;
+}
+
+void	recover_rule_filter(void *rf)
+{
+	filters = rf;
+	rf_tc = filters->rftc;
+	rl_tc = filters->rltc;
+	type_rf = filters->type_rf;
+	type_rl = filters->type_rl;
+	type_rftc = filters->type_rftc;
+	type_rltc = filters->type_rltc;
+}
+
+void	install_rf(int what)
+{
+	if(what==0)rule_filter = filters->nopack;
+	else if(what==1)rule_filter = filters->pack;
+	else if(what==2)rule_filter = filters->gpack;
+	else assert(!"Not reached");
+}
+
+// compute the set of rules which can appear as the x'th constituent of this rule, somewhere down the left edge of the subtree
+char	*compute_rxtc(int	rnum, int right)
 {
 	char	*table;
 	int	i, j, n, tot = 1;
 
 	table = calloc(sizeof(char), nrules);
-	table[r->rnum] = 1;
+	table[rnum] = 1;
 	do
 	{
 		n = 0;
 		for(i=0;i<nrules;i++) if(table[i])
 		{
-			for(j=0;j<nrules;j++) if(!table[j] && check_rf(rules[i], rules[j], arg))
+			for(j=0;j<nrules;j++) if(!table[j] && check_rf(rules[i], rules[j], right?rules[i]->ndaughters-1:0))
 			{
 				table[j] = 1;
 				n++;
@@ -446,14 +482,8 @@ char	*lex_filter_rule(struct rule	*r, int arg)
 		}
 	} while(n);
 
-	//printf("FIRST(%s) = %d / %d\n", r->name, tot, nrules);
-	//for(i=0;i<nrules;i++) if(table[i]) printf("%s\n", rules[i]->name);
-
 	return table;
 }
-
-char	**type_rf, **type_rl;
-char	**type_rftc, **type_rltc;
 
 char	*type_filter_rule(struct rule	*r, int arg, struct qc **typeqc)
 {
@@ -503,8 +533,8 @@ void	lex_filter_rules()
 		rl_tc = malloc(sizeof(char*) * nrules);
 		for(i=0;i<nrules;i++)
 		{
-			rf_tc[i] = lex_filter_rule(rules[i], 0);
-			rl_tc[i] = lex_filter_rule(rules[i], rules[i]->ndaughters-1);
+			rf_tc[i] = compute_rxtc(i, 0);
+			rl_tc[i] = compute_rxtc(i, 1);
 		}
 		return 0;
 	}
