@@ -25,6 +25,8 @@ void	*freeze_rule_filter();
 void	recover_rule_filter(void *rf);
 void	*freeze_conf();
 void	recover_conf(void	*vc);
+void	*freeze_fspp();
+void	recover_fspp(void	*ptr);
 
 extern char	*grammar_version, *grammar_dir;
 
@@ -67,6 +69,7 @@ struct grammar
 	void	*vpm;
 	void	*labels;
 	void	*conf;
+	void	*fspp;
 };
 
 extern void	*slab_alloc(int	len);
@@ -348,6 +351,7 @@ int	freeze_grammar()
 	G->vpm = freeze_vpm();
 	G->labels = freeze_labels();
 	G->conf = freeze_conf();
+	G->fspp = freeze_fspp();
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
@@ -403,6 +407,7 @@ static int	load_freeze()
 
 	recover_rule_filter(G->rule_filter);
 	recover_typehash(G->typehash);
+	recover_fspp(G->fspp);
 	recover_conf(G->conf);
 	recover_labels(G->labels);
 	recover_vpm(G->vpm);

@@ -1095,6 +1095,7 @@ int load_grammar(char	*path)
 	init_fnames();
 	load_conf();
 	load_version(get_conf_path(confdir, "version"));
+	load_fsr_preprocessor(get_conf_path(confdir, "preprocessor"));
 	load_expedients(get_conf_path(confdir, "generation-ignore-signs"));	// before grammar loading so the semindex knows how to build
 	load_grammar_top(get_conf_path(confdir, "grammar-top"));
 	load_vpm(get_conf_path(confdir, "variable-property-mapping"));

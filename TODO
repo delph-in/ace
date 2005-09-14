@@ -1,9 +1,9 @@
 TODO:
 
 loading:
-	- build and freeze ppdfa into grammar file
 	- simpleform big lexicon
 	- load all the roots, config.tdl sets default used roots, commandline overrides
+	- move rftc and type_rftc into `filters' freezer slot
 
 unicode support for preprocessor and morphology
 
