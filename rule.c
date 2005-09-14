@@ -323,23 +323,6 @@ int	load_rules()
 	return 0;
 }
 
-// output rule filter left daughter graph as a .dot file
-void	dot_rf(char	*fname)
-{
-	int	i, j;
-	FILE	*f = fopen(fname, "w");
-
-	for(i=0;i<nrules;i++)
-	{
-		for(j=0;j<nrules;j++)
-		{
-			if(check_rf(rules[i], rules[j], 0))
-				fprintf(f, "%s -> %s\n", rules[i]->name, rules[j]->name);
-		}
-	}
-	fclose(f);
-}
-
 char	**rf_tc, **rl_tc;
 char	**type_rf, **type_rl;
 char	**type_rftc, **type_rltc;
@@ -603,4 +586,22 @@ void	lex_filter_rules()
 		return 0;
 	}
 	run_task("type-rule-closed filter...", compose_type_rule_closured_filter);
+}
+
+// output rule filter left daughter graph as a .dot file
+void	dot_rf(char	*fname)
+{
+	int	i, j;
+	FILE	*f = fopen(fname, "w");
+
+	for(i=0;i<nrules;i++) if(rules[i]->ndaughters!=1)
+	{
+		for(j=0;j<nrules;j++) if(rules[j]->ndaughters!=1)
+		{
+			//if(check_rf(rules[i], rules[j], 0))
+			if(rf_tc[i][j])
+				fprintf(f, "\"%s\" -> \"%s\"\n", rules[i]->name, rules[j]->name);
+		}
+	}
+	fclose(f);
 }

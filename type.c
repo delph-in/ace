@@ -229,7 +229,7 @@ void	number_strings()
 int	add_type_only(char	*name, int	npar, struct type	**par)
 {
 	struct type	*t;
-	int		i, pari;
+	int		i, pari, lexical = 0;
 
 	if(th_look(name))
 	/*for(i=0;i<ntypes;i++)
@@ -263,6 +263,7 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 		for(pari=0;pari<npar;pari++)
 			if(descendent_of(par[pari]->tnum, types[i]))
 			{
+				if(!strcmp(par[pari]->name, "word_or_lexrule"))lexical = 1;
 				if(!descendent_of(ntypes-1, types[i]))
 					add_descendent(types[i], ntypes-1);
 				break;
@@ -270,6 +271,18 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 	}
 	add_descendent(t, ntypes-1);
 	//fprintf(stderr, " - done adding\n");
+
+	/*if(!lexical)
+	{
+		static FILE	*f = 0;
+		if(!f)f = fopen("/tmp/type-heirarchy.dot", "a");
+		if(f)
+		{
+			for(i=0;i<npar;i++)
+				fprintf(f, "	\"%s\" -> \"%s\";\n", par[i]->name, name);
+			fflush(f);
+		}
+	}*/
 
 	th_add(name, t);
 

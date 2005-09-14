@@ -105,8 +105,6 @@ int	main(int	argc, char	*argv[])
 
 	setup_extra_type_dgs();
 	g_loaded = 1;
-	//dot_rf("/tmp/rules.dot");
-	//dump_grammar();
 
 	if(export_parts)
 	{

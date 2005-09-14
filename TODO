@@ -1,9 +1,5 @@
 TODO:
 
-loading: use an instance to define configuration paths?
-
-have fun with `dot': rf, rftc, type heirarchy
-
 part-of-speech tagger for unknown wordisms
 
 deprecate old mrs output
@@ -46,6 +42,8 @@ generalize rule filter
 		- BUT this doesn't work if new rules are allowed to pack in after combine() has been tried
 
 make unpacking support 2+-ary
+
+loading: use an instance to define configuration paths?
 
 better max-ent hash keys
 
