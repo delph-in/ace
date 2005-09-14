@@ -187,9 +187,6 @@ int	parse_line(char	*line)
 {
 	char	copy[10240];
 	int	nparse = 0;
-	/*char	*p, *w;
-	char	*words[100];
-	int	nwords = 0;*/
 	int	nwords = 0, i, j;
 	char	**words, *p, *q;
 
@@ -203,46 +200,21 @@ int	parse_line(char	*line)
 		printf("%s\n", line);
 		return -1;
 	}
-	//if(!strcmp(line, "All rights reserved."))return -1;	// not interesting.
-	if(!strcmp(line, "@reloadrules@"))
-	{
-		load_rules_conf();
-		return -1;
-	}
 
 	strcpy(copy, line);
-
-	// break up into words, normalize capitalization
-	/*w = p = copy;
-	while(*p)
-	{
-		if(*p>='A' && *p<='Z')(*p) += 32;
-		switch(*p)
-		{
-			case	' ': case '\t': case '.': case '\n':
-			case	',': case '?': case '!':
-				if(nwords>=100) { fprintf(stderr, "NOTE: 0 readings. Too many words (100+)\n"); return 0; }
-				*p = 0;
-				if(w != p)words[nwords++] = w;
-				w = p+1;
-				break;
-		}
-		p++;
-	}*/
 
 	if(preprocess_line(copy, &nwords, &words))
 	{
 		fprintf(stderr, "NOTE: preprocessor failed!\n");
 		return -1;
 	}
-	//if(nwords<=1)return -1;	// experience shows short "sentences" to not usually be interesting
+
 	if(nwords>60)
 	{
 		fprintf(stderr, "NOTE: 0 readings, too many words (60+)\n");
-		return 0;	// trying to parse long sentences is a waste of time. we have lots of short ones.
+		return 0;
 	}
 
-	//printf("%d words\n", nwords);
 	for(j=0;j<nwords;j++)
 	{
 		wcap[j] = isupper(words[j][0]);
@@ -251,7 +223,7 @@ int	parse_line(char	*line)
 			words[j][i] = tolower(words[j][i]);
 		}
 	}
-	current_sentence = line;//(char*)trim_string(line);
+	current_sentence = line;
 	nparse = parse(nwords, words, current_sentence);
 	if(do_itsdb)itsdb_report(nwords, words, nparse);
 	clear_slab();
