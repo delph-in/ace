@@ -179,5 +179,6 @@ void	configure_rule(struct rule	*r)
 
 	r->span_only = check_conf_list("spanning-only-rules", r->name);
 	r->frag_only = check_conf_list("fragment-only-rules", r->name);
+	r->hyper = check_conf_list("hyper-active-rules", r->name);
 	r->pad = 0;
 }
