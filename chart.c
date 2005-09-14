@@ -12,6 +12,8 @@
 #include	"freeze.h"
 
 #define GENERALIZE_TYPES
+#define	ENABLE_HYPERACTIVE	1
+//#define	RULE_STATS
 
 int	inhibit_results = 0;
 extern int inhibit_pack;
@@ -27,7 +29,6 @@ int		edge_id;
 
 extern int	*nused, *nhactive, *nactive, *npassive, *nrecomb, *natries, *nptries, used_total, pused_total;
 extern int noldslabs;
-extern int	rnohyper[1000];
 
 char	*show_orth_leaves(struct edge	*e);
 static void	hyperactive_excursion(struct edge	*e);
@@ -200,7 +201,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	else
 	{
 		// building active
-		if(!rnohyper[a->rule->rnum] && !force_noha)
+		if(a->rule->hyper && !force_noha)
 		{
 			// hyperactive
 			//if(check_cycles(dg))return -1;
@@ -493,7 +494,7 @@ int	recall_hyper(struct edge	*b)
 
 inline int	combine(struct edge	*a, struct edge	*b)
 {
-	int	i, arg, force_noha = 0, res;
+	int	i, arg, force_noha = !ENABLE_HYPERACTIVE, res;
 	struct dg	*rdg, *pdg;
 #ifdef	TIM
 	struct timeval	tv1, tv2;
