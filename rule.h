@@ -11,7 +11,7 @@ struct rule
 	int				rnum:16;
 	unsigned int	ndaughters:4;
 	int				lexical:4;
-	int				rtl:4;
+	int				rtl:3, hyper:1;
 	int				gen_ignore:1, span_only:1, frag_only:1, pad:1;
 };
 

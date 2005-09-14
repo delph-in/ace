@@ -12,6 +12,8 @@
 #include	"conf.h"
 #include	"freeze.h"
 
+//#define	RULE_STATS
+
 struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels);
 
 struct rule	**rules;
@@ -24,8 +26,6 @@ extern int nfinal, trace, inhibit_pack;
 
 extern unsigned int generation;
 extern int gen_qc;
-
-int	rprio[1000], rnohyper[1000];
 
 int	lexrulefilt_l(int	x, int	rule);
 int	lexrulefilt_f(int	x, int	rule);
@@ -40,7 +40,7 @@ void	rule_stats()
 	if(!nactive || !npassive || !nrecomb || !nhactive || !nused)return;
 	for(i=0;i<nrules;i++)
 	{
-		//if(nactive[i])printf("%4d %.3f %d %s\n", nactive[i], (float)nrecomb[i] / nactive[i], i, rules[i]->name);
+		if(nactive[i])printf("%4d %.3f %d %s\n", nactive[i], (float)nrecomb[i] / nactive[i], i, rules[i]->name);
 		//printf("%32s %6d %6d %6d %.1f\n", rules[i]->name, nused[i], npassive[i], nactive[i], 100*(float)nused[i]/npassive[i]);
 		nact+=nactive[i];
 		npass+=npassive[i];
@@ -254,51 +254,6 @@ struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels)
 	if(!dg)goto fail;
 	top_copies++;
 	return dg;
-}
-
-int	load_rules_conf()
-{
-	FILE	*f = fopen("rules.conf", "r");
-	char	dir, hyper;
-	int	save, i, prio;
-	char	name[1024];
-
-	if(!f)
-	{
-		char fname[1024];
-		sprintf(fname, "%s/.rules.conf", getenv("HOME"));
-		f = fopen(fname, "r");
-	}
-	if(!f)
-	{
-		perror("rules.conf");
-		fprintf(stderr, "resorting to left-to-right parsing!\n");
-		return -1;
-	}
-
-	while(!feof(f))
-	{
-		prio = 0;
-		if(fscanf(f, "%c %c %d %s %d\n", &dir, &hyper, &save, name, &prio) < 3)break;
-		//printf("dir %c save %d name %s\n", dir, save, name);
-		for(i=0;i<nrules;i++)
-			if(!strcmp(rules[i]->name, name))break;
-		if(i==nrules)
-		{
-			fprintf(stderr, "rules.conf: `%s': no such rule!\n", name);
-			exit(-1);
-		}
-		if(dir=='r')
-		{
-			//printf("rule `%s' should go RTL\n", name);
-			//rules[i]->rtl = 1;
-		}
-		if(hyper=='a')rnohyper[i] = 1;
-		rprio[i] = prio;
-	}
-
-	fclose(f);
-	return 0;
 }
 
 void	agenda_rules(int	count)
