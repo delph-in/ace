@@ -308,10 +308,17 @@ void	simplify_lexeme(struct lexeme	*l)
 	if(DARCS(dg)[0].label != synsemfeat && DARCS(dg)[1].label != synsemfeat)return;
 
 	ss = dg_hop(dg, synsemfeat);
-	// we want just 'LKEYS' and 'ONSET'
-	if(ss->narcs != 2)return;
-	if(DARCS(ss)[0].label != lkeysfeat && DARCS(ss)[1].label != lkeysfeat)return;
-	if(DARCS(ss)[0].label != phonfeat && DARCS(ss)[1].label != phonfeat)return;
+	// we want just 'LKEYS' and 'ONSET' or else just LKEYS
+	if(ss->narcs == 2)
+	{
+		if(DARCS(ss)[0].label != lkeysfeat && DARCS(ss)[1].label != lkeysfeat)return;
+		if(DARCS(ss)[0].label != phonfeat && DARCS(ss)[1].label != phonfeat)return;
+	}
+	else if(ss->narcs==1)
+	{
+		if(DARCS(ss)[0].label != lkeysfeat)return;
+	}
+	else return;
 
 	// check LKEYS branch
 	lk = dg_hop(ss, lkeysfeat);
@@ -326,11 +333,16 @@ void	simplify_lexeme(struct lexeme	*l)
 
 	// check PHON branch
 	ph = dg_hop(ss, phonfeat);
-	// we want just 'ONSET'
-	if(ph->narcs != 1 || DARCS(ph)[0].label != onsetfeat)return;
-	on = dg_hop(ph, onsetfeat);
-	// we want predictable onset
-	if(on->narcs != 0 || on->type != predict_onset(l->stem[0]->name))return;
+	if(!ph)l->onset = 0;
+	else
+	{
+		// we want just 'ONSET'
+		if(ph->narcs != 1 || DARCS(ph)[0].label != onsetfeat)return;
+		on = dg_hop(ph, onsetfeat);
+		// we want predictable onset
+		if(on->narcs != 0 || on->type != predict_onset(l->stem[0]->name))return;
+		l->onset = 1;
+	}
 
 	//printf("`%s' has simple form\n", l->word);
 	nsimpleform++;
@@ -354,10 +366,13 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 	lk = add_dg_hop(atomic_dg("*top*"), keyrelfeat, kr);
 	ss = add_dg_hop(atomic_dg("*top*"), lkeysfeat, lk);
 
-	on = atomic_dg("*top*");
-	on->xtype = on->type = predict_onset(l->stem[0]->name);
-	ph = add_dg_hop(atomic_dg("*top*"), onsetfeat, on);
-	ss = add_dg_hop(ss, phonfeat, ph);
+	if(l->onset)
+	{
+		on = atomic_dg("*top*");
+		on->xtype = on->type = predict_onset(l->stem[0]->name);
+		ph = add_dg_hop(atomic_dg("*top*"), onsetfeat, on);
+		ss = add_dg_hop(ss, phonfeat, ph);
+	}
 
 	f = atomic_dg("*top*");
 	f->xtype = f->type = l->stem[0];

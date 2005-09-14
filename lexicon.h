@@ -10,7 +10,7 @@ struct lexeme
 	char		*word;
 	struct dg	*dg;
 
-	int		stemlen;
+	int		stemlen:16, onset:16;
 	struct type	**stem;
 	struct type	*lextype;
 

@@ -1,7 +1,6 @@
 TODO:
 
 loading:
-	- simpleform big lexicon
 	- load all the roots, config.tdl sets default used roots, commandline overrides
 	- move rftc and type_rftc into `filters' freezer slot
 
