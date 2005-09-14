@@ -2,15 +2,27 @@ TODO:
 
 loading:
 	- build and freeze ppdfa into grammar file
-	- freeze rules.conf into grammar file
 	- simpleform big lexicon
 	- load all the roots, config.tdl sets default used roots, commandline overrides
 
 unicode support for preprocessor and morphology
 
+use RFTC and RLTC to better advantage
+	- e.g. precompute which rules unify with root,
+		- then never build a leftmost edge which doesn't fit leftmost into any root rules, same for right
+		- might be able to do better than rftc, if take into account how much grow room there is
+			- e.g. a spanning edge is useless if not root and no unary path to a root
+			- that might eliminate those spurious subjh_nmc's
+	- also in morphology chain hypothesization
+
+maybe precompute full charts above every lexical type?
+	- experiment and find out how much time is spent at each span length! very interesting.
+
 part-of-speech tagger for unknown wordisms
 
 optimize lexicon storage; maybe use provided lexdb schema
+	- make wellform-ing of lexemes faster, really should be able to just unify top level type in
+		- figure out why this didn't work last time it was tried
 maybe support lexdb
 
 try to prove/analyze interesting things at grammar compile time
@@ -29,6 +41,8 @@ generalize rule filter
 	| can provide useful local information about when unpacking will fail
 	+ combine() needs to check all packed edges, not just representative
 		- BUT this doesn't work if new rules are allowed to pack in after combine() has been tried
+
+make unpacking support 2+-ary
 
 deprecate old mrs output
 
