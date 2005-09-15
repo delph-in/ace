@@ -131,7 +131,7 @@ struct lexeme	*proper_noun_lex(char	*name)
 }
 
 #ifdef UNKNOWN
-struct lexeme	*unknown_lexeme(char	*name)
+struct lexeme	*unknown_lexeme(char	*name, char	*type)
 {
 	struct lexeme	*lex;
 	struct dg		*extra, *stem, *ss, *lk, *kr;
@@ -140,7 +140,7 @@ struct lexeme	*unknown_lexeme(char	*name)
 	extern struct type	**strings;
 
 	// make a skeletal dag for our lexeme
-	extra = atomic_dg(UNKNOWN);
+	extra = atomic_dg(type);
 	assert(extra);
 
 	sprintf(ncopy, "\"%s\"", name);
@@ -158,15 +158,41 @@ struct lexeme	*unknown_lexeme(char	*name)
 	return lex;
 }
 
-struct edge	*unknown_lexical_edge(int	i, char	*word)
+struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 {
-	struct edge *e = lexical_edge(unknown_lexeme(word), i, 1, 0);
+	char	*type = UNKNOWN;
+	struct lexeme *l;
+	struct edge *e;
+
+	// map 'tag' to unknown lexeme type
+		if(!strcmp(tag, "NNP"))type = "n_proper_nale";
+	else if(!strcmp(tag, "JJ"))type = "adj_intrans_nale";
+	else if(!strcmp(tag, "JJS"))type = "adj_intrans_superl_nale";
+	else if(!strcmp(tag, "JJR"))type = "adj_intrans_compar_nale";
+	else if(!strcmp(tag, "JJR"))type = "adj_intrans_compar_nale";
+	else if(!strcmp(tag, "RB"))type = "adv_word_nale";
+	else if(!strcmp(tag, "NNPS"))type = "n_proper_nale";
+	else if(!strcmp(tag, "NNS"))type = "n_intr_pl_nale";
+	else if(!strcmp(tag, "NN"))type = "n_mass_count_le";
+	else if(!strcmp(tag, "VB"))type = "v_np*_trans_bse_nale";
+	else if(!strcmp(tag, "VBD"))type = "v_np*_trans_past_nale";
+	else if(!strcmp(tag, "VBG"))type = "v_np*_trans_prp_nale";
+	else if(!strcmp(tag, "VBN"))type = "v_np*_trans_psp_nale";
+	else if(!strcmp(tag, "VBZ"))type = "v_np*_trans_psp_nale";
+	else if(!strcmp(tag, "VBP"))type = "v_np*_trans_presn3sg_nale";
+	else if(!strcmp(tag, "VBZ"))type = "v_np*_trans_pres3sg_nale";
+	else type = "n_proper_nale";
+
+	printf("NOTE: guessing `%s' is a `%s' (POS %s%s)\n", word, type, tag, tagunk?"?":"");
+
+	l = unknown_lexeme(word, type);
+	e = lexical_edge(l, i, 1, 0);
 	e->north_routes = -1;
 	e->orth_routes = 0;
 	return e;
 }
 #else
-struct edge	*unknown_lexical_edge(int	i, char	*word) { return 0; }
+struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk) { return 0; }
 #endif
 
 int	wstrcmp(char	*a, char	*b)

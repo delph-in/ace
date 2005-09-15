@@ -12,6 +12,9 @@
 #include	"lexicon.h"
 #include	"preprocessor.h"
 #include	"mrs.h"
+#ifdef POST
+#include	"post.h"
+#endif
 
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;
@@ -102,6 +105,10 @@ int	main(int	argc, char	*argv[])
 
 	if(save_grammar_path)
 		exit(0);
+
+#ifdef	POST
+	post_train_from("../post/brown.train.txt");
+#endif
 
 	setup_extra_type_dgs();
 	g_loaded = 1;

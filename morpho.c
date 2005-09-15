@@ -14,6 +14,9 @@ extern int	wcap[1024];
 #include	"tdl.h"
 #include	"lexicon.h"
 #include	"freeze.h"
+#ifdef POST
+#include "post.h"
+#endif
 
 #define	MAX_ORTH_RULES	5
 
@@ -93,6 +96,24 @@ int	lexical_lookup(int	nwords, char	**words)
 {
 	struct ochart	*charts = slab_alloc(sizeof(struct ochart)*nwords);
 	int				i, j, k, cover[nwords];
+	char	**tags;
+	int		*unk;
+
+	tags = malloc(sizeof(char*) * nwords);
+	unk = malloc(sizeof(int) * nwords);
+#ifdef	POST
+	for(i=0;i<nwords;i++)if(wcap[i])words[i][0]-=32;
+	post_tag_sequence(nwords, words, tags, unk);
+	for(i=0;i<nwords;i++)if(wcap[i])words[i][0]+=32;
+#else
+	for(i=0;i<nwords;i++)
+	{
+		tags[i] = "NNP";
+		unk[i] = 1;
+	}
+#endif
+//	for(i=0;i<nwords;i++)printf("%s%s ", tags[i], unk[i]?"?":"");
+//	printf("\n");
 
 	// compute all the orthography variations
 	bzero(charts, sizeof(struct ochart)*nwords);
@@ -194,7 +215,7 @@ int	lexical_lookup(int	nwords, char	**words)
 				if(j<charts[i].nedges)
 				{
 					struct ochart_edge	*e = charts[i].edges[j];
-					le = unknown_lexical_edge(i, stem);
+					le = unknown_lexical_edge(i, stem, tags[i], unk[i]);
 					le->north_routes = e->north_routes;
 					le->orth_routes = e->orth_routes;
 					add_agenda(le);
@@ -204,6 +225,8 @@ int	lexical_lookup(int	nwords, char	**words)
 		}
 	}
 #endif
+	free(tags);
+	free(unk);
 
 	return 0;
 }

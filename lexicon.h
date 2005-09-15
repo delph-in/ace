@@ -24,7 +24,7 @@ int		load_lexicon();
 struct dg	*expand_lexeme(struct lexeme	*l);
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels);
 struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels);
-struct edge	*unknown_lexical_edge(int	i, char	*word);
+struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk);
 
 // semantic index
 void	add_semantic_index(struct lexeme *l, struct dg *full, int which);
