@@ -165,13 +165,13 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 	struct edge *e;
 
 	// map 'tag' to unknown lexeme type
-		if(!strcmp(tag, "NNP"))type = "n_proper_nale";
-	else if(!strcmp(tag, "JJ"))type = "adj_intrans_nale";
+		if(!strcmp(tag, "NNP"))type = "n_proper_le";
+	else if(!strcmp(tag, "JJ"))type = "adj_intrans_le";
 	else if(!strcmp(tag, "JJS"))type = "adj_intrans_superl_nale";
 	else if(!strcmp(tag, "JJR"))type = "adj_intrans_compar_nale";
 	else if(!strcmp(tag, "JJR"))type = "adj_intrans_compar_nale";
 	else if(!strcmp(tag, "RB"))type = "adv_word_nale";
-	else if(!strcmp(tag, "NNPS"))type = "n_proper_nale";
+	else if(!strcmp(tag, "NNPS"))type = "n_proper_le";
 	else if(!strcmp(tag, "NNS"))type = "n_intr_pl_nale";
 	else if(!strcmp(tag, "NN"))type = "n_mass_count_le";
 	else if(!strcmp(tag, "VB"))type = "v_np*_trans_bse_nale";
@@ -181,7 +181,6 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 	else if(!strcmp(tag, "VBZ"))type = "v_np*_trans_psp_nale";
 	else if(!strcmp(tag, "VBP"))type = "v_np*_trans_presn3sg_nale";
 	else if(!strcmp(tag, "VBZ"))type = "v_np*_trans_pres3sg_nale";
-	else type = "n_proper_nale";
 
 	printf("NOTE: guessing `%s' is a `%s' (POS %s%s)\n", word, type, tag, tagunk?"?":"");
 

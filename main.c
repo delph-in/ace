@@ -10,7 +10,6 @@
 #include	"freeze.h"
 #include	"rule.h"
 #include	"lexicon.h"
-#include	"preprocessor.h"
 #include	"mrs.h"
 #ifdef POST
 #include	"post.h"

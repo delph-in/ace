@@ -95,7 +95,7 @@ void	alarm_handler(int	sig)
 
 int	parse(int	nwords, char	*words[], char	*sentence)
 {
-	int		i, count;
+	int		i, count, didsent = 0;
 	int		num_parses = 0, num_entries;
 	float	t_setup, t_forest, t_unpack;
 	struct dg	*root;
@@ -104,8 +104,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	// setup the chart
 	clear_chart(nwords+1);
-	if(lexical_lookup(nwords, words))return -1;
-	if(reduce_chart(nwords, words))return -1;
+	if(lexical_lookup(nwords, words)) { printf("NOTE: lexical coverage gap\n");  return -1; }
+	if(reduce_chart(nwords, words)) { printf("NOTE: post reduction gap\n"); return -1; }
 
 	//if(rtried)free(rtried);
 	//rtried = calloc(sizeof(int),nrules);
@@ -145,7 +145,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
 		if(!inhibit_results)
 		{
-			if(sentence && !question)printf("SENT: %s\n", sentence);
+			if(sentence && !question && !didsent){printf("SENT: %s\n", sentence);didsent=1;}
 			print_mrs(mrs);
 		}
 		free_mrs(mrs);
@@ -183,6 +183,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 int		wcap[1024];
 char	*current_sentence = "(not initialized)";
 
+void	preprocess_line(char	*string, int	*Nwords, char	***Lemmas, char	***Forms);
+
 int	parse_line(char	*line)
 {
 	char	copy[10240];
@@ -203,11 +205,7 @@ int	parse_line(char	*line)
 
 	strcpy(copy, line);
 
-	if(preprocess_line(copy, &nwords, &words))
-	{
-		fprintf(stderr, "NOTE: preprocessor failed!\n");
-		return -1;
-	}
+	preprocess_line(copy, &nwords, 0, &words);
 
 	if(nwords>60)
 	{
@@ -225,6 +223,7 @@ int	parse_line(char	*line)
 	}
 	current_sentence = line;
 	nparse = parse(nwords, words, current_sentence);
+	if(nparse==-1)printf("NOTE: ignoring `%s'\n", current_sentence);
 	if(do_itsdb)itsdb_report(nwords, words, nparse);
 	clear_slab();
 	for(i=0;i<nwords;i++)free(words[i]);
