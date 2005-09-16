@@ -54,6 +54,7 @@ void	add_agenda(struct edge	*e)
 	e->unpack = 0;
 
 	if(e->from==e->to)e->prio = EPSILON_PRIORITY(e->rule);
+	else if(e->lex)e->prio = LEX_PRIO;
 	else e->prio = EDGE_PRIORITY(e);
 
 	if(e->prio < 0 || e->prio >= NPRIO)
