@@ -1,5 +1,7 @@
 TODO:
 
+discount time waiting for stdin when parsing from stdin
+
 deprecate old mrs output
 
 freeze POST / configurable-ize
