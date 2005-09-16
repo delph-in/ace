@@ -80,6 +80,15 @@ static char	*fixup_pattern(char	*str)
 				out[bs] = ']';
 				f=1;
 			}
+			for(i=bs;i<=be;i++)
+				if(out[i]=='[' && strchr(":.=", out[i+1]))break;
+			if(i<=be)
+			{
+				// found a '[:' or `[=' or `[.' in the block that needs to be twiddled.
+				out[i] = out[i+1];
+				out[i+1] = '[';
+				f=1;
+			}
 		}
 	}
 	//if(f)printf("fixed pattern: `%s'\n", out);
@@ -257,7 +266,7 @@ void	preprocess_line(char	*string, int	*Nwords, char	***Lemmas, char	***Forms)
 		again:
 		m->rm_so = strlen(s) - redo;
 		m->rm_eo = strlen(s);
-		if(!regexec(&r->re, s, r->re.re_nsub+1, m, REG_STARTEND))
+		if(!regexec(&r->re, s, r->re.re_nsub+1, m, REG_STARTEND | (m->rm_so!=0 ? REG_NOTBOL : 0)))
 		{
 			redo = strlen(s) - m->rm_eo;
 			s = replace(s, strlen(s), m, r->rep, s!=string);
