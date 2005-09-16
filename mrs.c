@@ -2,9 +2,12 @@
 #include	<stdlib.h>
 #include	<string.h>
 
+#ifndef	NODAG
 #include	"type.h"
-#include	"mrs.h"
 #include	"dag.h"
+#endif
+
+#include	"mrs.h"
 
 // mrs IO
 
@@ -15,8 +18,10 @@ void	free_mrs_var(struct mrs_var	*v)
 	if(!v)return;
 	v->refs--;
 	if(v->refs>0)return;
+#ifndef	NODAG
 	if(v->dg && v->dg->gen == 1 && v->dg->copy == (void*)v)
 		v->dg->gen = 2;
+#endif
 
 	for(i=0;i<v->nprops;i++)
 	{
@@ -93,6 +98,7 @@ struct mrs_var	*parse_mrs_const(char	**P)
 	char	*c = parse_word(P, 1);
 	struct mrs_var *var = calloc(sizeof(struct mrs_var), 1);
 	var->is_const = 1;
+	var->type = strdup(c);
 	var->name = strdup(c);
 	var->vnum = 0;
 	return var;
@@ -343,6 +349,16 @@ struct mrs	*read_mrs(FILE	*f)
 	return mrs;
 }
 
+struct mrs_var	*mrs_find_ep_role(struct mrs_ep	*ep, char	*role)
+{
+	int i;
+
+	for(i=0;i<ep->nargs;i++)
+		if(!strcmp(ep->args[i].name, role))
+			return ep->args[i].value;
+	return 0;
+}
+
 char	*marked;
 
 void	print_mrs_var(struct mrs_var	*var)
@@ -402,6 +418,8 @@ void	print_mrs(struct mrs	*mrs)
 
 	free(marked); marked = 0;
 }
+
+#ifndef	NOTESTING
 
 // mrs testing
 
@@ -556,3 +574,5 @@ int mrs_subsumes1(struct mrs *in, struct mrs *out, int hci, int *vmap, char *use
 	}
 	return 0;
 }
+
+#endif
