@@ -446,8 +446,12 @@ int instantiate_hypothesis(struct hypothesis *h)
 	{
 		if(!arity)
 		{
-			// lexeme.  don't put the specialized RELS list in.
-			h->dg = lexical_dg(h->dec->edge->lex, 0);
+			if(g_mode == GENERATING)
+			{
+				// generator lexeme.  don't put the specialized RELS list in.
+				h->dg = lexical_dg(h->dec->edge->lex, 0);
+			}
+			else h->dg = h->dec->edge->dg;
 		}
 		else if(h->dec->edge)
 		{
