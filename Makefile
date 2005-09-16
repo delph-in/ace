@@ -14,7 +14,7 @@ CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char ${GRAM} -falign-loops=32 -fun
 
 CFLAGS+=${DELPHIN_CFLAGS} ${POST_CFLAGS}
 
-OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.c
+OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o
 all: ${OBJ}
 	${CC} ${CFLAGS} ${POST_LIBS} main.c ${OBJ} -o ace ${DELPHIN_LIBS} -lpthread
 
