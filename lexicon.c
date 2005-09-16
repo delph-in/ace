@@ -3,6 +3,7 @@
 #include	<stdio.h>
 #include	<assert.h>
 #include	<ctype.h>
+#include	<sys/time.h>
 
 #include	"tdl.h"
 #include	"lexicon.h"

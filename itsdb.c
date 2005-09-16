@@ -3,6 +3,7 @@
 #include	<string.h>
 #include	<stdlib.h>
 #include	<time.h>
+#include	<sys/time.h>
 
 #ifdef	TSDB
 #include	<itsdb.h>
