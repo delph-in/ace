@@ -1,6 +1,7 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
+#include	<wchar.h>
 #include	<ctype.h>
 
 int	invert_ipat(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem, int type);
@@ -428,6 +429,8 @@ void	setup_morpho(char	*line)
 
 int	appropriate_letter(int	let, int	group)
 {
+	if(let>255 || let<0)return 0;
+	if(group>255 || group<0)return 0;
 	if(!lgroups[group])
 	{
 		fprintf(stderr, "morpho: no such letter group as `%c'\n", group);
@@ -467,11 +470,11 @@ char	*inflect(struct orule	*or, char	*str)
 	return res;
 }
 
-int	invert_ipat_prefix(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem)
+int	invert_ipat_prefix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, wchar_t	*stem)
 {
 	int	let, lclear = 0;
 	int	ri = 0, fi = 0;
-	char	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
+	wchar_t	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
 
 	if(repl==1 && rep[0]=='*')ri++;	// trivially match
 	else do
@@ -480,9 +483,10 @@ int	invert_ipat_prefix(char	*pat, int patl, char	*rep, int repl, char	*form, int
 		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
 		if(ri+1<repl && rep[ri]=='!')
 		{
-			if(!lclear){bzero(letters, 256);lclear=1;}
+			if(!lclear){bzero(letters, 256*sizeof(wchar_t));lclear=1;}
 			if(appropriate_letter(let, rep[++ri]))
 			{
+				assert((int)rep[ri] < 256);
 				if(letters[(int)rep[ri]] == 0)
 					letters[(int)rep[ri]] = let;
 				else if(let != letters[(int)rep[ri]])
@@ -509,18 +513,18 @@ int	invert_ipat_prefix(char	*pat, int patl, char	*rep, int repl, char	*form, int
 				pat+=2;
 			}
 		}
-		memcpy(stem, form+fi, forml-fi+1);
-		//printf(" form `%s' -> stem `%s' under pat `%s' rep `%s' [len %d len2 %d]\n", form, rstem, rpat, rrep, len, len2);
+		memcpy(stem, form+fi, sizeof(wchar_t)*(forml-fi+1));
+		//printf(" form `%S' -> stem `%S' under pat `%S' rep `%S'\n", form, rstem, rpat, rrep);
 		return 0;
 	}
 	else return -1;
 }
 
-int	invert_ipat_suffix(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem)
+int	invert_ipat_suffix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, wchar_t	*stem)
 {
 	int	let, lclear = 0;
 	int	len = forml-1, len2 = repl-1;
-	char	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
+	wchar_t	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
 
 	if(repl==1 && rep[0]=='*')len2--;	// trivially match
 	else do
@@ -529,10 +533,11 @@ int	invert_ipat_suffix(char	*pat, int patl, char	*rep, int repl, char	*form, int
 		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
 		if(len2>0 && rep[len2-1]=='!')
 		{
-			if(!lclear){bzero(letters, 256);lclear=1;}
+			if(!lclear){bzero(letters, 256*sizeof(wchar_t));lclear=1;}
 			if(appropriate_letter(let, rep[len2]))
 			{
 				//printf("`%c' is appropriate for `%c'\n", let, rep[len2]);
+				assert((int)rep[len2] < 256);
 				if(letters[(int)rep[len2]] == 0)
 					letters[(int)rep[len2]] = let;
 				else if(let != letters[(int)rep[len2]])
@@ -549,7 +554,7 @@ int	invert_ipat_suffix(char	*pat, int patl, char	*rep, int repl, char	*form, int
 	{
 		match:
 		// success!
-		strncpy(stem, form, len+1);
+		wcsncpy(stem, form, len+1);
 		stem += len+1;
 		if(*pat!='*') while(*pat)
 		{
@@ -557,22 +562,53 @@ int	invert_ipat_suffix(char	*pat, int patl, char	*rep, int repl, char	*form, int
 				*stem++ = *pat++;
 			else
 			{
+				assert((int)pat[1] < 256);
 				*stem++ = letters[(int)pat[1]];
 				pat+=2;
 			}
 		}
 		*stem++ = 0;
-		//printf(" form `%s' -> stem `%s' under pat `%s' rep `%s' [len %d len2 %d]\n", form, rstem, rpat, rrep, len, len2);
+		//fprintf(stderr, " form `%ls' -> stem `%ls' under pat `%ls' rep `%ls' [len %d len2 %d]\n", form, rstem, rpat, rrep, len, len2);
 		return 0;
 	}
 	else return -1;
 }
 
+wchar_t	*towide(char	*mbs)
+{
+	int		len = strlen(mbs);
+	wchar_t	*wide = malloc(sizeof(wchar_t)*(len+1));
+	if(-1 == mbstowcs(wide, mbs, len+1))
+	{
+		perror("multibyte decoding failed");
+		exit(-1);
+	}
+	return wide;
+}
+
 int	invert_ipat(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem, int type)
 {
+	wchar_t	*wpat = towide(pat), *wrep = towide(rep), *wform = towide(form), *wstem = malloc(sizeof(wchar_t)*1024);
+	int		wpatl = wcslen(wpat), wrepl = wcslen(wrep), wforml = wcslen(wform), res;
+
 	if(type == or_suffix)
-		return invert_ipat_suffix(pat, patl, rep, repl, form, forml, stem);
-	else return invert_ipat_prefix(pat, patl, rep, repl, form, forml, stem);
+		res = invert_ipat_suffix(wpat, wpatl, wrep, wrepl, wform, wforml, wstem);
+	else res = invert_ipat_prefix(wpat, wpatl, wrep, wrepl, wform, wforml, wstem);
+
+	if(!res)
+	{
+		if(-1 == wcstombs(stem, wstem, 1024))
+		{
+			perror("multibyte encoding failed");
+			exit(-1);
+		}
+	}
+
+	free(wstem);
+	free(wpat);
+	free(wrep);
+	free(wform);
+	return res;
 }
 
 void	setup_orule(struct orule	*or, char	*def)
