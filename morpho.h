@@ -24,7 +24,7 @@ struct orule
 extern int		norules;
 extern struct orule	**orules;
 
-int		lexical_lookup(int	nwords, char	**words);
+int		lexical_lookup(int	nwords, char	**lemmas, char	**forms);
 char	*inflect(struct orule	*or, char	*str);
 void	setup_morpho(char	*line);
 int		load_lrules();

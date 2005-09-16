@@ -7,7 +7,7 @@ struct path
 	int		*fnums;
 };
 
-extern struct path	lex_stem_path, lex_rels_path, rule_rels_path, extract_mrs_path;
+extern struct path	lex_stem_path, lex_rels_path, rule_rels_path, extract_mrs_path, lex_carg_path;
 extern char			*semarg_type;
 extern char			*g_cons_type;
 extern char			*g_list_type;

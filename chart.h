@@ -62,7 +62,7 @@ void	free_edge(struct edge	*edge);
 int		next_eid();
 
 // parser
-int		parse(int	nwords, char	*words[], char	*sentence);
+int		parse(int	nwords, char	**lemmas, char	**forms, char	*sentence);
 
 // display
 void	output_lui_chart(char	*words[]);

@@ -2,7 +2,9 @@ TODO:
 
 deprecate old mrs output
 
-record ersatzing
+freeze POST / configurable-ize
+
+find a way of making web / email ersatz work; preprocessor breaks them now, thanks to new treatment which separates U.S. into U. S. and X/Y into X / Y...
 
 unicode support for preprocessor and morphology
 

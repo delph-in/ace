@@ -159,6 +159,17 @@ struct lexeme	*unknown_lexeme(char	*name, char	*type)
 	return lex;
 }
 
+void	record_carg(struct edge	*le, char	*carg_str)
+{
+	char	*ncopy = malloc(strlen(carg_str)+3);
+	struct type	*carg_type;
+	struct dg	*carg = calloc(sizeof(struct dg), 1);
+	sprintf(ncopy, "\"%s\"", carg_str);
+	carg_type = temporary_string_type(ncopy);
+	carg->xtype = carg->type = carg_type;
+	le->dg = dg_path_add(le->dg, lex_carg_path, carg);
+}
+
 struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 {
 	char	*type = UNKNOWN;
@@ -189,6 +200,9 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 	e = lexical_edge(l, i, 1, 0);
 	e->north_routes = -1;
 	e->orth_routes = 0;
+
+	if(type == "n_proper_le")record_carg(e, word);
+
 	return e;
 }
 #else

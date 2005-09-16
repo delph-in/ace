@@ -93,7 +93,7 @@ void	alarm_handler(int	sig)
 	cancel_parse = 1;
 }
 
-int	parse(int	nwords, char	*words[], char	*sentence)
+int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 {
 	int		i, count, didsent = 0;
 	int		num_parses = 0, num_entries;
@@ -104,8 +104,8 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 
 	// setup the chart
 	clear_chart(nwords+1);
-	if(lexical_lookup(nwords, words)) { printf("NOTE: lexical coverage gap\n");  return -1; }
-	if(reduce_chart(nwords, words)) { printf("NOTE: post reduction gap\n"); return -1; }
+	if(lexical_lookup(nwords, lemmas, forms)) { printf("NOTE: lexical coverage gap\n");  return -1; }
+	if(reduce_chart(nwords, lemmas)) { printf("NOTE: post reduction gap\n"); return -1; }
 
 	//if(rtried)free(rtried);
 	//rtried = calloc(sizeof(int),nrules);
@@ -164,7 +164,7 @@ int	parse(int	nwords, char	*words[], char	*sentence)
 	{
 		if(num_parses)
 			output_lui_trees(cells+chart_size-1, sentence, best_only);
-		else output_lui_chart(words);
+		else output_lui_chart(lemmas);
 	}
 
 	used_total += used_edges;
@@ -190,7 +190,7 @@ int	parse_line(char	*line)
 	char	copy[10240];
 	int	nparse = 0;
 	int	nwords = 0, i, j;
-	char	**words, *p, *q;
+	char	**forms, **lemmas, *p, *q;
 
 	timer();
 
@@ -205,7 +205,7 @@ int	parse_line(char	*line)
 
 	strcpy(copy, line);
 
-	preprocess_line(copy, &nwords, 0, &words);
+	preprocess_line(copy, &nwords, &lemmas, &forms);
 
 	if(nwords>60)
 	{
@@ -215,18 +215,20 @@ int	parse_line(char	*line)
 
 	for(j=0;j<nwords;j++)
 	{
-		wcap[j] = isupper(words[j][0]);
-		for(i=0;words[j][i];i++)
+		wcap[j] = isupper(forms[j][0]);
+		for(i=0;forms[j][i];i++)
 		{
-			words[j][i] = tolower(words[j][i]);
+			forms[j][i] = tolower(forms[j][i]);
 		}
 	}
 	current_sentence = line;
-	nparse = parse(nwords, words, current_sentence);
+	nparse = parse(nwords, lemmas, forms, current_sentence);
 	if(nparse==-1)printf("NOTE: ignoring `%s'\n", current_sentence);
-	if(do_itsdb)itsdb_report(nwords, words, nparse);
+	if(do_itsdb)itsdb_report(nwords, lemmas, nparse);
 	clear_slab();
-	for(i=0;i<nwords;i++)free(words[i]);
-	free(words);
+	for(i=0;i<nwords;i++)free(forms[i]);
+	free(forms);
+	for(i=0;i<nwords;i++)free(lemmas[i]);
+	free(lemmas);
 	return nparse;
 }

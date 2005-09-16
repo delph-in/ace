@@ -8,7 +8,7 @@
 #include	"rule.h"
 #include	"freeze.h"
 
-struct path	lex_stem_path, lex_rels_path, rule_rels_path, extract_mrs_path;
+struct path	lex_stem_path, lex_rels_path, rule_rels_path, extract_mrs_path, lex_carg_path;
 char		*semarg_type;
 char		*g_cons_type;
 char		*g_list_type;
@@ -87,6 +87,7 @@ struct conf
 	char		*diff_list_type;
 	struct path	lex_stem_path;
 	struct path	lex_rels_path;
+	struct path	lex_carg_path;
 	struct path	rule_rels_path;
 	struct path	extract_mrs_path;
 
@@ -114,6 +115,7 @@ void	*freeze_conf()
 	c->diff_list_type = freeze_string(g_diff_list_type);
 	c->lex_stem_path = freeze_path(lex_stem_path);
 	c->lex_rels_path = freeze_path(lex_rels_path);
+	c->lex_carg_path = freeze_path(lex_carg_path);
 	c->rule_rels_path = freeze_path(rule_rels_path);
 	c->extract_mrs_path = freeze_path(extract_mrs_path);
 
@@ -134,6 +136,7 @@ void	recover_conf(void	*vc)
 	g_diff_list_type = c->diff_list_type;
 	lex_stem_path = c->lex_stem_path;
 	lex_rels_path = c->lex_rels_path;
+	lex_carg_path = c->lex_carg_path;
 	rule_rels_path = c->rule_rels_path;
 	extract_mrs_path = c->extract_mrs_path;
 
@@ -155,6 +158,7 @@ int	load_conf()
 
 	lex_stem_path = get_conf_path("orth-path");
 	lex_rels_path = get_conf_path("lex-rels-path");
+	lex_carg_path = get_conf_path("lex-carg-path");
 	rule_rels_path = get_conf_path("rule-rels-path");
 	extract_mrs_path = get_conf_path("semantics-path");
 	recover_conf(freeze_conf());

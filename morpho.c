@@ -92,7 +92,7 @@ void add_mwe_routes(struct edge *e, struct ochart_edge *pre, struct ochart_edge 
 			}
 }
 
-int	lexical_lookup(int	nwords, char	**words)
+int	lexical_lookup(int	nwords, char	**lemmas, char	**forms)
 {
 	struct ochart	*charts = slab_alloc(sizeof(struct ochart)*nwords);
 	int				i, j, k, cover[nwords];
@@ -102,9 +102,7 @@ int	lexical_lookup(int	nwords, char	**words)
 	tags = malloc(sizeof(char*) * nwords);
 	unk = malloc(sizeof(int) * nwords);
 #ifdef	POST
-	for(i=0;i<nwords;i++)if(wcap[i])words[i][0]-=32;
-	post_tag_sequence(nwords, words, tags, unk);
-	for(i=0;i<nwords;i++)if(wcap[i])words[i][0]+=32;
+	post_tag_sequence(nwords, lemmas, tags, unk);
 #else
 	for(i=0;i<nwords;i++)
 	{
@@ -120,12 +118,12 @@ int	lexical_lookup(int	nwords, char	**words)
 	bzero(cover, sizeof(int)*nwords);
 	for(i=0;i<nwords;i++)
 	{
-		add_ochart_edge(0, charts+i, words[i], 0);
+		add_ochart_edge(0, charts+i, forms[i], 0);
 		for(j=0;j<charts[i].nedges;j++)
 			unfold_oroutes(charts[i].edges[j], charts[i].edges[j], 0, 0);
 		/*for(j=0;j<charts[i].nedges;j++)
 		{
-			printf("%s -> %s\n", words[i], charts[i].edges[j]->form);
+			printf("%s -> %s\n", forms[i], charts[i].edges[j]->form);
 			for(k=0;k<charts[i].edges[j]->north_routes;k++)
 			{
 				struct orth_route *r = charts[i].edges[j]->orth_routes+k;
@@ -156,7 +154,7 @@ int	lexical_lookup(int	nwords, char	**words)
 					if(lex->stemlen + i > nwords)return 0;
 					for(k=1;k<lex->stemlen-1;k++)
 					{
-						sprintf(stemcmp, "\"%s\"", words[i+k]);
+						sprintf(stemcmp, "\"%s\"", forms[i+k]);
 						// no inflection allowed on inner elements of MWEs
 						if(strcasecmp(lex->stem[k]->name, stemcmp))
 							return 0;
@@ -176,6 +174,8 @@ int	lexical_lookup(int	nwords, char	**words)
 				else
 				{
 					le = lexical_edge(lex, i, lex->stemlen, 0);
+					if(strcasecmp(forms[i], lemmas[i]))
+						record_carg(le, lemmas[i]);
 					le->north_routes = e->north_routes;
 					le->orth_routes = e->orth_routes;
 				}
@@ -199,7 +199,7 @@ int	lexical_lookup(int	nwords, char	**words)
 	{
 		if(cover[i] == 0)
 		{
-			char	*stem = freeze_string(words[i]);
+			char	*stem = freeze_string(forms[i]);
 			int		l;
 			struct edge *le;
 			while(stem[0]=='"' || stem[0]=='\'' || stem[0]=='[' || stem[0]=='(')stem++;
@@ -207,6 +207,8 @@ int	lexical_lookup(int	nwords, char	**words)
 			while(l>=0 && (stem[l]=='"' || stem[l]=='\'' || stem[l]==']' || stem[l]==')' || stem[l]=='?' || stem[l]=='!' || stem[l]==',' || stem[l]=='.'))
 				l--;
 			stem[l+1] = 0;
+			//printf("NOTE: suffix removal from `%s' produced `%s'\n", forms[i], stem);
+			//for(j=0;j<charts[i].nedges;j++) printf(" choice `%s'\n", charts[i].edges[j]->form);
 			if(stem[0])
 			{
 				for(j=0;j<charts[i].nedges;j++)
