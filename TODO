@@ -1,14 +1,24 @@
 TODO:
 
+make ep_drop and var_drop in mrsdg.c configurable (otherwise mrs extraction fails for JACY)
+	- var_drop should just be in the .vpm file, actually
+
 discount time waiting for stdin when parsing from stdin
 
 deprecate old mrs output
 
-freeze POST / configurable-ize
+freeze POST & configurable-ize it
+
+try to prove/analyze interesting things at grammar compile time
+	- *intelligently* auto pick quickcheck paths
+		- make quickcheck used for packing ignore packing restrictor
+		- and the shameless hack(tm) in qc.c with 0-1-lists
+	- e.g. the INFLECTD is monotonic, '-' becomes '+'
+		- this would help rule out applying inflectional rules like non3sg_fin_verb when 3sg_fin_verb is on the orth-agenda
+		- might be lots of other such features we could find
+	- auto pick packing restrictor
 
 find a way of making web / email ersatz work; preprocessor breaks them now, thanks to new treatment which separates U.S. into U. S. and X/Y into X / Y...
-
-unicode support for preprocessor and morphology
 
 use RFTC and RLTC to better advantage
 	- e.g. precompute which rules unify with root,
@@ -26,15 +36,6 @@ optimize lexicon storage; maybe use provided lexdb schema
 		- figure out why this didn't work last time it was tried
 maybe support lexdb
 
-try to prove/analyze interesting things at grammar compile time
-	- auto pick quickcheck paths
-		- make quickcheck used for packing ignore packing restrictor
-		- and the shameless hack(tm) in qc.c with 0-1-lists
-	- e.g. the INFLECTD is monotonic, '-' becomes '+'
-		- this would help rule out applying inflectional rules like non3sg_fin_verb when 3sg_fin_verb is on the orth-agenda
-		- might be lots of other such features we could find
-	- auto pick packing restrictor
-
 make STEM actually be updated by ortho rules; apparently some grammars depend on it.
 
 generalize rule filter
@@ -48,6 +49,9 @@ make unpacking support 2+-ary
 loading: use an instance to define configuration paths?
 
 better max-ent hash keys
+
+check correctness of unicode support for preprocessor and morphology somehow
+	- possibly still need a call to setlocale() in main()
 
 done:
 +grab "spanning-only-rules" from PET common.set!!
