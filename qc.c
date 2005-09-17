@@ -1,6 +1,10 @@
 #include	<stdlib.h>
 #include	<assert.h>
+#include	<string.h>
+#include	<time.h>
 
+#include	"conf.h"
+#include	"chart.h"
 #include	"dag.h"
 #include	"tdl.h"
 
@@ -184,28 +188,40 @@ PUSH("ROOT"), REC(86),
 
 //};
 
-#define	QC_SIZE	46
-//#define	QC_SIZE	103
-
 //#define	nqcprog	(sizeof(qcprog)/(sizeof(struct qcinst)))
+
+//unsigned int	qc_size = 46;
+//unsigned int	qc_size = 71;
+
+#define	QC_SIZE(x) unsigned int	qc_size = x;
+#define PUSH(fname)
+#define POP
+#define REC(x)
+#include	"qccode.c"
+#undef PUSH
+#undef POP
+#undef REC
+#undef QC_SIZE
+#define	QC_SIZE(x)
 
 struct qc
 {
-	struct type	*entries[QC_SIZE];
+	struct type	*entries[1];
 };
 
 int	__qc_use_heap = 0;
 
-const int	qcbytes = sizeof(struct type*)*QC_SIZE;
-
 static struct type	*olist, *minus, *_1list, *_0dlist, *null;
 extern int gen_qc;
+
+IFCLOCK(unsigned long long extract_clock;)
+IFCLOCK(unsigned long long extract_count;)
 
 struct qc	*extract_qc(struct dg	*d)
 {
 	static int	init = 0;
 	struct qc	*q;
-	long		i, sp = 0, dst, fn, onf;
+	long		i, iter, sp = 0, dst, fn, onf;
 	extern int	nfnames;
 	int			*lp;
 	extern unsigned int	generation;
@@ -228,6 +244,8 @@ struct qc	*extract_qc(struct dg	*d)
 		/*for(i=0;i<nqcprog;i++)
 			if(qcprog[i].com==_PUSH)
 				qcprog[i].fnum = lookup_fname(qcprog[i].arg);*/
+
+#ifdef	HIDEOUS_HACK
 		olist = lookup_type("*olist*");
 		assert(olist);
 		minus = lookup_type("-");
@@ -238,14 +256,19 @@ struct qc	*extract_qc(struct dg	*d)
 		assert(_0dlist);
 		null = lookup_type(g_null_type);
 		assert(null);
+#endif
 	}
-	lp = labels;
 
 	if(!__qc_use_heap)
-		q = slab_alloc(sizeof(struct qc));
-	else q = malloc(sizeof(struct qc));
+		q = slab_alloc(sizeof(struct type*)*qc_size);
+	else q = malloc(sizeof(struct type*)*qc_size);
 
+IFCLOCK(	clock_t	T = clock();for(iter=0;iter<100;iter++)	)
+	{
+	sp = 0;
+	lp = labels;
 	stack[sp] = d;
+
 
 #define	REC(dst)	if(stack[sp]) \
 						q->entries[dst] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype; \
@@ -253,11 +276,19 @@ struct qc	*extract_qc(struct dg	*d)
 
 #define	POP			--sp;
 
+#ifdef	CLOCKCOUNT
+#define	EC		extract_count++
+#else
+#define	EC
+#endif
 #define	PUSH(fname)	if(stack[sp])stack[sp+1] = dg_hop(stack[sp], *lp);	\
 					else stack[sp+1] = 0;	\
-					sp++; lp++;
+					sp++; lp++; EC;
 
 #include	"qccode.c"
+	}
+IFCLOCK(	extract_clock += clock() - T; )
+
 /*	for(i=0;i<nqcprog;i++)
 	{
 		switch(qcprog[i].com)
@@ -307,26 +338,40 @@ struct qc	*extract_qc_arg(struct dg	*d, int	arg)
 	return extract_qc(to);
 }
 
+IFCLOCK(unsigned long long glb_clock;)
+IFCLOCK(unsigned long long glb_count;)
+
 int	quickcheck(struct qc	*a, struct qc	*b)
 {
 	int	i;
+IFCLOCK(	clock_t T = clock();)
+IFCLOCK(	int j;)
 
-	for(i=0;i<QC_SIZE;i++)
+IFCLOCK(for(j=0;j<100;j++))
+	for(i=0;i<qc_size;i++)
 	{
 		if(a->entries[i] && b->entries[i] &&
 			!glb(a->entries[i], b->entries[i]))
 		{
 			//printf("QC reject %d\n", i);
-			return -1;
+			break;
 		}
 	}
-	// XXX shameless hack
+
+IFCLOCK(	glb_clock += clock() - T;)
+IFCLOCK(	glb_count += i*100;)
+
+	if(i<qc_size)return -1;
+
+#ifdef	HIDEOUS_HACK
 	if(a->entries[20] == olist && b->entries[9]==minus)return -1;
 	if(b->entries[20] == olist && a->entries[9]==minus)return -1;
 	if(a->entries[31] == _1list && b->entries[32]==_0dlist && b->entries[24]==null)return -1;
 	if(b->entries[31] == _1list && a->entries[32]==_0dlist && a->entries[24]==null)return -1;
 	if(a->entries[10] == olist && b->entries[11]==minus)return -1;
 	if(b->entries[10] == olist && a->entries[11]==minus)return -1;
+#endif
+
 	return 0;
 }
 
@@ -336,7 +381,7 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 	struct type	*ta, *tb, *g;
 	int	fw = 1, bw = 1;
 
-	for(i=0;i<QC_SIZE;i++)
+	for(i=0;i<qc_size;i++)
 	{
 		ta = a->entries[i];
 		tb = b->entries[i];
@@ -361,14 +406,138 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 struct qc	*copy_qc(struct qc	*in)
 {
 	if(!in)return 0;
-	struct qc	*out = slab_alloc(sizeof(struct qc));
-	*out = *in;
-	return out;
+	struct qc	*out = slab_alloc(sizeof(struct type*)*qc_size);
+	return memcpy(out, in, sizeof(struct type*)*qc_size);
 }
 
-/*
-   1125 SYNSEM LOCAL CAT VAL SUBJ FIRST OPT 
-   1583 SYNSEM NON-LOCAL QUE LAST 
-   2336 SYNSEM NON-LOCAL SLASH LAST 
-   2895 SYNSEM LOCAL CAT VAL SPR FIRST OPT 
-   */
+// qc generator
+
+static struct qc_path
+{
+	struct path			path;
+	unsigned long long	failures;
+	int					rank;
+}			*paths;
+static int	npaths;
+
+void	gqc_count_failure(struct path	path)
+{
+	int	i;
+
+	for(i=0;i<npaths;i++)
+		if(!pathcmp(&path, &paths[i].path))
+		{
+			paths[i].failures++;
+			return;
+		}
+	npaths++;
+	paths = realloc(paths, sizeof(struct qc_path)*npaths);
+	paths[npaths-1].path = pathdup(path);
+	paths[npaths-1].failures = 1;
+}
+
+extern unsigned long long unify_attempts_total, unify_attempts_pass_rf, unify_attempts_pass_qc, unify_attempts_success, unify_attempts_bad_orth;
+
+const double	k_glb = 0.0000022, k_unify = 0.0011, k_hop = 0.0000024;
+
+void	gqc_treeify(int	count, int *hops)
+{
+	struct qc_path	pth[count];
+	int				i;
+
+	memcpy(pth, paths, sizeof(struct qc_path)*count);
+	int	lexcmp(const struct qc_path	*a, const struct qc_path	*b)
+	{
+		int i;
+		for(i=0;i<a->path.count && i<b->path.count;i++)
+			if(a->path.fnums[i] != b->path.fnums[i])
+				return a->path.fnums[i] - b->path.fnums[i];
+		return a->path.count - b->path.count;
+	}
+	qsort(pth, count, sizeof(struct qc_path), (int(*)(const void*,const void*))lexcmp);
+
+	if(hops)
+	{
+		int i, hc = pth[0].path.count;
+		// just count hops
+		for(i=1;i<count;i++)
+		{
+			// find common prefix
+			int j;
+			for(j=0;j<pth[i].path.count && j<pth[i-1].path.count;j++)
+				if(pth[i].path.fnums[j] != pth[i-1].path.fnums[j])break;
+			hc += pth[i].path.count - j;
+		}
+		*hops = hc;
+	}
+	else
+	{
+		// actually build program
+		extern char	**fnames;
+		int i, hc = pth[0].path.count;
+		for(i=0;i<pth[0].path.count;i++)
+			printf(" PUSH(%s)", fnames[pth[0].path.fnums[i]]);
+		printf(" REC(%d)", pth[0].rank);
+		for(i=1;i<count;i++)
+		{
+			// find common prefix
+			int j, k;
+			for(j=0;j<pth[i].path.count && j<pth[i-1].path.count;j++)
+				if(pth[i].path.fnums[j] != pth[i-1].path.fnums[j])break;
+			for(k=j;k<pth[i-1].path.count;k++)printf(" POP");
+			printf("\n"); for(k=0;k<j;k++)printf("    ");
+			for(k=j;k<pth[i].path.count;k++)printf(" PUSH(%s)", fnames[pth[i].path.fnums[k]]);
+			printf(" REC(%d)", pth[i].rank);
+		}
+		printf("\n");
+	}
+}
+
+void	gqc_result()
+{
+	int i, nhops[npaths], cnh = 0, cheapest = 0;
+	unsigned long long total = 0, cum = 0;
+	double	filtration[npaths], least_cost;
+	int	qcpcmp(const struct qc_path	*a, const struct qc_path	*b) { return b->failures - a->failures; }
+	qsort(paths, npaths, sizeof(struct qc_path), (int(*)(const void*,const void*))qcpcmp);
+
+	for(i=0;i<npaths;i++)
+	{
+		total += paths[i].failures;
+		paths[i].rank = i;
+	}
+
+	for(i=0;i<npaths;i++)
+	{
+		cnh += paths[i].path.count;
+		cum += paths[i].failures;
+
+		filtration[i] = (double)cum / unify_attempts_pass_rf;//total;
+		gqc_treeify(i+1, &nhops[i]);
+	}
+
+	for(i=0;i<=npaths;i++)
+	{
+		int j;
+		double	cost, c_check = 0, c_unify, c_extract;
+		for(j=0;j<i;j++)
+			c_check += k_glb * unify_attempts_pass_rf * ((j>0)?(1-filtration[j-1]):1.0);
+		c_unify = k_unify * unify_attempts_pass_rf * ((i>0)?(1-filtration[i-1]):1.0);
+		c_extract = k_hop * ((i>0)?nhops[i-1]:0) * (unify_attempts_success - unify_attempts_bad_orth);
+		cost = c_check + c_unify + c_extract;
+		/*printf("%3d paths:	%10f = %10f + %10f + %10f\n", i, cost, c_check, c_unify, c_extract);
+		if(i<npaths)
+		{
+			printf("%16lld (%.1f%%, %d hops): ", paths[i].failures, 100*filtration[i], nhops[i]);
+			print_path(paths[i].path);
+			printf("\n");
+		}*/
+		if(i==0)least_cost = cost;
+		else if(cost<least_cost) { least_cost = cost; cheapest = i; }
+	}
+
+	printf("QC_SIZE(%d)\n", cheapest);
+	printf("/* GQC: using %d paths, %.1f%% of failures, %d extraction hops, expected cost %f */\n",
+		cheapest, 100 * (filtration[cheapest-1] / filtration[npaths-1]), nhops[cheapest-1], least_cost);
+	gqc_treeify(cheapest, 0);
+}

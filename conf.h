@@ -16,7 +16,9 @@ extern char			*g_diff_list_type;
 
 struct dg	*dg_path(struct dg	*dg, struct path	p);
 struct dg	*dg_path_add(struct dg	*dg, struct path	p, struct dg	*add);
+int			pathcmp(const struct path	*p1, const struct path	*p2);
 void		print_path(struct path	p);
 struct path	make_path(int count, ...);
+struct path	pathdup(struct path	p);
 
 #endif

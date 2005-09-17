@@ -38,6 +38,21 @@ void print_path(struct path	p)
 		printf("%s%s", (i==0)?"":" ", fnames[p.fnums[i]]);
 }
 
+int			pathcmp(const struct path	*p1, const struct path	*p2)
+{
+	if(p1->count != p2->count)return p1->count - p2->count;
+	return memcmp(p1->fnums, p2->fnums, sizeof(int)*p1->count);
+}
+
+struct path	pathdup(struct path	q)
+{
+	struct path p;
+	p.count = q.count;
+	p.fnums = malloc(sizeof(int)*p.count);
+	memcpy(p.fnums, q.fnums, sizeof(int)*p.count);
+	return p;
+}
+
 struct path	make_path(int count, ...)
 {
 	struct path	p;
