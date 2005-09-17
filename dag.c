@@ -7,6 +7,7 @@
 #include	<unistd.h>
 #include	<sys/mman.h>
 #include	"dag.h"
+#include	"conf.h"
 
 extern int	debug_level;
 extern int	loud_noises;
@@ -432,6 +433,7 @@ int reload_restrictors = 1, restrictor_size = 0;
 int	lookup_fname(char	*label)
 {
 	int	i;
+	extern int g_mode;
 
 	for(i=0;i<nfnames;i++)
 		if(!strcasecmp(fnames[i], label))return i;
@@ -441,6 +443,7 @@ int	lookup_fname(char	*label)
 	introduce = realloc(introduce, sizeof(int) * nfnames);
 	introduce[i] = -1;
 	reload_restrictors = 1;
+	if(g_mode != -1) { fprintf(stderr, "WARNING: added new feature `%s' at runtime\n", label); }
 	return i;
 }
 
@@ -454,6 +457,12 @@ void	unify_backtrace()
 	for(i=0;i<upathl;i++)fprintf(stdout, "%s ", fnames[upath[i]]);
 	fprintf(stdout, "\n");
 	fflush(stdout);
+}
+
+struct path	unify_backtrace_path()
+{
+	struct path p = {.count = upathl, .fnums = upath};
+	return p;
 }
 #endif
 

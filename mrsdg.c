@@ -9,8 +9,10 @@
 
 static int name;
 
+#ifdef	ERG
 static char	*ep_drop[] = {"WLINK", "LBL", "CTO", "CFROM", "PARAMS", "PRED", 0};
 static char	*var_drop[] = {"--TPC", "--PSV", "SORT", "INSTLOC", 0};
+#endif
 
 // dag to mrs conversion
 
@@ -19,8 +21,10 @@ void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 	extern char **fnames;
 	int i, onp = v->nprops, flen = strlen(fnames[label]);
 
+#ifdef	ERG
 	for(i=0;var_drop[i];i++)
 		if(!strcmp(fnames[label], var_drop[i]))return;
+#endif
 
 	if(value->narcs)
 	{
@@ -93,17 +97,13 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 {
 	struct darc	*arcs = DARCS(dg);
 	struct dg		*pred;
-	static int		lblf = -1, cfromf, ctof, wlinkf, predf, paramsf;
+	static int		lblf = -1, predf;
 	int				i, j;
 
 	if(lblf==-1)
 	{
 		lblf = lookup_fname("LBL");
 		predf = lookup_fname("PRED");
-		wlinkf = lookup_fname("WLINK");
-		cfromf = lookup_fname("CFROM");
-		ctof = lookup_fname("CTO");
-		paramsf = lookup_fname("PARAMS");
 	}
 	pred = dg_hop(dg, predf);
 	if(!pred)
@@ -118,9 +118,11 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 	for(i=0;i<dg->narcs;i++)
 	{
 		extern char	**fnames;
+#ifdef	ERG
 		for(j=0;ep_drop[j];j++)
 			if(!strcmp(fnames[arcs[i].label], ep_drop[j]))break;
 		if(ep_drop[j])continue;
+#endif
 		ep->nargs++;
 		ep->args = realloc(ep->args, sizeof(struct mrs_ep_role)*ep->nargs);
 		ep->args[ep->nargs-1].name = strdup(fnames[arcs[i].label]);
