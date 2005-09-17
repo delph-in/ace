@@ -138,6 +138,8 @@ parse_pprules()
 
 int	load_fsr_preprocessor(char	*fname)
 {
+	if(!fname)return 0;
+
 	FILE	*f = fopen(fname, "r");
 	char	basepath[1024], subpath[1024];
 	char	line[1024], typec, pattern[1024], rep[1024], *p, *s;

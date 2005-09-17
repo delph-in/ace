@@ -715,7 +715,7 @@ int	load_irregulars(char	*path)
 	char	*form =0 , *rule =0 , *stem =0 ;
 	struct orule	*or;
 
-	if(!f) { perror(path); return -1; }
+	if(!f) { perror(path); return 0; }
 	while(fgets(line, 1024, f))
 	{
 		if(!*line)break;

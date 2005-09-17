@@ -1010,6 +1010,11 @@ void	load_version(char *path)
 	FILE	*f = fopen(path, "r");
 	char	record[1024], *p = record, in = 0;
 
+	if(!f)
+	{
+		fprintf(stderr, "couldn't load version from `%s'\n", path);
+		exit(-1);
+	}
 	while(!feof(f))
 	{
 		*p = fgetc(f);

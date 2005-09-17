@@ -125,6 +125,7 @@ void	*freeze_labels()
 	struct label_set	*ls = slab_alloc(sizeof(*ls));
 	int					i;
 
+	if(!lset)return 0;
 	ls->nlabels = lset->nlabels;
 	ls->labels = slab_alloc(sizeof(struct label)*ls->nlabels);
 	for(i=0;i<ls->nlabels;i++)
@@ -142,6 +143,7 @@ char	*label_dag(struct dg	*dg, char *fallback)
 {
 	int i;
 
+	if(!lset)return fallback;
 	for(i=0;i<lset->nlabels;i++)
 	{
 		lset->labels[i].dg->xtype = lset->labels[i].dg->type = lookup_type("*top*");
