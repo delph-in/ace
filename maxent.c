@@ -54,7 +54,7 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl)
 		}
 	}
 	if(mem)hash_visit_key(mem, lhs, (void(*)(void*))visitor);
-	else printf("WARNING: maxent_score() invoked with no max-ent model loaded\n");
+	else fprintf(stderr, "WARNING: maxent_score() invoked with no max-ent model loaded\n");
 	MAXENT_NOISE(" ... %f\n", ret);
 	return ret;
 }
