@@ -221,7 +221,7 @@ void	agenda_rules(int	count)
 	//fprintf(stderr, "NOTE: lex-filtered %d epsilon-edges\n", nlf);
 }
 
-void	install_rule_name(struct dg	*dg, char *name)
+/*void	install_rule_name(struct dg	*dg, char *name)
 {
 	static int	rnamef = -1;
 	struct dg	*rnamedg;
@@ -233,14 +233,14 @@ void	install_rule_name(struct dg	*dg, char *name)
 		dg->xtype->dg = add_dg_hop(dg->xtype->dg, rnamef, rnamedg);
 		//printf("added rule name `%s' to rule type `%s'\n", rnamedg->xtype->name, dg->xtype->name);
 	}
-}
+}*/
 
 void	add_rule(char	*name, struct dg	*dg, int	num)
 {
 	struct rule	*r = calloc(sizeof(struct rule), 1);
 	int			i;
 
-	install_rule_name(dg, name);
+	//install_rule_name(dg, name);
 
 	nrules++;
 	rules = realloc(rules, sizeof(struct rule*)*nrules);
