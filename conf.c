@@ -109,6 +109,7 @@ struct conf
 	char	*deleted_daughters;
 	char	*parsing_packing;
 	char	*generating_packing;
+	char	*ep_drop;
 };
 
 struct path	freeze_path(struct path	p)
@@ -118,7 +119,7 @@ struct path	freeze_path(struct path	p)
 }
 
 extern int reload_restrictors, restrictor_size, nfnames;
-extern char	*deleted_daughters, *parsing_packing, *generating_packing;
+extern char	*deleted_daughters, *parsing_packing, *generating_packing, *ep_drop;
 
 void	*freeze_conf()
 {
@@ -137,6 +138,7 @@ void	*freeze_conf()
 	c->deleted_daughters = freeze_block(deleted_daughters, restrictor_size);
 	c->parsing_packing = freeze_block(parsing_packing, restrictor_size);
 	c->generating_packing = freeze_block(generating_packing, restrictor_size);
+	c->ep_drop = freeze_block(ep_drop, restrictor_size);
 
 	return c;
 }
@@ -158,6 +160,7 @@ void	recover_conf(void	*vc)
 	deleted_daughters = c->deleted_daughters;
 	parsing_packing = c->parsing_packing;
 	generating_packing = c->generating_packing;
+	ep_drop = c->ep_drop;
 	reload_restrictors = (restrictor_size == nfnames);
 
 	//printf("types cons `%s' list `%s' null `%s' dlist `%s'\n", g_cons_type, g_list_type, g_null_type, g_diff_list_type);

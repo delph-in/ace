@@ -9,8 +9,9 @@
 
 static int name;
 
+extern char	*ep_drop;
+
 #ifdef	ERG
-static char	*ep_drop[] = {"WLINK", "LBL", "CTO", "CFROM", "PARAMS", "PRED", 0};
 static char	*var_drop[] = {"--TPC", "--PSV", "SORT", "INSTLOC", 0};
 #endif
 
@@ -118,11 +119,8 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 	for(i=0;i<dg->narcs;i++)
 	{
 		extern char	**fnames;
-#ifdef	ERG
-		for(j=0;ep_drop[j];j++)
-			if(!strcmp(fnames[arcs[i].label], ep_drop[j]))break;
-		if(ep_drop[j])continue;
-#endif
+		if(arcs[i].label == lblf || arcs[i].label==predf)continue;
+		if(ep_drop[arcs[i].label])continue;
 		ep->nargs++;
 		ep->args = realloc(ep->args, sizeof(struct mrs_ep_role)*ep->nargs);
 		ep->args[ep->nargs-1].name = strdup(fnames[arcs[i].label]);
@@ -190,6 +188,7 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	}
 	//printf("extract from cont: "); print_dg(cont); printf("\n");
 
+	load_ep_drop();
 	hook = dg_hop(cont, hookf);
 	rels = dg_hop(cont, relsf);
 	hcons = dg_hop(cont, hconsf);

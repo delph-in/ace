@@ -489,7 +489,7 @@ int	init_fnames()
 char	*copy_restrictor;
 char	*unify_restrictor;
 
-char	*deleted_daughters, *parsing_packing, *generating_packing;
+char	*deleted_daughters, *parsing_packing, *generating_packing, *ep_drop;
 
 void print_restrictor(char *name, char *restr)
 {
@@ -510,18 +510,26 @@ void load_restrictors()
 	if(deleted_daughters)free(deleted_daughters);
 	if(parsing_packing)free(parsing_packing);
 	if(generating_packing)free(generating_packing);
+	if(ep_drop)free(ep_drop);
 	deleted_daughters = calloc(nfnames, 1);
 	parsing_packing = calloc(nfnames, 1);
 	generating_packing = calloc(nfnames, 1);
+	ep_drop = calloc(nfnames, 1);
 	for(i=0;i<nfnames;i++)
 	{
 		deleted_daughters[i] = check_conf_list("deleted-daughters", fnames[i]);
 		parsing_packing[i] = check_conf_list("parsing-packing-restrictor", fnames[i]);
 		generating_packing[i] = check_conf_list("generation-packing-restrictor", fnames[i]);
+		ep_drop[i] = check_conf_list("mrs-deleted-roles", fnames[i]);
 	}
 
 	restrictor_size = nfnames;
 	reload_restrictors = 0;
+}
+
+void	load_ep_drop()
+{
+	if(reload_restrictors)load_restrictors();
 }
 
 void enable_trim(int trim)
