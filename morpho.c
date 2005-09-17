@@ -391,7 +391,7 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 
 char	*lgroups[256];
 
-void	set_lgroup(int	group, char	*letters)
+void	set_lgroup(int	group, wchar_t	*letters)
 {
 	//printf("letter group %c = %s\n", group, letters);
 	if(lgroups[group])
@@ -400,53 +400,78 @@ void	set_lgroup(int	group, char	*letters)
 		exit(-1);
 	}
 	lgroups[group] = calloc(256, sizeof(char));
-	while(*letters)
-		lgroups[group][(int)*letters++] = 1;
+	while(*letters)	// XXX taking the low 8 bits of a wchar_t is *not* the right way of storing the letter set :-P
+		lgroups[group][255 & ((int)*letters++)] = 1;
+}
+
+wchar_t	*wcsdup(wchar_t	*str)
+{
+	int len = wcslen(str);
+	wchar_t	*w = malloc((len+1)*sizeof(wchar_t));
+	return memcpy(w, str, (len+1)*sizeof(wchar_t));
+}
+
+wchar_t	*trim_wcs(wchar_t	*str)
+{
+	int len;
+	while(*str == ' ' || *str=='\t')++str;
+	len = wcslen(str);
+	while(len>0 && (str[len-1]==' ' || str[len-1]=='\t'))len--;
+	str[len] = 0;
+	return str;
 }
 
 void	setup_morpho(char	*line)
 {
 	char	*end;
-	int	letter;
+	int	letter, over;
 
 	line = trim_string(line);
 	end = line + strlen(line)-1;
-	if(*end != ')')
+	if(*end != ')' || *line != '(')
 	{
 		fprintf(stderr, "morpho: setup command `%s' malformed\n", line);
 		exit(-1);
 	}
 	*end = 0;
 
-	end = line;
-	while(*end && *end!=' ' && *end!='\t')end++;
+	end = line+1;
+	while(*end && *end!=' ' && *end!='\t' && *end!='(')end++;
+	over = *end;
 	if(*end)*end=0;
-	if(!strcmp(line, "letter-set"))
+	if(strcmp(line, "(letter-set"))
 	{
 		fprintf(stderr, "morpho: setup command `%s' not supported\n", line);
 		exit(-1);
 	}
+	*end = over;
 
-	line = trim_string(end+1);
-	if(*line != '(' || line[1] != '!')
+	wchar_t	*wide = trim_wcs(towide(end)), *wend;
+
+	if(*wide != '(' || wide[1] != '!')
 	{
 		synt:
 		fprintf(stderr, "morpho: letter-set syntax is (!x abcd...)\n");
 		exit(-1);
 	}
-	end = line + strlen(line)-1;
-	if(*end != ')')goto synt;
-	*end = 0;
-	line = trim_string(line+2);
+	wend = wide + wcslen(wide)-1;
+	if(*wend != ')')goto synt;
+	*wend = 0;
+	wide = trim_wcs(wide+2);
 
-	letter = *line;
-	if(line[1] != ' ' && line[1] != '\t')goto synt;
-	set_lgroup(letter, trim_string(line+2));
+	if(*wide < 0 || *wide > 255)
+	{
+		fprintf(stderr, "morpho: letter-set name must be ASCII\n");
+		exit(-1);
+	}
+	letter = *wide;
+	if(wide[1] != ' ' && wide[1] != '\t')goto synt;
+	set_lgroup(letter, trim_wcs(wide+2));
 }
 
 int	appropriate_letter(int	let, int	group)
 {
-	if(let>255 || let<0)return 0;
+	let = ((unsigned int)let) & 255;	// XXX for now we're only looking about 8 bits of wchar_t for letter groups
 	if(group>255 || group<0)return 0;
 	if(!lgroups[group])
 	{
@@ -619,7 +644,7 @@ static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 
 void	setup_orule(struct orule	*or, char	*def)
 {
-	char	*sp, *type, *next;
+	char	*sp, *type;
 
 	or->nsub = 0;
 	or->sub = 0;
@@ -643,41 +668,43 @@ void	setup_orule(struct orule	*or, char	*def)
 	if(!strcmp(type, "suffix"))or->type = or_suffix;
 	else or->type = or_prefix;
 
-	while(*def == '(')
+	wchar_t	*wdef = towide(def), *next, *wsp;
+
+	while(*wdef == '(')
 	{
 		struct orule_sub *sub;
-		def++;
-		sp = strchr(def, ')');
-		if(!sp)
+		wdef++;
+		wsp = wcschr(wdef, ')');
+		if(!wsp)
 		{
-			fprintf(stderr, "morpho: subrule `%s' is not closed\n", def);
+			fprintf(stderr, "morpho: subrule `%S' is not closed\n", wdef);
 			exit(-1);
 		}
-		*sp = 0;
-		next = sp+1;
-		for(sp=def;*sp && *sp!=' ' && *sp!='\t';sp++) {}
-		if(!*sp)
+		*wsp = 0;
+		next = wsp+1;
+		for(wsp=wdef;*wsp && *wsp!=' ' && *wsp!='\t';wsp++) {}
+		if(!*wsp)
 		{
-			fprintf(stderr, "morpho: subrule `%s' has no RHS\n", def);
+			fprintf(stderr, "morpho: subrule `%S' has no RHS\n", wdef);
 			exit(-1);
 		}
-		*sp = 0;
-		sp = trim_string(sp+1);
-		//printf("subrule lhs `%s', rhs `%s'\n", def, sp);
+		*wsp = 0;
+		wsp = trim_wcs(wsp+1);
+		//printf("subrule lhs `%S', rhs `%S'\n", wdef, wsp);
 		or->nsub++;
 		or->sub = realloc(or->sub, sizeof(struct orule_sub)*or->nsub);
 		sub = or->sub + or->nsub-1;
-		sub->pat = towide(def);
+		sub->pat = wcsdup(wdef);
 		sub->patl = wcslen(sub->pat);
-		sub->rep = towide(sp);
+		sub->rep = wcsdup(wsp);
 		sub->repl = wcslen(sub->rep);
 
-		def = trim_string(next);
+		wdef = trim_wcs(next);
 	}
-	if(*def)
+	if(*wdef)
 	{
 		fprintf(stderr, "morpho: syntax for orthographemic patterns is %%type (pat rep) (pat rep) ...\n");
-		fprintf(stderr, "   trailing garbage `%s' after subrules\n", def);
+		fprintf(stderr, "   trailing garbage `%S' after subrules\n", wdef);
 		exit(-1);
 	}
 }
