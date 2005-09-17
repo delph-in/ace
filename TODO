@@ -3,8 +3,6 @@ TODO:
 make ep_drop and var_drop in mrsdg.c configurable (otherwise mrs extraction fails for JACY)
 	- var_drop should just be in the .vpm file, actually
 
-discount time waiting for stdin when parsing from stdin
-
 deprecate old mrs output
 
 freeze POST & configurable-ize it

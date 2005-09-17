@@ -26,6 +26,9 @@ int g_mode = PARSING;
 extern int	g_loaded, inhibit_results, trace;
 extern long long	accum_ram_usage;
 extern char			*use_roots;
+float	stdin_time = 0;
+
+extern float timer();
 
 int	parse_line(char	*line);
 
@@ -150,7 +153,9 @@ int	main(int	argc, char	*argv[])
 		if(g_mode == PARSING)
 		{
 			char	line[10240];
+			if(fin==stdin)timer();
 			if(!fgets(line, 10240, fin))break;
+			if(fin==stdin)stdin_time += timer();
 			num_results = parse_line(line);
 		}
 		else
@@ -166,6 +171,7 @@ int	main(int	argc, char	*argv[])
 		if(num_results>=0)count++;
 		fflush(stderr);
 	}
+	if(fin==stdin)stdin_time += timer();
 	gettimeofday(&tv2, 0);
 	restore_stderr();
 
@@ -176,7 +182,7 @@ int	main(int	argc, char	*argv[])
 		tv2.tv_usec -= tv1.tv_usec;
 		clear_slab();
 		fprintf(stderr, "NOTE: %s %d / %d sentences, avg %dk, time %.5fs\n", (g_mode==PARSING)?"parsed":"generated",
-			success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
+			success, count, (int)(accum_ram_usage / count / 1024), (float)tv2.tv_sec + (float)tv2.tv_usec/1000000 - stdin_time);
 	}
 	rule_stats();
 	print_glb_stats();
