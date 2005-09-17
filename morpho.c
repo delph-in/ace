@@ -1,10 +1,11 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
+#include	<limits.h>
 #include	<wchar.h>
 #include	<ctype.h>
 
-int	invert_ipat(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem, int type);
+static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, char	*stem, int type);
 struct lexeme	*proper_noun_lex(char	*name);
 
 extern int	wcap[1024];
@@ -54,6 +55,18 @@ void add_orules(struct edge *le)
 		for(j=0;j<r->len;j++)
 			add_agenda_lrule(le->from, rules[r->rules[j]]);
 	}
+}
+
+wchar_t	*towide(char	*mbs)
+{
+	int		len = strlen(mbs);
+	wchar_t	*wide = malloc(sizeof(wchar_t)*(len+1));
+	if(-1 == mbstowcs(wide, mbs, len+1))
+	{
+		perror("multibyte decoding failed");
+		exit(-1);
+	}
+	return wide;
 }
 
 static inline is_type_route(struct orth_route *r, int type)
@@ -301,7 +314,7 @@ void add_oparent(struct ochart_edge *daughter, struct ochart_edge *parent, struc
 
 void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule)
 {
-	int	i, forml = strlen(form);
+	int	i;
 	struct ochart_edge *edge = 0;
 
 	// check for a compatible edge already in the chart
@@ -312,6 +325,9 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 			add_oparent(chart->edges[i], parent, rule);
 			return;
 		}
+
+	wchar_t	*wform = towide(form);
+	int forml = wcslen(wform);
 
 	//printf(".. `%s' is new\n", form);
 	// completely new edge; add it to the chart
@@ -349,7 +365,7 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 		for(j=or->nsub-1;j>=0;j--)
 		{
 			struct orule_sub *sub = or->sub+j;
-			if(!invert_ipat(sub->pat, sub->patl, sub->rep, sub->repl, form, forml, stem, or->type))
+			if(!invert_ipat(sub->pat, sub->patl, sub->rep, sub->repl, wform, forml, stem, or->type))
 			{
 				// good guess; now check whether 'stem' actually inflects to 'form'
 				/*char *check = inflect(or, stem);
@@ -362,12 +378,13 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 				}
 				free(check);*/
 
-				//fprintf(stderr, "form `%s' = stem `%s' under rule `%s'[%d], i.e. `%s' replaced by `%s'\n",
-				//		form, stem, or->rule->name, j, sub->pat, sub->rep);
+				//fprintf(stderr, "form `%S' = stem `%s' under rule `%s'[%d], i.e. `%S' replaced by `%S'\n",
+				//		wform, stem, or->rule->name, j, sub->pat, sub->rep);
 				add_ochart_edge(edge, chart, stem, or);
 			}
 		}
 	}
+	free(wform);
 	return;
 }
 
@@ -442,30 +459,35 @@ int	appropriate_letter(int	let, int	group)
 
 char	*inflect(struct orule	*or, char	*str)
 {
+	wchar_t	*wstr = towide(str);
 	char	*res=0;
-	int		i, strl = strlen(str);
+	int		i, strl = wcslen(wstr);
 
 	for(i=0;i<or->nirregs;i++)
 		if(!strcmp(str, or->irregs[i].stem))
-			{res = freeze_string(or->irregs[i].form);break;}
+		{
+			res = freeze_string(or->irregs[i].form);
+			break;
+		}
 	if(!res)
 	{
 		int slen = strlen(str)+10;
 		if(slen%4)slen = (slen&~3)+4;
-		res = slab_alloc(slen);
+		res = slab_alloc(slen * MB_LEN_MAX);
 		strcpy(res, str);
 		for(i=or->nsub-1;i>=0;i--)
 		{
 			struct orule_sub *sub = or->sub+i;
-			if(!invert_ipat(sub->rep, sub->repl, sub->pat, sub->patl, str, strl, res, or->type))
+			if(!invert_ipat(sub->rep, sub->repl, sub->pat, sub->patl, wstr, strl, res, or->type))
 			{
-				//printf("applied (%s %s)\n", sub->pat, sub->rep);
+				//printf("applied (%S %S)\n", sub->pat, sub->rep);
 				break;
 			}
 		}
 		if(i<0)res=0;
 		if(!or->nsub)res = freeze_string(str);
 	}
+	free(wstr);
 	//printf("inflected[%s] `%s' to `%s'\n", or->rule->name, str, res);
 	return res;
 }
@@ -574,26 +596,14 @@ int	invert_ipat_suffix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 	else return -1;
 }
 
-wchar_t	*towide(char	*mbs)
+static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, char	*stem, int type)
 {
-	int		len = strlen(mbs);
-	wchar_t	*wide = malloc(sizeof(wchar_t)*(len+1));
-	if(-1 == mbstowcs(wide, mbs, len+1))
-	{
-		perror("multibyte decoding failed");
-		exit(-1);
-	}
-	return wide;
-}
-
-int	invert_ipat(char	*pat, int patl, char	*rep, int repl, char	*form, int forml, char	*stem, int type)
-{
-	wchar_t	*wpat = towide(pat), *wrep = towide(rep), *wform = towide(form), *wstem = malloc(sizeof(wchar_t)*1024);
-	int		wpatl = wcslen(wpat), wrepl = wcslen(wrep), wforml = wcslen(wform), res;
+	wchar_t	wstem[1024];
+	int		res;
 
 	if(type == or_suffix)
-		res = invert_ipat_suffix(wpat, wpatl, wrep, wrepl, wform, wforml, wstem);
-	else res = invert_ipat_prefix(wpat, wpatl, wrep, wrepl, wform, wforml, wstem);
+		res = invert_ipat_suffix(pat, patl, rep, repl, form, forml, wstem);
+	else res = invert_ipat_prefix(pat, patl, rep, repl, form, forml, wstem);
 
 	if(!res)
 	{
@@ -604,10 +614,6 @@ int	invert_ipat(char	*pat, int patl, char	*rep, int repl, char	*form, int forml,
 		}
 	}
 
-	free(wstem);
-	free(wpat);
-	free(wrep);
-	free(wform);
 	return res;
 }
 
@@ -661,10 +667,10 @@ void	setup_orule(struct orule	*or, char	*def)
 		or->nsub++;
 		or->sub = realloc(or->sub, sizeof(struct orule_sub)*or->nsub);
 		sub = or->sub + or->nsub-1;
-		sub->pat = strdup(def);
-		sub->patl = strlen(def);
-		sub->rep = strdup(sp);
-		sub->repl = strlen(sp);
+		sub->pat = towide(def);
+		sub->patl = wcslen(sub->pat);
+		sub->rep = towide(sp);
+		sub->repl = wcslen(sub->rep);
 
 		def = trim_string(next);
 	}

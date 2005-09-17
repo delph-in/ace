@@ -5,6 +5,7 @@ int			freeze_grammar();
 void		dump_grammar();
 void		reload_frozen_grammar();
 char		*freeze_string(char	*str);
+wchar_t		*freeze_wcs(wchar_t	*str);
 void		*freeze_block(void	*src, int	len);
 struct dg	*freeze_dg(struct dg	*dg);
 

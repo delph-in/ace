@@ -1,6 +1,8 @@
 #ifndef	_MORPHO_H
 #define	_MORPHO_H
 
+#include	<wchar.h>
+
 struct orule
 {
 	struct rule	*rule;
@@ -8,9 +10,9 @@ struct orule
 	int		nsub;
 	struct orule_sub
 	{
-		char		*pat;
+		wchar_t		*pat;
 		int			patl;
-		char		*rep;
+		wchar_t		*rep;
 		int			repl;
 	}		*sub;
 

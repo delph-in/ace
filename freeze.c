@@ -72,6 +72,15 @@ struct grammar
 
 extern void	*slab_alloc(int	len);
 
+wchar_t	*freeze_wcs(wchar_t	*str)
+{
+	int	len;
+	char	*copy;
+	if(str==0)return 0;
+	len = (wcslen(str)+1) * sizeof(wchar_t);
+	return freeze_block(str, len);
+}
+
 char	*freeze_string(char	*str)
 {
 	int	len;
@@ -127,8 +136,8 @@ struct orule	*freeze_orule(struct orule	*orin)
 	for(i=0;i<orout->nsub;i++)
 	{
 		struct orule_sub *subi = orin->sub+i, *subo = orout->sub+i;
-		subo->pat = freeze_string(subi->pat);
-		subo->rep = freeze_string(subi->rep);
+		subo->pat = freeze_wcs(subi->pat);
+		subo->rep = freeze_wcs(subi->rep);
 		subo->patl = subi->patl;
 		subo->repl = subi->repl;
 	}
