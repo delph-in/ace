@@ -4,6 +4,9 @@
 #include	"dag.h"
 #include	"morpho.h"
 
+#undef	CLOCKCOUNT
+#define	IFCLOCK(code)
+
 struct edge
 {
 	struct dg	*dg;

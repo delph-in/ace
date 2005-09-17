@@ -4,8 +4,10 @@
 #include	<signal.h>
 #include	<unistd.h>
 #include	<sys/time.h>
+#include	<time.h>
 #include	<assert.h>
 
+#include	"conf.h"
 #include	"chart.h"
 #include	"rule.h"
 #include	"lexicon.h"
@@ -37,6 +39,11 @@ int	combine(struct edge	*a, struct edge	*b);
 void	print_sem(struct dg	*dg);
 void	print_rel(struct dg	*rel);
 int		unfold_edge(struct edge	*e);
+
+unsigned long long unify_attempts_total, unify_attempts_pass_rf, unify_attempts_pass_qc, unify_attempts_success, unify_attempts_bad_orth;
+#ifdef	CLOCKCOUNT
+unsigned long long unify_clock, unify_count;
+#endif
 
 //int	*rtried;
 
@@ -547,6 +554,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
 
+	unify_attempts_total++;
 	if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
 
 /*
@@ -560,7 +568,9 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(!b->npack && i==b->npack)return 0;	// all packed 'b's were rejected by rule filter
 */
 
+	unify_attempts_pass_rf++;
 	if(!gen_qc && quickcheck(a->qc, b->qc))return 0;	// quickcheck rejected this combination
+	unify_attempts_pass_qc++;
 
 	//rtried[a->rule->rnum]++;
 
@@ -636,11 +646,20 @@ inline int	combine(struct edge	*a, struct edge	*b)
 #ifdef	TIM
 	gettimeofday(&tv1, 0);
 #endif
+#ifdef	CLOCKCOUNT
+	clock_t	T = clock();
+#endif
 	res = unify_dg_tmp(pdg, rdg, arg);
+#ifdef	CLOCKCOUNT
+	unify_clock += clock()-T;
+	unify_count++;
+#endif
 #ifdef	TIM
 	gettimeofday(&tv2, 0);
 	base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
 #endif
+
+	if(!res)unify_attempts_success++;
 
 	if(!res && a->rule->orth)
 	{
@@ -649,7 +668,11 @@ inline int	combine(struct edge	*a, struct edge	*b)
 		char *sub = show_orth_leaves(b), *foo;
 		foo = inflect(a->rule->orth, sub);
 		free(sub);
-		if(!foo)res = -1;
+		if(!foo)
+		{
+			res = -1;
+			unify_attempts_bad_orth++;
+		}
 	}
 
 	if(!res)
@@ -665,7 +688,9 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	else
 	{
 #ifdef	UNIFY_PATHS
-		if(trace>1 || gen_qc)unify_backtrace();
+		extern struct path	unify_backtrace_path();
+		if(trace>1)unify_backtrace();
+		if(gen_qc)gqc_count_failure(unify_backtrace_path());
 #endif
 		forget_tmp();
 	}
@@ -742,12 +767,18 @@ visit_roots(void (*visitor)(struct edge *e))
 void	final_chart_stats()
 {
 	packing_report();
+	if(debug_level)fprintf(stderr, "NOTE: unify filters: %lld total, %lld rf (%.1f%%), %lld qc (%.1f%% / %.1f%%), %lld success (%.1f%% / %.1f%%), %lld bad orth (%.1f%% / %.1f%%)\n", unify_attempts_total,
+					unify_attempts_pass_rf, 100*(double)unify_attempts_pass_rf / unify_attempts_total,
+					unify_attempts_pass_qc, 100*(double)unify_attempts_pass_qc / unify_attempts_total, 100*(double)unify_attempts_pass_qc / unify_attempts_pass_rf,
+					unify_attempts_success, 100*(double)unify_attempts_success / unify_attempts_total, 100*(double)unify_attempts_success / unify_attempts_pass_qc,
+					unify_attempts_bad_orth, 100*(double)unify_attempts_bad_orth / unify_attempts_total, 100*(double)unify_attempts_bad_orth / unify_attempts_success);
 #ifdef TIM
 	fprintf(stderr, "NOTE: unify was %.4fs\n", base_unify_time);
 	fprintf(stderr, "NOTE: finalize was %.4fs\n", base_finalize_time);
 	base_unify_time = 0;
 	base_finalize_time = 0;
 #endif
+	if(gen_qc)gqc_result();
 }
 
 int	unfold_edge(struct edge	*e)

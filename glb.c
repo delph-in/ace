@@ -109,5 +109,13 @@ struct type	*calc_glb(struct type	*a, struct type	*b)
 
 void	print_glb_stats()
 {
+	extern unsigned long long glb_clock, glb_count;
+	extern unsigned long long extract_clock, extract_count;
+	extern unsigned long long unify_clock, unify_count;
 	//fprintf(stderr, "NOTE: glb hash: %d direct hits, %d collisions, %d misses\n", glb_nhit, glb_ncollis, glb_nmiss);
+#ifdef	CLOCKCOUNT
+	fprintf(stderr, "avg qc-glb %e over %lld glbs\n", (double)glb_clock/glb_count, glb_count);
+	fprintf(stderr, "avg qc-ext %e over %lld exts\n", (double)extract_clock/extract_count, extract_count);
+	fprintf(stderr, "avg unify  %e over %lld unis\n", (double)unify_clock/unify_count, unify_count);
+#endif
 }
