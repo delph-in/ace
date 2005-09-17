@@ -1,8 +1,5 @@
 TODO:
 
-make ep_drop and var_drop in mrsdg.c configurable (otherwise mrs extraction fails for JACY)
-	- var_drop should just be in the .vpm file, actually
-
 deprecate old mrs output
 
 freeze POST & configurable-ize it
@@ -41,6 +38,8 @@ generalize rule filter
 	| can provide useful local information about when unpacking will fail
 	+ combine() needs to check all packed edges, not just representative
 		- BUT this doesn't work if new rules are allowed to pack in after combine() has been tried
+
+mve var_drop in mrsdg.c into the .vpm file
 
 make unpacking support 2+-ary
 
