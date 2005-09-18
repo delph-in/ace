@@ -181,6 +181,7 @@ int	parse_line(char	*line)
 	int	nparse = 0;
 	int	nwords = 0, i, j;
 	char	**forms, **lemmas, *p, *q;
+	extern int preprocess_only;
 
 	timer();
 
@@ -196,6 +197,13 @@ int	parse_line(char	*line)
 	strcpy(copy, line);
 
 	preprocess_line(copy, &nwords, &lemmas, &forms);
+	if(preprocess_only)
+	{
+		for(i=0;i<nwords;i++)
+			printf("%s%s", i?" ":"", forms[i]);
+		printf("\n");
+		goto finished;
+	}
 
 	if(nwords>60)
 	{
@@ -215,6 +223,8 @@ int	parse_line(char	*line)
 	nparse = parse(nwords, lemmas, forms, current_sentence);
 	if(nparse==-1)printf("NOTE: ignoring `%s'\n", current_sentence);
 	if(do_itsdb)itsdb_report(nwords, lemmas, nparse);
+
+finished:
 	clear_slab();
 	for(i=0;i<nwords;i++)free(forms[i]);
 	free(forms);

@@ -21,6 +21,8 @@ char	*load_grammar_path = 0;
 char	*sentence_path = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 
+int	preprocess_only = 0;
+
 int g_mode = PARSING;
 
 extern int	g_loaded, inhibit_results, trace;
@@ -44,12 +46,13 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "hvpPlXg:G:m:qtRe1n:r:"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvpEPlXg:G:m:qtRe1n:r:"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
 		case	'G':	save_grammar_path = optarg;	break;
+		case	'E':	preprocess_only = 1;		break;
 		case	'P':	export_parts = 1;		break;
 		case	'm':	connect_to_master(optarg);	break;
 		case	'q':	question = 1;			break;
