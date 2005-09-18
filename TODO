@@ -1,7 +1,5 @@
 TODO:
 
-deprecate old mrs output
-
 freeze POST & configurable-ize it
 
 try to prove/analyze interesting things at grammar compile time

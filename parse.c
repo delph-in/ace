@@ -127,16 +127,6 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 
 	alarm(0);
 
-	/*num_entries = 0;
-	for(i=0;i<nrules;i++)if(rtried[i])
-	{
-		num_entries++;
-		printf("rule %32s: %8d tries\n", rules[i]->name, rtried[i]);
-	}
-	printf(" -- %d / %d were tried\n", num_entries, nrules);*/
-
-	//capi_print_derivations();
-
 	// show analyses
 	int show_result(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
