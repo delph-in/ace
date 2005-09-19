@@ -8,6 +8,10 @@
 #include	"dag.h"
 #include	"tdl.h"
 
+#ifdef ERG
+#define	HIDEOUS_HACK
+#endif
+
 /* essentially, QC extracts a skeleton type tree from a dag
  * and performs *tree*-unification on that skeleton before
  * the full dag-unifier is allowed to run */
@@ -211,7 +215,7 @@ struct qc
 
 int	__qc_use_heap = 0;
 
-static struct type	*olist, *minus, *_1list, *_0dlist, *null;
+static struct type	*olist, *minus, *_0dlist;
 extern int gen_qc;
 
 IFCLOCK(unsigned long long extract_clock;)
@@ -250,12 +254,8 @@ struct qc	*extract_qc(struct dg	*d)
 		assert(olist);
 		minus = lookup_type("-");
 		assert(minus);
-		_1list = lookup_type("1-list");
-		assert(_1list);
 		_0dlist = lookup_type("0-dlist");
 		assert(_0dlist);
-		null = lookup_type(g_null_type);
-		assert(null);
 #endif
 	}
 
@@ -310,6 +310,10 @@ IFCLOCK(	extract_clock += clock() - T; )
 		}
 	}	*/
 
+//	printf("QUE %s LIST %s LAST %s\n", q->entries[29]?q->entries[29]->name:"0",
+//		q->entries[46]?q->entries[46]->name:"0", q->entries[12]?q->entries[12]->name:"0");
+
+
 	return q;
 }
 
@@ -350,7 +354,7 @@ IFCLOCK(	int j;)
 IFCLOCK(for(j=0;j<100;j++))
 	for(i=0;i<qc_size;i++)
 	{
-		if(a->entries[i] && b->entries[i] &&
+		if(a->entries[i] && b->entries[i] && (a->entries[i] != b->entries[i]) &&
 			!glb(a->entries[i], b->entries[i]))
 		{
 			//printf("QC reject %d\n", i);
@@ -364,12 +368,29 @@ IFCLOCK(	glb_count += i*100;)
 	if(i<qc_size)return -1;
 
 #ifdef	HIDEOUS_HACK
-	if(a->entries[20] == olist && b->entries[9]==minus)return -1;
-	if(b->entries[20] == olist && a->entries[9]==minus)return -1;
-	if(a->entries[31] == _1list && b->entries[32]==_0dlist && b->entries[24]==null)return -1;
-	if(b->entries[31] == _1list && a->entries[32]==_0dlist && a->entries[24]==null)return -1;
-	if(a->entries[10] == olist && b->entries[11]==minus)return -1;
-	if(b->entries[10] == olist && a->entries[11]==minus)return -1;
+	struct dlist_hack { int dlist, list, last; }	hacks[1] = { {30,21,15} };
+	struct olist_hack { int list, opt; }			ohacks[1] = { {28,17} };
+	int					nhacks=1, nohacks=1;
+//	if(a->entries[20] == olist && b->entries[9]==minus)return -1;
+//	if(b->entries[20] == olist && a->entries[9]==minus)return -1;
+	for(i=0;i<nhacks;i++)
+	{
+		struct dlist_hack	*h = hacks+i;
+		if(b->entries[h->dlist]==_0dlist)
+			if(a->entries[h->list] && a->entries[h->last] && !glb(a->entries[h->list], a->entries[h->last]))
+				return -1;
+		if(a->entries[h->dlist]==_0dlist)
+			if(b->entries[h->list] && b->entries[h->last] && !glb(b->entries[h->list], b->entries[h->last]))
+				return -1;
+	}
+	for(i=0;i<nohacks;i++)
+	{
+		struct olist_hack	*h = ohacks+i;
+		if(a->entries[h->list] == olist && b->entries[h->opt]==minus)return -1;
+		if(b->entries[h->list] == olist && a->entries[h->opt]==minus)return -1;
+	}
+//	if(a->entries[10] == olist && b->entries[11]==minus)return -1;
+//	if(b->entries[10] == olist && a->entries[11]==minus)return -1;
 #endif
 
 	return 0;
@@ -419,6 +440,9 @@ static struct qc_path
 	int					rank;
 }			*paths;
 static int	npaths;
+
+extern int			upathgl;
+extern struct type	*uglb;
 
 void	gqc_count_failure(struct path	path)
 {
