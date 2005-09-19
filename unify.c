@@ -25,7 +25,8 @@ struct darc	*realloc_carcs(struct darc	*ptr, int	old, int	new);
 
 #ifdef	UNIFY_PATHS
 extern int	upath[1024];
-extern int	upathl;
+extern int	upathl, upathgl;
+extern struct type *uglb;
 #endif
 
 #ifdef	COPY_COUNTS
@@ -769,6 +770,9 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 			// it's REALLY obnoxious that we have to do this
 			extra = get_extra_type_dg(t);
 		}
+		uglb = extra->xtype;
+		//printf("applying glb constraint `%s'\n", uglb->name);
+		upathgl = upathl;
 		if(unify1(dg1, extra))
 		{
 			if(!g_loaded)
@@ -778,6 +782,7 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 			}
 			return -1;
 		}
+		uglb = 0;
 	}
 
 	return 0;
@@ -812,6 +817,7 @@ int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 
 #ifdef	UNIFY_PATHS
 	upathl = 0;
+	uglb = 0;
 #endif
 	return unify1(to, dg1);
 }
