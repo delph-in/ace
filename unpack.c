@@ -15,6 +15,8 @@ extern int noldslabs;
 
 extern int debug_level, inhibit_pack;
 
+unsigned long long	ndecomposed;
+
 static inline char* edge_sign(struct edge *e)
 {
 	if(!e)return 0;
@@ -34,6 +36,8 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 {
 	int	n = 1, i, j, orign;
 	struct decomposition *dec, *d;
+
+	ndecomposed++;
 
 	for(i=0;i<edge->have;i++)n *= edge->daughters[i]->npack + 1;
 	d = dec = slab_alloc(sizeof(struct decomposition) * n);
