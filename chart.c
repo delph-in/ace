@@ -23,6 +23,7 @@ extern int inhibit_pack;
 int			chart_size;
 struct chart_cell	*cells;
 int	total_edges, real_edges, passive_edges, used_edges, pused_edges;
+unsigned long long total_passives;
 
 extern int	debug_level;
 extern int	question, exhaustive;
@@ -97,6 +98,7 @@ void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge)
 		cell->p_edges = realloc(cell->p_edges, sizeof(struct edge*) * cell->p_nedges);
 		cell->p_edges[cell->p_nedges-1] = edge;
 		passive_edges++;
+		total_passives++;
 	}
 	else if(edge->rtl)
 	{
@@ -195,7 +197,6 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		e->unpack = 0;
 		e->qc = qc;
 		e->dg = u;
-		e->age = (nhave==1)?(b->age+1):0;	// binary passive edges get age 0; unary get daughter.age+1
 		e->ha_par = a->dg;
 		e->ha_dg = b->dg;
 		e->ha_arg = arg;
@@ -249,7 +250,6 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		e->ha_arg = arg;
 		e->ha_use = 0;
 		e->qc = qc;
-		e->age = 0;	// 'age' is only used on passive edges
 		//printf("active qc %p (copy of %p)\n", e->qc, qc);
 	}
 	//e->prio = a->prio+1;
@@ -276,7 +276,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 		//printf("promoted lexeme %s to word %s via rule %s\n", b->dg->xtype->name, u->xtype->name, a->rule->name);
 	}
 	e->id = next_eid();
-	//fprintf(stderr, "build #%d %s age %d on #%d\n", e->id, e->rule->name, e->age, b->id);
+	//fprintf(stderr, "build #%d %s on #%d\n", e->id, e->rule->name, b->id);
 	e->daughters = slab_alloc(sizeof(struct edge*) * e->have);
 	e->rtl = a->rtl;
 	e->used = 0;
@@ -516,12 +516,6 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(trace>1)printf("[%8.8X #%d [lex %d orth %p] + %8.8X #%d [lex %p]] rule %s?\n",
 		0/*a->ep_span*/, a->id, a->rule->lexical, a->rule->orth, 0/*b->ep_span*/, b->id, b->lex, a->rule->name);
 
-	// don't allow span-only rules to finish on a non-span
-	if(g_mode == PARSING && a->have == a->need-1 && a->rule->span_only)
-		if(!( (a->from==0 || b->from==0) &&
-				(a->to==chart_size || b->to==chart_size) ))return 0;
-	if(a->rule->frag_only)return 0;	// XXX remove if we decide to accept fragments
-
 	if(a->rule->lexical)
 	{
 		if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
@@ -550,8 +544,29 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
 
+	int rf = (b->rule && !check_rf(a->rule, b->rule, arg));
+
+	// don't allow span-only rules to finish on a non-span
+	if(a->rule->frag_only)return 0;	// XXX remove if we decide to accept fragments
+
+	if(g_mode == PARSING && a->have == a->need-1)
+	{
+		if( (a->from==0 || b->from==0) && (a->to==chart_size || b->to==chart_size) )
+		{
+			// spanning edge
+			extern char	*rule_root_utc;
+			if(!rule_root_utc[a->rule->rnum]) return 0;
+		}
+		else
+		{
+			// non-spanning edge
+			if(a->rule->span_only) return 0;
+		}
+	}
+
 	unify_attempts_total++;
-	if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
+	if(rf)return 0;
+	//if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
 
 /*
 	// XXX this doesn't play fair if we allow edges to be packed into b after we try to combine b with other stuff :(
@@ -762,12 +777,17 @@ visit_roots(void (*visitor)(struct edge *e))
 
 void	final_chart_stats()
 {
+	extern unsigned long long ndecomposed;
 	packing_report();
-	if(debug_level)fprintf(stderr, "NOTE: unify filters: %lld total, %lld rf (%.1f%%), %lld qc (%.1f%% / %.1f%%), %lld success (%.1f%% / %.1f%%), %lld bad orth (%.1f%% / %.1f%%)\n", unify_attempts_total,
+	if(debug_level)
+	{
+		fprintf(stderr, "NOTE: unify filters: %lld total, %lld rf (%.1f%%), %lld qc (%.1f%% / %.1f%%), %lld success (%.1f%% / %.1f%%), %lld bad orth (%.1f%% / %.1f%%)\n", unify_attempts_total,
 					unify_attempts_pass_rf, 100*(double)unify_attempts_pass_rf / unify_attempts_total,
 					unify_attempts_pass_qc, 100*(double)unify_attempts_pass_qc / unify_attempts_total, 100*(double)unify_attempts_pass_qc / unify_attempts_pass_rf,
 					unify_attempts_success, 100*(double)unify_attempts_success / unify_attempts_total, 100*(double)unify_attempts_success / unify_attempts_pass_qc,
 					unify_attempts_bad_orth, 100*(double)unify_attempts_bad_orth / unify_attempts_total, 100*(double)unify_attempts_bad_orth / unify_attempts_success);
+		fprintf(stderr, "NOTE: %lld / %lld (%.1f%%) passive edges were connected to roots\n", ndecomposed, total_passives, 100*(double)ndecomposed / total_passives);
+	}
 #ifdef TIM
 	fprintf(stderr, "NOTE: unify was %.4fs\n", base_unify_time);
 	fprintf(stderr, "NOTE: finalize was %.4fs\n", base_finalize_time);
