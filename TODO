@@ -10,6 +10,8 @@ try to prove/analyze interesting things at grammar compile time
 		- this would help rule out applying inflectional rules like non3sg_fin_verb when 3sg_fin_verb is on the orth-agenda
 		- might be lots of other such features we could find
 	- auto pick packing restrictor
+	- for each type of rule, precompute segments of the rule which are non-reentrant with ARGS[k]
+		- then on filling in ARGS[k], copy() can know to structure-share without looking at those segments
 
 find a way of making web / email ersatz work; preprocessor breaks them now, thanks to new treatment which separates U.S. into U. S. and X/Y into X / Y...
 
@@ -42,8 +44,6 @@ mve var_drop in mrsdg.c into the .vpm file
 make unpacking support 2+-ary
 
 loading: use an instance to define configuration paths?
-
-better max-ent hash keys
 
 check correctness of unicode support for preprocessor and morphology somehow
 	- possibly still need a call to setlocale() in main()

@@ -24,7 +24,11 @@ static struct hash	*mem;
 float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl)
 {
 	float ret = 0;
+	char	*key = rtl?rhs2:rhs1;
+	char	hkey[256];
 
+	if(!mem)return 0;
+	sprintf(hkey, "%s:%s", lhs, key?:"");
 	MAXENT_NOISE("scoring [%s %s %s]\n", lhs, rhs1, rhs2?:"(null)");
 	void visitor(struct maxent_feature *feat)
 	{
@@ -47,13 +51,12 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl)
 			else
 			{
 				// backoff; only match KEY rhs element
-				if(!rtl && strcasecmp(rhs1, feat->rhs[0]))return;
-				if(rtl && strcasecmp(rhs2, feat->rhs[0]))return;
+				if(!rtl && strcasecmp(key, feat->rhs[0]))return;
 				ret += feat->score;
 			}
 		}
 	}
-	if(mem)hash_visit_key(mem, lhs, (void(*)(void*))visitor);
+	hash_visit_key(mem, hkey, (void(*)(void*))visitor);
 	MAXENT_NOISE(" ... %f\n", ret);
 	return ret;
 }
@@ -69,13 +72,15 @@ void print_mef(struct maxent_feature *f)
 void record_maxent_feature(char *head, char *rhs[2], float score)
 {
 	struct maxent_feature *feat = malloc(sizeof(struct maxent_feature));
+	char	*key = malloc(2+strlen(head) + (rhs[0]?strlen(rhs[0]):0));
 
+	sprintf(key, "%s:%s", head, rhs[0]?:"");
 	feat->head = strdup(head);
 	feat->rhs[0] = rhs[0]?strdup(rhs[0]):0;
 	feat->rhs[1] = rhs[1]?strdup(rhs[1]):0;
 	feat->score = score;
 	//print_mef(feat);
-	hash_add(mem, feat->head, feat);
+	hash_add(mem, key, feat);
 }
 
 static char	*parse_word(char	**P)
