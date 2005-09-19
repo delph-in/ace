@@ -14,16 +14,27 @@ extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trac
 extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only;
 extern float timer();
 
+#ifdef	LEVEL_TIMER
+float	level_times[100];
+#endif
+int		level = 0;
+
 static int	parse_process_edge(struct edge	*e)
 {
-	int			i, j, remain, pack = 0, from = e->from, to = e->to, have = e->have;
+	int			i, j, remain, pack = 0, from = e->from, to = e->to, have = e->have, nlist=0;
 	struct chart_cell	*c;
+	static struct edge	**list = 0;
+	static int			alist = 0;
 
-	//printf("processing [%d-%d] edge;    ", e->from, e->to);
-	//printf("  status: %d/%d\n", e->have, e->need);
+#ifdef	LEVEL_TIMER
+	if(!e->lex && (e->to-e->from != level))
+	{
+		if(e->to > e->from)
+			level_times[e->to-e->from - 1] = timer();
+		level = e->to - e->from;
+	}
+#endif
 
-	/*if(e->have==e->need)
-		e->dg->xtype = lookup_type("*top*");*/
 	if(!inhibit_pack && e->have == e->need)
 	{
 		pack = pack_edge(e);
@@ -32,55 +43,47 @@ static int	parse_process_edge(struct edge	*e)
 	}
 	if(pack==0)add_edge_to_chart(e);
 
+	if(!alist){list=calloc(sizeof(struct edge*), 4); alist=4;}
+#define	LADD(e)	do { if(nlist+1 > alist) { \
+					alist *= 2; \
+					list = realloc(list, sizeof(struct edge*)*alist); \
+					} list[nlist++] = (e); } while(0)
+
 	// try to combine with edges on either side
 	if(e->have == e->need)
 	{
+		c = cells + from;
 		// passive edge
 		for(i=0;i<=from;i++)
 		{
-			c = cells + from + i*chart_size;
-			for(j=0;j<c->al_nedges;j++)
-			{
-				remain = c->al_edges[j]->need - c->al_edges[j]->have;
-				if(to + (remain-1) < chart_size)
-					if(combine(c->al_edges[j], e) == -1)return -1;
-			}
+			struct edge	**E = c[i*chart_size].al_edges, **F = E+c[i*chart_size].al_nedges;
+			for(;E<F;E++) if(to + ((*E)->need - (*E)->have - 1) < chart_size) LADD(*E);
 		}
+		c = cells + to*chart_size;
 		for(i=to;i<chart_size;i++)
 		{
-			c = cells + i + to*chart_size;
-			for(j=0;j<c->ar_nedges;j++)
-			{
-				remain = c->ar_edges[j]->need - c->ar_edges[j]->have;
-				if(from - (remain-1) >= 0)
-					if(combine(c->ar_edges[j], e) == -1)return -1;
-			}
+			struct edge	**E = c[i].ar_edges, **F = E+c[i].ar_nedges;
+			for(;E<F;E++) if(from - ((*E)->need - (*E)->have - 1) >= 0) LADD(*E);
 		}
+		for(i=0;i<nlist;i++)
+			if(combine(list[i], e) == -1)return -1;
 	}
 	else
 	{
 		// active edge
 		remain = e->need - e->have;
-		if(e->rtl)
+		if(e->rtl) for(i=0,c=cells+from;i<=from;i++)
 		{
-			for(i=0;i<=from;i++)
-			{
-				c = cells + from + i*chart_size;
-				for(j=0;j<c->p_nedges;j++)
-					if(c->p_edges[j]->from - (remain-1) >= 0)
-						if(combine(e, c->p_edges[j]) == -1)return -1;
-			}
+			struct edge	**E = c[i*chart_size].p_edges, **F = E+c[i*chart_size].p_nedges;
+			for(;E<F;E++) if((*E)->from - (remain-1) >= 0)LADD(*E);
 		}
-		else
+		else for(i=to,c=cells+to*chart_size;i<chart_size;i++)
 		{
-			for(i=to;i<chart_size;i++)
-			{
-				c = cells + i + to*chart_size;
-				for(j=0;j<c->p_nedges;j++)
-					if(c->p_edges[j]->to + (remain-1) < chart_size)
-						if(combine(e, c->p_edges[j]) == -1)return -1;
-			}
+			struct edge **E = c[i].p_edges, **F = E+c[i].p_nedges;
+			for(;E<F;E++) if((*E)->to + (remain-1) < chart_size)LADD(*E);
 		}
+		for(i=0;i<nlist;i++)
+			if(combine(e, list[i]) == -1)return -1;
 	}
 	return 0;
 }
@@ -220,7 +223,15 @@ int	parse_line(char	*line)
 		}
 	}
 	current_sentence = line;
+	level = 0;
+	timer();
 	nparse = parse(nwords, lemmas, forms, current_sentence);
+
+#ifdef	LEVEL_TIMER
+	level_times[nwords] = timer();
+	for(i=1;i<=nwords;i++)printf(" level %d: %f\n", i, level_times[i]);
+#endif
+
 	if(nparse==-1)printf("NOTE: ignoring `%s'\n", current_sentence);
 	if(do_itsdb)itsdb_report(nwords, lemmas, nparse);
 
