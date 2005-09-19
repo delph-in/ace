@@ -6,6 +6,7 @@
 #include	"dag.h"
 #include	"freeze.h"
 #include	"chart.h"
+#include	"rule.h"
 
 struct instance
 {
@@ -16,6 +17,75 @@ struct instance
 int	ninstances;
 
 char	*use_roots = 0;
+
+char	**rule_inst_filter, *rule_root, *rule_root_utc;
+
+void	build_rif()
+{
+	int	i, j, ryes=0, yes, tyes=0, nroot=0;
+	extern int g_loaded;
+
+	clear_slab();
+	g_loaded = 1;	// make unify shut up about failures
+	rule_inst_filter = malloc(sizeof(char*)*nrules);
+	rule_root = malloc(nrules);
+	rule_root_utc = malloc(nrules);
+	for(i=0;i<nrules;i++)
+	{
+		rule_inst_filter[i] = malloc(ninstances);
+		yes = 0;
+		for(j=0;j<ninstances;j++)
+		{
+			rule_inst_filter[i][j] = unify_dg_tmp(rules[i]->dg, instances[j].dg, -1)?0:1;
+			if(instances[j].root_flag && rule_inst_filter[i][j])yes++;
+			forget_tmp();
+		}
+		if(yes)ryes++;
+		rule_root_utc[i] = (rule_root[i] = yes?1:0) && (rules[i]->ndaughters==1);
+		tyes += yes;
+	}
+	g_loaded = 0;
+//	printf("rule-instance filter: %.1f%% total, %d / %d rules\n",
+//		100*(double)tyes/(nrules*ninstances), ryes, nrules);
+	clear_slab();
+
+	install_rf(0);
+	do
+	{
+		yes = 0;
+		for(i=0;i<nrules;i++) if(/*!rules[i]->lexical && */rules[i]->ndaughters==1 && !rule_root_utc[i])
+		{
+			for(j=0;j<nrules;j++) if(rule_root_utc[j])
+				if(check_rf(rules[j], rules[i], 0))
+				{
+					yes = 1;
+					rule_root_utc[i] = 1;
+					//printf(" ... `%s' is root via `%s'\n", rules[i]->name, rules[j]->name);
+					break;
+				}
+		}
+	} while(yes);
+	for(i=0;i<nrules;i++)
+	{
+		if(rules[i]->ndaughters==1 && rule_root_utc[i])
+		{
+			//printf("	root unary `%s'\n", rules[i]->name);
+			for(j=0;j<nrules;j++) if(/*!rules[j]->lexical && */check_rf(rules[i], rules[j], 0))
+			{
+				//printf("		permits `%s'\n", rules[j]->name);
+				rule_root_utc[j] = 1;
+			}
+		}
+		else if(rule_root[i])
+		{
+			//printf("	root multi `%s'\n", rules[i]->name);
+			rule_root_utc[i] = 1;
+		}
+	}
+
+	for(i=0;i<nrules;i++)if(rule_root_utc[i])nroot++;
+	//printf("%d / %d rules may be root\n", nroot, nrules);
+}
 
 struct instances
 {
@@ -62,6 +132,8 @@ void	recover_instances(void	*ptr)
 			}
 		}
 	}
+
+	build_rif();
 }
 
 extern int trace;
