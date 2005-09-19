@@ -97,7 +97,6 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 	extern int	__qc_use_heap;
 
 	bzero(e, sizeof(struct edge));
-	e->age = 0;
 	e->from = e->to = x;
 	e->id = next_eid();
 	e->rule = r;

@@ -67,11 +67,54 @@ extern long long copycount, copytraverse;
 
 extern int gen_qc;
 
+int	upward_kill(struct edge	*edge)
+{
+	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
+	int					i, j, k, killed = 1, pass;
+
+	edge->qc = 0;
+	more: pass = 0;
+	for(i=0;i<c->p_nedges;i++)
+	{
+		struct edge *E = c->p_edges[i];
+		for(k=-1;k<E->npack;k++)
+		{
+			struct edge *e = (k==-1)?E:E->pack[k];
+			if(e->qc==0)continue;
+			for(j=0;j<e->have;j++)
+				if(e->daughters[j]->qc == 0)
+				{
+					if(k==-1)
+					{
+						//printf("UK #%d\n", e->id);
+						c->p_nedges--;
+						memmove(c->p_edges+i, c->p_edges+i+1, sizeof(struct edge*)*(c->p_nedges-i));
+						i--;
+					}
+					else
+					{
+						//printf("UKP #%d\n", e->id);
+						E->npack--;
+						memmove(E->pack+k, E->pack+k+1, sizeof(struct edge*)*(E->npack-k));
+						k--;
+					}
+					e->qc = 0;
+					killed++;
+					if(k==-1)pass = 1;	// we require that packed edges are not built on
+				}
+		}
+	}
+	if(pass)goto more;
+	//printf("upward_kill'd %d edges built on #%d\n", killed, edge->id);
+	return killed;
+}
+
 int	pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	struct edge			*h, **candidates = (edge->have==edge->need)?c->p_edges:(edge->rule->rtl?c->ar_edges:c->al_edges);
 	int			i, ssd, ncandidates = (edge->have==edge->need)?c->p_nedges:(edge->rule->rtl?c->ar_nedges:c->al_nedges);
+	int			already_packed = 0;
 
 #ifdef	COPY_COUNTS
 	packcount++;
@@ -79,6 +122,7 @@ int	pack_edge(struct edge	*edge)
 
 	PACKBUG("trying to pack #%d `%s' somewhere\n", edge->id, show_orth_leaves(edge));
 
+	try_more:
 	for(i=0;i<ncandidates && (h=candidates[i]);i++)
 		if( h->have == edge->have && h->need == edge->need
 		&& (g_mode != GENERATING || h->ep_span == edge->ep_span)
@@ -128,32 +172,59 @@ int	pack_edge(struct edge	*edge)
 				record_packing(h, edge);
 				return 1;
 			}
-			else if(ssd == -1/* && h->age == edge->age*/ && !h->built_on)	// XXX could kill built_on requirement and do upwards frosting?
+			else if(ssd == -1)
 			{
 				if(same_cell_daughter(h, edge))
 				{
 					//printf("blocked same-cell-daughter packing\n");
 					continue;
 				}
-				PACKBUG("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
-				//printf("host: "); print_dg(edge->dg); printf("\n");
-				//printf("pack: "); print_dg(h->dg); printf("\n");
-				edge->npack = h->npack;
-				edge->pack = h->pack;
+				if(!already_packed)
+					c->p_edges[i] = edge;	// replace 'h' by 'edge' in the chart before upward_kill() changes the chart around
+				else
+				{
+					// delete 'h' from the chart
+					c->p_nedges--;
+					memmove(c->p_edges+i, c->p_edges+i+1, sizeof(struct edge*)*(c->p_nedges-i));
+				}
+				if(h->built_on)
+					upward_kill(h);
+				h->built_on = 0;
+				if(!already_packed)
+				{
+					PACKBUG("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
+					//printf("host: "); print_dg(edge->dg); printf("\n");
+					//printf("pack: "); print_dg(h->dg); printf("\n");
+					edge->npack = h->npack;
+					edge->pack = h->pack;
+				}
+				else
+				{
+					//printf("claimed #%d also\n", h->id);
+					if(h->npack)
+					{
+						edge->pack = memcpy(slab_alloc(sizeof(struct edge*)*(edge->npack+h->npack)), edge->pack, sizeof(struct edge*)*edge->npack);
+						memcpy(edge->pack+edge->npack, h->pack, sizeof(struct edge*)*h->npack);
+						edge->npack += h->npack;
+					}
+				}
 				h->npack = 0;
 				h->pack = 0;
 				record_packing(edge, h);
-				c->p_edges[i] = edge;
+				already_packed = 1;
+				candidates = c->p_edges;
+				ncandidates = c->p_nedges;
+				//goto try_more;	// XXX for some reason this has a chance of killing edge->qc on the next pass
 				return 2;	// tell caller the edge is in the chart but requires further processing
 			}
-			/*else if(ssd == -1)printf("would have reverse packed but ages differ\n");
-			else
+			/*else
 			{
 				printf(" ... no subsumption relation\n");
 				printf("host: "); print_dg(h->dg); printf("\n");
 				printf("edge: "); print_dg(edge->dg); printf("\n");
 			}*/
 		}
+	if(already_packed)return 2;
 	return 0;
 }
 

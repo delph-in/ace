@@ -13,7 +13,7 @@ struct edge
 	struct rule	*rule;
 	signed char		have, need, from, to;
 	struct edge	**daughters;
-	int		id, age:16, built_on:16;
+	int		id:31, built_on:1;
 
 	struct lexeme	*lex;		// non-null if this is a lexical edge
 
