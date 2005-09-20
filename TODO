@@ -1,7 +1,5 @@
 TODO:
 
-move var_drop in mrsdg.c into the .vpm file
-
 freeze POST & configurable-ize it
 
 try to prove/analyze interesting things at grammar compile time

@@ -127,6 +127,10 @@ int	load_vpm(char	*path)
 			ctx->right = slab_alloc(sizeof(char*)*ctx->nright);
 			for(i=0;i<ctx->nleft;i++)ctx->left[i] = freeze_string(args[i]);
 			for(i=0;i<ctx->nright;i++)ctx->right[i] = freeze_string(args[iop+1+i]);
+			if(ctx->nleft==1 && !strcmp(ctx->left[0], "!"))
+				ctx->nleft = 0;
+			if(ctx->nright==1 && !strcmp(ctx->right[0], "!"))
+				ctx->nright = 0;
 			ctx->rules = 0;
 			ctx->nrules = 0;
 		}
@@ -281,6 +285,8 @@ char	*vpm_map(char	**right, struct vpm_context	*ctx, int	left)
 		// else the rule applies.
 		return strdup(r->left[left]);
 	}
+	// for equal-sized mappings, default to identity map
+	if(ctx->nleft == ctx->nright)return strdup(right[left]);
 	return 0;
 }
 

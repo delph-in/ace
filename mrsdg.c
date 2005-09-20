@@ -11,10 +11,6 @@ static int name;
 
 extern char	*ep_drop;
 
-#ifdef	ERG
-static char	*var_drop[] = {"--TPC", "--PSV", "SORT", "INSTLOC", 0};
-#endif
-
 // dag to mrs conversion
 
 void add_var_feats(struct mrs_var *v, int label, struct dg *value)
@@ -22,10 +18,7 @@ void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 	extern char **fnames;
 	int i, onp = v->nprops, flen = strlen(fnames[label]);
 
-#ifdef	ERG
-	for(i=0;var_drop[i];i++)
-		if(!strcmp(fnames[label], var_drop[i]))return;
-#endif
+	if(!strcmp(fnames[label], "INSTLOC"))return;
 
 	if(value->narcs)
 	{
