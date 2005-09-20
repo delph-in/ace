@@ -20,6 +20,9 @@ int	gen_process_edge(struct edge	*e)
 	struct chart_cell	*c = cells;
 	int	i, pack = 0;
 
+	for(i=0;i<e->have;i++)
+		if(e->daughters[i]->qc==0)return 0;
+
 	if(!inhibit_pack && e->have == e->need)
 	{
 		pack = pack_edge(e);

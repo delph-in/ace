@@ -86,14 +86,14 @@ int	upward_kill(struct edge	*edge)
 				{
 					if(k==-1)
 					{
-						//printf("UK #%d\n", e->id);
+						//printf("UK #%d  since daughter[%d] = #%d\n", e->id, j, e->daughters[j]->id);
 						c->p_nedges--;
 						memmove(c->p_edges+i, c->p_edges+i+1, sizeof(struct edge*)*(c->p_nedges-i));
 						i--;
 					}
 					else
 					{
-						//printf("UKP #%d\n", e->id);
+						//printf("UKP #%d since daughter[%d] = #%d\n", e->id, j, e->daughters[j]->id);
 						E->npack--;
 						memmove(E->pack+k, E->pack+k+1, sizeof(struct edge*)*(E->npack-k));
 						k--;
@@ -188,7 +188,10 @@ int	pack_edge(struct edge	*edge)
 					memmove(c->p_edges+i, c->p_edges+i+1, sizeof(struct edge*)*(c->p_nedges-i));
 				}
 				if(h->built_on)
+				{
+					//printf("upkilling #%d to pack it in #%d\n", h->id, edge->id);
 					upward_kill(h);
+				}
 				h->built_on = 0;
 				if(!already_packed)
 				{
