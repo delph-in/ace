@@ -532,6 +532,22 @@ inline int	combine(struct edge	*a, struct edge	*b)
 			if(i==b->north_routes)return 0;
 			//printf(" #%d admits rule %s as a next orthographemic\n", b->id, a->rule->name);
 		}
+		else if(!a->rule->orth && g_mode == PARSING && b->north_routes != -1)
+		{
+			extern char	**rf_tc;
+			// look at each route 'b' allows and see if this fits in the first rule on it
+			for(i=0;i<b->north_routes;i++)
+			{
+				struct orth_route *r = b->orth_routes+i;
+				if(!r->len || rf_tc[r->rules[0]][a->rule->rnum])
+					break;
+			}
+			if(i==b->north_routes)
+			{
+				//printf(" #%d rejects rule %s as a next nonorthographemic\n", b->id, a->rule->name);
+				return 0;
+			}
+		}
 	}
 	else if(b->lex && g_mode == PARSING)
 	{

@@ -265,7 +265,7 @@ int	*longer_rule_list_rev(int nr, int *ru, struct orule	*or)
 
 int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
 {
-	int i;
+	int i, j;
 
 	// see if this route is already packed on the edge
 	for(i=0;i<e->north_routes;i++)
@@ -273,6 +273,20 @@ int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
 		struct orth_route *r = e->orth_routes+i;
 		if(r->len == nrules && !memcmp(r->rules, rnums, sizeof(int)*nrules))
 			return 0;
+	}
+
+	// check if it is doomed by transitive rule filter
+	for(i=0;i<nrules;i++)
+	{
+		for(j=i+1;j<nrules;j++)
+		{
+			extern char	**rf_tc;
+			if(!rf_tc[rnums[j]][rnums[i]])
+			{
+				//printf("killing rule chain containing pair `%s %s'\n", rules[rnums[i]]->name, rules[rnums[j]]->name);
+				return 0;
+			}
+		}
 	}
 
 	// otherwise, add it

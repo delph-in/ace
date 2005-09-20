@@ -1,5 +1,7 @@
 TODO:
 
+move var_drop in mrsdg.c into the .vpm file
+
 freeze POST & configurable-ize it
 
 try to prove/analyze interesting things at grammar compile time
@@ -15,22 +17,12 @@ try to prove/analyze interesting things at grammar compile time
 
 find a way of making web / email ersatz work; preprocessor breaks them now, thanks to new treatment which separates U.S. into U. S. and X/Y into X / Y...
 
-use RFTC and RLTC to better advantage
-	- e.g. precompute which rules unify with root,
-		- then never build a leftmost edge which doesn't fit leftmost into any root rules, same for right
-		- might be able to do better than rftc, if take into account how much grow room there is
-			- e.g. a spanning edge is useless if not root and no unary path to a root
-			- that might eliminate those spurious subjh_nmc's
-	- also in morphology chain hypothesization
-
 optimize lexicon storage; maybe use provided lexdb schema
 maybe support lexdb
 
 make STEM actually be updated by ortho rules; apparently some grammars depend on it.
 
 generalize rule filter: given which rule filled 'key' daughter slot, what rules can fill nonkey slot?
-
-move var_drop in mrsdg.c into the .vpm file
 
 make unpacking support 2+-ary
 
