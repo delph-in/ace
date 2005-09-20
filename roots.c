@@ -18,7 +18,8 @@ int	ninstances;
 
 char	*use_roots = 0;
 
-char	**rule_inst_filter, *rule_root, *rule_root_utc;
+char	**rule_inst_filter, *rule_root, *rule_root_utc;//, *rule_left_filter, *rule_right_filter;
+extern char	**rf_tc, **rl_tc;
 
 void	build_rif()
 {
@@ -85,6 +86,21 @@ void	build_rif()
 
 	for(i=0;i<nrules;i++)if(rule_root_utc[i])nroot++;
 	//printf("%d / %d rules may be root\n", nroot, nrules);
+
+/*
+	rule_left_filter = calloc(1, nrules);
+	rule_right_filter = calloc(1, nrules);
+	for(i=0;i<nrules;i++)
+	{
+		for(j=0;j<nrules;j++)
+		{
+			if(rule_root[j] && rf_tc[j][i])rule_left_filter[i] = 1;
+			if(rule_root[j] && rl_tc[j][i])rule_right_filter[i] = 1;
+		}
+		if(!rule_left_filter[i])printf("`%s' may not be leftmost\n", rules[i]->name);
+		if(!rule_right_filter[i])printf("`%s' may not be rightmost\n", rules[i]->name);
+	}
+*/
 }
 
 struct instances
