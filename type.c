@@ -624,7 +624,6 @@ int	constrain_glbs_and_wellformedness()
 		wellform(types[i]->dg, types[i]->name);
 		descbytes += types[i]->ndescendents * sizeof(short);
 	}
-	//fprintf(stderr, "%d bytes were needed for descendent arrays\n", descbytes);
 
 	return 0;
 }

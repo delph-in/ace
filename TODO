@@ -45,9 +45,3 @@ loading: use an instance to define configuration paths?
 
 check correctness of unicode support for preprocessor and morphology somehow
 	- possibly still need a call to setlocale() in main()
-
-done:
-+grab "spanning-only-rules" from PET common.set!!
-	27.2s, 26.8k without
-	25.5s, 23.2k with
-	24.5s, 22.2k no frag rules
