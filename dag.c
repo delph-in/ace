@@ -280,14 +280,14 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 
 	aarcs = DARCS(a);
 	barcs = DARCS(b);
-	if(a->xtype==b->xtype)
+	if(a->xtype==b->xtype && a->narcs==b->narcs)
 	{
 		// well-formedness and sortedness conditions guarantee that since
 		// types match exactly, arc labels match exactly...
 		for(i=0;i<a->narcs;i++)
 			if(!subsume_dg1(aarcs[i].dest, barcs[i].dest))return 0;
 	}
-	else if(subsume_forward) // b is subtype of a, so has strict superset of features
+	else if(subsume_forward && a->narcs>=b->narcs) // b is subtype of a, so has strict superset of features
 	{
 		for(i=j=0;i<b->narcs;i++)
 		{
@@ -299,7 +299,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			}
 		}
 	}
-	else if(subsume_backward) // a is subtype of b, so has strict superset of features
+	else if(subsume_backward && b->narcs>=a->narcs) // a is subtype of b, so has strict superset of features
 	{
 		for(i=j=0;i<a->narcs;i++)
 		{
