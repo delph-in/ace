@@ -27,8 +27,6 @@ maybe precompute full charts above every lexical type?
 	- experiment and find out how much time is spent at each span length! very interesting.
 
 optimize lexicon storage; maybe use provided lexdb schema
-	- make wellform-ing of lexemes faster, really should be able to just unify top level type in
-		- figure out why this didn't work last time it was tried
 maybe support lexdb
 
 make STEM actually be updated by ortho rules; apparently some grammars depend on it.

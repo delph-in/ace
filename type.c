@@ -547,6 +547,15 @@ void	wellform(struct dg	*d, char	*typename)
 	for(i=0;i<d->narcs;i++)
 	{
 		arcs[i].dest = (struct dg*)dereference_dg(arcs[i].dest);
+		if(arcs[i].dest->gen != generation)
+		{
+			arcs[i].dest->type = arcs[i].dest->xtype;
+			arcs[i].dest->forward = 0;
+			arcs[i].dest->copy = 0;
+			arcs[i].dest->ncarcs = 0;
+			arcs[i].dest->carcs = 0;
+			arcs[i].dest->gen = generation;
+		}
 		wfpath[wfpl++] = arcs[i].label;
 		wellform(arcs[i].dest, typename);
 		t = most_general_type_for_dg(arcs[i].dest);
@@ -564,6 +573,7 @@ void	wellform(struct dg	*d, char	*typename)
 			if(!descendent_of(t->tnum, arcs[i].dest->type))
 			{
 				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i].dest->type->name, t->name);
+				fprintf(stderr, "	while processing `%s'\n", typename);
 				exit(-1);
 			}
 			top_unifies_wellform++;

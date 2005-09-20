@@ -47,7 +47,6 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed construction\n", lex->word);
 		exit(-1);
 	}
-	wellform(dg, lex->word); // XXX I don't think this is necessary, since lextype is already well formed. see XXX in study_lexeme
 	return dg;
 }
 
@@ -453,8 +452,6 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 	if(generation > MAX_GEN_RESET)generation = 11;
 	// XXX hack!
 
-	//wellform(dg, word);
-
 	if(synsemfeat==-1)init_fnums();
 	nlexemes++;
 	lexemes = realloc(lexemes, sizeof(struct lexeme)*nlexemes);
@@ -591,8 +588,7 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 		fprintf(stderr, "study_lexeme `%s': dag incompatible with type `%s'\n", name, t->name);
 		return -1;
 	}
-	wellform(fulldg, name);	// XXX I don't think this is necessary; t->dg is already wellformed.
-							// however, turning it off changes the grammar.dat file by 2k, so it does something...
+	wellform(fulldg, name);
 
 	add_lexeme(name, dg, t, fulldg);
 
