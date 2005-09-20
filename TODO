@@ -20,8 +20,6 @@ maybe support lexdb
 
 make STEM actually be updated by ortho rules; apparently some grammars depend on it.
 
-generalize rule filter: given which rule filled 'key' daughter slot, what rules can fill nonkey slot?
-
 make unpacking support 2+-ary
 
 loading: use an instance to define configuration paths?

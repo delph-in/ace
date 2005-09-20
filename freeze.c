@@ -379,21 +379,21 @@ static int	load_freeze()
 	strings = G->strings;
 	strtype = G->strtype;
 
-	recover_rule_filter(G->rule_filter);
-	recover_typehash(G->typehash);
-	recover_fspp(G->fspp);
-	recover_instances(G->instances);
-	recover_conf(G->conf);
-	recover_labels(G->labels);
-	recover_vpm(G->vpm);
-	recover_semantic_index(G->semindex);
-	recover_stochastic_model(G->stochmodel);
-
 	// in case we accidentally add more during parsing
 	fnames = malloc(sizeof(char*) * nfnames);
 	introduce = malloc(sizeof(int) * nfnames);
 	memcpy(fnames, G->fnames, sizeof(char*) * nfnames);
 	memcpy(introduce, G->introduce, sizeof(int) * nfnames);
+
+	recover_rule_filter(G->rule_filter);
+	recover_typehash(G->typehash);
+	recover_fspp(G->fspp);
+	recover_conf(G->conf);
+	recover_instances(G->instances);
+	recover_labels(G->labels);
+	recover_vpm(G->vpm);
+	recover_semantic_index(G->semindex);
+	recover_stochastic_model(G->stochmodel);
 
 	for(i=0;i<256;i++)
 	{

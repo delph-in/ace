@@ -106,8 +106,6 @@ int	main(int	argc, char	*argv[])
 		freeze_grammar();
 	}
 
-	install_rf(inhibit_pack?((g_mode == PARSING)?1:2):0);
-
 	if(save_grammar_path)
 		exit(0);
 
@@ -117,6 +115,8 @@ int	main(int	argc, char	*argv[])
 
 	setup_extra_type_dgs();
 	g_loaded = 1;
+
+	install_rf(inhibit_pack?((g_mode == PARSING)?1:2):0);
 
 	if(export_parts)
 	{
