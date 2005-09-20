@@ -28,13 +28,9 @@ maybe support lexdb
 
 make STEM actually be updated by ortho rules; apparently some grammars depend on it.
 
-generalize rule filter
-	| rule filter is the only source of unrestricted dag information when parsing with packing.
-	| can provide useful local information about when unpacking will fail
-	+ combine() needs to check all packed edges, not just representative
-		- BUT this doesn't work if new rules are allowed to pack in after combine() has been tried
+generalize rule filter: given which rule filled 'key' daughter slot, what rules can fill nonkey slot?
 
-mve var_drop in mrsdg.c into the .vpm file
+move var_drop in mrsdg.c into the .vpm file
 
 make unpacking support 2+-ary
 
