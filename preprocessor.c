@@ -283,6 +283,7 @@ void	preprocess_line(char	*string, int	*Nwords, char	***Lemmas, char	***Forms)
 	{
 		if(b.rm_so!=0)
 		{
+			newword:
 			nwords++;
 			lemmas = realloc(lemmas, sizeof(char*)*nwords);
 			forms = realloc(forms, sizeof(char*)*nwords);
@@ -291,6 +292,12 @@ void	preprocess_line(char	*string, int	*Nwords, char	***Lemmas, char	***Forms)
 		}
 		p += b.rm_eo;
 	}
+	if(*p)
+	{
+		b.rm_so = b.rm_eo = strlen(p);
+		goto newword;
+	}
+
 	if(Nwords)*Nwords = nwords;
 	if(Lemmas)*Lemmas = lemmas;
 	else if(nwords) { for(i=0;i<nwords;i++)free(lemmas[i]); free(lemmas); }
