@@ -45,6 +45,12 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 			return 0;
 		}
 		fprintf(stderr, "NOTE: ERROR! lexeme `%s' failed construction\n", lex->word);
+#ifdef UNIFY_PATHS
+		unify_backtrace();
+#endif
+		output_lui_dg(ldg, "lexical dag");
+		output_lui_dg(lex->lextype->dg, "type dag");
+		while(1)sleep(1);
 		exit(-1);
 	}
 	return dg;
@@ -582,12 +588,13 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 {
 	struct dg	*fulldg;
 
-	fulldg = unify_dg(dg, t->dg, -1);
+	fulldg = unify_dg_noss(dg, t->dg, -1);
 	if(!fulldg)
 	{
 		fprintf(stderr, "study_lexeme `%s': dag incompatible with type `%s'\n", name, t->name);
 		return -1;
 	}
+
 	wellform(fulldg, name);
 
 	add_lexeme(name, dg, t, fulldg);

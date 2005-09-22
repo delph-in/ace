@@ -125,7 +125,7 @@ int	main(int	argc, char	*argv[])
 	}
 
 	//print_rule("hspec");
-	//print_type("v_atrans_le");
+	//lui_type("j-head");
 	//print_rule("adjh_i_ques");
 	//print_type("adj_head_int_ques_phrase");
 	//print_type("basic_adj_head_phrase");

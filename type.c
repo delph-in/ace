@@ -116,6 +116,15 @@ struct type	*lookup_type(char	*name)
 	return 0;
 }
 
+void	lui_type(char	*name)
+{
+	struct type	*t = lookup_type(name);
+
+	if(!t)
+		fprintf(stderr, "print_type: `%s' doesn't exist\n", name);
+	else output_lui_dg(t->dg, name);
+}
+
 void	print_type(char	*name)
 {
 	struct type	*t = lookup_type(name);

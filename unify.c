@@ -842,6 +842,23 @@ struct dg	*finalize_tmp(struct dg	*d, int trim)
 	return res;
 }
 
+struct dg	*finalize_tmp_noss(struct dg	*d)
+{
+	struct dg	*res;
+
+	res = copy_dg_with_comp_arcs(d);
+	if(!res)set_slabstate(&tmpstate);
+	generation++;
+	if(generation==MAX_GEN)
+	{
+		fprintf(stderr, "ERROR: generation overflowed!\n");
+		exit(-1);
+	}
+
+	top_copies++;
+	return res;
+}
+
 void	forget_tmp()
 {
 	set_slabstate(&tmpstate);
@@ -858,6 +875,17 @@ struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 {
 	if(!unify_dg_tmp(dg1, dg2, arg))
 		return finalize_tmp(dg2, 0);
+	else
+	{
+		forget_tmp();
+		return 0;
+	}
+}
+
+struct dg	*unify_dg_noss(struct dg	*dg1, struct dg	*dg2, int	arg)
+{
+	if(!unify_dg_tmp(dg1, dg2, arg))
+		return finalize_tmp_noss(dg2);
 	else
 	{
 		forget_tmp();
@@ -886,16 +914,14 @@ static void dgreset_r(struct dg	*d)
 	int	i;
 	struct darc	*arcs;
 
-	d = dereference_dg(d);
+	d = p_dereference_dg(d);
 	if(!d)return;
 
-	if(d->gen == generation)return;
 	d->ncarcs = 0;
 	d->carcs = 0;
 	d->copy = 0;
 	d->forward = 0;
-	if(d->gen != generation)
-		d->type = d->xtype;
+	d->type = d->xtype;
 	d->gen = generation;
 
 	arcs = DARCS(d);
@@ -908,6 +934,7 @@ static void dgmark(struct dg	*d)
 	int	i;
 	struct darc	*arcs;
 
+	d = p_dereference_dg(d);
 	d->ncarcs++;
 	if(d->ncarcs>1)return;
 
@@ -922,6 +949,8 @@ static void	rprint_dg(struct dg	*d)
 {
 	int	i;
 	struct darc	*arcs;
+
+	d = p_dereference_dg(d);
 
 	if(d->copy)
 	{
@@ -943,8 +972,6 @@ static void	rprint_dg(struct dg	*d)
 		printf("<%ld>= ", (long)d->copy);
 #endif
 	}
-
-	d = p_dereference_dg(d);
 
 	//printf("(%p) ", d);
 	if(!d->narcs)

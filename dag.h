@@ -39,6 +39,7 @@ struct dg
 // basic dag operations
 int		unify_dg_infrom(struct dg	*dg1, struct dg	*dg2);
 struct dg	*unify_dg(struct dg	*a, struct dg	*b, int	arg);
+struct dg	*unify_dg_noss(struct dg	*dg1, struct dg	*dg2, int	arg);
 struct dg	*atomic_dg(char	*name);
 struct dg	*copy_dg(struct dg	*d);
 struct dg	*trim_args(struct dg	*d);
