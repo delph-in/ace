@@ -110,7 +110,8 @@ int	main(int	argc, char	*argv[])
 		exit(0);
 
 #ifdef	POST
-	post_train_from("../post/brown.train.txt");
+	if(g_mode == PARSING)
+		post_train_from("../post/brown.train.txt");
 #endif
 
 	setup_extra_type_dgs();
