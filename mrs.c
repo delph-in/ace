@@ -244,6 +244,7 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		ep->pred = (word=parse_word(P,1))?strdup(word):0;
 		ep->nargs = 0;
 		ep->args = 0;
+		ep->lbl = 0;
 		ep->epnum = nrels-1;
 		while((word=parse_word(P,1)) && strcmp(word,"]"))
 		{
@@ -423,15 +424,31 @@ void	print_mrs(struct mrs	*mrs)
 
 // mrs testing
 
+int	mrs_no_extra = 0;
+
+int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv);
+
 int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 {
 	int	i;
 	int	vmap[in->vlist.nvars];
 	char used[out->nrels];
-	if(in->nrels != out->nrels)return 0;
-	if(in->nhcons != out->nhcons)return 0;
+
+	if(mrs_no_extra)
+	{
+		if(in->nrels != out->nrels)return 0;
+		if(in->nhcons != out->nhcons)return 0;
+	}
+	else
+	{
+		if(in->nrels > out->nrels)return 0;
+		if(in->nhcons > out->nhcons)return 0;
+	}
 	for(i=0;i<in->vlist.nvars;i++)vmap[i] = -1;
 	bzero(used, out->nrels);
+	if(in->ltop && !var_subsume(in->ltop, out->ltop, vmap, in->vlist.nvars))return 0;
+	if(in->index && !var_subsume(in->index, out->index, vmap, in->vlist.nvars))return 0;
+	if(in->xarg && !var_subsume(in->xarg, out->xarg, vmap, in->vlist.nvars))return 0;
 	return mrs_subsumes0(in, out, 0, vmap, used);
 }
 
@@ -521,7 +538,7 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 		op = out->rels+i;
 		if(!pred_subsumes(ep->pred, op->pred))continue;
 		memcpy(vm, vmap, sizeof(int)*in->vlist.nvars);
-		if(!var_subsume(ep->lbl, op->lbl, vm, in->vlist.nvars))continue;
+		if(ep->lbl && !var_subsume(ep->lbl, op->lbl, vm, in->vlist.nvars))continue;
 		for(j=0;j<ep->nargs;j++)
 		{
 			for(k=0;k<op->nargs;k++)
