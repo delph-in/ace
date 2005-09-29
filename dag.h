@@ -114,6 +114,7 @@ static inline	void	*slab_alloc(int	len)
 	extern void	next_slab();
 
 	assert(len>=0);
+	assert((len%4)==0);
 
 	// align these special cases
 	/*if(len==32)

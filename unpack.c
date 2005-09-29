@@ -438,7 +438,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 		int slen = 0, i;
 		for(i=0;i<arity;i++)slen += strlen(h->rhs[i]->string) + 1;
 		if(slen%4)slen = (slen&~3)+4;
-		h->string = slab_alloc(slen+1); h->string[0] = 0;
+		h->string = slab_alloc(slen); h->string[0] = 0;
 		for(i=0;i<arity;i++)
 		{
 			if(i)strcat(h->string, " ");
