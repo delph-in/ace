@@ -159,8 +159,8 @@ int	load_vpm(char	*path)
 								VPM_LEFT_TO_RIGHT);
 			r.left = slab_alloc(sizeof(char*)*ctx->nleft);
 			r.right = slab_alloc(sizeof(char*)*ctx->nright);
-			r.leftprops = slab_alloc(sizeof(char)*ctx->nleft);
-			r.rightprops = slab_alloc(sizeof(char)*ctx->nright);
+			r.leftprops = slab_alloc(4*sizeof(char)*ctx->nleft);
+			r.rightprops = slab_alloc(4*sizeof(char)*ctx->nright);
 #define VPMPROP(type)	((type[0]=='!' || type[0]=='=')?((*type++=='!')?VPM_TYPE_VACANCY:VPM_TYPE_EQUALITY):0)
 			for(i=0;i<ctx->nleft;i++)
 			{

@@ -103,8 +103,7 @@ struct type	*freeze_type(struct type	*tin)
 	*tout = *tin;
 	tout->dg = tin->dg?copy_dg(tin->dg):0;
 	tout->name = freeze_string(tin->name);
-	tout->descendents = slab_alloc(tin->ndescendents * sizeof(short));
-	memcpy(tout->descendents, tin->descendents, tin->ndescendents * sizeof(short));
+	tout->descendents = freeze_block(tin->descendents, tin->ndescendents * sizeof(short));
 
 	return tout;
 }
