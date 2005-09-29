@@ -53,7 +53,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		assert(semarg = lookup_type(semarg_type));
 
 	if(!dg)return 0;
-	if(dg->gen != 1)
+	if(dg->gen != 1 || !dg->copy || ((struct mrs_var*)dg->copy)->dg!=dg)
 	{
 		struct darc	*arcs = DARCS(dg);
 		struct mrs_var	*var = calloc(sizeof(struct mrs_var), 1), *vnew;
