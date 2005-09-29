@@ -64,6 +64,7 @@ wchar_t	*towide(char	*mbs)
 	if(-1 == mbstowcs(wide, mbs, len+1))
 	{
 		perror("multibyte decoding failed");
+		fprintf(stderr, "on string `%s'\n", mbs);
 		exit(-1);
 	}
 	return wide;
