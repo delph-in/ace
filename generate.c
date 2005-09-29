@@ -119,6 +119,7 @@ int	generate(struct mrs	*mrs)
 		{
 			//printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
 			//print_mrs(mrs_res); printf("\n");
+			free_mrs(mrs_res);
 			return 0;
 		}
 		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->dec->edge->id);
@@ -144,7 +145,7 @@ int	generate(struct mrs	*mrs)
 		output_lui_chart(words);
 	}*/
 	if(lui_mode)
-		output_lui_trees(cells, "Generation Results", best_only);
+		output_lui_trees(cells, "Generation Results", best_only, mrs);
 
 	return count;
 }

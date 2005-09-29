@@ -157,11 +157,11 @@ void	browse_lui(int eid, char *what)
 			}
 }
 
-void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only)
+void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs)
 {
 	int	count;
 	lui_initialize();
-	int counter(struct hypothesis	*hyp, struct mrs	*mrs) { return 1; }
+	int counter(struct hypothesis	*hyp, struct mrs	*mrs) { if(!require_mrs || mrs_subsumes(require_mrs, mrs))return 1; else return 0; }
 	count = iterate_cell_root_hypotheses(c, counter, best_only);
 	fprintf(lui_write, "group %d \"%s\"\n", count, sent);
 
@@ -188,6 +188,7 @@ void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only)
 			}
 			fprintf(lui_write, "]");
 		}
+		if(require_mrs && !mrs_subsumes(require_mrs, mrs))return 0;
 		fprintf(lui_write, "tree %d", chart_id);
 		rtree(hyp, 0);
 		fprintf(lui_write, " \"%s\"\n", sent);

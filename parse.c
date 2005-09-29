@@ -159,7 +159,7 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 	if(lui_mode)
 	{
 		if(num_parses)
-			output_lui_trees(cells+chart_size-1, sentence, best_only);
+			output_lui_trees(cells+chart_size-1, sentence, best_only, 0);
 		else output_lui_chart(lemmas);
 	}
 

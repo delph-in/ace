@@ -35,7 +35,7 @@ long long copycount, copytraverse;
 
 long top_copies, top_unifies;
 
-static void dagreset_c(struct dg	*d);
+void dagreset_c(struct dg	*d);
 
 static inline void	p_forward_dg(struct dg	*from, struct dg	*to)
 {
@@ -895,7 +895,7 @@ struct dg	*unify_dg_noss(struct dg	*dg1, struct dg	*dg2, int	arg)
 
 static long	marker;
 
-static void dagreset_c(struct dg	*d)
+void dagreset_c(struct dg	*d)
 {
 	int	i;
 	struct darc	*arcs;

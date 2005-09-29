@@ -19,6 +19,8 @@ void	free_mrs_var(struct mrs_var	*v)
 	v->refs--;
 	if(v->refs>0)return;
 #ifndef	NODAG
+	//if(v->dg)printf("free var %p, dg = %p (copy %p, gen %d)\n", v, v->dg, v->dg->copy, v->dg->gen);
+	//else printf("free var %p, no dg\n", v);
 	if(v->dg && v->dg->gen == 1 && v->dg->copy == (void*)v)
 		v->dg->gen = 2;
 #endif

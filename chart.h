@@ -70,7 +70,8 @@ int		parse(int	nwords, char	**lemmas, char	**forms, char	*sentence);
 // display
 void	output_lui_chart(char	*words[]);
 void	output_lui_dg(struct dg	*dg, char *wtitle);
-void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only);
+struct mrs;
+void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs);
 char	*label_dag(struct dg	*dg, char *fallback);
 void	final_chart_stats();
 char	*show_orth_leaves(struct edge	*e);

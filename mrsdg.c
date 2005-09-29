@@ -81,8 +81,10 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		vlist->vars[vlist->nvars-1] = var;
 		dg->copy = (void*)var;
 		dg->gen = 1;
+		//printf("var %p dg %p\n", var, dg);
 		return var;
 	}
+	//printf("back to dg %p, think var %p\n", dg, dg->copy);
 	((struct mrs_var*)dg->copy)->refs++;
 	return (struct mrs_var*)dg->copy;
 }
@@ -180,6 +182,8 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		hconsf = lookup_fname("HCONS");
 	}
 	//printf("extract from cont: "); print_dg(cont); printf("\n");
+
+	dagreset_c(cont);
 
 	load_ep_drop();
 	hook = dg_hop(cont, hookf);
