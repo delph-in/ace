@@ -263,13 +263,13 @@ void	preprocess_line(char	*string, int	*Nwords, char	***Lemmas, char	***Forms)
 	for(i=0;i<npprules;i++) if(pprules[i].type == rtReplace)
 	{
 		struct pprule	*r = &pprules[i];
-		int				redo = strlen(s);
+		int				redo = strlen(s), off;
 		regmatch_t	m[r->re.re_nsub+1];
 		again:
-		m->rm_so = strlen(s) - redo;
-		m->rm_eo = strlen(s);
-		if(!regexec(&r->re, s, r->re.re_nsub+1, m, REG_STARTEND | (m->rm_so!=0 ? REG_NOTBOL : 0)))
+		off = strlen(s) - redo;
+		if(!regexec(&r->re, s+off, r->re.re_nsub+1, m, (off!=0 ? REG_NOTBOL : 0)))
 		{
+			int i; for(i=0;i<r->re.re_nsub+1;i++) { m[i].rm_so += off; m[i].rm_eo += off; }
 			redo = strlen(s) - m->rm_eo;
 			s = replace(s, strlen(s), m, r->rep, s!=string);
 			//printf(" `%s' -> `%s' yields `%s'\n", r->pat, r->rep, s);
