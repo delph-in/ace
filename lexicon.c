@@ -53,6 +53,7 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 		while(1)sleep(1);
 		exit(-1);
 	}
+	dg = wellform_dg(dg);
 	return dg;
 }
 
