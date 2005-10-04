@@ -142,34 +142,19 @@ capi_print_derivations(int nwords, char **words)
 {
 	int id;
 
+#ifdef	TSDB
 	DER_PRINTF("(:results . (");
 	id = 0;
-	void capi_print_tree(struct edge *e)
+	void capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
-		void capi_print_tree0(struct edge *e)
-		{
-			int i;
-			DER_PRINTF(" (%d %s %f %d %d", e->id, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), (float)e->prio, e->from, e->to);
-			if(e->have)
-				for(i=0;i<e->have;i++)
-					capi_print_tree0(e->daughters[i]);
-			else
-			{
-				int i;
-				DER_PRINTF(" (\\\"");
-				for(i=e->from;i<e->to;i++)
-					DER_PRINTF("%s%s", (i==e->from)?"":" ", words[i]);
-				DER_PRINTF("\\\" %d %d)", e->from, e->to);
-			}
-			DER_PRINTF(")");
-		}
 		if(itsdb_report_derivations && id>=itsdb_report_derivations)return;
 		DER_PRINTF("((:result-id . %d) (:derivation .\"", id++);
-		capi_print_tree0(e);
+		print_hypothesis(hyp, capi_printf);
 		DER_PRINTF("\"))");
 	}
-	visit_roots(capi_print_tree);
+	iterate_cell_root_hypotheses(&cells[chart_size-1], capi_print_tree, best_only);
 	DER_PRINTF("))");
+#endif
 }
 
 static int complete_test_run(int run_id, char *custom)
