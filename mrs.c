@@ -310,6 +310,8 @@ struct mrs	*parse_mrs(char	*buffer)
 			mrs.hcons = parse_mrs_hcons(&vlist, &p, &mrs.nhcons);
 		if(!strcasecmp(fname, "TRIGGER:") || !strcasecmp(fname, "VCS:"))
 			mrs.triggers = parse_mrs_trigger(&p, &mrs.ntriggers);
+		if(!strcasecmp(fname, "SCORE:"))
+			mrs.score = atof(parse_word(&p,1));
 	}
 
 	M = malloc(sizeof(mrs));
@@ -364,6 +366,15 @@ struct mrs_var	*mrs_find_ep_role(struct mrs_ep	*ep, char	*role)
 
 char	*marked;
 
+void	print_mrs_var_props(struct mrs_var	*var)
+{
+	int	i;
+	printf("[ %s", var->type);
+	for(i=0;i<var->nprops;i++)
+		{ printf(" %s: %s", var->props[i].name, var->props[i].value); }
+	printf(" ]");
+}
+
 void	print_mrs_var(struct mrs_var	*var)
 {
 	if(!var) { printf("(null)"); return; }
@@ -372,7 +383,7 @@ void	print_mrs_var(struct mrs_var	*var)
 	//printf("%s.%d", var->name, var->vnum);
 	//if(var->is_const) printf("_K");
 	if(marked && marked[var->vnum])return;
-	marked[var->vnum] = 1;
+	if(marked)marked[var->vnum] = 1;
 	if(var->nprops)
 	{
 		int	i;
@@ -393,7 +404,8 @@ void	print_mrs(struct mrs	*mrs)
 
 	printf("[ LTOP: "); print_mrs_var(mrs->ltop);
 	printf("%cINDEX: ", mrs_line_breaks); print_mrs_var(mrs->index);
-	printf("%cXARG: ", mrs_line_breaks); print_mrs_var(mrs->xarg);
+//	printf("%cXARG: ", mrs_line_breaks); print_mrs_var(mrs->xarg);
+	if(mrs->score)printf(" SCORE: %f", mrs->score);
 	printf("%cRELS: <", mrs_line_breaks);
 	for(i=0;i<mrs->nrels;i++)
 	{
@@ -463,14 +475,14 @@ int pred_subsumes(char *in, char *out)
 	tin = lookup_type(in);
 	if(!tin)
 	{
-		fprintf(stderr, "no such predicate type `%s'\n", in);
+		fprintf(stderr, "no such predicate type `%s' (when subsume(%s,%s) called)\n", in, in, out);
 		exit(-1);
 	}
 	if(out[0]=='"')return descendent_of(strtype->tnum, tin);
 	tout = lookup_type(out);
 	if(!tout)
 	{
-		fprintf(stderr, "no such predicate type `%s'\n", out);
+		fprintf(stderr, "no such predicate type `%s' (when subsume(%s,%s) called)\n", out, in, out);
 		exit(-1);
 	}
 	return descendent_of(tout->tnum, tin);

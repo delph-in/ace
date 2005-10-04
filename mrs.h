@@ -58,10 +58,12 @@ struct mrs
 	struct mrs_vlist vlist;
 	char			**triggers;
 	int				ntriggers;
+	float			score;
 };
 
 void		print_mrs(struct mrs	*mrs);
 void		print_mrs_var(struct mrs_var	*var);
+void		print_mrs_var_props(struct mrs_var	*var);
 struct mrs	*parse_mrs(char	*buffer);
 struct mrs	*read_mrs(FILE	*f);
 void		free_mrs(struct mrs	*m);

@@ -550,7 +550,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 		}
 	}
 
-	while( (hyp = process_hypagenda(&agenda)) )
+	while( !(nbest && count>=nbest) &&  (hyp = process_hypagenda(&agenda)) )
 	{
 		struct hypothesis	*rhyp;
 		rhyp = hyp->rhs[0];
@@ -561,9 +561,9 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 			if(is_root(rhyp->dg))
 			{
 				struct mrs	*m = extract_mrs(rhyp->dg);
+				m->score = rhyp->score;
 				//printf("\n"); print_hypothesis(rhyp, printf); printf("\n");
 				count += process(rhyp, m);
-				if(nbest && count>=nbest)break;
 			}
 			//else printf("... wasn't root after unpacking\n");
 		}
