@@ -1,5 +1,7 @@
 TODO:
 
+freeze qc settings into grammar file
+
 ignore punctuation-chars for jacy
 
 freeze POST & configurable-ize it
