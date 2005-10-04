@@ -41,7 +41,7 @@ static int create_test_run(char *data, int run_id, char *comment,
 extern int exhaustive, inhibit_pack;
 extern long top_unifies, top_unifies_wellform, top_copies;
 
-int itsdb_report_derivations;
+extern int best_only;
 
 static int process_item(int i_id, char *i_input, int parse_id, 
 		int edges, int nanalyses, int nderivations, int interactive)
@@ -53,8 +53,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 	char	*error = 0;
 
 	inhibit_results = 1;
-
-	itsdb_report_derivations = nderivations;
+	best_only = nderivations;
 
 	top_copies = top_unifies_wellform = top_unifies = 0;
 
@@ -147,7 +146,6 @@ capi_print_derivations(int nwords, char **words)
 	id = 0;
 	void capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
-		if(itsdb_report_derivations && id>=itsdb_report_derivations)return;
 		DER_PRINTF("((:result-id . %d) (:derivation .\"", id++);
 		print_hypothesis(hyp, capi_printf);
 		DER_PRINTF("\"))");
