@@ -389,7 +389,7 @@ void	simplify_lexeme(struct lexeme	*l)
 		l->onset = 1;
 	}
 
-	//printf("`%s' has simple form\n", l->word);
+	//printf("`%s' has simple form; ph = %p, onset = %d\n", l->word, ph, (int)l->onset);
 	nsimpleform++;
 	l->dg = 0;
 #else

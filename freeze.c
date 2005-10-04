@@ -174,6 +174,7 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 	lout->lextype = FT(lin->lextype);
 	lout->select = FT(lin->select);
 	lout->pred = FT(lin->pred);
+	lout->onset = lin->onset;
 	memcpy(lout->stem, lin->stem, sizeof(struct type*) * lout->stemlen);
 
 	lin->dg = (struct dg*)lout;	// NOTE: keep pointer to new copy of lexeme, so semantic index can be updated
