@@ -164,7 +164,9 @@ int	main(int	argc, char	*argv[])
 		}
 		else
 		{
+			if(fin==stdin)timer();
 			struct mrs	*mrs = read_mrs(fin);
+			if(fin==stdin)stdin_time += timer();
 			if(!mrs && feof(fin))break;
 			num_results = generate(mrs);
 			free(mrs);
