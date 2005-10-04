@@ -506,7 +506,7 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 		// now possibly actually print out the edge, with span information
 		if(!quiet)
 		{
-			print(" (%d %p %s %f %d %d", e->id, hyp, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), hyp->score, from, from+len);
+			print(" (%d %s %f %d %d", e->id, e->rule?e->rule->name:(e->lex?e->lex->word:"no-sign"), hyp->score, from, from+len);
 			if(e->have)
 				for(len=i=0;i<e->have;i++)
 					len += print_tree0(hyp->rhs[i], surf, from+len, 0);

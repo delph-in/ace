@@ -148,7 +148,7 @@ capi_print_derivations(int nwords, char **words)
 	{
 		DER_PRINTF("((:result-id . %d) (:derivation .\"", id++);
 		print_hypothesis(hyp, capi_printf);
-		DER_PRINTF("\"))");
+		DER_PRINTF("\") :score . %f)", hyp->score);
 	}
 	iterate_cell_root_hypotheses(&cells[chart_size-1], capi_print_tree, best_only);
 	DER_PRINTF("))");
