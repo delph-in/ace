@@ -52,16 +52,6 @@ static int process_item(int i_id, char *i_input, int parse_id,
 	clock_t	c0, c1;
 	char	*error = 0;
 
-	if(nanalyses == 0)
-	{
-		exhaustive = 1;
-		inhibit_pack = 1;
-	}
-	else
-	{
-		exhaustive = 0;
-		inhibit_pack = 0;
-	}
 	inhibit_results = 1;
 
 	itsdb_report_derivations = nderivations;
