@@ -777,20 +777,6 @@ char	*show_orth_leaves(struct edge	*e)
 
 int	nfinal;
 
-visit_roots(void (*visitor)(struct edge *e))
-{
-	int i, num_entries;
-	struct edge *edge;
-
-	num_entries = cells[chart_size-1].p_nedges;
-	for(i=0;i<num_entries;i++)
-	{
-		edge = cells[chart_size-1].p_edges[i];
-		if(is_root(edge->dg))
-			visitor(edge);
-	}
-}
-
 void	final_chart_stats()
 {
 	extern unsigned long long ndecomposed;
