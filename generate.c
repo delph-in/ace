@@ -21,7 +21,7 @@ int	gen_process_edge(struct edge	*e)
 	int	i, pack = 0;
 
 	for(i=0;i<e->have;i++)
-		if(e->daughters[i]->qc==0)return 0;
+		if(e->daughters[i]->frozen==1)return 0;
 
 	if(!inhibit_pack && e->have == e->need)
 	{

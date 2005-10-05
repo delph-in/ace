@@ -350,6 +350,7 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 		//if(subsume_forward && subsume_backward)return 1;
 		//else return 0;
 		//printf("subs-forward = %d, subs-backward = %d\n", subsume_forward, subsume_backward);
+		if(subsume_forward && subsume_backward)return 2;
 		if(subsume_forward)return 1;
 		if(subsume_backward)return -1;
 	}

@@ -27,7 +27,8 @@ static int	parse_process_edge(struct edge	*e)
 	static int			alist = 0;
 
 	for(i=0;i<e->have;i++)
-		if(e->daughters[i]->qc==0)return 0;
+		if(e->daughters[i]->frozen==1)
+			return 0;
 
 #ifdef	LEVEL_TIMER
 	if(!e->lex && (e->to-e->from != level))

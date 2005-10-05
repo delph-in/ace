@@ -72,7 +72,7 @@ int	upward_kill(struct edge	*edge)
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	int					i, j, k, killed = 1, pass;
 
-	edge->qc = 0;
+	edge->frozen = 1;
 	more: pass = 0;
 	for(i=0;i<c->p_nedges;i++)
 	{
@@ -80,16 +80,13 @@ int	upward_kill(struct edge	*edge)
 		for(k=-1;k<E->npack;k++)
 		{
 			struct edge *e = (k==-1)?E:E->pack[k];
-			if(e->qc==0)continue;
+			if(e->frozen==1)continue;
 			for(j=0;j<e->have;j++)
-				if(e->daughters[j]->qc == 0)
+				if(e->daughters[j]->frozen == 1)
 				{
 					if(k==-1)
 					{
-						//printf("UK #%d  since daughter[%d] = #%d\n", e->id, j, e->daughters[j]->id);
-						c->p_nedges--;
-						memmove(c->p_edges+i, c->p_edges+i+1, sizeof(struct edge*)*(c->p_nedges-i));
-						i--;
+						// leave E in the chart, "frozen".
 					}
 					else
 					{
@@ -98,7 +95,7 @@ int	upward_kill(struct edge	*edge)
 						memmove(E->pack+k, E->pack+k+1, sizeof(struct edge*)*(E->npack-k));
 						k--;
 					}
-					e->qc = 0;
+					e->frozen = 1;
 					killed++;
 					if(k==-1)pass = 1;	// we require that packed edges are not built on
 				}
@@ -158,7 +155,7 @@ int	pack_edge(struct edge	*edge)
 
 			ssd = equivalent_dg(h->dg, edge->dg);
 			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
-			if(ssd == 1)
+			if(ssd == 1 || (ssd == 2 && !h->frozen))
 			{
 				if(same_cell_daughter(edge, h))
 				{
@@ -172,8 +169,9 @@ int	pack_edge(struct edge	*edge)
 				record_packing(h, edge);
 				return 1;
 			}
-			else if(ssd == -1)
+			else if(ssd == -1 || ssd == 2)
 			{
+				int was_frozen = h->frozen;
 				if(same_cell_daughter(h, edge))
 				{
 					//printf("blocked same-cell-daughter packing\n");
@@ -213,7 +211,7 @@ int	pack_edge(struct edge	*edge)
 				}
 				h->npack = 0;
 				h->pack = 0;
-				record_packing(edge, h);
+				if(!was_frozen)record_packing(edge, h);
 				already_packed = 1;
 				candidates = c->p_edges;
 				ncandidates = c->p_nedges;

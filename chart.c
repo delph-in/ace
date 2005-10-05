@@ -266,6 +266,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	e->have = nhave;
 	e->rule = a->rule;
 	e->built_on = 0;
+	e->frozen = 0;
 	b->built_on = 1;
 	//printf("new edge qc %p\n", e->qc);
 
