@@ -81,7 +81,7 @@ int	upward_kill(struct edge	*edge)
 		for(k=-1;k<E->npack;k++)
 		{
 			struct edge *e = (k==-1)?E:E->pack[k];
-			if(e->frozen==1)continue;
+			if(e->frozen==1 && e->qc)continue;
 			for(j=0;j<e->have;j++)
 				if(e->daughters[j]->frozen == 1)
 				{
@@ -171,7 +171,7 @@ int	pack_edge(struct edge	*edge)
 				record_packing(h, edge);
 				return 1;
 			}
-			else if(ssd == -1 || ssd == 2)
+			else if((ssd == -1 || ssd == 2) && 1)
 			{
 				int was_frozen = h->frozen;
 				if(same_cell_daughter(h, edge))
