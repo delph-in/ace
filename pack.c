@@ -73,6 +73,7 @@ int	upward_kill(struct edge	*edge)
 	int					i, j, k, killed = 1, pass;
 
 	edge->frozen = 1;
+	//printf("frost #%d\n", edge->id);
 	more: pass = 0;
 	for(i=0;i<c->p_nedges;i++)
 	{
@@ -96,6 +97,7 @@ int	upward_kill(struct edge	*edge)
 						k--;
 					}
 					e->frozen = 1;
+					//printf("freeze #%d\n", e->id);
 					killed++;
 					if(k==-1)pass = 1;	// we require that packed edges are not built on
 				}
@@ -183,7 +185,9 @@ int	pack_edge(struct edge	*edge)
 				{
 					// delete 'h' from the chart
 					c->p_nedges--;
+					ncandidates--;
 					memmove(c->p_edges+i, c->p_edges+i+1, sizeof(struct edge*)*(c->p_nedges-i));
+					i--;
 				}
 				if(h->built_on)
 				{
@@ -211,12 +215,14 @@ int	pack_edge(struct edge	*edge)
 				}
 				h->npack = 0;
 				h->pack = 0;
+				h->qc = 0;
 				if(!was_frozen)record_packing(edge, h);
 				already_packed = 1;
-				candidates = c->p_edges;
-				ncandidates = c->p_nedges;
-				//goto try_more;	// XXX for some reason this has a chance of killing edge->qc on the next pass
-				return 2;	// tell caller the edge is in the chart but requires further processing
+				// keep going!
+				//candidates = c->p_edges;
+				//ncandidates = c->p_nedges;
+				//goto try_more;
+				//return 2;	// tell caller the edge is in the chart but requires further processing
 			}
 			/*else
 			{

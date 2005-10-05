@@ -38,6 +38,11 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	struct decomposition *dec, *d;
 
 	ndecomposed++;
+	if(edge->frozen && edge->qc)
+	{
+		fprintf(stderr, "ERROR: edge #%d frozen but not removed from chart\n", edge->id);
+		exit(-1);
+	}
 
 	for(i=0;i<edge->have;i++)n *= edge->daughters[i]->npack + 1;
 	d = dec = slab_alloc(sizeof(struct decomposition) * n);
