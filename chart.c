@@ -568,7 +568,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 
 	if(g_mode == PARSING && a->have == a->need-1)
 	{
-		if( (a->from==0 || b->from==0) && (a->to==chart_size || b->to==chart_size) )
+		if( (a->from==0 || b->from==0) && (a->to==chart_size-1 || b->to==chart_size-1) )
 		{
 			// spanning edge
 			extern char	*rule_root_utc;
