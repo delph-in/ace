@@ -80,11 +80,11 @@ static int process_item(int i_id, char *i_input, int parse_id,
 	c1 = clock();
 	msec = 1000*(tv2.tv_sec - tv1.tv_sec) + 0.001*(tv2.tv_usec - tv1.tv_usec);
 
-	capi_printf(" (:total . %d) (:treal . %d) (:tcpu . %d)", msec, msec, (int)((c1-c0)*0.001));
+	capi_printf(" (:total . %d) (:treal . %d)", (int)((c1-c0)*0.001), msec);
 	if(error)capi_printf(" (:error \"%s\")", error);
 }
 
-itsdb_report(int nwords, char **words, int readings)
+itsdb_report(int nwords, char **words, int readings, int	tforest)
 {
 	extern int total_edges, real_edges, passive_edges, slab_usage();
 
@@ -94,6 +94,7 @@ itsdb_report(int nwords, char **words, int readings)
 	capi_printf("(:others . %d) ", slab_usage());
 
 	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
+	capi_printf("(:tcpu . %d) ", tforest);
 
 	capi_print_derivations(nwords, words);
 

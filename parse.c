@@ -102,12 +102,13 @@ void	alarm_handler(int	sig)
 
 int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 {
-	int		i, count, didsent = 0;
+	int		i, count, didsent = 0, cforest;
 	int		num_parses = 0, num_entries;
 	float	t_setup, t_forest, t_unpack;
 	struct dg	*root;
 	struct dg	*sem;
 	struct edge	*edge;
+	clock_t	start = clock();
 
 	// setup the chart
 	clear_chart(nwords+1);
@@ -131,6 +132,7 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 		if(parse_process_edge(edge))break;
 
 	t_forest = timer();
+	cforest = clock() - start;
 
 	alarm(0);
 
@@ -173,6 +175,8 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 		fprintf(f, "%d	%d	%f	%f	%f	%s\n", nwords, num_parses, t_setup, t_forest, t_unpack, sentence);
 		fflush(f);
 	}
+
+	if(do_itsdb)itsdb_report(nwords, lemmas, num_parses, cforest);
 
 	return num_parses;
 }
@@ -237,7 +241,7 @@ int	parse_line(char	*line)
 #endif
 
 	if(nparse==-1)printf("NOTE: ignoring `%s'\n", current_sentence);
-	if(do_itsdb)itsdb_report(nwords, lemmas, nparse);
+	if(do_itsdb && nparse==-1)itsdb_report(nwords, lemmas, -1, 0);
 
 finished:
 	clear_slab();
