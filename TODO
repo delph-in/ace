@@ -1,5 +1,7 @@
 TODO:
 
+figure out why unpacking is so much slower than PET (sometimes 10x slower!)
+
 freeze qc settings into grammar file
 
 ignore punctuation-chars for jacy
