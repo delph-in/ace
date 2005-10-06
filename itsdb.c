@@ -80,7 +80,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 	c1 = clock();
 	msec = 1000*(tv2.tv_sec - tv1.tv_sec) + 0.001*(tv2.tv_usec - tv1.tv_usec);
 
-	capi_printf(" (:total . %d) (:treal . %d)", (int)((c1-c0)*0.001), msec);
+	capi_printf(" (:total . %d) (:treal . %d)", (int)((long long)(c1-c0)*1000 / CLOCKS_PER_SEC), msec);
 	if(error)capi_printf(" (:error \"%s\")", error);
 }
 

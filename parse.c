@@ -176,7 +176,7 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 		fflush(f);
 	}
 
-	if(do_itsdb)itsdb_report(nwords, lemmas, num_parses, cforest);
+	if(do_itsdb)itsdb_report(nwords, lemmas, num_parses, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
 
 	return num_parses;
 }
