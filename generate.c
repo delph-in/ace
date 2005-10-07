@@ -147,5 +147,8 @@ int	generate(struct mrs	*mrs)
 	if(lui_mode)
 		output_lui_trees(cells, "Generation Results", best_only, mrs);
 
+	clear_mrs();
+	clear_slab();
+
 	return count;
 }

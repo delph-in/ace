@@ -244,6 +244,7 @@ int	parse_line(char	*line)
 	if(do_itsdb && nparse==-1)itsdb_report(nwords, lemmas, -1, 0);
 
 finished:
+	clear_mrs();
 	clear_slab();
 	for(i=0;i<nwords;i++)free(forms[i]);
 	free(forms);

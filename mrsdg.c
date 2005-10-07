@@ -45,6 +45,26 @@ void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 	}
 }
 
+#define	VHSIZE	10240
+struct mrs_var	*varhash[VHSIZE];
+int				varind;
+static inline unsigned hashcode(struct dg	*dg) { return ((unsigned)dg>>2) % VHSIZE; }
+
+void	clear_mrs()
+{
+	int i;
+
+	for(i=0;i<VHSIZE;i++)
+	{
+		if(varhash[i])
+		{
+			varhash[i]->refs = 1;
+			free_mrs_var(varhash[i]);
+			varhash[i] = 0;
+		}
+	}
+}
+
 struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 {
 	static struct type *semarg = 0;
@@ -53,13 +73,31 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		assert(semarg = lookup_type(semarg_type));
 
 	if(!dg)return 0;
+
 	if(dg->gen != 1 || !dg->copy || ((struct mrs_var*)dg->copy)->dg!=dg)
 	{
 		struct darc	*arcs = DARCS(dg);
-		struct mrs_var	*var = calloc(sizeof(struct mrs_var), 1), *vnew;
+		unsigned hc = hashcode(dg);
+		struct mrs_var	*var, *vnew;
 		extern char **fnames;
 		int i;
 
+		// check whether a different reading already extracted this variable
+		if(varhash[hc] && varhash[hc]->dg==dg)
+		{
+			var = varhash[hc];
+			var->refs = 2;
+			var->vnum = vlist->nvars;
+			//printf("reuse dg %p, think var %p\n", dg, varhash[hc]);
+			vlist->nvars++;
+			vlist->vars = realloc(vlist->vars, sizeof(struct mrs_var*)*vlist->nvars);
+			vlist->vars[vlist->nvars-1] = var;
+			dg->copy = (void*)var;
+			dg->gen = 1;
+			return var;
+		}
+
+		var = calloc(sizeof(struct mrs_var), 1);
 		if(!descendent_of(dg->type->tnum, semarg)) var->is_const = 1;
 		var->dg = dg;
 		var->type = strdup(dg->type->name);
@@ -81,7 +119,9 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		vlist->vars[vlist->nvars-1] = var;
 		dg->copy = (void*)var;
 		dg->gen = 1;
-		//printf("var %p dg %p\n", var, dg);
+		//printf("new var %p dg %p\n", var, dg);
+		if(varhash[hc])free_mrs_var(varhash[hc]);
+		varhash[hc] = var; var->refs++;
 		return var;
 	}
 	//printf("back to dg %p, think var %p\n", dg, dg->copy);
