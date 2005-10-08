@@ -5,6 +5,7 @@
 #ifndef	NODAG
 #include	"type.h"
 #include	"dag.h"
+#include	"chart.h"
 #endif
 
 #include	"mrs.h"
@@ -27,7 +28,10 @@ void	free_mrs_var(struct mrs_var	*v)
 
 	for(i=0;i<v->nprops;i++)
 	{
-		free(v->props[i].name);
+#ifndef NODAG
+		if(g_mode == GENERATING)
+#endif
+			free(v->props[i].name);
 		free(v->props[i].value);
 	}
 	free(v->name);

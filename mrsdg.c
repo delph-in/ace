@@ -11,7 +11,33 @@ static int name;
 
 extern char	*ep_drop;
 
+int		nmultifeatures;
+struct multifeature
+{
+	char	*sub;
+	int 	prep;
+	char	*str;
+}	*multifeatures;
+
 // dag to mrs conversion
+
+static inline char	*mfpath(char	*sub, int prep)
+{
+	extern char **fnames;
+	int i;
+
+	for(i=0;i<nmultifeatures;i++)
+		if(multifeatures[i].sub == sub && multifeatures[i].prep == prep)
+			return multifeatures[i].str;
+	nmultifeatures++;
+	multifeatures = realloc(multifeatures, sizeof(struct multifeature)*nmultifeatures);
+	multifeatures[nmultifeatures-1].sub = sub;
+	multifeatures[nmultifeatures-1].prep = prep;
+	multifeatures[nmultifeatures-1].str = malloc(strlen(sub) + 1 + strlen(fnames[prep]) + 1);
+	sprintf(multifeatures[nmultifeatures-1].str, "%s.%s", fnames[prep], sub);
+	//printf("new mf `%s'\n", multifeatures[nmultifeatures-1].str);
+	return multifeatures[nmultifeatures-1].str;
+}
 
 void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 {
@@ -31,17 +57,18 @@ void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 	{
 		v->nprops++;
 		v->props = realloc(v->props, sizeof(struct mrs_var_property)*v->nprops);
-		v->props[v->nprops-1].name = strdup(fnames[label]);
+		v->props[v->nprops-1].name = fnames[label];//strdup(fnames[label]);
 		v->props[v->nprops-1].value = strdup(value->xtype->name);
 		return;
 	}
 	// prepend each of the new property names with label
 	for(i=onp;i<v->nprops;i++)
 	{
-		char opn[1024];
-		strcpy(opn, v->props[i].name);
-		v->props[i].name = realloc(v->props[i].name, strlen(opn) + flen + 2);
-		sprintf(v->props[i].name, "%s.%s", fnames[label], opn);
+		v->props[i].name = mfpath(v->props[i].name, label);
+		//char opn[1024];
+		//strcpy(opn, v->props[i].name);
+		//v->props[i].name = realloc(v->props[i].name, strlen(opn) + flen + 2);
+		//sprintf(v->props[i].name, "%s.%s", fnames[label], opn);
 	}
 }
 
