@@ -79,7 +79,7 @@ void	clear_chart(int	size)
 	clear_agenda();
 	edge_id = 1;
 
-	clear_slab();
+	//clear_slab();
 
 	passive_edges = real_edges = total_edges = used_edges = pused_edges = 0;
 	chart_size = size;

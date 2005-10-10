@@ -200,7 +200,7 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 	else if(!strcmp(tag, "VBP"))type = "v_np*_trans_presn3sg_nale";
 	else if(!strcmp(tag, "VBZ"))type = "v_np*_trans_pres3sg_nale";
 
-	printf("NOTE: guessing `%s' is a `%s' (POS %s%s)\n", word, type, tag, tagunk?"?":"");
+	fprintf(stderr, "NOTE: guessing `%s' is a `%s' (POS %s%s)\n", word, type, tag, tagunk?"?":"");
 
 	l = unknown_lexeme(word, type);
 	e = lexical_edge(l, i, 1, 0);
