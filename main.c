@@ -154,6 +154,7 @@ int	main(int	argc, char	*argv[])
 	while(!die && !feof(fin))
 	{
 		int num_results;
+		clear_slab();
 		if(g_mode == PARSING)
 		{
 			char	line[10240];
@@ -169,7 +170,7 @@ int	main(int	argc, char	*argv[])
 			if(fin==stdin)stdin_time += timer();
 			if(!mrs && feof(fin))break;
 			num_results = generate(mrs);
-			free(mrs);
+			free_mrs(mrs);
 		}
 		if(num_results==-1)fprintf(stderr, "NOTE: ignore\n");
 		else if(num_results>0)success++;

@@ -6,6 +6,7 @@
 #include	"dag.h"
 #include	"mrs.h"
 #include	"conf.h"
+#include	"freeze.h"
 
 static int name;
 
@@ -39,6 +40,9 @@ static inline char	*mfpath(char	*sub, int prep)
 	return multifeatures[nmultifeatures-1].str;
 }
 
+static inline void	*slab_malloc(int l) { if(l%4)l += (4-(l%4)); return slab_alloc(l); }
+static inline void	*slab_calloc(int a, int b) { int l = a*b; void *p = slab_malloc(l); bzero(p, l); return p; }
+
 void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 {
 	extern char **fnames;
@@ -56,20 +60,15 @@ void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 	else
 	{
 		v->nprops++;
-		v->props = realloc(v->props, sizeof(struct mrs_var_property)*v->nprops);
+		v->props = slab_realloc(v->props, sizeof(struct mrs_var_property)*(v->nprops-1),
+											sizeof(struct mrs_var_property)*v->nprops);
 		v->props[v->nprops-1].name = fnames[label];//strdup(fnames[label]);
 		v->props[v->nprops-1].value = strdup(value->xtype->name);
 		return;
 	}
 	// prepend each of the new property names with label
 	for(i=onp;i<v->nprops;i++)
-	{
 		v->props[i].name = mfpath(v->props[i].name, label);
-		//char opn[1024];
-		//strcpy(opn, v->props[i].name);
-		//v->props[i].name = realloc(v->props[i].name, strlen(opn) + flen + 2);
-		//sprintf(v->props[i].name, "%s.%s", fnames[label], opn);
-	}
 }
 
 #define	VHSIZE	10240
@@ -85,8 +84,8 @@ void	clear_mrs()
 	{
 		if(varhash[i])
 		{
-			varhash[i]->refs = 1;
-			free_mrs_var(varhash[i]);
+			//varhash[i]->refs = 1;
+			//free_mrs_var(varhash[i]);
 			varhash[i] = 0;
 		}
 	}
@@ -117,14 +116,15 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 			var->vnum = vlist->nvars;
 			//printf("reuse dg %p, think var %p\n", dg, varhash[hc]);
 			vlist->nvars++;
-			vlist->vars = realloc(vlist->vars, sizeof(struct mrs_var*)*vlist->nvars);
+			vlist->vars = slab_realloc(vlist->vars, sizeof(struct mrs_var*)*(vlist->nvars-1),
+													sizeof(struct mrs_var*)*vlist->nvars);
 			vlist->vars[vlist->nvars-1] = var;
 			dg->copy = (void*)var;
 			dg->gen = 1;
 			return var;
 		}
 
-		var = calloc(sizeof(struct mrs_var), 1);
+		var = slab_calloc(sizeof(struct mrs_var), 1);
 		if(!descendent_of(dg->type->tnum, semarg)) var->is_const = 1;
 		var->dg = dg;
 		var->type = strdup(dg->type->name);
@@ -137,17 +137,18 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 				add_var_feats(var, arcs[i].label, arcs[i].dest);
 
 			vnew = internal_to_external_mrs_var(var);
-			free_mrs_var(var); var = vnew;
-			var->refs = 1;
+			//free_mrs_var(var);
+			var = vnew; var->refs = 1;
 		}
 
 		vlist->nvars++;
-		vlist->vars = realloc(vlist->vars, sizeof(struct mrs_var*)*vlist->nvars);
+		vlist->vars = slab_realloc(vlist->vars, sizeof(struct mrs_var*)*(vlist->nvars-1),
+												sizeof(struct mrs_var*)*vlist->nvars);
 		vlist->vars[vlist->nvars-1] = var;
 		dg->copy = (void*)var;
 		dg->gen = 1;
 		//printf("new var %p dg %p\n", var, dg);
-		if(varhash[hc])free_mrs_var(varhash[hc]);
+		//if(varhash[hc])free_mrs_var(varhash[hc]);
 		varhash[hc] = var; var->refs++;
 		return var;
 	}
@@ -184,8 +185,9 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 		if(arcs[i].label == lblf || arcs[i].label==predf)continue;
 		if(ep_drop[arcs[i].label])continue;
 		ep->nargs++;
-		ep->args = realloc(ep->args, sizeof(struct mrs_ep_role)*ep->nargs);
-		ep->args[ep->nargs-1].name = strdup(fnames[arcs[i].label]);
+		ep->args = slab_realloc(ep->args, sizeof(struct mrs_ep_role)*(ep->nargs-1),
+											sizeof(struct mrs_ep_role)*ep->nargs);
+		ep->args[ep->nargs-1].name = freeze_string(fnames[arcs[i].label]);
 		ep->args[ep->nargs-1].value = dg_to_mrs_var(arcs[i].dest, vlist);
 	}
 }
@@ -236,7 +238,7 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 {
 	static int	hookf = -1, ltopf, indexf, xargf, relsf, hconsf;
 	struct dg	*hook, *rels, *hcons;
-	struct mrs	*mrs = calloc(sizeof(struct mrs), 1);
+	struct mrs	*mrs = slab_calloc(sizeof(struct mrs), 1);
 
 	name = 0;
 	if(hookf==-1)
@@ -262,15 +264,18 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		mrs->index = dg_to_mrs_var(dg_hop(hook, indexf), &mrs->vlist);
 		mrs->xarg = dg_to_mrs_var(dg_hop(hook, xargf), &mrs->vlist);
 	}
+	// XXX come on, just go count them first... slab_realloc is slow.
 	DO_DIFFLIST(rels, struct dg *rel,
 		mrs->nrels++;
-		mrs->rels = realloc(mrs->rels, sizeof(struct mrs_ep)*mrs->nrels);
+		mrs->rels = slab_realloc(mrs->rels, sizeof(struct mrs_ep)*(mrs->nrels-1),
+											sizeof(struct mrs_ep)*mrs->nrels);
 		dg_to_mrs_ep(rel, &mrs->vlist, mrs->rels+mrs->nrels-1);
 		mrs->rels[mrs->nrels-1].epnum = mrs->nrels-1;
 	);
 	DO_DIFFLIST(hcons, struct dg *hc,
 		mrs->nhcons++;
-		mrs->hcons = realloc(mrs->hcons, sizeof(struct mrs_hcons)*mrs->nhcons);
+		mrs->hcons = slab_realloc(mrs->hcons, sizeof(struct mrs_hcons)*(mrs->nhcons-1),
+												sizeof(struct mrs_hcons)*mrs->nhcons);
 		dg_to_mrs_hc(hc, &mrs->vlist, mrs->hcons+mrs->nhcons-1);
 	);
 	return mrs;
@@ -308,7 +313,7 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 	dg = add_dg_feature(dg, "INSTLOC", skolem);
 	evar->dg = wellform_dg(dg);
 
-	free_mrs_var(var);
+	//free_mrs_var(var);
 }
 
 void dagify_mrs_ep(struct mrs_ep *ep)

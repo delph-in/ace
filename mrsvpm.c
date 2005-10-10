@@ -271,6 +271,9 @@ extern int prop_subsumes(char*,char*);
 	return res;
 }
 
+static inline void	*slab_malloc(int l) { if(l%4)l += (4-(l%4)); return slab_alloc(l); }
+static inline void	*slab_calloc(int a, int b) { int l = a*b; void *p = slab_malloc(l); bzero(p, l); return p; }
+
 char	*vpm_map(char	**right, struct vpm_context	*ctx, int	left)
 {
 	int	i, j;
@@ -283,21 +286,21 @@ char	*vpm_map(char	**right, struct vpm_context	*ctx, int	left)
 				break;
 		if(j<ctx->nright)continue;
 		// else the rule applies.
-		return strdup(r->left[left]);
+		return r->left[left];
 	}
 	// for equal-sized mappings, default to identity map
-	if(ctx->nleft == ctx->nright)return strdup(right[left]);
+	if(ctx->nleft == ctx->nright)return right[left];
 	return 0;
 }
 
 struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 {
-	struct mrs_var	*vout = malloc(sizeof(*vout));
+	struct mrs_var	*vout = slab_malloc(sizeof(*vout));
 	char			inused[vin->nprops];
 	int				i, j, k;
 
 	*vout = *vin;
-	vout->name = strdup(vin->name);
+	vout->name = vin->name;
 	vout->type = 0;
 	bzero(inused, vin->nprops);
 	vout->nprops = 0;
@@ -334,20 +337,22 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 				char	*nval = vpm_map(values, ctx, j);
 				if(!nval)break; // should only ever fail the first iteration
 				vout->nprops++;
-				vout->props = realloc(vout->props, sizeof(struct mrs_var_property)*vout->nprops);
-				vout->props[vout->nprops-1].name = strdup(ctx->left[j]);
+				vout->props = slab_realloc(vout->props, sizeof(struct mrs_var_property)*(vout->nprops-1),
+														sizeof(struct mrs_var_property)*vout->nprops);
+				vout->props[vout->nprops-1].name = ctx->left[j];
 				vout->props[vout->nprops-1].value = nval;
 			}
 			if(j==ctx->nleft) for(j=0;j<ctx->nright;j++)inused[props[j]] = 1;
 		}
 	}
-	if(!vout->type)vout->type = strdup(vin->type);
+	if(!vout->type)vout->type = vin->type;
 	for(i=0;i<vin->nprops;i++) if(!inused[i])
 	{
 		vout->nprops++;
-		vout->props = realloc(vout->props, sizeof(struct mrs_var_property)*vout->nprops);
-		vout->props[vout->nprops-1].name = strdup(vin->props[i].name);
-		vout->props[vout->nprops-1].value = strdup(vin->props[i].value);
+		vout->props = slab_realloc(vout->props, sizeof(struct mrs_var_property)*(vout->nprops-1),
+												sizeof(struct mrs_var_property)*vout->nprops);
+		vout->props[vout->nprops-1].name = vin->props[i].name;
+		vout->props[vout->nprops-1].value = vin->props[i].value;
 	}
 	//printf("converted: ");print_mrs_var(vout);printf("\n");
 	return vout;

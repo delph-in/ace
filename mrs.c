@@ -62,6 +62,7 @@ void	free_mrs_hcons(struct mrs_hcons	*hc)
 void	free_mrs(struct mrs	*m)
 {
 	int i;
+	return;
 	if(!m)return;
 	free_mrs_var(m->ltop);
 	free_mrs_var(m->index);
@@ -99,10 +100,13 @@ static char	*parse_word(char	**P, int advance)
 
 #define	FAIL(reason)	do { fprintf(stderr, "MRS parsing error: %s (near `%*s')\n", reason, 16, *P); return 0; } while(0)
 
+static inline void	*slab_malloc(int l) { if(l%4)l += (4-(l%4)); return slab_alloc(l); }
+static inline void	*slab_calloc(int a, int b) { int l = a*b; void *p = slab_malloc(l); bzero(p, l); return p; }
+
 struct mrs_var	*parse_mrs_const(char	**P)
 {
 	char	*c = parse_word(P, 1);
-	struct mrs_var *var = calloc(sizeof(struct mrs_var), 1);
+	struct mrs_var *var = slab_calloc(sizeof(struct mrs_var), 1);
 	var->is_const = 1;
 	var->type = strdup(c);
 	var->name = strdup(c);
@@ -132,7 +136,7 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 		{
 			struct mrs_var_property *prop;
 			var.nprops++;
-			var.props = realloc(var.props, sizeof(struct mrs_var_property)*var.nprops);
+			var.props = slab_realloc(var.props, sizeof(struct mrs_var_property)*(var.nprops-1), sizeof(struct mrs_var_property)*var.nprops);
 			prop = var.props + var.nprops-1;
 			// trim off pesky ':' at end of role name
 			if(word[0]!=':' && word[strlen(word)-1]==':')
@@ -146,7 +150,7 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 	{
 		// assume name up to number is type
 		for(i=0;var.name[i]>'9';i++) {}
-		var.type = malloc(i+1);
+		var.type = slab_malloc(i+1);
 		memcpy(var.type, var.name, i);
 		var.type[i] = 0;
 	}
@@ -165,14 +169,14 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 			return vlist->vars[i];
 		}
 
-	V = malloc(sizeof(var));
+	V = slab_malloc(sizeof(var));
 	*V = var;
 	V->name = strdup(V->name);
 	V->refs = 1;
 
 	V->vnum = vlist->nvars;
 	vlist->nvars++;
-	vlist->vars = realloc(vlist->vars, sizeof(struct mrs_var*) * vlist->nvars);
+	vlist->vars = slab_realloc(vlist->vars, sizeof(struct mrs_var*) * (vlist->nvars-1), sizeof(struct mrs_var*) * vlist->nvars);
 	vlist->vars[vlist->nvars-1] = V;
 
 	return V;
@@ -189,7 +193,7 @@ void	*parse_list(struct mrs_vlist	*vlist, char	**P, int	*N, void (*parse)(struct
 	while((word=parse_word(P,0)) && strcmp(word, ">"))
 	{
 		n++;
-		v = realloc(v, sizeof(void*)*n);
+		v = slab_realloc(v, sizeof(void*)*(n-1), sizeof(void*)*n);
 		parse(vlist,P, &v[n-1]);
 	}
 	if(!(word=parse_word(P,1)) || strcmp(word, ">"))FAIL("list lacks closing '>'");
@@ -216,7 +220,7 @@ struct mrs_hcons	*parse_mrs_hcons(struct mrs_vlist	*vlist, char **P, int	*Nhcons
 	{
 		struct mrs_hcons	*hc;
 		nhcons++;
-		hcons = realloc(hcons, sizeof(struct mrs_hcons)*nhcons);
+		hcons = slab_realloc(hcons, sizeof(struct mrs_hcons)*(nhcons-1), sizeof(struct mrs_hcons)*nhcons);
 		hc = hcons+nhcons-1;
 		hc->hi = parse_mrs_var(vlist, P);
 		word = parse_word(P, 1);
@@ -245,7 +249,7 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		struct mrs_ep	*ep;
 		parse_word(P, 1);	// [
 		nrels++;
-		eps = realloc(eps, sizeof(struct mrs_ep)*nrels);
+		eps = slab_realloc(eps, sizeof(struct mrs_ep)*(nrels-1), sizeof(struct mrs_ep)*nrels);
 		ep = eps+nrels-1;
 		ep->pred = (word=parse_word(P,1))?strdup(word):0;
 		ep->nargs = 0;
@@ -259,7 +263,7 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 			{
 				struct mrs_ep_role	*role;
 				ep->nargs++;
-				ep->args = realloc(ep->args, sizeof(struct mrs_ep_role)*ep->nargs);
+				ep->args = slab_realloc(ep->args, sizeof(struct mrs_ep_role)*(ep->nargs-1), sizeof(struct mrs_ep_role)*ep->nargs);
 				role = ep->args+ep->nargs-1;
 				if(word[0]!=':' && word[strlen(word)-1]==':')
 					word[strlen(word)-1] = 0;
@@ -318,7 +322,7 @@ struct mrs	*parse_mrs(char	*buffer)
 			mrs.score = atof(parse_word(&p,1));
 	}
 
-	M = malloc(sizeof(mrs));
+	M = slab_malloc(sizeof(mrs));
 	*M = mrs;
 	M->vlist = vlist;
 	return M;

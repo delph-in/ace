@@ -59,6 +59,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 
 	gettimeofday(&tv1, 0);
 	c0 = clock();
+	clear_slab();
 	if(g_mode == PARSING)
 		readings = parse_line(i_input);
 	else
