@@ -10,34 +10,35 @@
 
 #include	"mrs.h"
 
+#ifdef NODAG
+#define slab_alloc(len)	malloc(len)
+#define	slab_realloc(ptr,olen,len) realloc(ptr,len)
+#define	slab_free(ptr)	free(ptr)
+#else
+#define	slab_free(ptr)
+#endif
+
 // mrs IO
 
 void	free_mrs_var(struct mrs_var	*v)
 {
+#ifdef NODAG
 	int	i;
 
 	if(!v)return;
 	v->refs--;
 	if(v->refs>0)return;
-#ifndef	NODAG
-	//if(v->dg)printf("free var %p, dg = %p (copy %p, gen %d)\n", v, v->dg, v->dg->copy, v->dg->gen);
-	//else printf("free var %p, no dg\n", v);
-	if(v->dg && v->dg->gen == 1 && v->dg->copy == (void*)v)
-		v->dg->gen = 2;
-#endif
 
 	for(i=0;i<v->nprops;i++)
 	{
-#ifndef NODAG
-		if(g_mode == GENERATING)
-#endif
-			free(v->props[i].name);
+		free(v->props[i].name);
 		free(v->props[i].value);
 	}
 	free(v->name);
 	if(v->type)free(v->type);
 	if(v->props)free(v->props);
 	free(v);
+#endif
 }
 
 void	free_mrs_ep(struct mrs_ep	*ep)
@@ -61,8 +62,9 @@ void	free_mrs_hcons(struct mrs_hcons	*hc)
 
 void	free_mrs(struct mrs	*m)
 {
+#ifdef NODAG
 	int i;
-	return;
+
 	if(!m)return;
 	free_mrs_var(m->ltop);
 	free_mrs_var(m->index);
@@ -74,6 +76,7 @@ void	free_mrs(struct mrs	*m)
 		free_mrs_hcons(m->hcons+i);
 	if(m->hcons)free(m->hcons);
 	free(m);
+#endif
 }
 
 static char	*parse_word(char	**P, int advance)
@@ -163,8 +166,10 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 			{
 				var.name = vlist->vars[i]->name;
 				var.vnum = i;
+				if(vlist->vars[i]->type)slab_free(vlist->vars[i]->type);
 				*vlist->vars[i] = var;
 			}
+			else slab_free(var.type);
 			vlist->vars[i]->refs++;
 			return vlist->vars[i];
 		}
@@ -251,10 +256,8 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		nrels++;
 		eps = slab_realloc(eps, sizeof(struct mrs_ep)*(nrels-1), sizeof(struct mrs_ep)*nrels);
 		ep = eps+nrels-1;
+		bzero(ep,sizeof(*ep));
 		ep->pred = (word=parse_word(P,1))?strdup(word):0;
-		ep->nargs = 0;
-		ep->args = 0;
-		ep->lbl = 0;
 		ep->epnum = nrels-1;
 		while((word=parse_word(P,1)) && strcmp(word,"]"))
 		{
