@@ -117,7 +117,7 @@ int	main(int	argc, char	*argv[])
 	setup_extra_type_dgs();
 	g_loaded = 1;
 
-	install_rf(inhibit_pack?((g_mode == PARSING)?1:2):0);
+	install_rf(inhibit_pack?0:((g_mode == PARSING)?1:2));
 
 	if(export_parts)
 	{
