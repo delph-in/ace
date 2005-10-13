@@ -1,12 +1,11 @@
 TODO:
 
+delete deleted daughters from daughters of rule, since they can't ever be present in unified-in daughters
+
 figure out why unpacking is so much slower than PET (sometimes 10x slower!)
 	- mrs extraction is the big bottleneck
 	- approach one: memoization; most bits and pieces of MRS are reused many times
 		- tried this on mrs_var's with good results, should also do ep's and hcon's
-	- approach two: slab allocator; most of the time is spent in memory management
-		- tried adding a cache of output property names, which good speedup
-		- should move to slab allocation for the rest of the mrs memory.
 	- type names perhaps should be pointers to types, since much time is spent looking up and comparing types
 	- maybe some other aspects of unpacking are slow? not clear yet.
 
