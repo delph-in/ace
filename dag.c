@@ -287,7 +287,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		for(i=0;i<a->narcs;i++)
 			if(!subsume_dg1(aarcs[i].dest, barcs[i].dest))return 0;
 	}
-	else if(subsume_forward && a->narcs>=b->narcs) // b is subtype of a, so has strict superset of features
+	else if(subsume_forward && a->narcs<=b->narcs) // b is subtype of a, so has strict superset of features
 	{
 		for(i=j=0;i<b->narcs;i++)
 		{
@@ -299,7 +299,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			}
 		}
 	}
-	else if(subsume_backward && b->narcs>=a->narcs) // a is subtype of b, so has strict superset of features
+	else if(subsume_backward && b->narcs<=a->narcs) // a is subtype of b, so has strict superset of features
 	{
 		for(i=j=0;i<a->narcs;i++)
 		{
@@ -311,11 +311,17 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			}
 		}
 	}
-	else return 0;
+	else
+	{
+		/*printf(" `%s'#%d vs `%s'#%d flags %d %d\n", a->xtype->name, a->narcs, b->xtype->name, b->narcs, subsume_forward, subsume_backward);
+		for(i=0;i<a->narcs;i++)printf(" %s", fnames[aarcs[i].label]); printf("\n");
+		for(i=0;i<b->narcs;i++)printf(" %s", fnames[barcs[i].label]); printf("\n");*/
+		return 0;
+	}
 	return 1;
 }
 
-int	equivalent_dg(struct dg	*a, struct dg	*b)
+int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk)
 {
 	int	res;
 	extern unsigned int	generation;
@@ -327,7 +333,8 @@ int	equivalent_dg(struct dg	*a, struct dg	*b)
 		exit(-1);
 	}
 
-	subsume_forward = subsume_backward = 1;
+	subsume_forward = Fw;
+	subsume_backward = Bk;
 	res = subsume_dg1(a, b);
 	generation++;
 	if(generation==MAX_GEN)

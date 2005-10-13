@@ -41,4 +41,13 @@ static inline int	check_rf(struct rule	*m, struct rule	*d, int	arg)
 	return byte & (1<<arg);
 }
 
+static inline int	check_srf(struct rule	*m, struct rule	*d)
+{
+	char	byte;
+	extern char	*rule_sfilter;
+
+	byte = rule_sfilter[m->rnum*nrules + d->rnum];
+	return byte;
+}
+
 #endif

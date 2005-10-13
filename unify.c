@@ -822,6 +822,13 @@ int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 	return unify1(to, dg1);
 }
 
+struct dg	*trim_copy(struct dg	*d)
+{
+	char	ch = 0;
+	enable_trim(1);
+	return copy_dg_with_comp_arcs_ss(d, &ch);
+}
+
 struct dg	*finalize_tmp(struct dg	*d, int trim)
 {
 	char		ch = 0;

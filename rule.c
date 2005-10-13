@@ -19,7 +19,7 @@ struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels);
 struct rule	**rules;
 int		nrules;
 
-char	*rule_filter;
+char	*rule_filter, *rule_sfilter;
 int	*nhactive, *nactive, *npassive, *nrecomb, *nused, *nptries, *natries;
 int	used_total = 0, pused_total = 0;
 extern int nfinal, trace, inhibit_pack;
@@ -331,14 +331,18 @@ char	*setup_rule_filter1(int pack)
 	int	i, j, k;
 	struct rule	*m, *d;
 	struct dg	*mdg;
-	int	yes = 0, count = 0, res;
+	int	yes = 0, count = 0, res, ssbl = 0;
 	char	byte, *rule_filter;
+	struct type *top = lookup_type("*top*");
 
 	show_task_name("rule filter...");
 	rule_filter = calloc(sizeof(char), nrules*nrules);
+	rule_sfilter = calloc(sizeof(char), nrules*nrules);
 
 	for(i=0;i<nrules;i++)
 	{
+		struct slab_state	st;
+		get_slabstate(&st);
 		m = rules[i];
 		if(m->ndaughters>8)
 		{
@@ -363,17 +367,30 @@ char	*setup_rule_filter1(int pack)
 			}
 			count += m->ndaughters;
 			rule_filter[i*nrules + j] = byte;
+			struct dg	*left = trim_copy(pack?( (pack==1) ? d->packdg : d->gpackdg ) : d->dg), *right = trim_copy(mdg);
+			left->xtype = left->type = top;
+			right->xtype = right->type = top;
+			res = unify_dg_tmp(left , right, -1);
+			if(res)
+			{
+				//printf("ssfilter[%d] `%s' + `%s': ", pack, rules[i]->name, rules[j]->name);
+				//unify_backtrace();
+				ssbl++;
+			}
+			forget_tmp();
+			rule_sfilter[i*nrules+j] = res?0:1;
 		}
+		set_slabstate(&st);
 	}
-	printf("%.1f%% blocked\n", 100*(float)(count-yes)/count);
+	printf("%.1f%% blocked (%.1f%% ss)\n", 100*(float)(count-yes)/count, 100*(float)ssbl/nrules/nrules);
 	return rule_filter;
 }
 
 struct rule_filters
 {
-	char	*nopack;
-	char	*pack;
-	char	*gpack;
+	char	*nopack, *nopacks;
+	char	*pack, *packs;
+	char	*gpack, *gpacks;
 	char	**rftc, **rltc;
 	char	**type_rf, **type_rl;
 	char	**type_rftc, **type_rltc;
@@ -383,9 +400,13 @@ void setup_rule_filter()
 {
 	filters = calloc(sizeof(*filters), 0);
 	filters->nopack = setup_rule_filter1(0);
+	filters->nopacks = rule_sfilter;
 	filters->pack = setup_rule_filter1(1);
+	filters->packs = rule_sfilter;
 	filters->gpack = setup_rule_filter1(2);
+	filters->gpacks = rule_sfilter;
 	rule_filter = filters->nopack;	// type_rxtc is applied before packing starts
+	rule_sfilter = filters->nopacks;
 	lex_filter_rules();
 }
 
@@ -412,8 +433,11 @@ void	*freeze_rule_filter()
 {
 	filters = freeze_block(filters, sizeof(*filters));
 	filters->nopack = freeze_block(filters->nopack, sizeof(char) * nrules*nrules);
+	filters->nopacks = freeze_block(filters->nopacks, sizeof(char) * nrules*nrules);
 	filters->pack = freeze_block(filters->pack, sizeof(char) * nrules*nrules);
+	filters->packs = freeze_block(filters->packs, sizeof(char) * nrules*nrules);
 	filters->gpack = freeze_block(filters->gpack, sizeof(char) * nrules*nrules);
+	filters->gpacks = freeze_block(filters->gpacks, sizeof(char) * nrules*nrules);
 	filters->rftc = freeze_rxtc(rf_tc, nrules);
 	filters->rltc = freeze_rxtc(rl_tc, nrules);
 	filters->type_rf = freeze_rxtc(type_rf, ntypes);
@@ -439,6 +463,11 @@ void	install_rf(int what)
 	if(what==0)rule_filter = filters->nopack;
 	else if(what==1)rule_filter = filters->pack;
 	else if(what==2)rule_filter = filters->gpack;
+	else assert(!"Not reached");
+
+	if(what==0)rule_sfilter = filters->nopacks;
+	else if(what==1)rule_sfilter = filters->packs;
+	else if(what==2)rule_sfilter = filters->gpacks;
 	else assert(!"Not reached");
 }
 

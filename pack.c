@@ -8,6 +8,9 @@
 #define PACKBUG(fmt,...) do {} while(0)
 //#define PACKBUG printf
 
+extern int debug_level;
+extern unsigned int	generation;
+
 static int	same_cell_daughter(struct edge *par, struct edge *dtr)
 {
 	int i;
@@ -60,8 +63,8 @@ static void record_packing(struct edge *host, struct edge *e)
 	host->pack[host->npack-1] = e;
 }
 
+static long long packcount = 0, packtry = 0, packqc = 0, packss = 0;
 #ifdef	COPY_COUNTS
-static long long packcount = 0, packtry = 0;
 extern long long copycount, copytraverse;
 #endif
 
@@ -125,12 +128,17 @@ int	pack_edge(struct edge	*edge)
 	for(i=0;i<ncandidates && (h=candidates[i]);i++)
 		if( h->have == edge->have && h->need == edge->need
 		&& (g_mode != GENERATING || h->ep_span == edge->ep_span)
-		&& (gen_qc || !equiv_quickcheck(h->qc, edge->qc))
 			)
 		{
-#ifdef	COPY_COUNTS
+			int	fw = 1, bk = 1;
+			// if nothing is subsumed by both rule schemata,
+			// then refinements of them cannot be in subsumption relations
+			if(edge->rule && h->rule)
+				if(!check_srf(edge->rule, h->rule))continue;
+
 			packtry++;
-#endif
+			if(!gen_qc && equiv_quickcheck(h->qc, edge->qc, &fw, &bk))continue;
+			packqc++;
 
 			PACKBUG("would like to pack #%d `%s' and #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
 			if(!identical_orth_routes(h, edge))continue;
@@ -155,7 +163,8 @@ int	pack_edge(struct edge	*edge)
 			h->ntries++;
 #endif
 
-			ssd = equivalent_dg(h->dg, edge->dg);
+			ssd = equivalent_dg(h->dg, edge->dg, fw, bk);
+			if(ssd)packss++;
 			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
 			if(ssd == 1 || (ssd == 2 && !h->frozen))
 			{
@@ -241,4 +250,6 @@ void packing_report()
 	fprintf(stderr, "NOTE: %lld packings (%.1f%% success), %lld / %lld = %.1f%% copies\n", packcount, 100*(float)packcount / packtry,
 		copycount, copytraverse, 100*(float)copycount / copytraverse);
 #endif
+	if(debug_level)fprintf(stderr, "NOTE: %lld subsumption tests; qc filters %.1f%% leaving %lld, of which ss passes %.1f%% = %lld\n",
+		packtry, 100 - 100*(float)packqc/packtry, packqc, 100*(float)packss/packqc, packss);
 }

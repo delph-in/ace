@@ -4,7 +4,7 @@
 struct qc	*extract_qc(struct dg	*d);
 struct qc	*extract_qc_arg(struct dg	*d, int	arg);
 int			quickcheck(struct qc	*a, struct qc	*b);
-int			equiv_quickcheck(struct qc	*a, struct qc	*b);
+int			equiv_quickcheck(struct qc	*a, struct qc	*b, int *Fw, int *Bk);
 struct qc	*copy_qc(struct qc	*in);
 
 #ifdef	CONF_H

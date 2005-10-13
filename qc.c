@@ -396,7 +396,7 @@ IFCLOCK(	glb_count += i*100;)
 	return 0;
 }
 
-int	equiv_quickcheck(struct qc	*a, struct qc	*b)
+int	equiv_quickcheck(struct qc	*a, struct qc	*b, int *Fw, int *Bk)
 {
 	int	i;
 	struct type	*ta, *tb, *g;
@@ -419,8 +419,9 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b)
 		}
 		if(ta && !tb)fw = 0;
 		if(tb && !ta)bw = 0;
-		if(!fw && !bw)return -1;
+		if(!fw && !bw) { *Fw = fw; *Bk = bw; return -1; }
 	}
+	*Fw = fw; *Bk = bw;
 	return 0;
 }
 
