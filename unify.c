@@ -624,7 +624,7 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 
 	if(!FROZEN(dg2))
 	{
-		if(FROZEN(dg1))// || dg1->narcs < dg2->narcs)
+		if(FROZEN(dg1) || dg1->narcs < dg2->narcs)
 		{
 			// trick: swap to make dg1 non-frozen if possible
 			// otherwise try to make the more specific dag dg1
