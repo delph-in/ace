@@ -624,8 +624,15 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 
 	if(!FROZEN(dg2))
 	{
-		if(FROZEN(dg1) || dg1->narcs < dg2->narcs)
+		register int balance = 0;
+		if(FROZEN(dg1))goto swap;
+		if(dg2->gen==generation && (dg2->ncarcs || dg2->type!=dg2->xtype))balance += 5;
+		if(dg1->gen==generation && (dg1->ncarcs || dg1->type!=dg1->xtype))balance -= 5;
+		balance += (7*dg2->narcs)/5;
+		balance -= 1*dg1->narcs;
+		if(balance>0)
 		{
+			swap:
 			// trick: swap to make dg1 non-frozen if possible
 			// otherwise try to make the more specific dag dg1
 			// to avoid copying info
