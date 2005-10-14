@@ -384,7 +384,7 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 		for(i=0;i<dg->ncarcs;i++)
 		{
 			if(PACKING_RESTRICTOR(dg->carcs[i].label))
-				{ newcopy->ncarcs--; continue; }
+				{ newcopy->narcs--; continue; }
 			aptr->label = dg->carcs[i].label;
 			//fprintf(stderr, "copying comp `%s' arc from %s to %p\n",
 			//	fnames[aptr->label], newcopy->type->name, dg->carcs[i].dest);

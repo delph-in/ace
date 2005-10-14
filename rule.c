@@ -398,7 +398,7 @@ struct rule_filters
 
 void setup_rule_filter()
 {
-	filters = calloc(sizeof(*filters), 0);
+	filters = calloc(sizeof(*filters), 1);
 	filters->nopack = setup_rule_filter1(0);
 	filters->nopacks = rule_sfilter;
 	filters->pack = setup_rule_filter1(1);
