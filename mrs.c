@@ -375,16 +375,24 @@ struct mrs_var	*mrs_find_ep_role(struct mrs_ep	*ep, char	*role)
 	return 0;
 }
 
-char	*marked;
+void	sprint_mrs_var(char	*str, struct mrs_var	*var)
+{
+	int	i;
+	char *p = str;
+	p += sprintf(p, "[ %s", var->type);
+	for(i=0;i<var->nprops;i++)
+		{ p += sprintf(p, " %s: %s", var->props[i].name, var->props[i].value); }
+	p += sprintf(p, " ]");
+}
 
 void	print_mrs_var_props(struct mrs_var	*var)
 {
-	int	i;
-	printf("[ %s", var->type);
-	for(i=0;i<var->nprops;i++)
-		{ printf(" %s: %s", var->props[i].name, var->props[i].value); }
-	printf(" ]");
+	char text[1024];
+	sprint_mrs_var(text, var);
+	printf("%s", text);
 }
+
+char	*marked;
 
 void	print_mrs_var(struct mrs_var	*var)
 {

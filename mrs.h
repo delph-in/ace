@@ -1,3 +1,6 @@
+#ifndef	MRS_H
+#define	MRS_H
+
 #include <stdio.h>
 
 struct mrs_var
@@ -78,3 +81,5 @@ void		*freeze_vpm();
 void		recover_vpm(void *vpm);
 struct mrs_var	*internal_to_external_mrs_var(struct mrs_var	*vin);
 struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin);
+
+#endif
