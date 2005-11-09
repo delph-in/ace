@@ -582,7 +582,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	}
 
 	unify_attempts_total++;
-	if(rf)return 0;
+	if(rf) { /*printf("RF fail: #%d + %s\n", b->id, a->rule->name);*/return 0; }
 	//if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
 
 /*

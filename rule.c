@@ -353,12 +353,12 @@ char	*setup_rule_filter1(int pack)
 		for(j=0;j<nrules;j++)
 		{
 			d = rules[j];
+			struct dg *ddg = pack?( (pack==1) ? d->packdg : d->gpackdg ) : d->dg;
 			byte = 0;
 			for(k=0;k<m->ndaughters;k++)
 			{
-				res = unify_dg_tmp(pack?( (pack==1) ? d->packdg : d->gpackdg ) : d->dg , mdg, k);
+				res = unify_dg_tmp(ddg, mdg, k);
 				forget_tmp();
-				//if(unify_dg(d->dg, mdg, k))
 				if(res==0)
 				{
 					byte |= (1<<k);
@@ -367,10 +367,11 @@ char	*setup_rule_filter1(int pack)
 			}
 			count += m->ndaughters;
 			rule_filter[i*nrules + j] = byte;
-			struct dg	*left = trim_copy(pack?( (pack==1) ? d->packdg : d->gpackdg ) : d->dg), *right = trim_copy(mdg);
+
+			struct dg	*left = trim_copy(ddg), *right = trim_copy(mdg);
 			left->xtype = left->type = top;
 			right->xtype = right->type = top;
-			res = unify_dg_tmp(left , right, -1);
+			res = unify_dg_tmp(left, right, -1);
 			if(res)
 			{
 				//printf("ssfilter[%d] `%s' + `%s': ", pack, rules[i]->name, rules[j]->name);
