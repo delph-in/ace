@@ -408,7 +408,7 @@ char	*lgroups[256];
 
 void	set_lgroup(int	group, wchar_t	*letters)
 {
-	//printf("letter group %c = %s\n", group, letters);
+	//printf("letter group %c = {%S}\n", group, letters);
 	if(lgroups[group])
 	{
 		fprintf(stderr, "morpho: redefining letter group `%c' not allowed\n", group);
@@ -424,6 +424,17 @@ wchar_t	*wcsdup(wchar_t	*str)
 	int len = wcslen(str);
 	wchar_t	*w = malloc((len+1)*sizeof(wchar_t));
 	return memcpy(w, str, (len+1)*sizeof(wchar_t));
+}
+
+wchar_t	*wcsdup_esc(wchar_t	*str)
+{
+	int len = wcslen(str);
+	wchar_t	*w = malloc((len+1)*sizeof(wchar_t)), *p, *r = w;
+	for(p=str;*p;p++)
+		if(*p=='\\' && p[1])*r++ = *++p;
+		else *r++ = *p;
+	*r = 0;
+	return w;
 }
 
 wchar_t	*trim_wcs(wchar_t	*str)
@@ -472,7 +483,7 @@ void	setup_morpho(char	*line)
 	wend = wide + wcslen(wide)-1;
 	if(*wend != ')')goto synt;
 	*wend = 0;
-	wide = trim_wcs(wide+2);
+	wide = wide+2;//trim_wcs(wide+2);
 
 	if(*wide < 0 || *wide > 255)
 	{
@@ -481,7 +492,7 @@ void	setup_morpho(char	*line)
 	}
 	letter = *wide;
 	if(wide[1] != ' ' && wide[1] != '\t')goto synt;
-	set_lgroup(letter, trim_wcs(wide+2));
+	set_lgroup(letter, trim_wcs(wcsdup_esc(wide+2)));
 }
 
 int	appropriate_letter(int	let, int	group)
@@ -689,15 +700,15 @@ void	setup_orule(struct orule	*or, char	*def)
 	{
 		struct orule_sub *sub;
 		wdef++;
-		wsp = wcschr(wdef, ')');
-		if(!wsp)
+		for(wsp=wdef;*wsp && (*wsp!=')' || wsp[-1]=='\\');wsp++) {}
+		if(!*wsp)
 		{
 			fprintf(stderr, "morpho: subrule `%S' is not closed\n", wdef);
 			exit(-1);
 		}
 		*wsp = 0;
 		next = wsp+1;
-		for(wsp=wdef;*wsp && *wsp!=' ' && *wsp!='\t';wsp++) {}
+		for(wsp=wdef;*wsp && ((*wsp!=' ' && *wsp!='\t') || wsp[-1]=='\\');wsp++) {}
 		if(!*wsp)
 		{
 			fprintf(stderr, "morpho: subrule `%S' has no RHS\n", wdef);
@@ -709,9 +720,9 @@ void	setup_orule(struct orule	*or, char	*def)
 		or->nsub++;
 		or->sub = realloc(or->sub, sizeof(struct orule_sub)*or->nsub);
 		sub = or->sub + or->nsub-1;
-		sub->pat = wcsdup(wdef);
+		sub->pat = wcsdup_esc(wdef);
 		sub->patl = wcslen(sub->pat);
-		sub->rep = wcsdup(wsp);
+		sub->rep = wcsdup_esc(wsp);
 		sub->repl = wcslen(sub->rep);
 
 		wdef = trim_wcs(next);
