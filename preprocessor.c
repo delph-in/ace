@@ -129,11 +129,27 @@ print_pprules()
 
 parse_pprules()
 {
-	int		i;
+	int		i, err;
 
+	err = regcomp(&delim, delim_pat, REG_EXTENDED);
+	if(err)
+	{
+		char buf[1024];
+		regerror(err, &pprules[i].re, buf, 1023);
+		fprintf(stderr, "preprocessor: while compiling `%s': %s\n", delim_pat, buf);
+		exit(-1);
+	}
 	for(i=0;i<npprules;i++)
-		regcomp(&pprules[i].re, pprules[i].pat, REG_EXTENDED);
-	regcomp(&delim, delim_pat, REG_EXTENDED);
+	{
+		err = regcomp(&pprules[i].re, pprules[i].pat, REG_EXTENDED);
+		if(err)
+		{
+			char buf[1024];
+			regerror(err, &pprules[i].re, buf, 1023);
+			fprintf(stderr, "preprocessor: while compiling `%s': %s\n", pprules[i].pat, buf);
+			exit(-1);
+		}
+	}
 }
 
 int	load_fsr_preprocessor(char	*fname)
