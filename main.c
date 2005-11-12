@@ -5,6 +5,7 @@
 #include	<unistd.h>
 #include	<string.h>
 #include	<ctype.h>
+#include	<locale.h>
 #include	"chart.h"
 #include	"net.h"
 #include	"freeze.h"
@@ -82,6 +83,7 @@ int	main(int	argc, char	*argv[])
 	struct timeval	tv1, tv2;
 	FILE	*fin;
 
+	setlocale(LC_ALL, "");
 	parse_args(argc, argv);
 	setup_carcs_stack();
 	init_glb_cache();
