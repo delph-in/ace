@@ -113,8 +113,8 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 
 	// setup the chart
 	clear_chart(nwords+1);
-	if(lexical_lookup(nwords, lemmas, forms)) { printf("NOTE: lexical coverage gap\n");  return -1; }
-	if(reduce_chart(nwords, lemmas)) { printf("NOTE: post reduction gap\n"); return -1; }
+	if(lexical_lookup(nwords, lemmas, forms)) { fprintf(stderr, "NOTE: lexical coverage gap\n");  return -1; }
+	if(reduce_chart(nwords, lemmas)) { fprintf(stderr, "NOTE: post reduction gap\n"); return -1; }
 
 	//if(rtried)free(rtried);
 	//rtried = calloc(sizeof(int),nrules);
@@ -141,12 +141,16 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 	int show_result(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
 		struct dg	*root = hyp->dg, *sem;
+		extern char	*mrs_end;
 		if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->dec->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
 		if(!inhibit_results)
 		{
 			if(sentence && !question && !didsent){printf("SENT: %s\n", sentence);didsent=1;}
+			mrs_end = " ; ";
 			print_mrs(mrs);
+			print_hypothesis(hyp, printf);
+			printf((mrs_end = "\n"));
 		}
 		free_mrs(mrs);
 		return 1;
@@ -241,7 +245,7 @@ int	parse_line(char	*line)
 	for(i=1;i<=nwords;i++)printf(" level %d: %f\n", i, level_times[i]);
 #endif
 
-	if(nparse==-1)printf("NOTE: ignoring `%s'\n", current_sentence);
+	if(nparse==-1)fprintf(stderr, "NOTE: ignoring `%s'\n", current_sentence);
 	if(do_itsdb && nparse==-1)itsdb_report(nwords, lemmas, -1, 0);
 
 finished:

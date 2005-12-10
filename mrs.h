@@ -61,7 +61,6 @@ struct mrs
 	struct mrs_vlist vlist;
 	char			**triggers;
 	int				ntriggers;
-	float			score;
 };
 
 void		print_mrs(struct mrs	*mrs);

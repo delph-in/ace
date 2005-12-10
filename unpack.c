@@ -566,7 +566,6 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 			if(is_root(rhyp->dg))
 			{
 				struct mrs	*m = extract_mrs(rhyp->dg);
-				m->score = rhyp->score;
 				//printf("\n"); print_hypothesis(rhyp, printf); printf("\n");
 				count += process(rhyp, m);
 			}

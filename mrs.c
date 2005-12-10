@@ -321,8 +321,6 @@ struct mrs	*parse_mrs(char	*buffer)
 			mrs.hcons = parse_mrs_hcons(&vlist, &p, &mrs.nhcons);
 		if(!strcasecmp(fname, "TRIGGER:") || !strcasecmp(fname, "VCS:"))
 			mrs.triggers = parse_mrs_trigger(&p, &mrs.ntriggers);
-		if(!strcasecmp(fname, "SCORE:"))
-			mrs.score = atof(parse_word(&p,1));
 	}
 
 	M = slab_malloc(sizeof(mrs));
@@ -414,6 +412,7 @@ void	print_mrs_var(struct mrs_var	*var)
 }
 
 char	mrs_line_breaks = ' ', mrs_tab = ' ';
+char	*mrs_end = "\n";
 
 void	print_mrs(struct mrs	*mrs)
 {
@@ -424,7 +423,6 @@ void	print_mrs(struct mrs	*mrs)
 	printf("[ LTOP: "); print_mrs_var(mrs->ltop);
 	printf("%cINDEX: ", mrs_line_breaks); print_mrs_var(mrs->index);
 //	printf("%cXARG: ", mrs_line_breaks); print_mrs_var(mrs->xarg);
-	if(mrs->score)printf(" SCORE: %f", mrs->score);
 	printf("%cRELS: <", mrs_line_breaks);
 	for(i=0;i<mrs->nrels;i++)
 	{
@@ -448,7 +446,7 @@ void	print_mrs(struct mrs	*mrs)
 			case hcons_geq: printf(" geq "); break; }
 		print_mrs_var(hc->lo);
 	}
-	printf(" > ]\n");
+	printf(" > ]%s", mrs_end);
 
 	free(marked); marked = 0;
 }
