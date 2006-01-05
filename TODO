@@ -15,7 +15,7 @@ freeze qc settings into grammar file
 
 ignore punctuation-chars for jacy
 
-freeze POST & configurable-ize it
+configurable-ize POST
 
 try to prove/analyze interesting things at grammar compile time
 	- *intelligently* auto pick quickcheck paths
