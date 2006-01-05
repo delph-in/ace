@@ -13,6 +13,9 @@
 #include	"maxent.h"
 #include	"mrs.h"
 #include	"freeze.h"
+#ifdef	POST
+#include	"post.h"
+#endif
 
 extern void		**oldslabs;
 extern int		noldslabs, aoldslabs, currslabsize;
@@ -68,6 +71,7 @@ struct grammar
 	void	*conf;
 	void	*fspp;
 	void	*instances;
+	void	*post;
 };
 
 extern void	*slab_alloc(int	len);
@@ -344,6 +348,11 @@ int	freeze_grammar()
 	strcat(G->message, grammar_dir); strcat(G->message, "\n");
 	strcat(G->message, grammar_version); strcat(G->message, "\n");
 
+#ifdef	POST
+	G->post = slab_alloc(post_image_size());
+	post_freeze(G->post);
+#endif
+
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 
 	printf("\n ... "); commit_slab();
@@ -394,6 +403,10 @@ static int	load_freeze()
 	recover_vpm(G->vpm);
 	recover_semantic_index(G->semindex);
 	recover_stochastic_model(G->stochmodel);
+
+#ifdef	POST
+	post_recover(G->post);
+#endif
 
 	for(i=0;i<256;i++)
 	{

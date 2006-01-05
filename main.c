@@ -96,6 +96,9 @@ int	main(int	argc, char	*argv[])
 			load_grammar_path = "../erg/ace/config.tdl";
 		gettimeofday(&tv1, 0);
 		load_grammar(load_grammar_path);
+#ifdef	POST
+		post_train_from("../post/brown.train.txt");
+#endif
 		gettimeofday(&tv2, 0);
 		tv2.tv_sec -= tv1.tv_sec;
 		tv2.tv_usec -= tv1.tv_usec;
@@ -110,11 +113,6 @@ int	main(int	argc, char	*argv[])
 
 	if(save_grammar_path)
 		exit(0);
-
-#ifdef	POST
-	if(g_mode == PARSING)
-		post_train_from("../post/brown.train.txt");
-#endif
 
 	setup_extra_type_dgs();
 	g_loaded = 1;
