@@ -106,14 +106,19 @@ static char	*parse_word(char	**P, int advance)
 static inline void	*slab_malloc(int l) { if(l%4)l += (4-(l%4)); return slab_alloc(l); }
 static inline void	*slab_calloc(int a, int b) { int l = a*b; void *p = slab_malloc(l); bzero(p, l); return p; }
 
-struct mrs_var	*parse_mrs_const(char	**P)
+struct mrs_var	*parse_mrs_const(struct mrs_vlist *vlist, char	**P)
 {
 	char	*c = parse_word(P, 1);
 	struct mrs_var *var = slab_calloc(sizeof(struct mrs_var), 1);
 	var->is_const = 1;
 	var->type = strdup(c);
 	var->name = strdup(c);
-	var->vnum = 0;
+
+	var->vnum = vlist->nvars;
+	vlist->nvars++;
+	vlist->vars = slab_realloc(vlist->vars, sizeof(struct mrs_var*) * (vlist->nvars-1), sizeof(struct mrs_var*) * vlist->nvars);
+	vlist->vars[vlist->nvars-1] = var;
+
 	return var;
 }
 
@@ -272,7 +277,7 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 					word[strlen(word)-1] = 0;
 				role->name = strdup(word);
 				if(!strcmp(word, "CARG"))
-					role->value = parse_mrs_const(P);
+					role->value = parse_mrs_const(vlist, P);
 				else role->value = parse_mrs_var(vlist, P);
 			}
 		}

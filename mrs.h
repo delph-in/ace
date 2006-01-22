@@ -15,7 +15,11 @@ struct mrs_var
 	short		refs;
 	int			vnum;
 
-	struct dg		*dg;
+	union
+	{
+		struct dg		*dg;
+		struct dbid		*dbid;
+	};
 };
 
 struct mrs_ep
