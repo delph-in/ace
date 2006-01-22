@@ -148,8 +148,8 @@ struct orule	*freeze_orule(struct orule	*orin)
 	orout->irregs = slab_alloc(sizeof(struct irreg) * orout->nirregs);
 	for(i=0;i<orout->nirregs;i++)
 	{
-		orout->irregs[i].stem = freeze_string(orin->irregs[i].stem);
-		orout->irregs[i].form = freeze_string(orin->irregs[i].form);
+		orout->irregs[i].stem = freeze_wcs(orin->irregs[i].stem);
+		orout->irregs[i].form = freeze_wcs(orin->irregs[i].form);
 	}
 
 	return orout;

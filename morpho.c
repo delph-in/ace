@@ -70,6 +70,18 @@ wchar_t	*towide(char	*mbs)
 	return wide;
 }
 
+char	*freeze_tombs(wchar_t	*w)
+{
+	char	*str = slab_alloc(4*(wcslen(w)+1));
+	if(-1 == wcstombs(str, w, 1+4*wcslen(w)))
+	{
+		perror("multibyte encoding failed");
+		fprintf(stderr, "on wcs `%S'\n", w);
+		exit(-1);
+	}
+	return str;
+}
+
 static inline is_type_route(struct orth_route *r, int type)
 {
 	int j;
@@ -368,11 +380,12 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 		for(j=0;j<or->nirregs;j++)
 		{
 			irr = or->irregs+j;
-			if(!strcmp(form, irr->form))
+			//printf("consider irreg `%S -> %s' for rule %s\n", irr->stem, irr->form, or->rule->name);
+			if(!wcscmp(wform, irr->form))
 			{
-				//fprintf(stderr, "used irreg `%s -> %s' for rule %s\n",
-				//		irr->stem, irr->form, or->rule->name);
-				add_ochart_edge(edge, chart, irr->stem, or);
+				//fprintf(stderr, "used irreg `%S -> %S' for rule %s\n",
+						//irr->stem, irr->form, or->rule->name);
+				add_ochart_edge(edge, chart, freeze_tombs(irr->stem), or);
 				break;	// TODO support irregs.tab defining whether to cut the search here or continue it
 			}
 		}
@@ -515,9 +528,9 @@ char	*inflect(struct orule	*or, char	*str)
 	int		i, strl = wcslen(wstr);
 
 	for(i=0;i<or->nirregs;i++)
-		if(!strcmp(str, or->irregs[i].stem))
+		if(!wcscmp(wstr, or->irregs[i].stem))
 		{
-			res = freeze_string(or->irregs[i].form);
+			res = freeze_tombs(or->irregs[i].form);
 			break;
 		}
 	if(!res)
@@ -785,18 +798,17 @@ int	load_irregulars(char	*path)
 			fprintf(stderr, "orth: invalid irregular form `%s'\n", copy);
 			return -1;
 		}
-		sprintf(copy, "%s_infl_rule", rule);
-		or = lookup_orule(copy);
+		or = lookup_orule(rule);
 		if(!or)
 		{
-			//fprintf(stderr, "orth: warning -- irregular for nonextant orule `%s'\n", copy);
+			fprintf(stderr, "orth: warning -- irregular for nonextant orule `%s'\n", rule);
 			continue;
 		}
 		//printf("add form `%s', stem `%s' TO rule: %s\n", form, stem, or->rule->name);
 		or->nirregs++;
 		or->irregs = realloc(or->irregs, sizeof(struct irreg)*or->nirregs);
-		or->irregs[or->nirregs-1].stem = strdup(stem);
-		or->irregs[or->nirregs-1].form = strdup(form);
+		or->irregs[or->nirregs-1].stem = towide(stem);
+		or->irregs[or->nirregs-1].form = towide(form);
 	}
 	fclose(f);
 	return 0;

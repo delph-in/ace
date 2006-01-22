@@ -19,7 +19,7 @@ struct orule
 	int		nirregs;
 	struct irreg
 	{
-		char	*form, *stem;
+		wchar_t	*form, *stem;
 	}	*irregs;
 };
 
