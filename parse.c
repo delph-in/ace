@@ -205,7 +205,7 @@ int	parse_line(char	*line)
 	while(line[0] && line[strlen(line)-1] == '\n')line[strlen(line)-1] = 0;
 	if(!*line)
 	{
-		if(!inhibit_results)printf("SKIP: \n");
+		if(!inhibit_results){printf("SKIP: \n");fflush(stdout);}
 		return -1;
 	}
 	if(!strncmp(line, "<DOC", 4))
@@ -228,7 +228,7 @@ int	parse_line(char	*line)
 	if(nwords>60)
 	{
 		fprintf(stderr, "NOTE: 0 readings, too many words (60+)\n");
-		if(!inhibit_results)printf("SKIP: %s\n", line);
+		if(!inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
 		return 0;
 	}
 
@@ -245,7 +245,7 @@ int	parse_line(char	*line)
 	level = 0;
 	timer();
 	nparse = parse(nwords, lemmas, forms, current_sentence);
-	if(nparse<=0 && !inhibit_results)printf("SKIP: %s\n", line);
+	if(nparse<=0 && !inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
 
 #ifdef	LEVEL_TIMER
 	level_times[nwords] = timer();

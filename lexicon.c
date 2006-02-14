@@ -188,7 +188,7 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 	else if(!strcmp(tag, "JJS"))type = "adj_intrans_superl_nale";
 	else if(!strcmp(tag, "JJR"))type = "adj_intrans_compar_nale";
 	else if(!strcmp(tag, "JJR"))type = "adj_intrans_compar_nale";
-	else if(!strcmp(tag, "RB"))type = "adv_word_nale";
+	else if(!strcmp(tag, "RB"))type = "adv_int_vp_le";//"adv_word_nale";
 	else if(!strcmp(tag, "NNPS"))type = "n_proper_le";
 	else if(!strcmp(tag, "NNS"))type = "n_intr_pl_nale";
 	else if(!strcmp(tag, "NN"))type = "n_mass_count_le";
