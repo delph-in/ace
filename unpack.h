@@ -5,7 +5,7 @@ struct decomposition
 	float		score;
 
 	int	*seeni1;
-	int	ni2;
+	int	ni2, ai2;
 };
 
 struct hypothesis

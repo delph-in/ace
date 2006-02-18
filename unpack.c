@@ -52,6 +52,7 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 		dec[i].edge = edge;
 		dec[i].seeni1 = 0;
 		dec[i].ni2 = 0;
+		dec[i].ai2 = 0;
 	}
 
 	orign = n; n = 0;
@@ -113,9 +114,13 @@ int dec_add_indices(struct decomposition	*dec, int indices[2])
 	{
 		assert(indices[0] == 0);
 		dec->ni2++;
-		dec->seeni1 = slab_realloc(dec->seeni1,
-			sizeof(int) * (dec->ni2-1),
-			sizeof(int) * dec->ni2);
+		if(dec->ni2 >= dec->ai2)
+		{
+			int	oa = dec->ai2;
+			dec->ai2 = (dec->ai2 + 1) * 1.5;
+			dec->seeni1 = slab_realloc(dec->seeni1,
+				sizeof(int) * oa, sizeof(int) * dec->ai2);
+		}
 		dec->seeni1[indices[1]] = 0;
 	}
 	else
@@ -211,7 +216,7 @@ struct hypothesis *leaf_hypothesis(struct edge *e)
 	int	i, slen = 0;
 	dec->edge = e;
 	dec->rhs[0] = dec->rhs[1] = 0;
-	dec->ni2 = 0;
+	dec->ni2 = dec->ai2 = 0;
 	dec->seeni1 = 0;
 	score_decomposition(dec);
 	hyp->dec = dec;
@@ -321,7 +326,7 @@ again:
 			for(j=0;j<arity;j++)
 			{
 				rhs[j] = hypothesize_edge(hyp->dec->rhs[j], idx[j]);
-				if(!rhs[j])break;
+				if(!rhs[j] || rhs[j]->dg==(void*)0x1)break;
 			}
 			if(j==arity)new_hypothesis(hyp->dec, A, rhs, idx);
 			else
@@ -547,6 +552,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 				rootdec->score = 0;
 				rootdec->seeni1 = 0;
 				rootdec->ni2 = 0;
+				rootdec->ai2 = 0;
 
 				int idx[2] = {0,0};
 				struct hypothesis *rhs[2] = { hypothesize_edge(e, 0), 0 };
