@@ -30,9 +30,9 @@ void	shutdown_net()
 {
 	if(saved_termerr == 2)return;
 	close(1);
-	close(2);
 	shutdown(0, SHUT_RDWR);
 	close(0);
+	restore_stderr();
 }
 
 static int	conn(char	*hostname, int	port)
