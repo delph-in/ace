@@ -551,47 +551,47 @@ void	wellform(struct dg	*d, char	*typename)
 	int		i;
 	struct type	*t;
 	//extern char	**fnames;
-	struct darc	*arcs = DARCS(d);
+	struct dg	**arcs = DARCS(d);
 
 	for(i=0;i<d->narcs;i++)
 	{
-		arcs[i].dest = (struct dg*)dereference_dg(arcs[i].dest);
-		if(arcs[i].dest->gen != generation)
+		arcs[i] = (struct dg*)dereference_dg(arcs[i]);
+		if(arcs[i]->gen != generation)
 		{
-			arcs[i].dest->type = arcs[i].dest->xtype;
-			arcs[i].dest->forward = 0;
-			arcs[i].dest->copy = 0;
-			arcs[i].dest->ncarcs = 0;
-			arcs[i].dest->carcs = 0;
-			arcs[i].dest->gen = generation;
+			arcs[i]->type = arcs[i]->xtype;
+			arcs[i]->forward = 0;
+			arcs[i]->copy = 0;
+			arcs[i]->ncarcs = 0;
+			arcs[i]->carcs = 0;
+			arcs[i]->gen = generation;
 		}
-		wfpath[wfpl++] = arcs[i].label;
-		wellform(arcs[i].dest, typename);
-		t = most_general_type_for_dg(arcs[i].dest);
+		wfpath[wfpl++] = d->label[i];
+		wellform(arcs[i], typename);
+		t = most_general_type_for_dg(arcs[i]);
 		if(!t)
 		{
-			fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", arcs[i].dest->type->name);
+			fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", arcs[i]->type->name);
 			exit(-1);
 		}
-		if(t != arcs[i].dest->type)
+		if(t != arcs[i]->type)
 		{
 			//fprintf(stderr, "well-formedness forces dag `%s' -> `%s'  (inside constraint for type %s)\n", arcs[i].dest->type->name, t->name, typename);
 			//for(j=0;j<wfpl;j++)
 				//fprintf(stderr, "%s ", fnames[wfpath[j]]);
 			//fprintf(stderr, "\n");
-			if(!descendent_of(t->tnum, arcs[i].dest->type))
+			if(!descendent_of(t->tnum, arcs[i]->type))
 			{
-				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i].dest->type->name, t->name);
+				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i]->type->name, t->name);
 				fprintf(stderr, "	while processing `%s'\n", typename);
 				exit(-1);
 			}
 			top_unifies_wellform++;
-			if(unify_dg_infrom(arcs[i].dest, copy_dg(t->dg)))
+			if(unify_dg_infrom(arcs[i], copy_dg(t->dg)))
 			{
 				fprintf(stderr, "failed well-formedness constraint!\n");
 				exit(-1);
 			}
-			//print_dg(arcs[i].dest);printf("\n");
+			//print_dg(arcs[i]);printf("\n");
 		}
 		wfpl--;
 	}
@@ -618,7 +618,7 @@ int	constrain_glbs_and_wellformedness()
 		//printf("pre-welformed dag for `%s':\n", types[i]->name);
 		//print_dg(types[i]->dg); printf("\n\n");
 		for(j=0;j<types[i]->dg->narcs;j++)
-			introduce_feature(DARCS(types[i]->dg)[j].label, i);
+			introduce_feature(types[i]->dg->label[j], i);
 	}
 	number_strings();	// just in case
 

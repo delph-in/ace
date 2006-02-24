@@ -189,7 +189,7 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 void	patch_dg(struct dg	*dg)
 {
 	int	i;
-	struct darc	*arcs;
+	struct dg	**arcs;
 
 	if(!dg)return;
 	dg = dereference_dg(dg);
@@ -209,7 +209,7 @@ void	patch_dg(struct dg	*dg)
 
 	//printf("%s\n", dg->type->name);
 	for(i=0;i<dg->narcs;i++)
-		patch_dg(arcs[i].dest);
+		patch_dg(arcs[i]);
 }
 
 struct dg	*freeze_dg(struct dg	*dg)

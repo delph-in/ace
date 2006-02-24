@@ -350,29 +350,29 @@ void	simplify_lexeme(struct lexeme	*l)
 	if(dg->narcs != 2)return;
 
 	// we want just 'STEM' and 'SYNSEM' features
-	if(DARCS(dg)[0].label != stemfeat && DARCS(dg)[1].label != stemfeat)return;
-	if(DARCS(dg)[0].label != synsemfeat && DARCS(dg)[1].label != synsemfeat)return;
+	if(dg->label[0] != stemfeat && dg->label[1] != stemfeat)return;
+	if(dg->label[0] != synsemfeat && dg->label[1] != synsemfeat)return;
 
 	ss = dg_hop(dg, synsemfeat);
 	// we want just 'LKEYS' and 'ONSET' or else just LKEYS
 	if(ss->narcs == 2)
 	{
-		if(DARCS(ss)[0].label != lkeysfeat && DARCS(ss)[1].label != lkeysfeat)return;
-		if(DARCS(ss)[0].label != phonfeat && DARCS(ss)[1].label != phonfeat)return;
+		if(ss->label[0] != lkeysfeat && ss->label[1] != lkeysfeat)return;
+		if(ss->label[0] != phonfeat && ss->label[1] != phonfeat)return;
 	}
 	else if(ss->narcs==1)
 	{
-		if(DARCS(ss)[0].label != lkeysfeat)return;
+		if(ss->label[0] != lkeysfeat)return;
 	}
 	else return;
 
 	// check LKEYS branch
 	lk = dg_hop(ss, lkeysfeat);
 	// we want just 'KEYREL'
-	if(lk->narcs != 1 || DARCS(lk)[0].label != keyrelfeat)return;
+	if(lk->narcs != 1 || lk->label[0] != keyrelfeat)return;
 	kr = dg_hop(lk, keyrelfeat);
 	// we want just 'PRED'
-	if(kr->narcs != 1 || DARCS(kr)[0].label != predfeat)return;
+	if(kr->narcs != 1 || kr->label[0] != predfeat)return;
 	pr = dg_hop(kr, predfeat);
 	// we want l->pred
 	if(pr->narcs != 0 || pr->type != l->pred)return;
@@ -383,7 +383,7 @@ void	simplify_lexeme(struct lexeme	*l)
 	else
 	{
 		// we want just 'ONSET'
-		if(ph->narcs != 1 || DARCS(ph)[0].label != onsetfeat)return;
+		if(ph->narcs != 1 || ph->label[0] != onsetfeat)return;
 		on = dg_hop(ph, onsetfeat);
 		// we want predictable onset
 		if(on->narcs != 0 || on->type != predict_onset(l->stem[0]->name))return;

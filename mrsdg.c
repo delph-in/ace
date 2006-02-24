@@ -52,10 +52,10 @@ void add_var_feats(struct mrs_var *v, int label, struct dg *value)
 
 	if(value->narcs)
 	{
-		struct darc *arcs = DARCS(value);
+		struct dg **arcs = DARCS(value);
 		// walk inside
 		for(i=0;i<value->narcs;i++)
-			add_var_feats(v, arcs[i].label, arcs[i].dest);
+			add_var_feats(v, value->label[i], arcs[i]);
 	}
 	else
 	{
@@ -102,7 +102,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 
 	if(dg->gen != 1 || !dg->copy || ((struct mrs_var*)dg->copy)->dg!=dg)
 	{
-		struct darc	*arcs = DARCS(dg);
+		struct dg	**arcs = DARCS(dg);
 		unsigned hc = hashcode(dg);
 		struct mrs_var	*var, *vnew;
 		extern char **fnames;
@@ -134,7 +134,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		if(!var->is_const)
 		{
 			for(i=0;i<dg->narcs;i++)
-				add_var_feats(var, arcs[i].label, arcs[i].dest);
+				add_var_feats(var, dg->label[i], arcs[i]);
 
 			vnew = internal_to_external_mrs_var(var);
 			//free_mrs_var(var);
@@ -159,7 +159,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 
 void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 {
-	struct darc	*arcs = DARCS(dg);
+	struct dg	**arcs = DARCS(dg);
 	struct dg		*pred;
 	static int		lblf = -1, predf;
 	int				i, j;
@@ -182,13 +182,13 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 	for(i=0;i<dg->narcs;i++)
 	{
 		extern char	**fnames;
-		if(arcs[i].label == lblf || arcs[i].label==predf)continue;
-		if(ep_drop[arcs[i].label])continue;
+		if(dg->label[i] == lblf || dg->label[i]==predf)continue;
+		if(ep_drop[dg->label[i]])continue;
 		ep->nargs++;
 		ep->args = slab_realloc(ep->args, sizeof(struct mrs_ep_role)*(ep->nargs-1),
 											sizeof(struct mrs_ep_role)*ep->nargs);
-		ep->args[ep->nargs-1].name = freeze_string(fnames[arcs[i].label]);
-		ep->args[ep->nargs-1].value = dg_to_mrs_var(arcs[i].dest, vlist);
+		ep->args[ep->nargs-1].name = freeze_string(fnames[dg->label[i]]);
+		ep->args[ep->nargs-1].value = dg_to_mrs_var(arcs[i], vlist);
 	}
 }
 

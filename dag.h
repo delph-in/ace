@@ -19,7 +19,7 @@
 
 struct darc
 {
-	int		label;
+	int			label;
 	struct dg	*dest;
 };
 
@@ -28,14 +28,13 @@ struct dg
 {
 	struct type	*type;
 	struct type	*xtype;
-#define	DARCS(dg)	((struct darc*)(dg+1))
+#define	DARCS(dg1)	((struct dg**)((void*)dg1+sizeof(struct dg) + (dg1->narcs-2+3)/4 * 4))
 	struct dg	*forward;
 	struct darc	*carcs;
 	struct dg	*copy;
-	unsigned short	narcs, ncarcs;
 	unsigned int	gen;
-	//unsigned char	narcs, ncarcs;
-	//unsigned short	gen;
+	unsigned char	narcs, ncarcs;
+	unsigned char	label[2];
 };
 
 // basic dag operations
@@ -182,18 +181,18 @@ static inline struct dg	*dg_hop(struct dg	*d, int	label)
 {
 	int	i, j, k, l;
 	extern unsigned int	generation;
-	struct darc	*arcs;
+	struct dg	**arcs;
 
 	if(d->forward)d = dereference_dg(d);
 	if(!d)return 0;
-	arcs = (struct darc*)(d+1);
+	arcs = DARCS(d);
 
 	for(i=0,j=d->narcs;i<j;)
 	{
 		k = (i+j)>>1;
 		//printf("guess %d: %d\n", k, arcs[k].label);
-		l = arcs[k].label;
-		if(l==label){d=arcs[k].dest;goto ret;}
+		l = d->label[k];
+		if(l==label){d=arcs[k];goto ret;}
 		else if(l>label)j = k;
 		else i = k+1;
 	}

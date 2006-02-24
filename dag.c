@@ -163,34 +163,48 @@ struct dg	*add_dg_hop(struct dg	*d, int	label, struct dg	*value)
 {
 	int	i, olen, nlen;
 	struct dg	*dn;
-	struct darc	*arcs;
+	struct dg	**arcs;
+
+	//printf("add hop [%d -> %p], current arcs:\n", label, value);
+	//for(i=0;i<d->narcs;i++)printf("   %d -> %p\n", d->label[i], DARCS(d)[i]);
 
 	d = dereference_dg(d);
 	// find in sorted order
-	arcs = DARCS(d);
-	for(i=0;i<d->narcs;i++)if(arcs[i].label>=label)break;
+	for(i=0;i<d->narcs;i++)if(d->label[i]>=label)break;
 
-	if(i==d->narcs || arcs[i].label>label)
+	if(i==d->narcs || d->label[i]>label)
 	{
 		// need to grow list of arcs
 		d->narcs++;
-		olen = sizeof(struct dg) + sizeof(struct darc) * (d->narcs-1);
-		nlen = sizeof(struct dg) + sizeof(struct darc) * d->narcs;
+		int	oab = (d->narcs-1-2 + 3)/4 * 4;
+		int	ab = (d->narcs-2 + 3)/4 * 4;
+		olen = sizeof(struct dg) + oab + sizeof(struct dg*) * (d->narcs-1);
+		nlen = sizeof(struct dg) + ab + sizeof(struct dg*) * d->narcs;
 		dn = slab_realloc(d, olen, nlen);
 		if(dn != d)
 		{
+			struct dg	**oarcs;
 			// oops! we left the old dg behind, forward it along
 			d->gen = 9;
 			d->forward = dn;
 			d = dn;
 			// arcs go directly after the `struct dg'
-			arcs = DARCS(d);
+			arcs = (struct dg**)((void*)d + sizeof(*d) + ab);
+			oarcs = (struct dg**)((void*)d + sizeof(*d) + oab);
+			memmove(arcs, oarcs, sizeof(struct dg*)*(d->narcs-1));
 		}
+		else arcs = DARCS(d);
 
-		memmove(arcs+i+1, arcs+i, sizeof(struct darc)*(d->narcs-1-i));
+		memmove(arcs+i+1, arcs+i, sizeof(struct dg*)*(d->narcs-1-i));
+		memmove(d->label+i+1, d->label+i, d->narcs-1-i);
 	}
-	arcs[i].label = label;
-	arcs[i].dest = value;
+	else arcs = DARCS(d);
+
+	d->label[i] = label;
+	arcs[i] = value;
+
+	//printf("now arcs:\n", label, value);
+	//for(i=0;i<d->narcs;i++)printf("   %d -> %p\n", d->label[i], DARCS(d)[i]);
 
 	return d;
 }
@@ -205,7 +219,7 @@ int	subsume_same_dg(struct dg	*a)
 {
 	int	i;
 	extern unsigned int	generation;
-	struct darc	*arcs;
+	struct dg	**arcs;
 
 	//return 0;
 	a = p_dereference_dg(a);
@@ -229,7 +243,7 @@ int	subsume_same_dg(struct dg	*a)
 
 	arcs = DARCS(a);
 	for(i=0;i<a->narcs;i++)
-		if(!subsume_same_dg(arcs[i].dest))return 0;
+		if(!subsume_same_dg(arcs[i]))return 0;
 	return 1;
 }
 
@@ -239,12 +253,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 {
 	int	i, j;
 	extern unsigned int	generation;
-	struct darc	*aarcs, *barcs;
+	struct dg	**aarcs, **barcs;
 
 	a = p_dereference_dg(a);
 	b = p_dereference_dg(b);
 
-	//if(!a || !b)return 0;
 	if(a==b)return subsume_same_dg(a);
 	if(a->gen!=generation)
 	{
@@ -285,16 +298,16 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		// well-formedness and sortedness conditions guarantee that since
 		// types match exactly, arc labels match exactly...
 		for(i=0;i<a->narcs;i++)
-			if(!subsume_dg1(aarcs[i].dest, barcs[i].dest))return 0;
+			if(!subsume_dg1(aarcs[i], barcs[i]))return 0;
 	}
 	else if(subsume_forward && a->narcs<=b->narcs) // b is subtype of a, so has strict superset of features
 	{
 		for(i=j=0;i<b->narcs;i++)
 		{
 			if(j>=a->narcs)break;
-			if(aarcs[j].label == barcs[i].label)
+			if(a->label[j] == b->label[i])
 			{
-				if(!subsume_dg1(aarcs[j].dest, barcs[i].dest))return 0;
+				if(!subsume_dg1(aarcs[j], barcs[i]))return 0;
 				j++;
 			}
 		}
@@ -304,9 +317,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		for(i=j=0;i<a->narcs;i++)
 		{
 			if(j>=b->narcs)break;
-			if(aarcs[i].label == barcs[j].label)
+			if(a->label[i] == b->label[j])
 			{
-				if(!subsume_dg1(aarcs[i].dest, barcs[j].dest))return 0;
+				if(!subsume_dg1(aarcs[i], barcs[j]))return 0;
 				j++;
 			}
 		}
@@ -380,23 +393,22 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 {
 	int	i, intro = -1, k;
 	struct type	*up = 0, *th;
-	struct darc	*arcs = DARCS(d);
 
 	for(i=0;i<d->narcs;i++)
 	{
-		k = introduce[arcs[i].label];
+		k = introduce[d->label[i]];
 		if(k==-1)
 		{
 			fprintf(stderr, "ERROR: tried to wellform a dag containing feature `%s', "
-					"which was never introduced in the type heirarchy\n", fnames[arcs[i].label]);
+					"which was never introduced in the type heirarchy\n", fnames[d->label[i]]);
 			exit(-1);
 		}
 		th = types[k];
 		/*if(k>intro)
 		{
 			//printf("dag `%s' uses `%s', introduced by %s\n",
-					//d->type->name, fnames[arcs[i].label],
-					//types[introduce[arcs[i].label]]->name);
+					//d->type->name, fnames[d->label[i]],
+					//types[introduce[d->label[i]]]->name);
 			intro = k;
 		}*/
 		if(!up)up = th;
@@ -415,7 +427,7 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 	//if(intro==-1)return d->type;
 	if(!up)
 	{
-		//if(d->narcs)printf("type inferred for %d features [%s ...] = null\n", d->narcs, fnames[arcs[0].label]);
+		//if(d->narcs)printf("type inferred for %d features [%s ...] = null\n", d->narcs, fnames[d->label[0]]);
 		return d->type;
 	}
 	else

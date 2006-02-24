@@ -61,7 +61,7 @@ static inline void	forward_dg(struct dg	*from, struct dg	*to)
 int	check_cycles(struct dg	*dg)
 {
 	int	i;
-	struct darc	*arcs;
+	struct dg	**arcs;
 
 	if(!dg)return -1;
 	if(dg->forward)
@@ -84,7 +84,7 @@ int	check_cycles(struct dg	*dg)
 
 	arcs = DARCS(dg);
 	for(i=0;i<dg->narcs;i++)
-		if(check_cycles(arcs[i].dest))return -1;
+		if(check_cycles(arcs[i]))return -1;
 	if(dg->gen == generation)for(i=0;i<dg->ncarcs;i++)
 		if(check_cycles(dg->carcs[i].dest))return -1;
 	dg->copy = (void*)2;
@@ -95,7 +95,8 @@ int	check_cycles(struct dg	*dg)
 static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
-	struct darc	*aptr, *optr;
+	unsigned char	*alptr, *olptr;
+	struct dg	**aptr, **optr;
 	int		i;
 
 	dg = p_dereference_dg(dg);
@@ -106,7 +107,8 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 
 	if(dg->copy)return dg->copy;
 
-	newcopy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*dg->narcs);
+	int	ab = (dg->narcs-2+3)/4 * 4;
+	newcopy = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*dg->narcs);
 	dg->copy = newcopy;
 	*newcopy = *dg;
 	newcopy->type = newcopy->xtype;
@@ -120,16 +122,15 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 		newcopy->forward = 0;
 		newcopy->gen = generation;
 	}
-	aptr = DARCS(newcopy);//slab_alloc(sizeof(struct darc) * dg->narcs);
+	memcpy(newcopy->label, dg->label, dg->narcs);
+	aptr = DARCS(newcopy);
 	optr = DARCS(dg);
 
 	for(i=0;i<dg->narcs;i++)
 	{
-		aptr->label = optr->label;
-		aptr->dest = copy_dg_no_comp_arcs(optr->dest);
-		if(!aptr->dest)return 0;
-		aptr++;
-		optr++;
+		*aptr = copy_dg_no_comp_arcs(*optr);
+		if(!*aptr)return 0;
+		aptr++; optr++;
 	}
 	return newcopy;
 }
@@ -153,8 +154,8 @@ static void print_copy_path(char	*name)
 
 static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 {
-	struct dg	*dg;
-	struct darc	xarc, *aptr, *optr;
+	struct dg	*dg, **aptr, **optr;
+	unsigned char	*alptr, *olptr;
 	struct dg	*newcopy;
 	char		forwarded, i, j, ch, st;
 	struct slab_state	state;
@@ -209,7 +210,14 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 
 	get_slabstate(&state);
 
-	newcopy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*(dg->narcs+dg->ncarcs));
+	int	na = dg->narcs+dg->ncarcs;
+	for(i=0;i<dg->narcs;i++)
+		if(SHOULD_TRIM(dg->label[i]))na--;
+	for(i=0;i<dg->ncarcs;i++)
+		if(SHOULD_TRIM(dg->carcs[i].label))na--;
+
+	int	ab = (na-2 + 3)/4 * 4;
+	newcopy = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*na);
 	//*newcopy = *dg;
 	newcopy->xtype = newcopy->type = dg->type;
 	newcopy->carcs = 0;
@@ -217,20 +225,22 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	newcopy->copy = 0;
 	newcopy->ncarcs = 0;
 	newcopy->forward = 0;
-	newcopy->narcs = dg->narcs + dg->ncarcs;
-	aptr = DARCS(newcopy);//slab_alloc(sizeof(struct darc) * newcopy->narcs);
+	newcopy->narcs = na;
+	aptr = DARCS(newcopy);
+	alptr = newcopy->label;
 	optr = DARCS(dg);
+	olptr = dg->label;
 
 	st = 0;
 	if(!dg->ncarcs)
 	{
 		for(i=0;i<dg->narcs;i++)
 		{
-			aptr->label = optr->label;
-			if(SHOULD_TRIM(aptr->label))
+			*alptr = *olptr;
+			if(SHOULD_TRIM(*alptr))
 			{
-				newcopy->narcs--;
 				optr++;
+				olptr++;
 				st=1;
 				continue;
 			}
@@ -240,33 +250,50 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 
 //#define	COPY_PATHS
 #ifdef	COPY_PATHS
-			copypath[copypathp++] = optr->label;
+			copypath[copypathp++] = *olptr;
 #endif
-			aptr->dest = copy_dg_with_comp_arcs_ss(optr->dest, &ch);
+			*aptr = copy_dg_with_comp_arcs_ss(*optr, &ch);
 #ifdef	COPY_PATHS
 			copypathp--;
 #endif
 
 			if(ch)st = 1;
-			if(!aptr->dest)return 0;
+			if(!*aptr)return 0;
+			alptr++;
 			aptr++;
+			olptr++;
 			optr++;
 		}
 	}
 	else for(j=0,i=0;i<dg->narcs || j<dg->ncarcs;) // mergesort
 	{
+		struct dg		*copyme;
+		unsigned char	copylabel;
 		if(j<dg->ncarcs && i<dg->narcs)
 		{
-			if(optr[(int)i].label < dg->carcs[(int)j].label)
-				xarc = optr[(int)i++];
-			else xarc = dg->carcs[(int)j++];
+			if(olptr[(int)i] < dg->carcs[(int)j].label)
+			{
+				copylabel = olptr[(int)i];
+				copyme = optr[(int)i++];
+			}
+			else
+			{
+				copylabel = dg->carcs[(int)j].label;
+				copyme = dg->carcs[(int)j++].dest;
+			}
 		}
-		else if(i<dg->narcs)xarc = optr[(int)i++];
-		else xarc = dg->carcs[(int)j++];
-		aptr->label = xarc.label;
-		if(SHOULD_TRIM(aptr->label))
+		else if(i<dg->narcs)
 		{
-			newcopy->narcs--;
+			copylabel = olptr[(int)i];
+			copyme = optr[(int)i++];
+		}
+		else
+		{
+			copylabel = dg->carcs[(int)j].label;
+			copyme = dg->carcs[(int)j++].dest;
+		}
+		if(SHOULD_TRIM(copylabel))
+		{
 			st=1;
 			continue;
 		}
@@ -275,16 +302,17 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 		ch = 0;
 
 #ifdef	COPY_PATHS
-		copypath[copypathp++] = xarc.label;
+		copypath[copypathp++] = copylabel;
 #endif
-		aptr->dest = copy_dg_with_comp_arcs_ss(xarc.dest, &ch);
+		*alptr = copylabel;
+		*aptr = copy_dg_with_comp_arcs_ss(copyme, &ch);
 #ifdef	COPY_PATHS
 		copypathp--;
 #endif
 
 		if(ch)st = 1;
-		if(!aptr->dest)return 0;
-		aptr++;
+		if(!*aptr)return 0;
+		aptr++; alptr++;
 	}
 	dg->copy = newcopy;
 
@@ -318,8 +346,9 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
-	struct darc	*aptr, *optr;
-	int		i, nnar;
+	unsigned char	*alptr, *olptr;
+	struct dg	**aptr, **optr;
+	int		i, j;
 
 	dg = dereference_dg(dg);
 	if(!dg)return 0;
@@ -350,10 +379,14 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 		return dg->copy;
 	}
 
-	if(dg->gen == generation)
-		nnar = dg->narcs + dg->ncarcs;
-	else nnar = dg->narcs;
-	newcopy = slab_alloc(sizeof(struct dg) + sizeof(struct darc)*nnar);
+	int	na = dg->narcs + dg->ncarcs;
+	for(i=0;i<dg->narcs;i++)
+		if(PACKING_RESTRICTOR(dg->label[i]))na--;
+	for(i=0;i<dg->ncarcs;i++)
+		if(PACKING_RESTRICTOR(dg->carcs[i].label))na--;
+	int	ab = (na-2 + 3)/4 * 4;
+
+	newcopy = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*na);
 	dg->copy = newcopy;
 	*newcopy = *dg;
 	newcopy->xtype = newcopy->type = (dg->gen==generation)?dg->type:dg->xtype;
@@ -361,39 +394,60 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 	newcopy->copy = 0;
 	newcopy->ncarcs = 0;
 	newcopy->carcs = 0;
-	newcopy->narcs = nnar;
-	aptr = DARCS(newcopy);//slab_alloc(sizeof(struct darc) * newcopy->narcs);
+	newcopy->narcs = na;
+	alptr = newcopy->label;
+	aptr = DARCS(newcopy);
+	olptr = dg->label;
 	optr = DARCS(dg);
 
 	// mark that we are inside this node, to detect cycles
 	newcopy->forward = (void*)1;
-	for(i=0;i<dg->narcs;i++)
+
+	for(j=0,i=0;i<dg->narcs || j<dg->ncarcs;) // mergesort
 	{
-		if(PACKING_RESTRICTOR(optr->label))
-			{ optr++; newcopy->narcs--; continue; }
-		aptr->label = optr->label;
-		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
-		//		fnames[aptr->label], newcopy->type->name, optr->dest);
-		aptr->dest = copy_dg_with_comp_arcs(optr->dest);
-		if(!aptr->dest)return 0;
-		aptr++;
-		optr++;
-	}
-	if(dg->gen == generation)
-	{
-		for(i=0;i<dg->ncarcs;i++)
+		struct dg		*copyme;
+		unsigned char	copylabel;
+		if(j<dg->ncarcs && i<dg->narcs)
 		{
-			if(PACKING_RESTRICTOR(dg->carcs[i].label))
-				{ newcopy->narcs--; continue; }
-			aptr->label = dg->carcs[i].label;
-			//fprintf(stderr, "copying comp `%s' arc from %s to %p\n",
-			//	fnames[aptr->label], newcopy->type->name, dg->carcs[i].dest);
-			aptr->dest = copy_dg_with_comp_arcs(dg->carcs[i].dest);
-			if(!aptr->dest)return 0;
-			aptr++;
+			if(olptr[(int)i] < dg->carcs[(int)j].label)
+			{
+				copylabel = olptr[(int)i];
+				copyme = optr[(int)i++];
+			}
+			else
+			{
+				copylabel = dg->carcs[(int)j].label;
+				copyme = dg->carcs[(int)j++].dest;
+			}
 		}
-		qsort(DARCS(newcopy), newcopy->narcs, sizeof(struct darc), darc_cmp);
+		else if(i<dg->narcs)
+		{
+			copylabel = olptr[(int)i];
+			copyme = optr[(int)i++];
+		}
+		else
+		{
+			copylabel = dg->carcs[(int)j].label;
+			copyme = dg->carcs[(int)j++].dest;
+		}
+		if(PACKING_RESTRICTOR(copylabel))
+			continue;
+		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
+		//		fnames[aptr->label], newcopy->type->name, xarc.dest);
+
+#ifdef	COPY_PATHS
+		copypath[copypathp++] = copylabel;
+#endif
+		*alptr = copylabel;
+		*aptr = copy_dg_with_comp_arcs(copyme);
+#ifdef	COPY_PATHS
+		copypathp--;
+#endif
+
+		if(!*aptr)return 0;
+		aptr++; alptr++;
 	}
+
 	newcopy->forward = 0;
 	return newcopy;
 }
@@ -417,7 +471,7 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 	unsigned char	news[256], nn=0;
 	struct type	*t, *t1, *t2;
 	struct dg	*extra=0;
-	struct darc	*arcs1, *arcs2;
+	struct dg	**arcs1, **arcs2;
 
 	dg1 = dereference_dg(dg1);
 	dg2 = dereference_dg(dg2);
@@ -465,14 +519,14 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 	arcs2 = DARCS(dg2);
 	for(j=0,i=0;i<dg2->narcs;i++)
 	{
-		for(;j<dg1->narcs && arcs2[i].label>arcs1[j].label;j++){}
-		if(j==dg1->narcs || arcs2[i].label != arcs1[j].label)news[nn++] = i;
+		for(;j<dg1->narcs && dg2->label[i]>dg1->label[j];j++){}
+		if(j==dg1->narcs || dg2->label[i] != dg1->label[j])news[nn++] = i;
 		else
 		{
 #ifdef	UNIFY_PATHS
-			upath[upathl++] = arcs2[i].label;
+			upath[upathl++] = dg2->label[i];
 #endif
-			if(unify_dg_infrom(arcs1[j].dest, arcs2[i].dest))return -1;
+			if(unify_dg_infrom(arcs1[j], arcs2[i]))return -1;
 #ifdef	UNIFY_PATHS
 			upathl--;
 #endif
@@ -500,7 +554,8 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 		dg1->narcs+=nn;
 		*/
 		for(k=0;k<nn;k++)
-			dg1 = add_dg_hop(dg1, arcs2[news[k]].label, arcs2[news[k]].dest);
+			dg1 = add_dg_hop(dg1, dg2->label[news[k]], arcs2[news[k]]);
+		arcs1 = DARCS(dg1);
 		//qsort(dg1->arcs, dg1->narcs, sizeof(struct darc), darc_cmp);
 	}
 
@@ -612,7 +667,7 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	unsigned char	newcs[32], nc=0;
 	struct type	*t, *t1, *t2;
 	struct dg	*extra=0;
-	struct darc	*arcs1, *arcs2;
+	struct dg	**arcs1, **arcs2;
 
 	if(dg1->forward)dg1 = dereference_dg(dg1);
 	if(dg2->forward)dg2 = dereference_dg(dg2);
@@ -678,19 +733,19 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	{
 		if(k>=dg1->narcs && j>=dg1->ncarcs)break;
 #ifdef	UNIFY_PATHS
-		upath[upathl++] = arcs2[i].label;
+		upath[upathl++] = dg2->label[i];
 #endif
-		for(;k<dg1->narcs && arcs2[i].label > arcs1[k].label;k++) {}
-		if(k<dg1->narcs && arcs2[i].label == arcs1[k].label)
+		for(;k<dg1->narcs && dg2->label[i] > dg1->label[k];k++) {}
+		if(k<dg1->narcs && dg2->label[i] == dg1->label[k])
 		{
-			if(unify1(arcs1[k++].dest, arcs2[i].dest))return -1;
+			if(unify1(arcs1[k++], arcs2[i]))return -1;
 		}
 		else
 		{
-			for(;j<dg1->ncarcs && arcs2[i].label > dg1->carcs[j].label;j++) {}
-			if(j<dg1->ncarcs && arcs2[i].label == dg1->carcs[j].label)
+			for(;j<dg1->ncarcs && dg2->label[i] > dg1->carcs[j].label;j++) {}
+			if(j<dg1->ncarcs && dg2->label[i] == dg1->carcs[j].label)
 			{
-				if(unify1(dg1->carcs[j++].dest, arcs2[i].dest))return -1;
+				if(unify1(dg1->carcs[j++].dest, arcs2[i]))return -1;
 			}
 			else news[nn++] = i;
 		}
@@ -707,10 +762,10 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 #ifdef	UNIFY_PATHS
 		upath[upathl++] = dg2->carcs[i].label;
 #endif
-		for(;k<dg1->narcs && dg2->carcs[i].label > arcs1[k].label;k++) {}
-		if(k<dg1->narcs && dg2->carcs[i].label == arcs1[k].label)
+		for(;k<dg1->narcs && dg2->carcs[i].label > dg1->label[k];k++) {}
+		if(k<dg1->narcs && dg2->carcs[i].label == dg1->label[k])
 		{
-			if(unify1(arcs1[k++].dest, dg2->carcs[i].dest))return -1;
+			if(unify1(arcs1[k++], dg2->carcs[i].dest))return -1;
 		}
 		else
 		{
@@ -730,11 +785,7 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	// add remaining dg2 arcs and comps arcs to dg1's comps arcs
 	if(nn+nc > 0)
 	{
-		//dg1->carcs = slab_realloc(dg1->carcs, sizeof(struct darc) * dg1->ncarcs,
-		//		sizeof(struct darc) * (dg1->ncarcs + nn + nc));
 		dg1->carcs = realloc_carcs(dg1->carcs, dg1->ncarcs, dg1->ncarcs + nn + nc);
-
-		//dg1->carcs = realloc(dg1->carcs, sizeof(struct darc) * (dg1->ncarcs + nn + nc));
 
 		// merge-sort
 		j=k=0;
@@ -751,7 +802,11 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 				if(k==nc)break;
 			}
 		}*/
-		while(j<nn) dg1->carcs[dg1->ncarcs++] = arcs2[news[j++]];
+		while(j<nn)
+		{
+			dg1->carcs[dg1->ncarcs].label = dg2->label[news[j]];
+			dg1->carcs[dg1->ncarcs++].dest = arcs2[news[j++]];
+		}
 		while(k<nc) dg1->carcs[dg1->ncarcs++] = dg2->carcs[newcs[k++]];
 		if(nn+nc < dg1->ncarcs || (nc&&nn))
 		{
@@ -912,7 +967,7 @@ static long	marker;
 void dagreset_c(struct dg	*d)
 {
 	int	i;
-	struct darc	*arcs;
+	struct dg	**arcs;
 
 	d = p_dereference_dg(d);
 	if(!d)return;
@@ -920,13 +975,13 @@ void dagreset_c(struct dg	*d)
 	d->copy = 0;
 	arcs = DARCS(d);
 	for(i=0;i<d->narcs;i++)
-		dagreset_c(arcs[i].dest);
+		dagreset_c(arcs[i]);
 }
 
 static void dgreset_r(struct dg	*d)
 {
 	int	i;
-	struct darc	*arcs;
+	struct dg	**arcs;
 
 	d = p_dereference_dg(d);
 	if(!d)return;
@@ -940,13 +995,13 @@ static void dgreset_r(struct dg	*d)
 
 	arcs = DARCS(d);
 	for(i=0;i<d->narcs;i++)
-		dgreset_r(arcs[i].dest);
+		dgreset_r(arcs[i]);
 }
 
 static void dgmark(struct dg	*d)
 {
 	int	i;
-	struct darc	*arcs;
+	struct dg	**arcs;
 
 	d = p_dereference_dg(d);
 	d->ncarcs++;
@@ -954,7 +1009,7 @@ static void dgmark(struct dg	*d)
 
 	arcs = DARCS(d);
 	for(i=0;i<d->narcs;i++)
-		dgmark(arcs[i].dest);
+		dgmark(arcs[i]);
 }
 
 extern char	**fnames;
@@ -962,7 +1017,7 @@ extern char	**fnames;
 static void	rprint_dg(struct dg	*d)
 {
 	int	i;
-	struct darc	*arcs;
+	struct dg	**arcs;
 
 	d = p_dereference_dg(d);
 
@@ -1001,8 +1056,8 @@ static void	rprint_dg(struct dg	*d)
 		arcs = DARCS(d);
 		for(i=0;i<d->narcs;i++)
 		{
-			printf(" %s: ", fnames[arcs[i].label]);
-			rprint_dg(arcs[i].dest);
+			printf(" %s: ", fnames[d->label[i]]);
+			rprint_dg(arcs[i]);
 		}
 		printf("]");
 	}
@@ -1011,7 +1066,7 @@ static void	rprint_dg(struct dg	*d)
 static void flat_print_dg(struct dg	*d)
 {
 	int	i;
-	struct darc	*arcs;
+	struct dg	**arcs;
 
 	d = dereference_dg(d);
 
@@ -1024,8 +1079,8 @@ static void flat_print_dg(struct dg	*d)
 		arcs = DARCS(d);
 		for(i=0;i<d->narcs;i++)
 		{
-			printf(" %s: ", fnames[arcs[i].label]);
-			flat_print_dg(arcs[i].dest);
+			printf(" %s: ", fnames[d->label[i]]);
+			flat_print_dg(arcs[i]);
 		}
 		if(d->gen==generation && d->ncarcs)for(i=0;i<d->ncarcs;i++)
 		{
