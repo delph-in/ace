@@ -113,7 +113,7 @@ struct job_stats	main_input_loop(FILE	*fin)
 {
 	struct job_stats	st = {.success = 0, .fail = 0, .count = 0, .time = 0};
 	struct timeval		tv1, tv2;
-	float				stdin_time;
+	float				stdin_time = 0;
 
 	gettimeofday(&tv1, 0);
 	while(!die && !feof(fin))
