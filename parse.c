@@ -174,6 +174,7 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 	used_total += used_edges;
 	pused_total += pused_edges;
 
+	if(1)
 	{
 		static FILE	*f = 0;
 		if(!f)f = fopen("/tmp/times", "w");
@@ -203,9 +204,10 @@ int	parse_line(char	*line)
 
 	current_sentence = "(preparing)";
 	while(line[0] && line[strlen(line)-1] == '\n')line[strlen(line)-1] = 0;
-	if(!*line)
+int	check_mbs(char	*mbs);
+	if(!*line || check_mbs(line)==-1)
 	{
-		if(!inhibit_results){printf("SKIP: \n");fflush(stdout);}
+		if(!inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
 		return -1;
 	}
 	if(!strncmp(line, "<DOC", 4))

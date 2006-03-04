@@ -57,14 +57,34 @@ void add_orules(struct edge *le)
 	}
 }
 
+int	check_mbs(char	*mbs)
+{
+	int		len = strlen(mbs);
+	wchar_t	*wide = malloc(sizeof(wchar_t)*(len+1));
+	if(-1 == mbstowcs(wide, mbs, len+1))
+	{
+		free(wide);
+		return -1;
+	}
+	else
+	{
+		free(wide);
+		return 0;
+	}
+}
+
 wchar_t	*towide(char	*mbs)
 {
 	int		len = strlen(mbs);
 	wchar_t	*wide = malloc(sizeof(wchar_t)*(len+1));
 	if(-1 == mbstowcs(wide, mbs, len+1))
 	{
+		extern char	*current_sentence;
+		restore_stderr();
 		perror("multibyte decoding failed");
 		fprintf(stderr, "on string `%s'\n", mbs);
+		if(current_sentence)
+			fprintf(stderr, "in sentence `%s'\n", current_sentence);
 		exit(-1);
 	}
 	return wide;
@@ -75,6 +95,7 @@ char	*freeze_tombs(wchar_t	*w)
 	char	*str = slab_alloc(4*(wcslen(w)+1));
 	if(-1 == wcstombs(str, w, 1+4*wcslen(w)))
 	{
+		restore_stderr();
 		perror("multibyte encoding failed");
 		fprintf(stderr, "on wcs `%S'\n", w);
 		exit(-1);
