@@ -135,7 +135,8 @@ void	print_type(char	*name)
 		return;
 	}
 	printf("type `%s': ", name);
-	print_dg(t->dg);
+	if(t->dg)print_dg(t->dg);
+	else printf("not yet constrained\n");
 	printf("\n\n");
 }
 
@@ -312,12 +313,12 @@ int	constrain_type(char	*name, struct dg	*dg)
 		return -1;
 	}
 	if(!dg)type->dg = atomic_dg(name);
-	else type->dg = dg;
+	else type->dg = copy_dg(dg);
 
 	type->dg->type = type->dg->xtype = type;
 
-	/*printf("\ntype: %s	definition: ", type->name);
-	print_dg(type->dg); printf("\n");*/
+	//printf("\ntype: %s	definition: ", type->name);
+	//print_dg(type->dg); printf("\n");
 	return 0;
 }
 
@@ -550,7 +551,7 @@ void	wellform(struct dg	*d, char	*typename)
 {
 	int		i;
 	struct type	*t;
-	//extern char	**fnames;
+	extern char	**fnames;
 	struct dg	**arcs = DARCS(d);
 
 	for(i=0;i<d->narcs;i++)
@@ -588,7 +589,18 @@ void	wellform(struct dg	*d, char	*typename)
 			top_unifies_wellform++;
 			if(unify_dg_infrom(arcs[i], copy_dg(t->dg)))
 			{
-				fprintf(stderr, "failed well-formedness constraint!\n");
+				int j;
+				fprintf(stderr, "entity `%s' failed well-formedness constraint!\n", typename?typename:"(unknown)");
+				fprintf(stderr, "at path: ");
+				for(j=0;j<wfpl;j++)
+					fprintf(stderr, "%s ", fnames[wfpath[j]]);
+				fprintf(stderr, "\n");
+				fprintf(stderr, "reason: unable to unify with type `%s'\n", t->name);
+				unify_backtrace();
+				printf("partly unified dag fragment from entity to be wellformed:\n");
+				print_dg(arcs[i]);printf("\n");
+				printf("dag type to be wellformed:\n");
+				print_dg(t->dg);printf("\n");
 				exit(-1);
 			}
 			//print_dg(arcs[i]);printf("\n");
@@ -614,6 +626,7 @@ int	constrain_glbs_and_wellformedness()
 
 	for(i=0;i<ntypes;i++)
 	{
+		types[i]->dg = dereference_dg(types[i]->dg);
 		// introduce top-level features for this type, it might be the most general type for them
 		//printf("pre-welformed dag for `%s':\n", types[i]->name);
 		//print_dg(types[i]->dg); printf("\n\n");

@@ -814,8 +814,7 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 			printf("lhs: "); print_dg(lhs); printf("\n");
 			printf("rhs: "); print_dg(rhs); printf("\n");
 		}
-		res = unify_dg(lhs, rhs, -1);
-		if(!res)
+		if(0 != unify_dg_infrom(res = copy_dg(lhs), copy_dg(rhs)))
 		{
 			fprintf(stderr, "tdl: requested unification failed\n");
 #ifdef	UNIFY_PATHS
