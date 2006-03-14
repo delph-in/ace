@@ -363,10 +363,12 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank)
 			e->unpack = slab_alloc(sizeof(struct unpack_info));
 			e->unpack->agenda = 0;
 			e->unpack->nhypotheses = e->unpack->ahypotheses = 1;
-			e->unpack->hypotheses = slab_alloc(sizeof(struct hypothesis*)*1);
-			e->unpack->hypotheses[0] = leaf_hypothesis(e);
+			e->unpack->nhb = 1;
+			e->unpack->hypotheses = slab_alloc(sizeof(struct hypothesis**)*1);
+			e->unpack->hypotheses[0] = slab_alloc(sizeof(struct hypothesis*)*1);
+			e->unpack->hypotheses[0][0] = leaf_hypothesis(e);
 		}
-		return e->unpack->hypotheses[0];
+		return e->unpack->hypotheses[0][0];
 	}
 
 	if(!e->unpack)
@@ -378,6 +380,7 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank)
 		e->unpack = slab_alloc(sizeof(struct unpack_info));
 		e->unpack->agenda = 0;
 		e->unpack->hypotheses = 0;
+		e->unpack->nhb = 0;
 		e->unpack->nhypotheses = e->unpack->ahypotheses = 0;
 		indent++;
 		for(i=0;i<ndecs;i++)
@@ -394,7 +397,12 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank)
 		}
 		indent--;
 	}
-	else if(rank < e->unpack->nhypotheses)return e->unpack->hypotheses[rank];
+	else if(rank < e->unpack->nhypotheses)
+	{
+#define	HYPS_PER_BLOCK	1024
+		int hb = rank / HYPS_PER_BLOCK;
+		return e->unpack->hypotheses[hb][rank % HYPS_PER_BLOCK];
+	}
 
 	indent++;
 	hyp = process_hypagenda(&e->unpack->agenda);
@@ -403,10 +411,18 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank)
 
 	if(++e->unpack->nhypotheses > e->unpack->ahypotheses)
 	{
-		int onum = e->unpack->ahypotheses;
+		if((e->unpack->nhypotheses % HYPS_PER_BLOCK) == 1)
+		{
+			e->unpack->hypotheses = slab_realloc(e->unpack->hypotheses,
+				sizeof(struct hypothesis**) * (e->unpack->nhypotheses / HYPS_PER_BLOCK),
+				sizeof(struct hypothesis**) * (e->unpack->nhypotheses / HYPS_PER_BLOCK + 1));
+			e->unpack->ahypotheses = 0;
+		}
+		int onum = e->unpack->ahypotheses, hb = (e->unpack->nhypotheses-1) / HYPS_PER_BLOCK;
 		e->unpack->ahypotheses++;
 		e->unpack->ahypotheses *= 2;
-		e->unpack->hypotheses = slab_realloc(e->unpack->hypotheses,
+		if(e->unpack->ahypotheses > HYPS_PER_BLOCK)e->unpack->ahypotheses = HYPS_PER_BLOCK;
+		e->unpack->hypotheses[hb] = slab_realloc(e->unpack->hypotheses[hb],
 			sizeof(struct hypothesis*) * onum,
 			sizeof(struct hypothesis*) * e->unpack->ahypotheses);
 	}
@@ -416,7 +432,10 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank)
 					rank, e->unpack->nhypotheses-1);
 		assert(0);
 	}
-	e->unpack->hypotheses[rank] = hyp;
+	{
+		int hb = rank / HYPS_PER_BLOCK;
+		e->unpack->hypotheses[hb][rank % HYPS_PER_BLOCK] = hyp;
+	}
 	return hyp;
 }
 

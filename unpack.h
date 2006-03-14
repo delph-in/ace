@@ -24,8 +24,8 @@ struct hypothesis
 struct unpack_info
 {
 	struct hypothesis *agenda;
-	struct hypothesis **hypotheses;
-	int	nhypotheses, ahypotheses;
+	struct hypothesis ***hypotheses;
+	int	nhb, nhypotheses, ahypotheses;
 };
 
 struct mrs;
