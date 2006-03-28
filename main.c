@@ -23,6 +23,7 @@ char	*sentence_path = 0, *master_addr = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 
 int	preprocess_only = 0;
+extern char mrs_line_breaks;
 
 int g_mode = PARSING;
 int	die = 0;
@@ -76,7 +77,7 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "hvpEPlXg:G:m:qtRe1n:r:"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvpfEPlXg:G:m:qtRe1n:r:"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
@@ -91,6 +92,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'n':	best_only = atoi(optarg);	break;
 		case	'r':	use_roots = optarg;		break;
 		case	'l':	lui_mode = 1;			break;
+		case	'f':	mrs_line_breaks = '\n';		break;
 		case	'p':	inhibit_pack = 1;		break;
 		case	'R':	inhibit_results = 1;		break;
 		case	't':	do_itsdb = 1;			break;
@@ -104,9 +106,9 @@ void	parse_args(int	argc, char	*argv[])
 
 struct job_stats
 {
-	int		success, fail, count;
-	long	ram;
-	float	time;
+	int			success, fail, count;
+	long long	ram;
+	float		time;
 };
 
 struct job_stats	main_input_loop(FILE	*fin)
@@ -204,6 +206,8 @@ void	initialize_engine()
 	//print_type("basic_adj_head_phrase");
 	//print_type("phrasal");
 	//print_lexeme("delete_v2");
+
+	//check_unary_chains();
 }
 
 void	report_stats(struct job_stats	stats)
