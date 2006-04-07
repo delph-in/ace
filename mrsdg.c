@@ -127,7 +127,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		var = slab_calloc(sizeof(struct mrs_var), 1);
 		if(!descendent_of(dg->type->tnum, semarg)) var->is_const = 1;
 		var->dg = dg;
-		var->type = strdup(dg->type->name);
+		var->type = var->is_const?strdup("c"):strdup(dg->type->name);
 		var->name = strdup(dg->type->name);
 		var->vnum = vlist->nvars;
 		var->refs = 1;

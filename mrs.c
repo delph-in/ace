@@ -111,7 +111,7 @@ struct mrs_var	*parse_mrs_const(struct mrs_vlist *vlist, char	**P)
 	char	*c = parse_word(P, 1);
 	struct mrs_var *var = slab_calloc(sizeof(struct mrs_var), 1);
 	var->is_const = 1;
-	var->type = strdup(c);
+	var->type = strdup("c");
 	var->name = strdup(c);
 
 	var->vnum = vlist->nvars;
@@ -400,10 +400,8 @@ char	*marked;
 void	print_mrs_var(struct mrs_var	*var)
 {
 	if(!var) { printf("(null)"); return; }
-	if(var->is_const)printf("%s", var->type);
+	if(var->is_const)printf("%s", var->name);
 	else printf("%s%d", var->type, var->vnum);
-	//printf("%s.%d", var->name, var->vnum);
-	//if(var->is_const) printf("_K");
 	if(marked && marked[var->vnum])return;
 	if(marked)marked[var->vnum] = 1;
 	if(var->nprops)
@@ -435,7 +433,9 @@ void	print_mrs(struct mrs	*mrs)
 		int				j;
 		printf("%c[ %s LBL: ", mrs_tab, ep->pred); print_mrs_var(ep->lbl);
 		for(j=0;j<ep->nargs;j++)
-			{ printf(" %s: ", ep->args[j].name); print_mrs_var(ep->args[j].value); }
+			{ printf(" %s: ", ep->args[j].name);
+				if(ep->args[j].value)print_mrs_var(ep->args[j].value);
+				else printf(" (null)"); }
 		printf(" ]");
 		if(i+1 != mrs->nrels)putchar(mrs_line_breaks);
 	}
