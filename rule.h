@@ -41,6 +41,12 @@ static inline int	check_rf(struct rule	*m, struct rule	*d, int	arg)
 	return byte & (1<<arg);
 }
 
+static inline int	check_trl(struct rule	*m, struct type	*t)
+{
+	extern char	**type_rl;
+	return type_rl[m->rnum][t->tnum];
+}
+
 static inline int	check_srf(struct rule	*m, struct rule	*d)
 {
 	char	byte;
