@@ -383,7 +383,12 @@ int enumerate_alignments(struct grammar_entity	*e, int ei, struct mrs_ep	*align[
 	else
 	{
 		// we've finished aligning up to but not including extra_preds[ei].
-		return enumerate_eps(e, e->extra_preds[ei], (ei<e->pidx)?(ei):(ei+1), ei+1, align);
+		struct semindex_pred_node	*next = e->extra_preds[ei];
+		int	count = 0, i;
+		count = enumerate_eps(e, next, (ei<e->pidx)?(ei):(ei+1), ei+1, align);
+		for(i=0;i<next->nrelatives;i++)
+			count += enumerate_eps(e, next->relatives[i], (ei<e->pidx)?(ei):(ei+1), ei+1, align);
+		return count;
 	}
 }
 
