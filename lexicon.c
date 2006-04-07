@@ -148,8 +148,8 @@ void	record_pred(struct edge	*le, char	*word, char	*tag)
 						case 'J': tagc='a'; break;
 						case 'R': tagc='a'; break;	}
 	int		len = strlen(word);
-	if(len>2 && word[len-2]=='e' && word[len-1]=='d')len-=2;
-	else if(len>3 && word[len-3]=='i' && word[len-2]=='n' && word[len-1]=='g')len-=3;
+	if(len>2 && word[len-2]=='e' && word[len-1]=='d' && (!strcmp(tag, "VBD") || !strcmp(tag, "VBN")))len-=2;
+	else if(len>3 && word[len-3]=='i' && word[len-2]=='n' && word[len-1]=='g' && !strcmp(tag,"VBG"))len-=3;
 	else if(len>1 && word[len-1]=='s' && (!strcmp(tag,"VBZ") || !strcmp(tag,"NNS")))len-=1;
 	sprintf(ncopy, "\"_%.*s_%c_1_rel\"", len, word, tagc);
 	pred_type = temporary_string_type(ncopy);
