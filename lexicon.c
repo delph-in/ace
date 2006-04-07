@@ -61,7 +61,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 {
 	struct edge	*edge = slab_alloc(sizeof(struct edge));
 
-#define RECORD_LEXICAL_ACCESS
+//#define RECORD_LEXICAL_ACCESS
 #ifdef RECORD_LEXICAL_ACCESS
 	static FILE	*lexf = 0;
 	if(!lexf)lexf = fopen("/tmp/lexical-access", "w");
