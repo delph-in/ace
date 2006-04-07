@@ -17,6 +17,8 @@
 #define	ENABLE_HYPERACTIVE	1
 //#define	RULE_STATS
 
+int	nofragments = 1;
+
 int	inhibit_results = 0;
 extern int inhibit_pack;
 
@@ -564,7 +566,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	int rf = (b->rule && !check_rf(a->rule, b->rule, arg));
 
 	// don't allow span-only rules to finish on a non-span
-	if(a->rule->frag_only)return 0;	// XXX remove if we decide to accept fragments
+	if(nofragments && a->rule->frag_only)return 0;	// XXX remove if we decide to accept fragments
 
 	if(g_mode == PARSING && a->have == a->need-1)
 	{

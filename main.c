@@ -68,6 +68,7 @@ void	setup_signal_handlers()
 void	parse_args(int	argc, char	*argv[])
 {
 	char	*prog = argv[0], *tla;
+	extern int nofragments;
 	unsigned char ch;
 
 	tla = prog + strlen(prog) - 3;
@@ -90,7 +91,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'X':	exhaustive = 0;			break;
 		case	'1':	best_only = 1;			break;
 		case	'n':	best_only = atoi(optarg);	break;
-		case	'r':	use_roots = optarg;		break;
+		case	'r':	use_roots = optarg;	if(strstr(use_roots, "root_frag"))nofragments = 0;	break;
 		case	'l':	lui_mode = 1;			break;
 		case	'f':	mrs_line_breaks = '\n';		break;
 		case	'p':	inhibit_pack = 1;		break;
