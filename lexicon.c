@@ -137,6 +137,17 @@ struct lexeme	*proper_noun_lex(char	*name)
 	return lex;
 }
 
+void	record_pred(struct edge	*le, char	*word, char	*tag)
+{
+	char	*ncopy = malloc(strlen(word)+30);
+	struct type	*pred_type;
+	struct dg	*pred = calloc(sizeof(struct dg), 1);
+	sprintf(ncopy, "\"_%s_%.2s_1_rel\"", word, tag);
+	pred_type = temporary_string_type(ncopy);
+	pred->xtype = pred->type = pred_type;
+	le->dg = dg_path_add(le->dg, lex_pred_path, pred);
+}
+
 void	record_carg(struct edge	*le, char	*carg_str)
 {
 	char	*ncopy = malloc(strlen(carg_str)+3);
@@ -208,6 +219,7 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 	e->orth_routes = 0;
 
 	if(type == "n_proper_le")record_carg(e, word);
+	record_pred(e, word, tag);
 
 	return e;
 }
