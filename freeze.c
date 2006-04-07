@@ -247,6 +247,7 @@ int	freeze_grammar()
 	int		i, j;
 	struct grammar	*G;
 
+	use_freezer();
 	//print_rule("sing_noun_infl_rule");
 
 	inval_thash();
@@ -274,13 +275,13 @@ int	freeze_grammar()
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->dg);
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->packdg);
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->gpackdg);
+
 	for(i=0;i<nlexemes;i++)
 	{
 		if(lexemes[i]->dg)patch_dg(lexemes[i]->dg);
 		for(j=0;j<lexemes[i]->stemlen;j++)
 			lexemes[i]->stem[j] = strings[lexemes[i]->stem[j]->tnum];
 	}
-	//fprintf(stderr, "patched.\n");
 
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 
@@ -469,6 +470,10 @@ int	setup_save_frozen_grammar(char	*path)
 		perror("mmap fixed");
 		exit(-1);
 	}
+}
+
+int use_freezer()
+{
 	//fprintf(stderr, "we got %p\n", freeze_point);
 	freeze_next = freeze_point;
 	currslabsize = FREEZER_MMAP_SIZE;

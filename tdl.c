@@ -1101,5 +1101,6 @@ int load_grammar(char	*path)
 	// make sure none of the grammar is auto-freed when the first parse is over
 	free_tdl();
 	commit_slab();
+
 	return 0;
 }

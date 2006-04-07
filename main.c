@@ -169,6 +169,8 @@ void	initialize_engine()
 		struct timeval	tv1, tv2;
 		if(!load_grammar_path)
 			load_grammar_path = "../erg/ace/config.tdl";
+		setup_save_frozen_grammar(save_grammar_path);
+
 		gettimeofday(&tv1, 0);
 		load_grammar(load_grammar_path);
 #ifdef	POST
@@ -178,11 +180,7 @@ void	initialize_engine()
 		tv2.tv_sec -= tv1.tv_sec;
 		tv2.tv_usec -= tv1.tv_usec;
 		fprintf(stderr, "loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
-	}
 
-	if(save_grammar_path)
-	{
-		setup_save_frozen_grammar(save_grammar_path);
 		freeze_grammar();
 	}
 
