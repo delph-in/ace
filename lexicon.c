@@ -142,7 +142,16 @@ void	record_pred(struct edge	*le, char	*word, char	*tag)
 	char	*ncopy = malloc(strlen(word)+30);
 	struct type	*pred_type;
 	struct dg	*pred = calloc(sizeof(struct dg), 1);
-	sprintf(ncopy, "\"_%s_%.2s_1_rel\"", word, tag);
+	char	tagc = '?';
+	switch(tag[0]) {	case 'N': tagc='n'; break;
+						case 'V': tagc='v'; break;
+						case 'J': tagc='a'; break;
+						case 'R': tagc='a'; break;	}
+	int		len = strlen(word);
+	if(len>2 && word[len-2]=='e' && word[len-1]=='d')len-=2;
+	else if(len>3 && word[len-3]=='i' && word[len-2]=='n' && word[len-1]=='g')len-=3;
+	else if(len>1 && word[len-1]=='s' && (!strcmp(tag,"VBZ") || !strcmp(tag,"NNS")))len-=1;
+	sprintf(ncopy, "\"_%.*s_%c_1_rel\"", len, word, tagc);
 	pred_type = temporary_string_type(ncopy);
 	pred->xtype = pred->type = pred_type;
 	le->dg = dg_path_add(le->dg, lex_pred_path, pred);
@@ -198,16 +207,14 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 	else if(!strcmp(tag, "JJ"))type = "adj_intrans_le";
 	else if(!strcmp(tag, "JJS"))type = "adj_intrans_superl_nale";
 	else if(!strcmp(tag, "JJR"))type = "adj_intrans_compar_nale";
-	else if(!strcmp(tag, "JJR"))type = "adj_intrans_compar_nale";
 	else if(!strcmp(tag, "RB"))type = "adv_int_vp_le";//"adv_word_nale";
 	else if(!strcmp(tag, "NNPS"))type = "n_proper_le";
 	else if(!strcmp(tag, "NNS"))type = "n_intr_pl_nale";
 	else if(!strcmp(tag, "NN"))type = "n_mass_count_le";
 	else if(!strcmp(tag, "VB"))type = "v_np*_trans_bse_nale";
-	else if(!strcmp(tag, "VBD"))type = "v_np*_trans_past_nale";
 	else if(!strcmp(tag, "VBG"))type = "v_np*_trans_prp_nale";
+	else if(!strcmp(tag, "VBD"))type = "v_np*_trans_past_nale";
 	else if(!strcmp(tag, "VBN"))type = "v_np*_trans_psp_nale";
-	else if(!strcmp(tag, "VBZ"))type = "v_np*_trans_psp_nale";
 	else if(!strcmp(tag, "VBP"))type = "v_np*_trans_presn3sg_nale";
 	else if(!strcmp(tag, "VBZ"))type = "v_np*_trans_pres3sg_nale";
 
