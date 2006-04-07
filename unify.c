@@ -316,6 +316,14 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	}
 	dg->copy = newcopy;
 
+//#define	DAG_SIGNATURES
+#ifdef	DAG_SIGNATURES
+	printf("TYPE %s", newcopy->xtype->name);
+	for(i=0;i<newcopy->narcs;i++)
+		printf(" %s", fnames[DARCS(newcopy)[i].label]);
+	printf("\n");
+#endif
+
 	if(dg->ncarcs || dg->type!=dg->xtype || st || FROZEN(dg))
 	{
 		*chret = 1;
@@ -491,15 +499,9 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 
 	if(t != t1 && t!= t2 && t->dg && t->dg->narcs)
 	{
-		//if(t->dg->gen != generation)
-		//	extra = t->dg;
-		//else
-		{
-			// it's REALLY obnoxious that we have to do this
-			dagreset_c(t->dg);
-			extra = copy_dg_with_comp_arcs(t->dg);
-			dagreset_c(t->dg);
-		}
+		dagreset_c(t->dg);
+		extra = copy_dg_with_comp_arcs(t->dg);
+		dagreset_c(t->dg);
 	}
 	if(dg1->gen != generation)
 	{
