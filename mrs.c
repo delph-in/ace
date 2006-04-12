@@ -126,25 +126,32 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 {
 	struct mrs_var	var, *V;
 	int		defined = 0, i;
-	char	*word;
+	char	*word, *var_name;
 
-	bzero(&var, sizeof(var));
-	var.name = parse_word(P, 1);
-	if(!var.name)FAIL("var lacks a name");
+	var_name = parse_word(P, 1);
+	if(!var_name)FAIL("var lacks a name");
 	if((word=parse_word(P,0)) && !strcmp("[", word))
 	{
+		int		aprops = 8;
 		char	*type;
+		bzero(&var, sizeof(var));
+		var.name = var_name;
 		parse_word(P, 1);
 		defined = 1;
 		type = parse_word(P, 1);
 		if(!type)FAIL("var lacks a type");
 		var.type = strdup(type);
-		
+		var.props = slab_alloc(sizeof(struct mrs_var_property)*aprops);
+
 		while((word = parse_word(P,1)) && strcmp(word,"]"))
 		{
 			struct mrs_var_property *prop;
 			var.nprops++;
-			var.props = slab_realloc(var.props, sizeof(struct mrs_var_property)*(var.nprops-1), sizeof(struct mrs_var_property)*var.nprops);
+			if(var.nprops > aprops)
+			{
+				aprops += 4;
+				var.props = slab_realloc(var.props, sizeof(struct mrs_var_property)*(aprops-4), sizeof(struct mrs_var_property)*aprops);
+			}
 			prop = var.props + var.nprops-1;
 			// trim off pesky ':' at end of role name
 			if(word[0]!=':' && word[strlen(word)-1]==':')
@@ -153,19 +160,13 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 			prop->value = (word=parse_word(P,1))?strdup(word):0;
 			//printf(" { prop `%s' value `%s' }\n", prop->name, prop->value);
 		}
-	}
-	else
-	{
-		// assume name up to number is type
-		for(i=0;var.name[i]>'9';i++) {}
-		var.type = slab_malloc(i+1);
-		memcpy(var.type, var.name, i);
-		var.type[i] = 0;
+		if(var.nprops != aprops)
+			var.props = slab_realloc(var.props, sizeof(struct mrs_var_property)*aprops, sizeof(struct mrs_var_property)*var.nprops);
 	}
 
 	// done parsing, check for reentrancies
 	for(i=0;i<vlist->nvars;i++)
-		if(!strcmp(vlist->vars[i]->name, var.name))
+		if(!strcmp(vlist->vars[i]->name, var_name))
 		{
 			if(defined)
 			{
@@ -174,10 +175,20 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 				if(vlist->vars[i]->type)slab_free(vlist->vars[i]->type);
 				*vlist->vars[i] = var;
 			}
-			else slab_free(var.type);
 			vlist->vars[i]->refs++;
 			return vlist->vars[i];
 		}
+
+	if(!defined)
+	{
+		// assume name up to number is type
+		bzero(&var, sizeof(var));
+		var.name = var_name;
+		for(i=0;var.name[i]>'9';i++) {}
+		var.type = slab_malloc(i+1);
+		memcpy(var.type, var.name, i);
+		var.type[i] = 0;
+	}
 
 	V = slab_malloc(sizeof(var));
 	*V = var;
@@ -248,22 +259,28 @@ struct mrs_hcons	*parse_mrs_hcons(struct mrs_vlist	*vlist, char **P, int	*Nhcons
 
 struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 {
-	int				nrels = 0;
+	int				nrels = 0, arels = 8;
 	struct mrs_ep	*eps = 0;
 	char			*word;
 
 	*Nrels = 0;
 	if(!(word=parse_word(P,1)) || strcmp(word, "<"))FAIL("rels list lacks initial '<'");
+	eps = slab_alloc(sizeof(struct mrs_ep)*arels);
 	while(!strcmp(parse_word(P, 0), "["))
 	{
 		struct mrs_ep	*ep;
 		parse_word(P, 1);	// [
 		nrels++;
-		eps = slab_realloc(eps, sizeof(struct mrs_ep)*(nrels-1), sizeof(struct mrs_ep)*nrels);
+		if(nrels>arels)
+		{
+			arels *= 2;
+			eps = slab_realloc(eps, sizeof(struct mrs_ep)*(arels/2), sizeof(struct mrs_ep)*arels);
+		}
 		ep = eps+nrels-1;
 		bzero(ep,sizeof(*ep));
 		ep->pred = (word=parse_word(P,1))?strdup(word):0;
 		ep->epnum = nrels-1;
+		struct mrs_ep_role	args[10];
 		while((word=parse_word(P,1)) && strcmp(word,"]"))
 		{
 			if(!strcmp(word, "LBL:"))ep->lbl = parse_mrs_var(vlist, P);
@@ -271,8 +288,7 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 			{
 				struct mrs_ep_role	*role;
 				ep->nargs++;
-				ep->args = slab_realloc(ep->args, sizeof(struct mrs_ep_role)*(ep->nargs-1), sizeof(struct mrs_ep_role)*ep->nargs);
-				role = ep->args+ep->nargs-1;
+				role = args+ep->nargs-1;
 				if(word[0]!=':' && word[strlen(word)-1]==':')
 					word[strlen(word)-1] = 0;
 				role->name = strdup(word);
@@ -282,7 +298,11 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 			}
 		}
 		if(!word)FAIL("ep lacks closing ']'");	// ]
+		ep->args = slab_alloc(sizeof(struct mrs_ep_role)*ep->nargs);
+		memcpy(ep->args, args, sizeof(struct mrs_ep_role)*ep->nargs);
 	}
+	if(nrels != arels)
+		eps = slab_realloc(eps, sizeof(struct mrs_ep)*arels, sizeof(struct mrs_ep)*nrels);
 	if(!(word=parse_word(P,1)) || strcmp(word, ">"))FAIL("rels list lacks closing '>'");
 	*Nrels = nrels;
 	return eps;
