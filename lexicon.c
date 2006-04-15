@@ -226,7 +226,7 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 	e->orth_routes = 0;
 
 	if(type == "n_proper_le")record_carg(e, word);
-	record_pred(e, word, tag);
+	else record_pred(e, word, tag);
 
 	return e;
 }
