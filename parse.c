@@ -174,7 +174,7 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 	used_total += used_edges;
 	pused_total += pused_edges;
 
-	if(1)
+	if(0)
 	{
 		static FILE	*f = 0;
 		if(!f)f = fopen("/tmp/times", "w");
