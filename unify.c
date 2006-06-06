@@ -236,8 +236,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	{
 		for(i=0;i<dg->narcs;i++)
 		{
-			*alptr = *olptr;
-			if(SHOULD_TRIM(*alptr))
+			if(SHOULD_TRIM(*olptr))
 			{
 				optr++;
 				olptr++;
@@ -252,6 +251,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 #ifdef	COPY_PATHS
 			copypath[copypathp++] = *olptr;
 #endif
+			*alptr = *olptr;
 			*aptr = copy_dg_with_comp_arcs_ss(*optr, &ch);
 #ifdef	COPY_PATHS
 			copypathp--;
