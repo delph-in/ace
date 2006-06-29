@@ -671,13 +671,17 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	struct dg	*extra=0;
 	struct dg	**arcs1, **arcs2;
 
+	if(dg1 == dg2)return 0;
 	if(dg1->forward)dg1 = dereference_dg(dg1);
 	if(dg2->forward)dg2 = dereference_dg(dg2);
 	if(!dg1 || !dg2)return -1;
 
+	if(dg1 == dg2)return 0;
 	if(dg1->copy)dg1->copy = 0;
 	if(dg2->copy)dg2->copy = 0;
-	if(dg1 == dg2)return 0;
+
+	__builtin_prefetch(dg1->label);
+	__builtin_prefetch(dg2->label);
 
 	if(!FROZEN(dg2))
 	{
