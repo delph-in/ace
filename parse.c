@@ -70,8 +70,6 @@ static int	parse_process_edge(struct edge	*e)
 			struct edge	**E = c[i].ar_edges, **F = E+c[i].ar_nedges;
 			for(;E<F;E++) if(from - ((*E)->need - (*E)->have - 1) >= 0) LADD(*E);
 		}
-		for(i=0;i<nlist;i++)
-			if(combine(list[i], e) == -1)return -1;
 	}
 	else
 	{
@@ -87,8 +85,58 @@ static int	parse_process_edge(struct edge	*e)
 			struct edge **E = c[i].p_edges, **F = E+c[i].p_nedges;
 			for(;E<F;E++) if((*E)->to + (remain-1) < chart_size)LADD(*E);
 		}
+	}
+
+	if(!nlist)return 0;
+
+	if(e->have == e->need)
+	{
+		__builtin_prefetch(e->rule);
+		for(i=j=0;i<nlist;i++)
+		{
+			if(i+2<nlist)__builtin_prefetch(list[i+2]);
+			if(i+1<nlist)__builtin_prefetch(list[i+1]->rule);
+			if(filter(list[i], e))
+				list[j++] = list[i];
+		}
+	}
+	else
+	{
+		__builtin_prefetch(e->rule);
+		for(i=j=0;i<nlist;i++)
+		{
+			if(i+2<nlist)__builtin_prefetch(list[i+2]);
+			if(i+1<nlist)__builtin_prefetch(list[i+1]->rule);
+			if(filter(e, list[i]))
+				list[j++] = list[i];
+		}
+	}
+	nlist = j;
+
+	if(!nlist)return 0;
+
+/*
+int	cmp(const void	*a, const void	*b)
+{
+	struct dg	*da = (*(const struct edge**)a)->dg;
+	struct dg	*db = (*(const struct edge**)b)->dg;
+	if(da && db)return db->gen - da->gen;
+	else if(da)return -1;
+	else if(db)return 1;
+	else return 0;
+}
+qsort(list, nlist, sizeof(void*), cmp);
+*/
+
+	if(e->have == e->need)
+	{
 		for(i=0;i<nlist;i++)
-			if(combine(e, list[i]) == -1)return -1;
+			if(unify_and_build(list[i], e) == -1)return -1;
+	}
+	else
+	{
+		for(i=0;i<nlist;i++)
+			if(unify_and_build(e, list[i]) == -1)return -1;
 	}
 	return 0;
 }
@@ -99,6 +147,76 @@ void	alarm_handler(int	sig)
 {
 	fprintf(stderr, "NOTE: cancelling parse, taking too long\n");
 	cancel_parse = 1;
+}
+
+int	fits(struct rule	*r, int	d, struct edge	*e)
+{
+	if(e->rule)return check_rf(r, e->rule, d);
+	if(d==r->ndaughters-1)return check_trl(r, e->lex->lextype);
+	return 1;
+}
+
+int	quickcheck_rule(int	rnum, int	d, struct qc	*q)
+{
+	static struct qc	**rqc = 0;
+	if(!rqc)
+	{
+		int	i;
+		rqc = malloc(sizeof(struct qc*)*nrules*2);
+		for(i=0;i<nrules;i++)
+		{
+			rqc[2*i+0] = extract_qc_arg(rules[i]->packdg, 0);
+			if(rules[i]->ndaughters>1)
+				rqc[2*i+1] = extract_qc_arg(rules[i]->packdg, 1);
+		}
+	}
+	return quickcheck(rqc[2*rnum+d], q);
+}
+
+void	halftime_analysis()
+{
+	struct chart_cell	*right = cells+(chart_size-1)+(chart_size-2)*chart_size;
+	char				parent[nrules], uleftsib[nrules], leftsib[nrules];
+	int					i, j;
+
+	bzero(parent, sizeof(parent));
+	bzero(uleftsib, sizeof(parent));
+	bzero(leftsib, sizeof(parent));
+	//printf("rightmost passive edges: %d\n", right->p_nedges);
+	for(i=0;i<right->p_nedges;i++)
+	{
+		struct edge	*e = right->p_edges[i];
+		for(j=0;j<nrules;j++) if(!rules[j]->rtl && rules[j]->ndaughters>1)
+			if(fits(rules[j], rules[j]->ndaughters-1, e) &&
+				!quickcheck_rule(j, rules[j]->ndaughters-1, e->qc))
+				parent[j] = 1;
+	}
+	//printf("rightmost active RL edges: %d\n", right->ar_nedges);
+	for(i=0;i<right->ar_nedges;i++)
+	{
+		struct edge	*e = right->ar_edges[i];
+		if(!e->have)continue;
+		parent[e->rule->rnum] = 1;
+	}
+
+	for(i=0;i<nrules;i++) if(parent[i])
+		printf("	right daughter of %s\n", rules[i]->name);
+
+	// mark all unaries which fit the left slot of the parent, recursively
+
+	int again;
+	do { again = 0;
+	for(i=0;i<nrules;i++) if(parent[j])
+		for(j=0;j<nrules;j++) if(rules[j]->ndaughters==1
+			&& check_rf(rules[i], rules[j], 0) && !parent[j])parent[j] = 1, again=1; } while(again);
+
+	// find all binaries that fit into the parents or the unaries
+	for(i=0;i<nrules;i++) if(parent[i])
+		for(j=0;j<nrules;j++)
+			if(check_rf(rules[i], rules[j], 0))leftsib[j] = 1;
+
+	for(i=0;i<nrules;i++) if(leftsib[i])
+		printf("	left sibling could be %s\n", rules[i]->name);
 }
 
 int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
@@ -124,15 +242,25 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
 
-	alarm(10);	// XXX make this commandline configurable, and apply it to unpacking too
+	//alarm(10);	// XXX make this commandline configurable, and apply it to unpacking too
 
 	t_setup = timer();
 
 	// do the actual parsing
+	int	half = nwords/2;
+	double t_half;
 	while( !cancel_parse && (edge = next_agenda(0)) )
+	{
+		if(edge->to-edge->from >= half)
+		{
+			half = nwords+2;
+			t_half = timer();
+			//halftime_analysis();
+		}
 		if(parse_process_edge(edge))break;
+	}
 
-	t_forest = timer();
+	t_forest = t_half + timer();
 	cforest = clock() - start;
 
 	alarm(0);
@@ -177,8 +305,11 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 	if(0)
 	{
 		static FILE	*f = 0;
+		//extern long long ndecomposed;
+		//static long long ond = 0;
 		if(!f)f = fopen("/tmp/times", "w");
-		fprintf(f, "%d	%d	%f	%f	%f	%s\n", nwords, num_parses, t_setup, t_forest, t_unpack, sentence);
+		fprintf(f, "%d	%d	%f	%f	%f	%s\n", nwords, num_parses, t_setup, t_forest, t_unpack/*, (int)(ndecomposed - ond), passive_edges*/, sentence);
+		//ond = ndecomposed;
 		fflush(f);
 	}
 
