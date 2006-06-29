@@ -347,25 +347,20 @@ IFCLOCK(unsigned long long glb_count;)
 
 int	quickcheck(struct qc	*a, struct qc	*b)
 {
-	int	i;
-IFCLOCK(	clock_t T = clock();)
-IFCLOCK(	int j;)
+	int	i, qcs = qc_size;
+	struct type	**ae = a->entries, **be = b->entries;
 
-IFCLOCK(for(j=0;j<100;j++))
-	for(i=0;i<qc_size;i++)
+	for(i=0;i<qcs;i++)
 	{
-		if(a->entries[i] && b->entries[i] && (a->entries[i] != b->entries[i]) &&
-			!glb(a->entries[i], b->entries[i]))
+		if(ae[i] && be[i] && (ae[i] != be[i]) &&
+			!glb(ae[i], be[i]))
 		{
 			//printf("QC reject %d\n", i);
 			break;
 		}
 	}
 
-IFCLOCK(	glb_clock += clock() - T;)
-IFCLOCK(	glb_count += i*100;)
-
-	if(i<qc_size)return -1;
+	if(i<qcs)return -1;
 
 #ifdef	HIDEOUS_HACK
 	struct dlist_hack { int dlist, list, last; }	hacks[1] = { {30,21,15} };
@@ -406,12 +401,8 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b, int *Fw, int *Bk)
 	{
 		ta = a->entries[i];
 		tb = b->entries[i];
-		//if(ta!=tb)return -1;
 
-		//if((ta&&!tb)||(tb&&!ta))return -1;
-		//if(ta && tb && !descendent_of(tb->tnum, ta))return -1;
-
-		if(ta && tb && ta!=tb)
+		if(ta && tb && (ta!=tb))
 		{
 			g = glb(ta, tb);
 			if(g!=tb)fw = 0;
