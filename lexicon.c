@@ -34,7 +34,9 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 #endif
 
 	if(rels)ldg = constrain_lex_rels(lex->dg?copy_dg(ldg):ldg, rels);
-	dg = unify_dg(ldg, lex->lextype->dg, -1);
+
+	struct dg	*lt = lex->lextype->dg;//restrict_copy_dg(lex->lextype->dg, (g_mode == GENERATING)?1:0);
+	dg = unify_dg(ldg, lt, -1);
 	if(!dg)
 	{
 		if(rels)
@@ -53,7 +55,6 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 		while(1)sleep(1);
 		exit(-1);
 	}
-	dg = wellform_dg(dg);
 	return dg;
 }
 
@@ -449,7 +450,8 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 	//printf("expanded `%s':\n", l->word);
 	//print_dg(dg);printf("\n");
 
-	return dg;
+	return wellform_dg(dg);
+	//return dg;
 #else
 	assert(!"Not reached (simple lexeme for non-ERG)");
 #endif
