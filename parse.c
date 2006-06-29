@@ -75,15 +75,21 @@ static int	parse_process_edge(struct edge	*e)
 	{
 		// active edge
 		remain = e->need - e->have;
-		if(e->rtl) for(i=0,c=cells+from;i<=from;i++)
+		if(e->rtl)
 		{
-			struct edge	**E = c[i*chart_size].p_edges, **F = E+c[i*chart_size].p_nedges;
-			for(;E<F;E++) if((*E)->from - (remain-1) >= 0)LADD(*E);
+			for(i=0,c=cells+from;i<=from;i++)
+			{
+				struct edge	**E = c[i*chart_size].p_edges, **F = E+c[i*chart_size].p_nedges;
+				for(;E<F;E++) if((*E)->from - (remain-1) >= 0)LADD(*E);
+			}
 		}
-		else for(i=to,c=cells+to*chart_size;i<chart_size;i++)
+		else
 		{
-			struct edge **E = c[i].p_edges, **F = E+c[i].p_nedges;
-			for(;E<F;E++) if((*E)->to + (remain-1) < chart_size)LADD(*E);
+			for(i=to,c=cells+to*chart_size;i<chart_size;i++)
+			{
+				struct edge **E = c[i].p_edges, **F = E+c[i].p_nedges;
+				for(;E<F;E++) if((*E)->to + (remain-1) < chart_size)LADD(*E);
+			}
 		}
 	}
 
