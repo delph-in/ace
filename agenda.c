@@ -3,6 +3,7 @@
 #include	<assert.h>
 #include	<stdio.h>
 
+#include	"conf.h"
 #include	"chart.h"
 #include	"morpho.h"
 #include	"lexicon.h"
@@ -156,6 +157,9 @@ void sanity_check_agenda(int length)
 	printf("passed sanity\n");
 }
 
+struct path	comp_head_path, head_path, subj_ind_path, sind_path;
+int			dep_init = 0;
+
 int	reduce_chart(int	length, char **words)
 {
 	extern int debug_level;
@@ -164,18 +168,57 @@ int	reduce_chart(int	length, char **words)
 	char		cover[1024];
 	int		i;
 
+	if(!dep_init)
+	{
+		dep_init = 1;
+		comp_head_path = make_path(3, "SYNSEM", "LKEYS", "--COMPHD");
+		head_path = make_path(4, "SYNSEM", "LOCAL", "CAT", "HEAD");
+		subj_ind_path = make_path(3, "SYNSEM", "LKEYS", "--+SUBJIND");
+		sind_path = make_path(2, "SYNSEM", "--SIND");
+	}
+
 	//sanity_check_agenda(length);
 	bzero(cover, length);
 	for(t1=lag->start;t1;t1=t1->next)
 	{
-		assert(t1->edge->lex);
-		if(!t1->edge->lex->select)goto kept;
-		//printf("%s selects %s\n", t1->edge->lex->word, t1->edge->lex->select->name);
-		for(t2=lag->start;t2;t2=t2->next)
+		assert(t1->edge->lex); t2 = t1;
+		struct dg	*comphd = dg_path(t1->edge->dg, comp_head_path);
+		if(comphd && strcmp(comphd->xtype->name, "head_min"))
 		{
-			assert(t2->edge->lex);
-			if(!t2->edge->lex->pred)continue;
-			if(glb(t2->edge->lex->pred, t1->edge->lex->select))break;
+			//printf("%s selects comphd %s\n", t1->edge->lex->word, comphd->xtype->name);
+			for(t2=lag->start;t2;t2=t2->next)
+			{
+				assert(t2->edge->lex);
+				struct dg	*hd = dg_path(t2->edge->dg, head_path);
+				if(descendent_of(hd->xtype->tnum, comphd->xtype)) {
+					//printf(" satisfied by %s\n", t2->edge->lex->word);
+					break; }
+			}
+			//if(!t2)printf(" .. reduce\n");
+		}
+		struct dg	*subjind = dg_path(t1->edge->dg, subj_ind_path);
+		if(subjind)
+		{
+			//printf("%s selects subjind %s\n", t1->edge->lex->word, subjind->xtype->name);
+			for(t2=lag->start;t2;t2=t2->next)
+			{
+				assert(t2->edge->lex);
+				struct dg	*si = dg_path(t2->edge->dg, sind_path);
+				if(descendent_of(si->xtype->tnum, subjind->xtype) && abs(t2->edge->from - t1->edge->from) <= 2) {
+					//printf(" satisfied by %s\n", t2->edge->lex->word);
+					break; }
+			}
+			//if(!t2)printf(" .. reduce\n");
+		}
+		if(t1->edge->lex->select)
+		{
+			//printf("%s selects %s\n", t1->edge->lex->word, t1->edge->lex->select->name);
+			for(t2=lag->start;t2;t2=t2->next)
+			{
+				assert(t2->edge->lex);
+				if(!t2->edge->lex->pred)continue;
+				if(glb(t2->edge->lex->pred, t1->edge->lex->select))break;
+			}
 		}
 		if(!t2)
 		{
