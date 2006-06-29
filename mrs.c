@@ -129,7 +129,10 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 	char	*word, *var_name;
 
 	var_name = parse_word(P, 1);
-	if(!var_name)FAIL("var lacks a name");
+	if(!var_name)
+	{
+		FAIL("var lacks a name");
+	}
 	if((word=parse_word(P,0)) && !strcmp("[", word))
 	{
 		int		aprops = 8;
@@ -289,6 +292,10 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 				struct mrs_ep_role	*role;
 				ep->nargs++;
 				role = args+ep->nargs-1;
+				if(!*word || word[strlen(word)-1]!=':')
+				{
+					fprintf(stderr, "mrs warning: role name `%s' does not end in a colon\n", word);
+				}
 				if(word[0]!=':' && word[strlen(word)-1]==':')
 					word[strlen(word)-1] = 0;
 				role->name = strdup(word);
@@ -297,7 +304,10 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 				else role->value = parse_mrs_var(vlist, P);
 			}
 		}
-		if(!word)FAIL("ep lacks closing ']'");	// ]
+		if(!word)
+		{
+			FAIL("ep lacks closing ']'");	// ]
+		}
 		ep->args = slab_alloc(sizeof(struct mrs_ep_role)*ep->nargs);
 		memcpy(ep->args, args, sizeof(struct mrs_ep_role)*ep->nargs);
 	}
