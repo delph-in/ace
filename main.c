@@ -16,6 +16,8 @@
 #include	"post.h"
 #endif
 
+#include	<liba.h>
+
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
@@ -30,7 +32,7 @@ int	die = 0;
 
 extern int	g_loaded, inhibit_results, trace;
 extern long long	accum_ram_usage;
-extern char			*use_roots;
+extern char			*use_roots, *disable_signs;
 float	stdin_time = 0;
 
 extern float timer();
@@ -78,7 +80,7 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "hvpfEPlXg:G:m:qtRe1n:r:"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvpfEPL:lXg:G:m:qtRe1n:r:"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
@@ -98,6 +100,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'R':	inhibit_results = 1;		break;
 		case	't':	do_itsdb = 1;			break;
 		case	'e':	g_mode = GENERATING;	break;
+		case	'L':	disable_signs = optarg;	break;
 		case	'?':	goto usage;
 	}
 	if(optind<argc-1)goto usage;
@@ -117,6 +120,7 @@ struct job_stats	main_input_loop(FILE	*fin)
 	struct job_stats	st = {.success = 0, .fail = 0, .count = 0, .time = 0};
 	struct timeval		tv1, tv2;
 	float				stdin_time = 0;
+//	int	tid = new_timer((g_mode==PARSING)?"parsing":"generating");
 
 	gettimeofday(&tv1, 0);
 	while(!die && !feof(fin))
@@ -129,14 +133,19 @@ struct job_stats	main_input_loop(FILE	*fin)
 			if(fin==stdin)timer();
 			if(!fgets(line, 10240, fin))break;
 			if(fin==stdin)stdin_time += timer();
+			//start_timer(tid);
+			num_results = parse_line(line);
 			if(lui_mode && line[0]==':')
 			{
 				int	l = strlen(line);
 				if(l>3)line[l-1] = 0;
 				if(line[1]=='r' && line[2]==' ')
 					lui_rule(line+3);
+				num_results = -2;
 			}
 			else num_results = parse_line(line);
+			//double et = stop_timer(tid, 1);
+			//printf("%f seconds\n", et);
 		}
 		else
 		{
@@ -147,7 +156,8 @@ struct job_stats	main_input_loop(FILE	*fin)
 			num_results = generate(mrs);
 			free_mrs(mrs);
 		}
-		if(num_results==-1)fprintf(stderr, "NOTE: ignore\n");
+		if(num_results==-1 || num_results==-2)
+			{ if(num_results==-1)fprintf(stderr, "NOTE: ignore\n"); }
 		else if(num_results>0)st.success++;
 		else if(num_results==0)st.fail++;
 		if(num_results>=0)st.count++;
@@ -209,8 +219,8 @@ void	initialize_engine()
 	//lui_type("j-head");
 	//print_rule("adjh_i_ques");
 	//print_type("adj_head_int_ques_phrase");
-	//print_type("basic_adj_head_phrase");
-	//print_type("phrasal");
+	//print_type("n_mass_count_le");
+	//print_type("n_intr_le");
 	//print_lexeme("delete_v2");
 
 	//check_unary_chains();

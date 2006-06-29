@@ -140,6 +140,8 @@ void add_mwe_routes(struct edge *e, struct ochart_edge *pre, struct ochart_edge 
 			}
 }
 
+char	*disable_signs = 0;
+
 int	lexical_lookup(int	nwords, char	**lemmas, char	**forms)
 {
 	struct ochart	*charts = slab_alloc(sizeof(struct ochart)*nwords);
@@ -194,6 +196,7 @@ int	lexical_lookup(int	nwords, char	**lemmas, char	**forms)
 			{
 				int k;
 				struct edge			*le = 0;
+				if(disable_signs && strstr(disable_signs, lex->word))return 0;
 				if(lex->stemlen!=1)
 				{
 					char *last = lex->stem[lex->stemlen-1]->name;
