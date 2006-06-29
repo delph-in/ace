@@ -134,7 +134,6 @@ struct job_stats	main_input_loop(FILE	*fin)
 			if(!fgets(line, 10240, fin))break;
 			if(fin==stdin)stdin_time += timer();
 			//start_timer(tid);
-			num_results = parse_line(line);
 			if(lui_mode && line[0]==':')
 			{
 				int	l = strlen(line);
