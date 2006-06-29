@@ -129,7 +129,14 @@ struct job_stats	main_input_loop(FILE	*fin)
 			if(fin==stdin)timer();
 			if(!fgets(line, 10240, fin))break;
 			if(fin==stdin)stdin_time += timer();
-			num_results = parse_line(line);
+			if(lui_mode && line[0]==':')
+			{
+				int	l = strlen(line);
+				if(l>3)line[l-1] = 0;
+				if(line[1]=='r' && line[2]==' ')
+					lui_rule(line+3);
+			}
+			else num_results = parse_line(line);
 		}
 		else
 		{
@@ -216,7 +223,7 @@ void	report_stats(struct job_stats	stats)
 			stats.success, stats.count, (int)(stats.ram / stats.count / 1024), (float)stats.time);
 
 	rule_stats();
-	print_glb_stats();
+	if(debug_level)print_glb_stats();
 	final_chart_stats();
 }
 
@@ -235,6 +242,7 @@ int	main(int	argc, char	*argv[])
 
 	shutdown_net();
 	report_stats(stats);
+	if(debug_level)report_timers();
 	wait_for_lui();
 
 	if(stats.success<=0 && stats.count>0)return -1;

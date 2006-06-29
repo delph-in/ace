@@ -280,6 +280,16 @@ int	study_rule(char	*name, struct dg	*dg)
 	return 0;
 }
 
+void	lui_rule(char	*name)
+{
+	int	i;
+
+	for(i=0;i<nrules;i++)if(!strcasecmp(rules[i]->name, name))break;
+	if(i>=nrules)return;
+
+	output_lui_dg(rules[i]->packdg, name);
+}
+
 void	print_rule(char	*name)
 {
 	int	i;
@@ -634,3 +644,44 @@ void	dot_rf(char	*fname)
 	}
 	fclose(f);
 }
+
+/*
+check_unary_chains()
+{
+	struct dg	**dags = 0;
+	int			**chains = 0;
+	int			nchains = 0, *len = 0, i, j;
+	nchains = 1; len = calloc(sizeof(int), 1);
+	chains = calloc(sizeof(int*), 1); chains[0] = calloc(sizeof(int), 1); chains[0][0] = -1;
+	dags = calloc(sizeof(struct dg*), 1); dags[0] = atomic_dg("*top*");
+	for(i=0;i<nchains;i++)
+	{
+		for(j=0;j<nrules;j++) if(rules[j]->ndaughters==1 && !strstr(rules[j]->name, "punct_"))
+		{
+			// try to extend chains[i] by rules[j]
+			struct rule	*d = len[i]?rules[chains[i][len[i]-1]]:0;
+			if(d && !check_rf(rules[j], d, 0))continue;
+			struct dg	*ndg = unify_dg(dags[i], rules[j]->dg, 0);
+			if(ndg)
+			{
+				int k;
+				for(k=0;k<nchains;k++)
+					if(equivalent_dg(ndg, dags[k], 1, 1) == 2)break;
+				if(k<nchains)continue;
+				nchains++;
+				chains = realloc(chains, sizeof(int*)*nchains);
+				chains[nchains-1] = malloc(sizeof(int)*(len[i]+1));
+				memcpy(chains[nchains-1], chains[i], sizeof(int)*len[i]);
+				chains[nchains-1][len[i]] = j;
+				len = realloc(len, sizeof(int)*nchains);
+				len[nchains-1] = len[i]+1;
+				dags = realloc(dags, sizeof(struct dag*)*nchains);
+				dags[nchains-1] = ndg;
+				for(k=0;k<len[nchains-1];k++)
+					printf(" %s", rules[chains[nchains-1][k]]->name);
+				printf("\n");
+			}
+		}
+	}
+	clear_slab();
+}*/
