@@ -498,13 +498,9 @@ int	recall_hyper(struct edge	*b)
 	return 0;
 }
 
-inline int	combine(struct edge	*a, struct edge	*b)
+inline int	filter(struct edge	*a, struct edge	*b)
 {
-	int	i, arg, force_noha = !ENABLE_HYPERACTIVE, res;
-	struct dg	*rdg, *pdg;
-#ifdef	TIM
-	struct timeval	tv1, tv2;
-#endif
+	int	i, arg, gmode = g_mode;
 
 	if(a->hex == b)return 0;	// already did this
 	if(a->have==-1)return 0;	// ghosted hyperactive edge -- got kicked out of the chart for a latent cycle
@@ -523,7 +519,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	{
 		if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
 		// if 'a' is orthographemic, make sure it's the right one
-		if(a->rule->orth && g_mode == PARSING && b->north_routes != -1)
+		if(a->rule->orth && gmode == PARSING && b->north_routes != -1)
 		{
 			// look at each route 'b' allows and see if this is the first rule on it
 			for(i=0;i<b->north_routes;i++)
@@ -535,7 +531,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 			if(i==b->north_routes)return 0;
 			//printf(" #%d admits rule %s as a next orthographemic\n", b->id, a->rule->name);
 		}
-		else if(!a->rule->orth && g_mode == PARSING && b->north_routes != -1)
+		else if(!a->rule->orth && gmode == PARSING && b->north_routes != -1)
 		{
 			extern char	**rf_tc;
 			// look at each route 'b' allows and see if this fits in the first rule on it
@@ -552,7 +548,7 @@ inline int	combine(struct edge	*a, struct edge	*b)
 			}
 		}
 	}
-	else if(b->lex && g_mode == PARSING)
+	else if(b->lex && gmode == PARSING)
 	{
 		// 'b' is lexical but 'a' is a syntax rule; see if 'b' might be done with its orthographemics
 		for(i=0;i<b->north_routes;i++)
@@ -566,9 +562,9 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	int rf = (b->rule && !check_rf(a->rule, b->rule, arg));
 
 	// don't allow span-only rules to finish on a non-span
-	if(nofragments && a->rule->frag_only)return 0;	// XXX remove if we decide to accept fragments
+	if(nofragments && a->rule->frag_only)return 0;
 
-	if(g_mode == PARSING && a->have == a->need-1)
+	if(gmode == PARSING && a->have == a->need-1)
 	{
 		if( (a->from==0 || b->from==0) && (a->to==chart_size-1 || b->to==chart_size-1) )
 		{
@@ -584,23 +580,24 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	}
 
 	unify_attempts_total++;
-	if(rf) { /*printf("RF fail: #%d + %s\n", b->id, a->rule->name);*/return 0; }
-	//if(b->rule && !check_rf(a->rule, b->rule, arg))return 0;	// rule filter with no packing rejected this
-
-/*
-	// XXX this doesn't play fair if we allow edges to be packed into b after we try to combine b with other stuff :(
-	// if we can force the right chart traversal order somehow, this will help reduce spurious rule applications.
-	for(i=-1;i<b->npack;i++)
-	{
-		struct edge *B = (i>=0)?b->pack[i]:b;
-		if(!B->rule || check_rf(a->rule, B->rule, arg))break;
-	}
-	if(!b->npack && i==b->npack)return 0;	// all packed 'b's were rejected by rule filter
-*/
+	if(rf)return 0;
 
 	unify_attempts_pass_rf++;
 	if(!gen_qc && quickcheck(a->qc, b->qc))return 0;	// quickcheck rejected this combination
 	unify_attempts_pass_qc++;
+	return 1;
+}
+
+inline int	unify_and_build(struct edge	*a, struct edge	*b)
+{
+	int	i, arg, force_noha = !ENABLE_HYPERACTIVE, res;
+	struct dg	*rdg, *pdg;
+#ifdef	TIM
+	struct timeval	tv1, tv2;
+#endif
+
+	if(a->rtl)arg = a->need - a->have - 1;
+	else arg = a->have;
 
 	//rtried[a->rule->rnum]++;
 
@@ -726,6 +723,13 @@ inline int	combine(struct edge	*a, struct edge	*b)
 	}
 
 	return 0;
+}
+
+inline int	combine(struct edge	*a, struct edge	*b)
+{
+	if(filter(a, b))
+		return unify_and_build(a, b);
+	else return 0;
 }
 
 int	is_root(struct dg	*d);
