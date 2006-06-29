@@ -393,24 +393,26 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 	// this edge is at least partly new; try to combine it with all the orthographemic rules
 	for(i=0;i<norules;i++)
 	{
-		int				j;//, *mrules = 0;
+		int				j, k, l, r;//, *mrules = 0;
 		char			stem[1024];
 		struct orule	*or = orules[i];
 		struct irreg	*irr;
 
-		for(j=0;j<or->nirregs;j++)
+		for(j=0,l=or->nirregs-1;j<=l;)
 		{
-			irr = or->irregs+j;
-			//printf("consider irreg `%S -> %s' for rule %s\n", irr->stem, irr->form, or->rule->name);
-			if(!wcscmp(wform, irr->form))
+			k = (j+l)/2;
+			irr = or->irregs_f + k;
+			r = wcscmp(wform, irr->form);
+			if(r==0)
 			{
-				//fprintf(stderr, "used irreg `%S -> %S' for rule %s\n",
-						//irr->stem, irr->form, or->rule->name);
 				add_ochart_edge(edge, chart, freeze_tombs(irr->stem), or);
 				break;	// TODO support irregs.tab defining whether to cut the search here or continue it
 			}
+			else if(r<0)l = k-1;
+			else j = k+1;
 		}
-		if(j<or->nirregs)continue;	// if we got it with an irreg, don't try patterns
+		if(j<=l)continue;	// if we got it with an irreg, don't try patterns
+
 		for(j=or->nsub-1;j>=0;j--)
 		{
 			struct orule_sub *sub = or->sub+j;
@@ -549,9 +551,9 @@ char	*inflect(struct orule	*or, char	*str)
 	int		i, strl = wcslen(wstr);
 
 	for(i=0;i<or->nirregs;i++)
-		if(!wcscmp(wstr, or->irregs[i].stem))
+		if(!wcscmp(wstr, or->irregs_s[i].stem))
 		{
-			res = freeze_tombs(or->irregs[i].form);
+			res = freeze_tombs(or->irregs_s[i].form);
 			break;
 		}
 	if(!res)
@@ -779,7 +781,8 @@ void	add_orule(struct rule	*rule, char	*def)
 
 	or->rule = rule;
 	or->nirregs = 0;
-	or->irregs = 0;
+	or->irregs_f = 0;
+	or->irregs_s = 0;
 	rule->orth = or;
 	setup_orule(or, def);
 	//printf("rule `%s' has %d orthographemic patterns\n", rule->name, or->nsub);
@@ -794,6 +797,9 @@ struct orule	*lookup_orule(char	*rule)
 			return orules[i];
 	return 0;
 }
+
+static int fcmp(const void	*ia, const void *ib) { return wcscmp( ((const struct irreg*)ia)->form, ((const struct irreg*)ib)->form ); }
+static int scmp(const void	*ia, const void *ib) { return wcscmp( ((const struct irreg*)ia)->stem, ((const struct irreg*)ib)->stem ); }
 
 int	load_irregulars(char	*path)
 {
@@ -826,12 +832,22 @@ int	load_irregulars(char	*path)
 			continue;
 		}
 		//printf("add form `%s', stem `%s' TO rule: %s\n", form, stem, or->rule->name);
+		wchar_t	*wstem = towide(stem), *wform = towide(form);
 		or->nirregs++;
-		or->irregs = realloc(or->irregs, sizeof(struct irreg)*or->nirregs);
-		or->irregs[or->nirregs-1].stem = towide(stem);
-		or->irregs[or->nirregs-1].form = towide(form);
+		or->irregs_f = realloc(or->irregs_f, sizeof(struct irreg)*or->nirregs);
+		or->irregs_f[or->nirregs-1].stem = wstem;
+		or->irregs_f[or->nirregs-1].form = wform;
+		or->irregs_s = realloc(or->irregs_s, sizeof(struct irreg)*or->nirregs);
+		or->irregs_s[or->nirregs-1].stem = wstem;
+		or->irregs_s[or->nirregs-1].form = wform;
 	}
 	fclose(f);
+	int i;
+	for(i=0;i<norules;i++)
+	{
+		qsort(orules[i]->irregs_f, orules[i]->nirregs, sizeof(struct irreg), fcmp);
+		qsort(orules[i]->irregs_s, orules[i]->nirregs, sizeof(struct irreg), scmp);
+	}
 	return 0;
 }
 

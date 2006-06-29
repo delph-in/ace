@@ -20,7 +20,7 @@ struct orule
 	struct irreg
 	{
 		wchar_t	*form, *stem;
-	}	*irregs;
+	}	*irregs_f, *irregs_s;
 };
 
 extern int		norules;

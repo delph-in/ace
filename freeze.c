@@ -145,12 +145,15 @@ struct orule	*freeze_orule(struct orule	*orin)
 		subo->repl = subi->repl;
 	}
 
-	orout->irregs = slab_alloc(sizeof(struct irreg) * orout->nirregs);
+	orout->irregs_f = slab_alloc(sizeof(struct irreg) * orout->nirregs);
+	orout->irregs_s = slab_alloc(sizeof(struct irreg) * orout->nirregs);
 	for(i=0;i<orout->nirregs;i++)
 	{
-		orout->irregs[i].stem = freeze_wcs(orin->irregs[i].stem);
-		orout->irregs[i].form = freeze_wcs(orin->irregs[i].form);
+		orout->irregs_f[i].stem = orout->irregs_s[i].stem = freeze_wcs(orin->irregs_f[i].stem);
+		orout->irregs_f[i].form = orout->irregs_s[i].form = freeze_wcs(orin->irregs_f[i].form);
 	}
+	int scmp(const void	*ia, const void *ib) { return wcscmp( ((const struct irreg*)ia)->stem, ((const struct irreg*)ib)->stem ); }
+	qsort(orout->irregs_s, orout->nirregs, sizeof(struct irreg), scmp);
 
 	return orout;
 }
