@@ -7,7 +7,7 @@
 int	glb_ncollis, glb_nhit, glb_nmiss;
 
 #define	HSIZE		32768
-#define	ROLLOVER	4
+#define	ROLLOVER	6
 
 extern int	glb_ncollis, glb_nhit, glb_nmiss;
 struct type	*calc_glb(struct type	*a, struct type	*b);
@@ -20,14 +20,14 @@ static struct glb_hashent
 
 void	init_glb_cache()
 {
-	if(!htab)htab = calloc(sizeof(struct glb_hashent), HSIZE);
+	if(!htab)htab = calloc(sizeof(struct glb_hashent), HSIZE+ROLLOVER);
 }
 
 struct type	*glb(struct type	*a, struct type	*b)
 {
 	unsigned long	h;
-	int		i, j, mi = 0, min = 0x3fff0000;
-	register struct glb_hashent	*ht = htab;
+	int		i, j, min = 0x3fff0000;
+	register struct glb_hashent	*ht, *mh;
 
 	if(a==b)return a;
 	if(a>b)
@@ -39,39 +39,34 @@ struct type	*glb(struct type	*a, struct type	*b)
 	}
 
 	h = (((unsigned long)a>>6) ^ ((unsigned long)b>>0)) & (HSIZE-1);
+	ht = htab + h;
+	__builtin_prefetch(ht, 0, 0);
 
 	// check for a,b in 
 	for(j=0;j<ROLLOVER;j++)
 	{
-		i = (h+j) & (HSIZE-1);
-		if(ht[i].a==a && ht[i].b==b)
-		{
-			//ht[i].use++;
-			//if(j)glb_ncollis++;
-			//else glb_nhit++;
-			//goto ret;
-			return ht[i].glb;
-		}
-		if(!ht[i].use)	// this automatically wins
+		if(ht->a==a && ht->b==b)
+			return ht->glb;
+		if(!ht->use)	// this automatically wins
 			goto grab;
-		if(ht[i].use < min)
+		if(ht->use < min)
 		{
-			mi = i;
-			min = ht[i].use;
+			mh = ht;
+			min = ht->use;
 		}
+		ht++;
 	}
-	i = mi;
-	//i = h;
+	ht = mh;
 
 grab:
 	glb_nmiss++;
-	ht[i].a = a;
-	ht[i].b = b;
-	ht[i].use = 1;
-	ht[i].glb = calc_glb(a, b);
+	ht->a = a;
+	ht->b = b;
+	ht->use = 1;
+	ht->glb = calc_glb(a, b);
 
 	ret:
-	return ht[i].glb;
+	return ht->glb;
 }
 
 struct type	*calc_glb(struct type	*a, struct type	*b)
@@ -112,7 +107,7 @@ void	print_glb_stats()
 	extern unsigned long long glb_clock, glb_count;
 	extern unsigned long long extract_clock, extract_count;
 	extern unsigned long long unify_clock, unify_count;
-	//fprintf(stderr, "NOTE: glb hash: %d direct hits, %d collisions, %d misses\n", glb_nhit, glb_ncollis, glb_nmiss);
+	fprintf(stderr, "NOTE: glb hash: %d direct hits, %d collisions, %d misses\n", glb_nhit, glb_ncollis, glb_nmiss);
 #ifdef	CLOCKCOUNT
 	fprintf(stderr, "avg qc-glb %e over %lld glbs\n", (double)glb_clock/glb_count, glb_count);
 	fprintf(stderr, "avg qc-ext %e over %lld exts\n", (double)extract_clock/extract_count, extract_count);
