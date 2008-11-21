@@ -57,18 +57,26 @@ static int	parse_process_edge(struct edge	*e)
 	// try to combine with edges on either side
 	if(e->have == e->need)
 	{
+//		char	fil[nrules*2];
+//		if(constraint_rule_filter(e->lex, e->id, e->dg, fil) != 0)
+//			return 0;
+
 		c = cells + from;
 		// passive edge
 		for(i=0;i<=from;i++)
 		{
 			struct edge	**E = c[i*chart_size].al_edges, **F = E+c[i*chart_size].al_nedges;
-			for(;E<F;E++) if(to + ((*E)->need - (*E)->have - 1) < chart_size) LADD(*E);
+			for(;E<F;E++) if(to + ((*E)->need - (*E)->have - 1) < chart_size)
+//				if(!fil[2*(*E)->rule->rnum + 0] || !fil[2*(*E)->rule->rnum + 1])
+					LADD(*E);
 		}
 		c = cells + to*chart_size;
 		for(i=to;i<chart_size;i++)
 		{
 			struct edge	**E = c[i].ar_edges, **F = E+c[i].ar_nedges;
-			for(;E<F;E++) if(from - ((*E)->need - (*E)->have - 1) >= 0) LADD(*E);
+			for(;E<F;E++) if(from - ((*E)->need - (*E)->have - 1) >= 0)
+//				if(!fil[2*(*E)->rule->rnum + 0] || !fil[2*(*E)->rule->rnum + 1])
+					LADD(*E);
 		}
 	}
 	else
@@ -276,15 +284,20 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 	{
 		struct dg	*root = hyp->dg, *sem;
 		extern char	*mrs_end;
+		extern int print_trees;
 		if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->dec->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
 		if(!inhibit_results)
 		{
 			if(sentence && !question && !didsent){printf("SENT: %s\n", sentence);didsent=1;}
-			mrs_end = " ; ";
-			print_mrs(mrs);
-			print_hypothesis(hyp, printf);
-			printf((mrs_end = "\n"));
+			if(print_trees)
+			{
+				mrs_end = " ; ";
+				print_mrs(mrs);
+				print_hypothesis(hyp, printf);
+				printf((mrs_end = "\n"));
+			}
+			else print_mrs(mrs);
 		}
 		free_mrs(mrs);
 		return 1;

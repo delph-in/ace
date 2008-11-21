@@ -118,15 +118,15 @@ static inline	void	*slab_alloc(int	len)
 	assert((len%4)==0);
 
 	// align these special cases
-	/*if(len==32)
+	if(len==48)
 	{
-		if((unsigned int)last & 31)
+		if((unsigned long)last % 48)
 		{
-			slabu += 32 - ((unsigned int)last & 31);
-			last += 32 - ((unsigned int)last & 31);
+			slabu += 48 - ((unsigned long)last % 48);
+			last += 48 - ((unsigned long)last % 48);
 		}
 	}
-	else if(!(len&7))
+	/*else if(!(len&7))
 	{
 		if((unsigned int)last & 7)
 		{

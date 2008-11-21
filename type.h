@@ -30,6 +30,8 @@ void	wellform(struct dg	*d, char	*typename);
 void	print_glb_stats();
 struct type	*temporary_string_type(char *string);
 
+struct type	*most_general_type_for_feat(int	feat);
+
 void recover_typehash(void *frozen);
 void *freeze_typehash();
 

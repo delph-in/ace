@@ -16,7 +16,7 @@
 #include	"post.h"
 #endif
 
-#include	<liba.h>
+//#include	<liba.h>
 
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;
@@ -27,7 +27,7 @@ int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 int	preprocess_only = 0;
 extern char mrs_line_breaks;
 
-int g_mode = PARSING;
+int g_mode = PARSING, print_trees = 1;
 int	die = 0;
 
 extern int	g_loaded, inhibit_results, trace;
@@ -80,7 +80,7 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "hvpfEPL:lXg:G:m:qtRe1n:r:"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvpfEPL:lXg:G:m:qtTRe1n:r:"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
@@ -99,6 +99,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'p':	inhibit_pack = 1;		break;
 		case	'R':	inhibit_results = 1;		break;
 		case	't':	do_itsdb = 1;			break;
+		case	'T':	print_trees = 0;		break;
 		case	'e':	g_mode = GENERATING;	break;
 		case	'L':	disable_signs = optarg;	break;
 		case	'?':	goto usage;
@@ -223,6 +224,7 @@ void	initialize_engine()
 	//print_lexeme("delete_v2");
 
 	//check_unary_chains();
+	//decompose_rules();
 }
 
 void	report_stats(struct job_stats	stats)
@@ -251,7 +253,7 @@ int	main(int	argc, char	*argv[])
 
 	shutdown_net();
 	report_stats(stats);
-	if(debug_level)report_timers();
+	//if(debug_level)report_timers();
 	wait_for_lui();
 
 	if(stats.success<=0 && stats.count>0)return -1;

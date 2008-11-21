@@ -74,22 +74,29 @@ extern char	*get_conf(char	*lhs);
 static struct path get_conf_path(char	*lhs)
 {
 	char		*str = get_conf(lhs);
-	struct path	p;
 	if(!str)
 	{
 		fprintf(stderr, "avm path `%s' not specified in configuration!\n", lhs);
 		exit(-1);
 	}
+	return path_from_string(str);
+}
+
+struct path	path_from_string(char	*str)
+{
+	struct path	p;
 
 	p.count = 0;
 	p.fnums = 0;
 
-	for(str = strtok(strdup(str), " \t");str;str = strtok(NULL, " \t"))
+	str = strdup(str);
+	for(str = strtok(str, " \t");str;str = strtok(NULL, " \t"))
 	{
 		p.count++;
 		p.fnums = realloc(p.fnums, sizeof(int) * p.count);
 		p.fnums[p.count-1] = lookup_fname(str);
 	}
+	free(str);
 	return p;
 }
 

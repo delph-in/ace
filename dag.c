@@ -389,6 +389,18 @@ struct dg	*wellform_dg(struct dg	*dg)
 	return dg_hop(wfee, 1);
 }
 
+struct type	*most_general_type_for_feat(int	feat)
+{
+	if(feat<0 || feat>=nfnames)return 0;
+	if(introduce[feat] == -1)
+	{
+		fprintf(stderr, "ERROR: no type is appropriate for feature `%s' yet\n", fnames[feat]);
+		exit(-1);
+	}
+	struct dg	*tdg = types[introduce[feat]]->dg, *h = dg_hop(tdg, feat);
+	return h->xtype;
+}
+
 struct type	*most_general_type_for_dg(struct dg	*d)
 {
 	int	i, intro = -1, k;

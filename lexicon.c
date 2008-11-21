@@ -457,17 +457,24 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 #endif
 }
 
-void print_lexeme(char *name)
+struct lexeme	*get_lex_by_name(char *name)
 {
 	int	i;
 
 	for(i=0;i<nlexemes;i++)
-		if(!strcmp(lexemes[i]->word, name))
-		{
-			print_dg(lexemes[i]->dg); printf("\n");
-			printf(" lex type %s\n", lexemes[i]->lextype->name);
-			print_dg(lexemes[i]->lextype->dg); printf("\n");
-		}
+		if(!strcmp(lexemes[i]->word, name))return lexemes[i];
+	return NULL;
+}
+
+void print_lexeme(char *name)
+{
+	struct lexeme	*l = get_lex_by_name(name);
+	if(l)
+	{
+		print_dg(l->dg); printf("\n");
+		printf(" lex type %s\n", l->lextype->name);
+		print_dg(l->lextype->dg); printf("\n");
+	}
 }
 
 void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)

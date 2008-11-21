@@ -184,7 +184,11 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 #ifdef	TIM
 			gettimeofday(&tv1, 0);
 #endif
+//static int	pft = -1;
+//if(pft==-1)pft = new_timer("passive copy");
+//start_timer(pft);
 			u = finalize_tmp(dg, 1);
+//stop_timer(pft, 1);
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
 			base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
@@ -236,7 +240,11 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 #ifdef	TIM
 			gettimeofday(&tv1, 0);
 #endif
+//static int	aft = -1;
+//if(aft==-1)aft = new_timer("active copy");
+//start_timer(aft);
 			u = finalize_tmp(dg, 0);
+//stop_timer(aft, 1);
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
 			base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
@@ -676,7 +684,11 @@ inline int	unify_and_build(struct edge	*a, struct edge	*b)
 #ifdef	CLOCKCOUNT
 	clock_t	T = clock();
 #endif
+//static int ut = -1;
+//if(ut==-1)ut = new_timer("core unification");
+//start_timer(ut);
 	res = unify_dg_tmp(pdg, rdg, arg);
+//stop_timer(ut, 1);
 #ifdef	CLOCKCOUNT
 	unify_clock += clock()-T;
 	unify_count++;

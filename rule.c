@@ -11,6 +11,7 @@
 #include	"chart.h"
 #include	"conf.h"
 #include	"freeze.h"
+#include	"lexicon.h"
 
 //#define	RULE_STATS
 
@@ -280,25 +281,26 @@ int	study_rule(char	*name, struct dg	*dg)
 	return 0;
 }
 
-void	lui_rule(char	*name)
+struct rule	*get_rule_by_name(char	*name)
 {
 	int	i;
 
 	for(i=0;i<nrules;i++)if(!strcasecmp(rules[i]->name, name))break;
-	if(i>=nrules)return;
+	if(i>=nrules)return NULL;
+	else return rules[i];
+}
 
-	output_lui_dg(rules[i]->packdg, name);
+void	lui_rule(char	*name)
+{
+	struct rule	*r = get_rule_by_name(name);
+	output_lui_dg(r->packdg, name);
 }
 
 void	print_rule(char	*name)
 {
-	int	i;
-
-	for(i=0;i<nrules;i++)if(!strcasecmp(rules[i]->name, name))break;
-	if(i>=nrules)return;
-
+	struct rule	*r = get_rule_by_name(name);
 	printf("rule `%s':\n", name);
-	print_dg(rules[i]->dg);printf("\n");
+	print_dg(r->dg);printf("\n");
 }
 
 int	study_lrule(char	*name, struct dg	*dg)
@@ -685,3 +687,198 @@ check_unary_chains()
 	}
 	clear_slab();
 }*/
+
+static int	path[64], pathl;
+
+struct constraint
+{
+	int	*path, pathl;
+	int	same_upto;
+
+	struct consub
+	{
+		struct type	*type;
+
+		int			nrules;
+		struct rule	**rules;
+		int			*rargs;
+	}	*types;
+	int	ntypes;
+}	*constraints;
+int	nconstraints;
+
+// returns 1 if every subtype of `parent' is compatible with `sub'
+int always_compatible(struct type	*parent, struct type	*sub)
+{
+	int i;
+	for(i=0;i<parent->ndescendents;i++)
+		if(!glb(types[parent->descendents[i]], sub))
+		{
+			//printf("%s compatible with %s but not with %s\n", types[parent->descendents[i]]->name, parent->name, sub->name);
+			return 0;
+		}
+	return 1;
+}
+
+decompose_dg(struct rule	*r, int	rarg, struct dg	*dg, int feat)
+{
+	struct dg	**arcs = DARCS(dg);
+	struct type	*at;
+	int			i;
+
+	if(feat != -1)at = most_general_type_for_feat(feat);
+	else at = lookup_type("*top*");
+	if(dg->xtype != at && !always_compatible(at, dg->xtype))
+	{
+		struct constraint	*c = 0;
+		struct consub		*ct = 0;
+
+		for(i=0;i<nconstraints;i++)
+			if(constraints[i].pathl == pathl && !memcmp(constraints[i].path, path, pathl*sizeof(int)))
+			{
+				c = constraints+i;
+				break;
+			}
+		if(!c)
+		{
+			constraints = realloc(constraints, sizeof(struct constraint)*++nconstraints);
+			c = constraints+nconstraints-1;
+			c->path = malloc(sizeof(int)*pathl); memcpy(c->path, path, sizeof(int) * (c->pathl = pathl));
+			c->ntypes = 0; c->types = 0;
+		}
+		for(i=0;i<c->ntypes;i++)
+			if(c->types[i].type == dg->xtype)
+			{
+				ct = c->types+i;
+				break;
+			}
+		if(i==c->ntypes)
+		{
+			c->types = realloc(c->types, sizeof(struct consub)*++(c->ntypes));
+			ct = c->types + c->ntypes-1;
+			ct->type = dg->xtype;
+			ct->nrules = 0; ct->rules = 0; ct->rargs = 0;
+		}
+		ct->rules = realloc(ct->rules, sizeof(struct rule*)*++(ct->nrules));
+		ct->rules[ct->nrules-1] = r;
+		ct->rargs = realloc(ct->rargs, sizeof(int)*ct->nrules);
+		ct->rargs[ct->nrules-1] = rarg;
+	}
+
+	for(i=0;i<dg->narcs;i++)
+	{
+		path[pathl++] = dg->label[i];
+		decompose_dg(r, rarg, arcs[i], dg->label[i]);
+		pathl--;
+	}
+}
+
+int conscmp(const void	*a, const void	*b)
+{
+	const struct constraint	*A=a, *B=b;
+	int	i;
+	for(i=0;i<A->pathl && i<B->pathl;i++)
+		if(A->path[i] != B->path[i])return A->path[i] - B->path[i];
+	if(A->pathl != B->pathl)return A->pathl - B->pathl;
+	return 0;
+}
+
+decompose_rules()
+{
+	int i, j;
+
+	for(i=0;i<nrules;i++)
+	{
+		pathl = 0;
+		struct dg *child = dg_hop(rules[i]->packdg, lookup_fname("ARGS"));
+		for(j=0;j<rules[i]->ndaughters;j++)
+		{
+			decompose_dg(rules[i], j, dg_hop(child, lookup_fname("FIRST")), -1);
+			child = dg_hop(child, lookup_fname("REST"));
+		}
+	}
+
+	qsort(constraints, nconstraints, sizeof(struct constraint), conscmp);
+
+	constraints[0].same_upto = 0;
+	for(i=1;i<nconstraints;i++)
+	{
+		struct constraint *c = constraints+i, *p = constraints+i-1;
+		for(c->same_upto=0;c->same_upto<c->pathl && c->same_upto<p->pathl
+			&& c->path[c->same_upto]==p->path[c->same_upto];c->same_upto++) {}
+	}
+
+/*
+	printf("%d constraint paths\n", nconstraints);
+	for(i=0;i<nconstraints;i++)
+	{
+		extern char **fnames;
+		struct constraint	*c = constraints+i;
+		int j, k;
+		printf("C#%d	", i);
+		for(j=0;j<c->pathl;j++)
+			printf("%s ", fnames[c->path[j]]);
+		printf("%d types\n", c->ntypes);
+		for(k=0;k<c->ntypes;k++)
+		{
+			printf("    %s (%d rules) ", c->types[k].type->name, c->types[k].nrules);
+			//for(j=0;j<c->types[k].nrules;j++)
+			//	printf("  %s.%d", c->types[k].rules[j]->name, c->types[k].rargs[j]);
+			//printf("\n");
+		}
+		printf("\n");
+	}
+	*/
+}
+
+int	constraint_rule_filter(struct lexeme	*lex, int id, struct dg	*dg, char	*fil)
+{
+	int i, j, k, nleft = 2*nrules, sp = 0;
+//	char	fil[2*nrules];
+	struct dg	*stack[128];
+
+
+	bzero(fil, 2*nrules);
+
+	for(i=0;i<nrules;i++)
+	{
+		if(!lex && rules[i]->lexical) { fil[2*i] = 1; nleft--; }
+		if(rules[i]->ndaughters==1) { fil[2*i+1] = 1; nleft--; }
+	}
+
+	//printf("constraint filtering passive edge #%d dag %p lex `%s'\n", id, dg, lex?lex->word:"(none)");
+	stack[sp = 0] = dg;
+	for(i=0;i<nconstraints;i++)
+	{
+		struct constraint	*c = constraints+i;
+		struct dg			*d;
+
+		if(i)sp -= constraints[i-1].pathl - c->same_upto;
+		assert(sp >= 0);
+		d = stack[sp];
+		for(j=c->same_upto;j<c->pathl && d;j++)
+			d = stack[++sp] = dg_hop(d, c->path[j]);
+		for(;j<c->pathl;j++)d = stack[++sp] = 0;
+
+		if(d)for(j=0;j<c->ntypes;j++)
+		{
+			struct consub	*ct = c->types+j;
+			if(!glb(d->xtype, ct->type))
+				for(k=0;k<ct->nrules;k++) if(!fil[2*ct->rules[k]->rnum + ct->rargs[k]])
+			{
+				fil[2*ct->rules[k]->rnum + ct->rargs[k]] = 1;
+				nleft--;
+				if(nleft==0)return -1;
+				//printf("  incompatible with rule `%s.%d' due to type %s at C#%d\n", ct->rules[k]->name, ct->rargs[k], d->xtype->name, i);
+			}
+		}
+	}
+
+	/*for(i=0;i<2*nrules;i++)
+	{
+		if(!fil[i])
+			printf("  compatible with rule `%s.%d'\n", rules[i/2]->name, i%2);
+	}*/
+
+	return 0;
+}
