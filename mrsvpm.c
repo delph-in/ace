@@ -9,21 +9,18 @@
 
 struct vpm
 {
-	char	*lefth, *righth;	// type hierarchy names
+	char	*inputh, *outputh;	// type hierarchy names
 	char	*filename;
 	struct vpm_context
 	{
-		int		nleft, nright;
-		char	**left, **right;
+		int		ninput, noutput;
+		char	**input, **output;
 		struct vpm_rule
 		{
-			char			**left, **right;
-			#define	VPM_TYPE_EQUALITY	0x1
-			#define	VPM_TYPE_VACANCY	0x2
-			unsigned char	*leftprops, *rightprops;
-			#define	VPM_LEFT_TO_RIGHT	0x1
-			#define	VPM_RIGHT_TO_LEFT	0x2
-			#define	VPM_BIDIRECTIONAL	(VPM_LEFT_TO_RIGHT | VPM_RIGHT_TO_LEFT)
+			char			**input, **output;
+			#define	VPM_INPUT_TO_OUTPUT	0x1
+			#define	VPM_OUTPUT_TO_INPUT	0x2
+			#define	VPM_BIDIRECTIONAL	(VPM_INPUT_TO_OUTPUT | VPM_OUTPUT_TO_INPUT)
 			unsigned		direction;
 		}	*rules;
 		int	nrules;
@@ -42,17 +39,17 @@ struct vpm	*invert_vpm(struct vpm	*v)
 
 	vpm->ncontexts = v->ncontexts;
 	vpm->contexts = malloc(sizeof(struct vpm_context)*vpm->ncontexts);
-	vpm->lefth = v->righth;
-	vpm->righth = v->lefth;
+	vpm->inputh = v->outputh;
+	vpm->outputh = v->inputh;
 	for(i=0;i<vpm->ncontexts;i++)
 	{
 		ctx = v->contexts+i;
 		fctx = vpm->contexts+i;
 		*fctx = *ctx;
-		fctx->nleft = ctx->nright;
-		fctx->nright = ctx->nleft;
-		fctx->right = ctx->left;
-		fctx->left = ctx->right;
+		fctx->ninput = ctx->noutput;
+		fctx->noutput = ctx->ninput;
+		fctx->output = ctx->input;
+		fctx->input = ctx->output;
 		fctx->rules = malloc(sizeof(struct vpm_rule)*ctx->nrules);
 		fctx->nrules = ctx->nrules;
 		for(j=0;j<ctx->nrules;j++)
@@ -60,13 +57,20 @@ struct vpm	*invert_vpm(struct vpm	*v)
 			r = ctx->rules+j;
 			fr = fctx->rules+j;
 			fr->direction = (r->direction==VPM_BIDIRECTIONAL)?r->direction:(r->direction^VPM_BIDIRECTIONAL);
-			fr->right = r->left;
-			fr->left = r->right;
-			fr->rightprops = r->leftprops;
-			fr->leftprops = r->rightprops;
+			fr->output = r->input;
+			fr->input = r->output;
 		}
 	}
 	return vpm;
+}
+
+char	*type_for_empty_if_rule(char	*token)
+{
+	int	sl=strlen(token);
+	if(! (token[0]=='[' && token[sl-1]==']'))return NULL;
+	token = freeze_string(token+1);
+	token[sl-2] = 0;
+	return token;
 }
 
 int	load_vpm(char	*path)
@@ -75,7 +79,7 @@ int	load_vpm(char	*path)
 	char	line[1024], *args[32], *p;
 	int		nargs, iop, i, lnum=0;
 	struct vpm_context *ctx;
-	struct vpm			vpm = {.lefth = 0, .righth = 0, .ncontexts = 0, .contexts = 0};
+	struct vpm			vpm = {.inputh = 0, .outputh = 0, .ncontexts = 0, .contexts = 0};
 
 	if(!path)return 0;
 	f = fopen(path, "r");
@@ -86,10 +90,12 @@ int	load_vpm(char	*path)
 	}
 	vpm.filename = freeze_string(path);
 	vpm.ncontexts++;
+	vpm.inputh = freeze_string("avm");
+	vpm.outputh = freeze_string("mrs");
 	ctx = vpm.contexts = slab_alloc(sizeof(*ctx));
 	bzero(ctx, sizeof(*ctx));
-	ctx->left = slab_alloc(sizeof(char*));	ctx->left[0]=freeze_string(""); ctx->nleft = 1;
-	ctx->right = slab_alloc(sizeof(char*));	ctx->right[0]=freeze_string(""); ctx->nright = 1;
+	ctx->input = slab_alloc(sizeof(char*));	ctx->input[0]=freeze_string(""); ctx->ninput = 1;
+	ctx->output = slab_alloc(sizeof(char*));	ctx->output[0]=freeze_string(""); ctx->noutput = 1;
 	while(!feof(f) && (p = fgets(line, 1023, f)) != NULL)
 	{
 		++lnum;
@@ -111,7 +117,7 @@ int	load_vpm(char	*path)
 		}
 
 		for(iop=1;iop<nargs-1;iop++)
-			if(!args[iop][1] && strchr("=<>:#", args[iop][0]))break;
+			if(!strcmp(args[iop], "<>") || !strcmp(args[iop], "<<") || !strcmp(args[iop], ">>") || !strcmp(args[iop], ":"))break;
 		if(iop==nargs-1)goto syntax;
 
 		if(args[iop][0]==':')
@@ -122,55 +128,46 @@ int	load_vpm(char	*path)
 				sizeof(struct vpm_context)*(vpm.ncontexts-1),
 				sizeof(struct vpm_context)*vpm.ncontexts);
 			ctx = vpm.contexts + vpm.ncontexts-1;
-			ctx->nleft = iop; ctx->nright = nargs-iop-1;
-			ctx->left = slab_alloc(sizeof(char*)*ctx->nleft);
-			ctx->right = slab_alloc(sizeof(char*)*ctx->nright);
-			for(i=0;i<ctx->nleft;i++)ctx->left[i] = freeze_string(args[i]);
-			for(i=0;i<ctx->nright;i++)ctx->right[i] = freeze_string(args[iop+1+i]);
-			if(ctx->nleft==1 && !strcmp(ctx->left[0], "!"))
-				ctx->nleft = 0;
-			if(ctx->nright==1 && !strcmp(ctx->right[0], "!"))
-				ctx->nright = 0;
+			ctx->ninput = iop; ctx->noutput = nargs-iop-1;
+			ctx->input = slab_alloc(sizeof(char*)*ctx->ninput);
+			ctx->output = slab_alloc(sizeof(char*)*ctx->noutput);
+			for(i=0;i<ctx->ninput;i++)ctx->input[i] = freeze_string(args[i]);
+			for(i=0;i<ctx->noutput;i++)ctx->output[i] = freeze_string(args[iop+1+i]);
 			ctx->rules = 0;
 			ctx->nrules = 0;
-		}
-		else if(args[iop][0]=='#')
-		{
-			// type hierarchy specifiers
-			if(nargs != 3)
-			{
-				fprintf(stderr, "vpm: syntax error on line %d\n", lnum);
-				return -1;
-			}
-			vpm.lefth = freeze_string(args[0]);
-			vpm.righth = freeze_string(args[2]);
 		}
 		else
 		{
 			struct vpm_rule r;
-			if(iop != ctx->nleft || nargs-iop-1 != ctx->nright)
+			int	ninput = iop, noutput = nargs-iop-1;
+			int	directionality = VPM_BIDIRECTIONAL;
+
+			bzero(&r,sizeof(r));
+			// check for directionality
+			if(!strcmp(args[iop], "<<"))
+				directionality = VPM_OUTPUT_TO_INPUT;
+			if(!strcmp(args[iop], ">>"))
+				directionality = VPM_INPUT_TO_OUTPUT;
+			if(ninput != ctx->ninput || noutput != ctx->noutput)
 			{
 				fprintf(stderr, "vpm: syntax error on line %d, %d/%d context but %d/%d rule\n",
-					lnum, ctx->nleft, ctx->nright, iop, nargs-iop-1);
+					lnum, ctx->ninput, ctx->noutput, iop, nargs-iop-1);
 				return -1;
 			}
-			r.direction = (args[iop][0]=='=')?VPM_BIDIRECTIONAL:
-							((args[iop][0]=='<')?VPM_RIGHT_TO_LEFT:
-								VPM_LEFT_TO_RIGHT);
-			r.left = slab_alloc(sizeof(char*)*ctx->nleft);
-			r.right = slab_alloc(sizeof(char*)*ctx->nright);
-			r.leftprops = slab_alloc(4*sizeof(char)*ctx->nleft);
-			r.rightprops = slab_alloc(4*sizeof(char)*ctx->nright);
-#define VPMPROP(type)	((type[0]=='!' || type[0]=='=')?((*type++=='!')?VPM_TYPE_VACANCY:VPM_TYPE_EQUALITY):0)
-			for(i=0;i<ctx->nleft;i++)
+			r.direction = directionality;
+			r.input = slab_alloc(sizeof(char*)*ctx->ninput);
+			for(i=0;i<ctx->ninput;i++)
 			{
-				r.left[i] = freeze_string(args[i]);
-				r.leftprops[i] = VPMPROP(r.left[i]);
+				if(args[i][0]=='[')	// for rules like "[e]", only record "[e" to make it easier to test with them
+					args[i][strlen(args[i])-1] = 0;
+				r.input[i] = freeze_string(args[i]);
 			}
-			for(i=0;i<ctx->nright;i++)
+			r.output = slab_alloc(sizeof(char*)*ctx->noutput);
+			for(i=0;i<ctx->noutput;i++)
 			{
-				r.right[i] = freeze_string(args[iop+1+i]);
-				r.rightprops[i] = VPMPROP(r.right[i]);
+				if(args[iop+1+i][0]=='[')
+					args[iop+1+i][strlen(args[iop+1+i])-1] = 0;
+				r.output[i] = freeze_string(args[iop+1+i]);
 			}
 			ctx->nrules++;
 			ctx->rules = slab_realloc(ctx->rules,
@@ -179,27 +176,34 @@ int	load_vpm(char	*path)
 			ctx->rules[ctx->nrules-1] = r;
 		}
 	}
-	if(!vpm.lefth || !vpm.righth)
-	{
-		fprintf(stderr, "vpm: no left/right hierarchy specified\n");
-		return -1;
-	}
 	v = slab_alloc(sizeof(vpm));
 	*v = vpm;
 
-	/*printf("vpm [%s # %s] has %d contexts:\n", v->lefth, v->righth, v->ncontexts);
+	/*printf("vpm [%s # %s] has %d contexts:\n", v->inputh, v->outputh, v->ncontexts);
 	for(i=0;i<v->ncontexts;i++)
 	{
 		int j;
 		ctx = v->contexts+i;
-		printf("left context:"); for(j=0;j<ctx->nleft;j++)printf("	%s", ctx->left[j]); printf("\n");
-		printf("right context:"); for(j=0;j<ctx->nright;j++)printf("	%s", ctx->right[j]); printf("\n");
+		printf("input context:"); for(j=0;j<ctx->ninput;j++)printf("	%s", ctx->input[j]); printf("\n");
+		printf("output context:"); for(j=0;j<ctx->noutput;j++)printf("	%s", ctx->output[j]); printf("\n");
 		for(j=0;j<ctx->nrules;j++)
 		{
 			struct vpm_rule *r = ctx->rules+j;
 			int k;
-			printf("  left types:"); for(k=0;k<ctx->nleft;k++)printf("	%s", r->left[k]); printf("\n");
-			printf("  right types:"); for(k=0;k<ctx->nright;k++)printf("	%s", r->right[k]); printf("\n");
+			if(r->direction == VPM_BIDIRECTIONAL)
+				printf("bidirectional rule:\n");
+			if(r->direction == VPM_INPUT_TO_OUTPUT)
+				printf("forward-only rule:\n");
+			if(r->direction == VPM_OUTPUT_TO_INPUT)
+				printf("backward-only rule:\n");
+			printf("  input types:");
+			for(k=0;k<ctx->ninput;k++)
+				printf("	%s", r->input[k]);
+			printf("\n");
+			printf("  output types:");
+			for(k=0;k<ctx->noutput;k++)
+				printf("	%s", r->output[k]);
+			printf("\n");
 		}
 	}*/
 	return 0;
@@ -215,19 +219,19 @@ void	*freeze_vpm()
 
 	vpm->contexts = slab_alloc(sizeof(struct vpm_context)*vpm->ncontexts);
 	vpm->ncontexts = v->ncontexts;
-	vpm->lefth = freeze_string(v->lefth);
-	vpm->righth = freeze_string(v->righth);
+	vpm->inputh = freeze_string(v->inputh);
+	vpm->outputh = freeze_string(v->outputh);
 	for(i=0;i<vpm->ncontexts;i++)
 	{
 		ctx = v->contexts+i;
 		fctx = vpm->contexts+i;
 		*fctx = *ctx;
-		fctx->left = slab_alloc(sizeof(char*)*ctx->nleft);
-		fctx->right = slab_alloc(sizeof(char*)*ctx->nright);
-		for(j=0;j<ctx->nleft;j++)
-			fctx->left[j] = freeze_string(ctx->left[j]);
-		for(j=0;j<ctx->nright;j++)
-			fctx->right[j] = freeze_string(ctx->right[j]);
+		fctx->input = slab_alloc(sizeof(char*)*ctx->ninput);
+		fctx->output = slab_alloc(sizeof(char*)*ctx->noutput);
+		for(j=0;j<ctx->ninput;j++)
+			fctx->input[j] = freeze_string(ctx->input[j]);
+		for(j=0;j<ctx->noutput;j++)
+			fctx->output[j] = freeze_string(ctx->output[j]);
 		fctx->rules = slab_alloc(sizeof(struct vpm_rule)*ctx->nrules);
 		fctx->nrules = ctx->nrules;
 		for(j=0;j<ctx->nrules;j++)
@@ -235,20 +239,12 @@ void	*freeze_vpm()
 			r = ctx->rules+j;
 			fr = fctx->rules+j;
 			fr->direction = r->direction;
-			fr->left = slab_alloc(sizeof(char*)*ctx->nleft);
-			fr->right = slab_alloc(sizeof(char*)*ctx->nright);
-			fr->leftprops = slab_alloc(sizeof(int)*ctx->nleft);	// make it big to keep alignment right
-			fr->rightprops = slab_alloc(sizeof(int)*ctx->nright);
-			for(k=0;k<ctx->nleft;k++)
-			{
-				fr->left[k] = freeze_string(r->left[k]);
-				fr->leftprops = freeze_block(r->leftprops, ctx->nleft);
-			}
-			for(k=0;k<ctx->nright;k++)
-			{
-				fr->right[k] = freeze_string(r->right[k]);
-				fr->rightprops = freeze_block(r->rightprops, ctx->nright);
-			}
+			fr->input = slab_alloc(sizeof(char*)*ctx->ninput);
+			fr->output = slab_alloc(sizeof(char*)*ctx->noutput);
+			for(k=0;k<ctx->ninput;k++)
+				fr->input[k] = freeze_string(r->input[k]);
+			for(k=0;k<ctx->noutput;k++)
+				fr->output[k] = freeze_string(r->output[k]);
 		}
 	}
 	return vpm;
@@ -259,101 +255,124 @@ void recover_vpm(void *vpm)
 	v = vpm;
 }
 
-// XXX need to support VPM_TYPE_VACANCY
-
-int vpm_test(char *value, char *against, unsigned char flags)
-{
 extern int prop_subsumes(char*,char*);
+
+// return 0 if value matches rule, else return nonzero
+int vpm_test(char	*vartype, char *value, char *rule)
+{
 	int res;
-	//printf("compare `%s' vs `%s' flags %d\n", against, value, flags);
-	if(flags & VPM_TYPE_EQUALITY)return strcasecmp(against, value);
-	res = !prop_subsumes(against, value);
+	if(!strcmp(rule, "*"))
+	{
+		if(value)return 0;
+		else return -1;
+	}
+	if(!strcmp(rule, "!"))
+	{
+		if(value)return -1;
+		else return 0;
+	}
+	if(rule[0]=='[')
+	{
+		// semantics of "[x" rule:
+		// matches iff value is missing and var is of type x
+		if(value)return -1;
+		else if(prop_subsumes(rule+1, vartype))return 0;
+		else return -1;
+	}
+	if(!value)return -1;
+	//printf("compare `%s' vs `%s' flags %d\n", rule, value, flags);
+	//if(flags & VPM_TYPE_EQUALITY)return strcasecmp(rule, value);
+	res = !prop_subsumes(rule, value);
 	return res;
 }
 
 static inline void	*slab_malloc(int l) { if(l%4)l += (4-(l%4)); return slab_alloc(l); }
 static inline void	*slab_calloc(int a, int b) { int l = a*b; void *p = slab_malloc(l); bzero(p, l); return p; }
 
-char	*vpm_map(char	**right, struct vpm_context	*ctx, int	left)
+char	*vpm_map(char	*vartype, char	**input, struct vpm_context	*ctx, int	output_slot)
 {
 	int	i, j;
 
 	for(i=0;i<ctx->nrules;i++)
 	{
 		struct vpm_rule	*r = ctx->rules+i;
-		for(j=0;j<ctx->nright;j++)
-			if(vpm_test(right[j], r->right[j], r->rightprops[j]) != 0)
+		if(! (r->direction & VPM_INPUT_TO_OUTPUT))
+			continue;	// only consider rules working forward
+		for(j=0;j<ctx->ninput;j++)
+			if(vpm_test(vartype, input[j], r->input[j]) != 0)
 				break;
-		if(j<ctx->nright)continue;
+		if(j<ctx->ninput)continue;
 		// else the rule applies.
-		return r->left[left];
+		char	*rout = r->output[output_slot];
+		if(!strcmp(rout, "*"))
+		{
+			assert(output_slot < ctx->ninput);
+			return input[output_slot];
+		}
+		else if(!strcmp(rout, "!"))return NULL;
+		else if(rout[0] == '[' && prop_subsumes(rout+1, vartype))return NULL;
+		else return rout;
 	}
 	// for equal-sized mappings, default to identity map
-	if(ctx->nleft == ctx->nright)return right[left];
-	return 0;
+	if(ctx->ninput == ctx->noutput)return input[output_slot];
+	else return NULL;
 }
 
 struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 {
 	struct mrs_var	*vout = slab_malloc(sizeof(*vout));
-	char			inused[vin->nprops];
 	int				i, j, k;
 
 	*vout = *vin;
 	vout->name = vin->name;
-	vout->type = 0;
-	bzero(inused, vin->nprops);
+	vout->type = vin->type;
 	vout->nprops = 0;
-	vout->props = 0;
+	vout->props = NULL;
 
 	for(i=0;i<v->ncontexts;i++)
 	{
 		struct vpm_context *ctx = v->contexts+i;
-		if(ctx->nleft==1 && *ctx->left[0]==0 && ctx->nright==1 && *ctx->right[0]==0)
+		if(ctx->ninput==1 && !*ctx->input[0] && ctx->noutput==1 && !*ctx->output[0])
 		{
-			// context matches root level
-			vout->type = vpm_map(&vin->type, ctx, 0);
+			// context matches root level, i.e. variable types
+			vout->type = vpm_map(vout->type, &vin->type, ctx, 0);
+			assert(vout->type != NULL);
 		}
 		else
 		{
-			char	*values[ctx->nright];
-			int		props[ctx->nright];
-			// try to align context to vin's properties
-			for(j=0;j<ctx->nright;j++)values[j] = 0;
-			for(j=0;j<ctx->nright;j++)
+			char	*values[ctx->ninput];
+			int		props[ctx->ninput];
+			// try to align context input to vin's properties
+			for(j=0;j<ctx->ninput;j++)values[j] = NULL;
+			for(j=0;j<ctx->ninput;j++)
 			{
-				for(k=0;k<vin->nprops;k++) if(!inused[k])
-					if(!strcasecmp(vin->props[k].name, ctx->right[j]))
+				for(k=0;k<vin->nprops;k++)
+					if(!strcasecmp(vin->props[k].name, ctx->input[j]))
 					{
 						values[j] = vin->props[k].value;
 						props[j] = k;
 						break;
 					}
-				if(k==vin->nprops)break;
+				if(k==vin->nprops)
+				{
+					values[j] = NULL;
+					props[j] = -1;
+				}
 			}
-			if(j<ctx->nright)continue;
-			for(j=0;j<ctx->nleft;j++)
+			for(j=0;j<ctx->noutput;j++)
 			{
-				char	*nval = vpm_map(values, ctx, j);
-				if(!nval)break; // should only ever fail the first iteration
+				char	*nval = vpm_map(vout->type, values, ctx, j);
+				//printf("mapping values: %s...; result = %s\n", values[0], nval);
+				if(!nval)continue; // don't include NULL outputs (the VPM rule drops this property in this case)
 				vout->nprops++;
 				vout->props = slab_realloc(vout->props, sizeof(struct mrs_var_property)*(vout->nprops-1),
 														sizeof(struct mrs_var_property)*vout->nprops);
-				vout->props[vout->nprops-1].name = ctx->left[j];
+				vout->props[vout->nprops-1].name = ctx->output[j];
 				vout->props[vout->nprops-1].value = nval;
 			}
-			if(j==ctx->nleft) for(j=0;j<ctx->nright;j++)inused[props[j]] = 1;
 		}
 	}
-	if(!vout->type)vout->type = vin->type;
-	for(i=0;i<vin->nprops;i++) if(!inused[i])
-	{
-		vout->nprops++;
-		vout->props = slab_realloc(vout->props, sizeof(struct mrs_var_property)*(vout->nprops-1),
-												sizeof(struct mrs_var_property)*vout->nprops);
-		vout->props[vout->nprops-1].name = vin->props[i].name;
-		vout->props[vout->nprops-1].value = vin->props[i].value;
-	}
+	//printf("input: ");print_mrs_var(vin);printf("\n");
 	//printf("converted: ");print_mrs_var(vout);printf("\n");
 	return vout;
 }
