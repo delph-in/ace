@@ -73,6 +73,7 @@ int	generate(struct mrs	*mrs)
 	int			i, count = 0;
 
 	timer();
+	reset_edges();
 	clear_chart(1);
 
 	if(debug_level)
