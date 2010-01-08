@@ -76,7 +76,7 @@ int	upward_kill(struct edge	*edge)
 	int					i, j, k, killed = 1, pass;
 
 	edge->frozen = 1;
-	//printf("frost #%d\n", edge->id);
+	PACKBUG("frost #%d\n", edge->id);
 	more: pass = 0;
 	for(i=0;i<c->p_nedges;i++)
 	{
@@ -109,6 +109,59 @@ int	upward_kill(struct edge	*edge)
 	if(pass)goto more;
 	//printf("upward_kill'd %d edges built on #%d\n", killed, edge->id);
 	return killed;
+}
+
+int	generalize_pack_edge(struct edge	*edge)
+{
+	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
+	printf("thinking about how to pack #%d [%d passives in cell]\n", edge->id, c->p_nedges);
+	if(c->p_nedges == 0)return 0;
+
+	struct edge	*existing = c->p_edges[0];
+
+	int	ssd, fw=1, bk=1;
+	ssd = equivalent_dg(existing->dg, edge->dg, fw, bk);
+	if(ssd == 1 || ssd == 3)
+	{
+		// existing susumes new edge
+		record_packing(existing, edge);
+		printf("#%d packs INTO existing #%d\n", edge->id, existing->id);
+		return 1;
+	}
+	if(ssd == 2)
+	{
+		// new edge subsumes existing edge
+		assert(!existing->frozen);
+		record_packing(edge, existing);
+		c->p_nedges = 0;
+		printf("#%d SUBSUMES existing #%d (so replaces it in the chart)\n", edge->id, existing->id);
+		return 0;
+	}
+
+	// no subsumption relation; invent a new more general edge!
+	struct edge	*invent = slab_alloc(sizeof(struct edge));
+	bzero(invent, sizeof(*invent));
+
+	enable_packing(1);
+	enable_trim(1);
+	invent->dg = generalize(existing->dg, edge->dg);
+	enable_packing(0);
+	enable_trim(0);
+
+	invent->from = edge->from;
+	invent->to = edge->to;
+	invent->id = next_eid();
+	invent->have = edge->have;
+	invent->need = edge->need;
+	invent->qc = extract_qc(invent->dg);
+
+	printf("invented a new generalized edge #%d [ subsumes #%d and #%d ]\n", invent->id, existing->id, edge->id);
+
+	record_packing(invent, edge);
+	record_packing(invent, existing);
+	c->p_nedges = 0;
+	add_agenda(invent);
+	return 1;
 }
 
 int	pack_edge(struct edge	*edge)
@@ -225,7 +278,11 @@ int	pack_edge(struct edge	*edge)
 				h->npack = 0;
 				h->pack = 0;
 				h->qc = 0;
-				if(!was_frozen)record_packing(edge, h);
+				if(!was_frozen)
+				{
+					//printf(" ... packing it though\n");
+					record_packing(edge, h);
+				}
 				already_packed = 1;
 				// keep going!
 				//candidates = c->p_edges;
