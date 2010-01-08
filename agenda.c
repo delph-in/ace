@@ -9,6 +9,7 @@
 #include	"lexicon.h"
 
 extern int	debug_level;
+extern int trace;
 
 struct task
 {
@@ -48,6 +49,13 @@ void	clear_agenda()
 void	add_agenda(struct edge	*e)
 {
 	struct task	*t = slab_alloc(sizeof(struct task));
+
+	if(trace && e->lex && !e->need)
+	{
+		struct lexeme	*lex = e->lex;
+		printf("added lexeme `%s' = #%d  [%d-%d]\n", lex->word, e->id, e->from, e->to);
+		if(trace>1){print_dg(e->dg); printf("\n\n");}
+	}
 
 	e->ntries = 0;
 	e->npack = 0;
@@ -157,10 +165,10 @@ void sanity_check_agenda(int length)
 	printf("passed sanity\n");
 }
 
-struct path	comp_head_path, head_path, subj_ind_path, sind_path;
-int			dep_init = 0;
+//struct path	comp_head_path, head_path, subj_ind_path, sind_path;
+//int			dep_init = 0;
 
-int	reduce_chart(int	length, char **words)
+int	reduce_chart(int	length)//, char **words)
 {
 	extern int debug_level;
 	struct task	*t1, *t2;
@@ -168,35 +176,42 @@ int	reduce_chart(int	length, char **words)
 	char		cover[1024];
 	int		i;
 
-	if(!dep_init)
+	/*if(!dep_init)
 	{
 		dep_init = 1;
 		comp_head_path = make_path(3, "SYNSEM", "LKEYS", "--COMPHD");
 		head_path = make_path(4, "SYNSEM", "LOCAL", "CAT", "HEAD");
-		subj_ind_path = make_path(3, "SYNSEM", "LKEYS", "--+SUBJIND");
+		subj_ind_path = make_path(3, "SYNSEM", "LOCAL", "--+ARGIND");
 		sind_path = make_path(2, "SYNSEM", "--SIND");
-	}
+	}*/
 
 	//sanity_check_agenda(length);
 	bzero(cover, length);
 	for(t1=lag->start;t1;t1=t1->next)
 	{
 		assert(t1->edge->lex); t2 = t1;
-		struct dg	*comphd = dg_path(t1->edge->dg, comp_head_path);
-		if(comphd && strcmp(comphd->xtype->name, "head_min"))
+		for(i=0;i<nchart_dependencies;i++)
 		{
-			//printf("%s selects comphd %s\n", t1->edge->lex->word, comphd->xtype->name);
-			for(t2=lag->start;t2;t2=t2->next)
+			struct dg	*from = dg_path(t1->edge->dg, chart_dependencies_from[i]);
+			if(from)
 			{
-				assert(t2->edge->lex);
-				struct dg	*hd = dg_path(t2->edge->dg, head_path);
-				if(descendent_of(hd->xtype->tnum, comphd->xtype)) {
-					//printf(" satisfied by %s\n", t2->edge->lex->word);
-					break; }
+				//printf("%s selects %s\n", t1->edge->lex->word, from->xtype->name);
+				for(t2=lag->start;t2;t2=t2->next)
+				{
+					assert(t2->edge->lex);
+					struct dg	*to = dg_path(t2->edge->dg, chart_dependencies_to[i]);
+					if(descendent_of(to->xtype->tnum, from->xtype)) {
+						//printf(" satisfied by %s\n", t2->edge->lex->word);
+						break; }
+				}
+				if(!t2)
+				{
+					//printf(" .. reduce\n");
+					break;
+				}
 			}
-			//if(!t2)printf(" .. reduce\n");
 		}
-		struct dg	*subjind = dg_path(t1->edge->dg, subj_ind_path);
+		/*struct dg	*subjind = dg_path(t1->edge->dg, subj_ind_path);
 		if(subjind)
 		{
 			//printf("%s selects subjind %s\n", t1->edge->lex->word, subjind->xtype->name);
@@ -209,8 +224,8 @@ int	reduce_chart(int	length, char **words)
 					break; }
 			}
 			//if(!t2)printf(" .. reduce\n");
-		}
-		if(t1->edge->lex->select)
+		}*/
+		/*if(t1->edge->lex->select)
 		{
 			//printf("%s selects %s\n", t1->edge->lex->word, t1->edge->lex->select->name);
 			for(t2=lag->start;t2;t2=t2->next)
@@ -219,7 +234,7 @@ int	reduce_chart(int	length, char **words)
 				if(!t2->edge->lex->pred)continue;
 				if(glb(t2->edge->lex->pred, t1->edge->lex->select))break;
 			}
-		}
+		}*/
 		if(!t2)
 		{
 			//printf("edge %d, lexeme %s dropped by reducer\n", t1->edge->id, t1->edge->lex->word);
@@ -246,7 +261,8 @@ int	reduce_chart(int	length, char **words)
 	for(i=0;i<length;i++)
 		if(!cover[i])
 		{
-			if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d `%s'!\n", i, words[i]);
+			//if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d `%s'!\n", i, words[i]);
+			if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d!\n", i);
 			return -1;
 		}
 
