@@ -4,6 +4,7 @@
 #include	<stdlib.h>
 #include	<sys/time.h>
 
+#include	"preprocessor.h"
 #include	"morpho.h"
 #include	"rule.h"
 #include	"lexicon.h"
@@ -30,7 +31,7 @@ char	*trim_string(char	*str)
 	while(*str==' ' || *str=='\t' || *str=='\n')str++;
 	len = strlen(str);
 	if(len==0)return str;
-	while(str[len-1]==' ' || str[len-1]=='\t' || str[len-1]=='\n')len--;
+	while(len>0 && (str[len-1]==' ' || str[len-1]=='\t' || str[len-1]=='\n'))len--;
 	str[len] = 0;
 	return str;
 }
@@ -46,11 +47,13 @@ struct tdl_line
 
 long			ntdllines;
 struct tdl_line	*tdllines;
-char			*tdlstatus = 0;
+char			*tdlstatus = "grammar";
 
 struct hash	*tdl_hash;
 
 int	loud_noises = 0;
+
+struct type	*_current_building_type = NULL;
 
 struct dg	*dagify(char	*str, struct type	*building_type);
 int	constrain_type(char	*name, struct dg	*dg);
@@ -81,7 +84,7 @@ char	*get_conf_unq(char	*lhs)
 	else return q;
 }
 
-static char	*get_conf_path(char	*dir, char	*lhs)
+char	*get_conf_file_path(char	*dir, char	*lhs)
 {
 	char	*u = get_conf_unq(lhs), *p = 0;
 	if(!u)return 0;
@@ -130,17 +133,22 @@ char	*g_orth_def;
 int	process_comments(char	*line, int	in_comment)
 {
 	char	*ptr, *oline;
-	int	inquote = 0;
+	int	inquote = 0, in_regex = 0;
 
 	// handle block-comments first
 	for(oline=ptr=line;*ptr;ptr++)
 	{
-		if(ptr[0]=='#' && ptr[1]=='|')in_comment++, ptr++;
-		else if(ptr[0]=='|' && ptr[1]=='#')in_comment--, ptr++;
+		if(!inquote && !in_regex && ptr[0]=='#' && ptr[1]=='|')in_comment++, ptr++;
+		else if(!inquote && !in_regex && ptr[0]=='|' && ptr[1]=='#')in_comment--, ptr++;
 		else if(!in_comment)
 		{
-			if(*ptr=='"')inquote=!inquote;
-			if(*ptr==';' && !inquote)*oline++ = 0;
+			if(*ptr=='\\' && (inquote || in_regex) && ptr[1])
+				{*oline++ = *ptr++;*oline++ = *ptr;continue;}
+			if(*ptr=='^' && !inquote)in_regex = 1;
+			if(*ptr=='$' && !inquote)in_regex = 0;
+			if(*ptr=='"' && !in_regex)inquote=!inquote;
+
+			if(*ptr==';' && !in_regex && !inquote)*oline++ = 0;
 			else *oline++ = *ptr;
 		}
 	}
@@ -150,22 +158,47 @@ int	process_comments(char	*line, int	in_comment)
 
 int	unbalanced(char	*line)
 {
-	int	inquote = 0, bal = 0;
+	int	inquote = 0, bal = 0, regex = 0;
 	int	escape = 0;
 
 	while(*line)
 	{
 		if(escape) { line++; escape = 0; }
-		else if(*line==':' && line[1]=='<')line+=2;
+		else if(!inquote && !regex && *line==':' && line[1]=='<')line+=2;
 		else switch(*line++)
 		{
-			case	'<':	if(!inquote)bal++;	break;
-			case	'>':	if(!inquote)bal--;	break;
-			case	'"':	inquote = !inquote;	break;
+			case	'^':	if(!inquote)regex = 1;	break;
+			case	'$':	if(!inquote)regex = 0;	break;
+			case	'<':	if(!regex && !inquote)bal++;	break;
+			case	'>':	if(!regex && !inquote)bal--;	break;
+			case	'"':	if(!regex)inquote = !inquote;	break;
 			case	'\\':	escape = 1;		break;
 		}
 	}
-	return bal;
+	return (bal != 0 || regex != 0 || inquote);
+}
+
+char	*tdlstatus_stack[16] = {"grammar"};
+int		tdlstatus_stack_pointer = 0;
+
+void	tdl_push_status(char	*mystatus)
+{
+	if(tdlstatus_stack_pointer>10)
+	{
+		fprintf(stderr, "TDL status stack overflow\n");
+		return;
+	}
+	tdlstatus = tdlstatus_stack[++tdlstatus_stack_pointer] = mystatus;
+}
+
+void	tdl_pop_status()
+{
+	if(tdlstatus_stack_pointer <= 0)
+	{
+		fprintf(stderr, "TDL status stack underflow\n");
+		return;
+	}
+	tdlstatus = tdlstatus_stack[--tdlstatus_stack_pointer];
 }
 
 int	process_colon_command(char	*parent, char	*cmd)
@@ -179,20 +212,24 @@ int	process_colon_command(char	*parent, char	*cmd)
 	if(word && !strcmp(word, ":begin"))
 	{
 		what = strtok(0, " 	\n");
-		if(what && !strcmp(what, ":type"))tdlstatus = "type";
+		if(what && !strcmp(what, ":type"))tdl_push_status("type");
 		else if(what && !strcmp(what, ":instance"))
 		{
 			status = strtok(0, " 	\n");
 			if(status && !strcmp(status, ":status"))
 			{
 				whatstatus = strtok(0, " 	\n");
-				if(whatstatus)tdlstatus = strdup(whatstatus);
+				if(whatstatus)tdl_push_status(strdup(whatstatus));
+			}
+			else
+			{
+				tdl_push_status("instance");
 			}
 		}
 		//printf("status now `%s'\n", tdlstatus);
 	}
 	else if(word && !strcmp(word, ":end"))
-		tdlstatus = 0;
+		tdl_pop_status();
 	else if(word && !strcmp(word, ":include"))
 	{
 		what = trim_string(cmd + 9);
@@ -206,11 +243,11 @@ int	process_colon_command(char	*parent, char	*cmd)
 			*p = 0;
 			sprintf(iname, "%s%s%s", dirpath, dirpath[0]?"/":"", what);
 			if(!strstr(what, ".tdl"))strcat(iname, ".tdl");
-			if(!tdlstatus && strstr(what, "parse-nodes"))
+			/*if(!tdlstatus && strstr(what, "parse-nodes"))
 			{
 				fprintf(stderr, "WARNING: implicitly setting tdl status to `parse-node'\n");
-				tdlstatus = "parse-node";
-			}
+				tdl_push_status("parse-node");
+			}*/
 			//printf(" should include `%s'\n", iname);
 			load_tdl(iname);
 		}
@@ -245,10 +282,14 @@ int	load_tdl(char	*path)
 	if(tdlstatus && !strcmp(tdlstatus, "rule"))tdlstatuses = "rules";
 	if(tdlstatus && !strcmp(tdlstatus, "lex-rule"))tdlstatuses = "lexical rules";
 	if(tdlstatus && !strcmp(tdlstatus, "lex-entry"))tdlstatuses = "lexical entries";
-	if(tdlstatus && !strcmp(tdlstatus, "parse-node"))tdlstatuses = "tree labels";
+	if(tdlstatus && !strcmp(tdlstatus, "tree-node-label"))tdlstatuses = "tree labels";
 	if(tdlstatus && !strcmp(tdlstatus, "config"))tdlstatuses = "configuration";
 	if(tdlstatus && !strcmp(tdlstatus, "grammar"))tdlstatuses = "grammar";
-	if(!tdlstatuses)tdlstatuses = "instances";
+	if(!tdlstatuses)
+	{
+		if(tdlstatus)tdlstatuses = tdlstatus;
+		else tdlstatuses = "instances";
+	}
 
 	sprintf(doing, "loading %s", tdlstatuses); show_task_name(doing);
 	printf("from `%s'\n", path);
@@ -279,6 +320,7 @@ int	load_tdl(char	*path)
 		if(buffer[0])strcat(buffer, " ");
 		strcat(buffer, lp);
 		if(!buffer[0])continue;
+		//printf("... accum tdl '%s'\n", buffer);
 		if(strlen(buffer) > 9000)
 		{
 			fprintf(stderr, "tdl statement too long: `%s'\n", buffer);
@@ -383,8 +425,9 @@ struct type	*find_type(char	*name, int	constrain)
 {
 	struct type	*type = lookup_type(name);
 	int		i;
+	int	is_atomic = (name[0]=='"' || name[0]=='\'' || name[0]=='^');
 
-	if(!type || (name[0]!='"' && name[0]!='\'' && constrain && !type->dg))
+	if(!type || (!is_atomic && constrain && !type->dg))
 	{
 		// try to find constraint for this type before returning it
 		if(type && name[0]=='G' && name[1]=='(')
@@ -496,7 +539,7 @@ struct dg *add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
 static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 {
 	int		i, j;
-	struct dg	*coref_template, *dg;
+	struct dg	*coref_template;
 	struct dg	*reentrancies[256];
 	char		*rnames[256];
 	int		nr = 0;
@@ -511,10 +554,9 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 	{
 		for(j=0;j<nr;j++)
 			if(!strcmp(rnames[j], R->corefs[i].name))break;
-		if(j<nr)dg  = reentrancies[j];
-		else
+		if(j==nr)
 		{
-			dg = reentrancies[j] = atomic_dg("*top*");
+			reentrancies[j] = atomic_dg("*top*");
 			rnames[j] = R->corefs[i].name;
 			nr++;
 		}
@@ -528,6 +570,7 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 		for(i=0;i<R->ncorefs;i++) if(!strcmp(rnames[j], R->corefs[i].name))
 			coref_template = add_dg_path(coref_template, R->corefs[i].path, R->corefs[i].pathlen, reentrancies[j]);
 		//printf("coref template:\n"); print_dg(coref_template); printf("\n");
+		//printf("target:\n");print_dg(target);printf("\n");
 		if(unify_dg_infrom(target, coref_template))
 		{
 			//printf("patch failed\n");
@@ -592,16 +635,31 @@ static struct dg	*listify(struct dagify_record	*R, char	*str, struct dg	**last)
 	{
 		comma = str;
 		bracket=0;
-		while(*comma && (bracket || inquote || (*comma!=',' && *comma!='.')))switch(*comma++)
+		int	regex = 0;
+		while(*comma && (bracket || regex || inquote || (*comma!=',' && *comma!='.')))switch(*comma++)
 		{
-			case	'<':	case	'[':	bracket++;	break;
-			case	'>':	case	']':	bracket--;	break;
-			case	'\\':	if(inquote && *comma)comma++;	break;	// skip a char
-			case	'"':	inquote = !inquote;		break;
+			case	'^':	if(!inquote)regex = 1;	break;
+			case	'$':	if(!inquote)regex = 0;	break;
+			case	'<':	case	'[':	if(!regex && !inquote)bracket++;	break;
+			case	'>':	case	']':	if(!regex && !inquote)bracket--;	break;
+			case	'\\':	if((regex || inquote) && *comma)comma++;	break;	// skip a char
+			case	'"':	if(!regex)inquote = !inquote;		break;
 		}
 		if(bracket)
 		{
 			fprintf(stderr, "tdl: unmatched bracket in list near `%s'\n", str);
+			R->current_pathlen = iplen;
+			return 0;
+		}
+		if(inquote)
+		{
+			fprintf(stderr, "tdl: unmatched quote in list near '%s'\n", str);
+			R->current_pathlen = iplen;
+			return 0;
+		}
+		if(regex)
+		{
+			fprintf(stderr, "tdl: regex not in matched ^...$ near '%s'\n", str);
 			R->current_pathlen = iplen;
 			return 0;
 		}
@@ -738,16 +796,47 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 		if(!*ptr)goto novalue;
 		// find the length of its value
 		vptr = ptr;
-		bracket = 0;
-		while(*ptr && (bracket || *ptr!=','))switch(*ptr++)
+		if(*ptr!='^')
 		{
-			case	'<':	case	'[':	bracket++;	break;
-			case	'>':	case	']':	bracket--;	break;
+			bracket = 0;
+			int	quote = 0, regex = 0;
+			while(*ptr && (bracket || quote || regex || *ptr!=','))switch(*ptr++)
+			{
+				case	'^':	if(!quote)regex = 1;	break;
+				case	'$':	if(!quote)regex = 0;	break;
+				case	'"':	if(!regex)quote = ~quote;	break;
+				case	'\\':	if((regex || quote) && *ptr)ptr++;	break;	// skip a char on escape
+				case	'<':	case	'[':	if(!regex && !quote)bracket++;	break;
+				case	'>':	case	']':	if(!regex && !quote)bracket--;	break;
+			}
+			if(bracket)
+			{
+				fprintf(stderr, "tdl: unbalanced '[' in dag value `%s'\n", vptr);
+				return 0;
+			}
+			if(quote)
+			{
+				fprintf(stderr, "tdl: unbalanced '\"' in dag value `%s'\n", vptr);
+				return 0;
+			}
+			if(regex)
+			{
+				fprintf(stderr, "tdl: regex not balanced in ^...$ in dag value '%s'\n", vptr);
+				return 0;
+			}
 		}
-		if(bracket)
+		else
 		{
-			fprintf(stderr, "tdl: unbalanced '[' in dag value `%s'\n", vptr);
-			return 0;
+			while(*ptr && *ptr!='$')switch(*ptr++)
+			{
+				case	'\\':	if(*ptr)ptr++;	break;	//skip a char on escape
+			}
+			if(*ptr != '$')
+			{
+				fprintf(stderr, "tdl: regex not balanced in ^...$ in dag value '%s'\n", vptr);
+				return 0;
+			}
+			ptr++;
 		}
 		*ptr = 0;
 		ptr = trim_string(ptr+1);
@@ -814,6 +903,7 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 			printf("lhs: "); print_dg(lhs); printf("\n");
 			printf("rhs: "); print_dg(rhs); printf("\n");
 		}
+		_current_building_type = building_type;
 		if(0 != unify_dg_infrom(res = copy_dg(lhs), copy_dg(rhs)))
 		{
 			fprintf(stderr, "tdl: requested unification failed\n");
@@ -822,12 +912,14 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 #endif
 			printf("lhs: "); print_dg(lhs); printf("\n");
 			printf("rhs: "); print_dg(rhs); printf("\n");
+			_current_building_type = NULL;
 			return 0;
 		}
 		else if(loud_noises)
 		{
 			printf("res: "); print_dg(res); printf("\n");
 		}
+		_current_building_type = NULL;
 		return res;
 	}
 	else return structify(R, str);
@@ -840,7 +932,7 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 	struct dagify_record	R;
 
 	R.ncorefs=0;
-	R.corefs = 0;
+	R.corefs = NULL;
 	R.current_pathlen = 0;
 
 	dg = rdagify(&R, str, building_type);
@@ -1045,7 +1137,6 @@ int	load_grammar_top(char *toptdl)
 		*strrchr(grammar_dir, '/') = 0;
 	else grammar_dir = ".";
 
-	tdlstatus = "grammar";
 	load_tdl(toptdl);
 #ifdef SLEX
 	tdlstatus = "lex-entry";
@@ -1059,6 +1150,8 @@ int	load_grammar_top(char *toptdl)
 	if(load_lexicon())exit(-1);
 	if(load_instances())exit(-1);
 	if(load_labels())exit(-1);
+	if(load_token_mapping_rules())exit(-1);
+	if(load_lexical_filtering_rules())exit(-1);
 
 	number_strings();
 
@@ -1081,22 +1174,30 @@ int load_grammar(char	*path)
 
 	clear_slab();
 	tdl_hash = hash_new("tdl type definitions");
-	tdlstatus = "config";
+
+	tdl_push_status("config");
 	load_tdl(path);
-	tdlstatus = 0;
+	tdl_pop_status();
 
 	init_fnames();
 	load_conf();
-	load_version(get_conf_path(confdir, "version"));
-	load_fsr_preprocessor(get_conf_path(confdir, "preprocessor"));
-	load_expedients(get_conf_path(confdir, "generation-ignore-signs"));	// before grammar loading so the semindex knows how to build
-	load_grammar_top(get_conf_path(confdir, "grammar-top"));
-	load_vpm(get_conf_path(confdir, "variable-property-mapping"));
-	load_mem(get_conf_path(confdir, "maxent-model"));
+	load_version(get_conf_file_path(confdir, "version"));
+	load_preprocessor(confdir);
+	load_expedients(get_conf_file_path(confdir, "generation-ignore-signs"));	// before grammar loading so the semindex knows how to build
+	load_grammar_top(get_conf_file_path(confdir, "grammar-top"));
 
-	g_loaded = 1;	// make unify shut up about failures
+	// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...
+	tdl_push_status("tree-node-label");
+	load_tdl(get_conf_file_path(confdir, "parse-node-labels"));
+	tdl_pop_status();
+
+	load_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
+	load_mem(get_conf_file_path(confdir, "maxent-model"));
+
 	setup_rule_filter();
-	g_loaded = 0;
+
+	// make sure we have complete restrictor sets in case recent activity has added new features...
+	load_restrictors();
 
 	// make sure none of the grammar is auto-freed when the first parse is over
 	free_tdl();

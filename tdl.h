@@ -12,3 +12,7 @@ int	process_tdl_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	
 //int	iterate_tdl_dgs(char	*path, int	(*callback)(char	*rhs, struct dg	*dg));
 //int	iterate_tdl_types(char	*path);
 //int	iterate_tdl_lex(char	*path);
+
+char	*get_conf(char	*lhs);
+char	*get_conf_unq(char	*lhs);
+char	*get_conf_file_path(char	*dir, char	*lhs);
