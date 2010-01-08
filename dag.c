@@ -50,7 +50,7 @@ void	commit_slab()
 		if(ftruncate(freeze_fd, slabu)) { perror("ftruncate to final length"); exit(-1); }
 		if(msync(freeze_point, slabu, MS_ASYNC)) { perror("msync"); exit(-1); }
 		close(freeze_fd);
-		freeze_next = 0;
+		freeze_next = NULL;
 	}
 	else if(debug_level) { printf("permanent "); print_slab_stats(); }
 	currslabsize = SLAB_SIZE;
