@@ -19,6 +19,7 @@ extern struct type	**types;
 
 struct type	*get_top();
 struct type	*lookup_type(char	*name);
+struct type	*add_string(char	*name);
 char	*trim_string(char	*str);
 int	descendent_of(int	dec, struct type	*of);
 void	inval_thash();
@@ -29,6 +30,7 @@ int		load_types();
 void	wellform(struct dg	*d, char	*typename);
 void	print_glb_stats();
 struct type	*temporary_string_type(char *string);
+struct dg	*type_dg(char		*name);
 
 struct type	*most_general_type_for_feat(int	feat);
 
@@ -36,5 +38,6 @@ void recover_typehash(void *frozen);
 void *freeze_typehash();
 
 struct type	*glb(struct type	*a, struct type	*b);
+struct type	*lub(struct type	*a, struct type	*b);
 
 #endif

@@ -15,7 +15,6 @@ int		nstrings;
 struct type	**strings;
 
 struct type	*get_top() { return types[0]; }
-struct type	*add_string(char	*name);
 
 struct type	*strtype = 0;
 
@@ -23,6 +22,7 @@ struct type	*strtype = 0;
 static struct type	**typehash;
 
 extern unsigned int generation;
+extern int g_loaded;
 
 void	th_init()
 {
@@ -84,27 +84,26 @@ struct type	*th_look(char	*name)
 {
 	unsigned int	h = thash(name), i;
 
-	if(!typehash)return 0;
+	if(!typehash)return NULL;
 
 	for(i=0;i<THSIZE;i++)
 	{
 		if(typehash[(h+i)%THSIZE] && !strcasecmp(typehash[(h+i)%THSIZE]->name, name))
 			return typehash[(h+i)%THSIZE];
-		if(!typehash[(h+i)%THSIZE])return 0;
+		if(!typehash[(h+i)%THSIZE])return NULL;
 	}
-	return 0;
+	return NULL;
 }
 
 struct type	*lookup_type(char	*name)
 {
 	int	i;
 
-	if(name[0]=='"' || name[0]=='\'')
+	if(name[0]=='"' || name[0]=='\'' || name[0]=='^')
 	{
 		if(!strcmp(name, "\"\\\"\""))strcpy(name, "\"\"\"");
 
-		if(name[0]=='\'')
-			name[0]='"';	// elsewhere in the code we assume strings start with ".
+		name[0]='"';	// elsewhere in the code we assume strings start with ".
 		// auto-add strings. this does a lookup too.
 		return add_string(name);
 	}
@@ -113,7 +112,7 @@ struct type	*lookup_type(char	*name)
 	else for(i=0;i<ntypes;i++)
 		if(!strcasecmp(types[i]->name, name))
 			return types[i];
-	return 0;
+	return NULL;
 }
 
 void	lui_type(char	*name)
@@ -206,9 +205,10 @@ struct type	*add_string(char	*name)
 	}
 	// i is (conveniently) the right place to insert
 
-	t = calloc(sizeof(struct type), 1);
-	nstrings++;
+	if(g_loaded)
+		return temporary_string_type(name);
 
+	nstrings++;
 	if(FROZEN(strings))
 	{
 		struct type **str = malloc(sizeof(struct type*)*nstrings);
@@ -216,6 +216,8 @@ struct type	*add_string(char	*name)
 		strings = str;
 	}
 	else strings = realloc(strings, sizeof(struct type*) * nstrings);
+
+	t = calloc(sizeof(struct type), 1);
 
 	memmove(strings+i+1, strings+i, sizeof(struct type*) * (nstrings-1-i));
 	strings[i] = t;
@@ -596,7 +598,9 @@ void	wellform(struct dg	*d, char	*typename)
 					fprintf(stderr, "%s ", fnames[wfpath[j]]);
 				fprintf(stderr, "\n");
 				fprintf(stderr, "reason: unable to unify with type `%s'\n", t->name);
+#ifdef	UNIFY_PATHS
 				unify_backtrace();
+#endif
 				printf("partly unified dag fragment from entity to be wellformed:\n");
 				print_dg(arcs[i]);printf("\n");
 				printf("dag type to be wellformed:\n");
@@ -667,4 +671,24 @@ int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 
 	run_task("processing constraints...", constrain_glbs_and_wellformedness);
 	return 0;
+}
+
+
+struct type	*lub(struct type	*a, struct type	*b)
+{
+	if(a==b)return a;
+
+	int	tn = a->tnum;
+	if(b->tnum < tn)tn = b->tnum;
+
+	if(a->name[0]=='"')return lub(strtype, b);
+	if(b->name[0]=='"')return lub(a, strtype);
+	while(tn >= 0)
+	{
+		if(descendent_of(a->tnum, types[tn]))
+			if(descendent_of(b->tnum, types[tn]))
+				return types[tn];
+		tn--;
+	}
+	assert(!"no upper bound found");
 }
