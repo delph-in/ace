@@ -232,7 +232,7 @@ struct qc	*extract_qc(struct dg	*d)
 	struct dg	*stack[64];
 	static int	labels[1024];
 
-	if(gen_qc)return 0;
+	if(gen_qc)return NULL;
 
 	if(!init)
 	{
