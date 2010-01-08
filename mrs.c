@@ -106,6 +106,12 @@ static char	*parse_word(char	**P, int advance)
 static inline void	*slab_malloc(int l) { if(l%4)l += (4-(l%4)); return slab_alloc(l); }
 static inline void	*slab_calloc(int a, int b) { int l = a*b; void *p = slab_malloc(l); bzero(p, l); return p; }
 
+int	parse_mrs_int(char	**P)
+{
+	char	*c = parse_word(P, 1);
+	return atoi(c);
+}
+
 struct mrs_var	*parse_mrs_const(struct mrs_vlist *vlist, char	**P)
 {
 	char	*c = parse_word(P, 1);
@@ -287,6 +293,8 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		while((word=parse_word(P,1)) && strcmp(word,"]"))
 		{
 			if(!strcmp(word, "LBL:"))ep->lbl = parse_mrs_var(vlist, P);
+			else if(!strcmp(word, "CFROM:"))ep->cfrom = parse_mrs_int(P);
+			else if(!strcmp(word, "CTO:"))ep->cto = parse_mrs_int(P);
 			else
 			{
 				struct mrs_ep_role	*role;
@@ -408,6 +416,21 @@ struct mrs_var	*mrs_find_ep_role(struct mrs_ep	*ep, char	*role)
 	return 0;
 }
 
+void	mrs_crange_for_x(struct mrs	*m, struct mrs_var	*x, int	quantified, int	*From, int	*To)
+{
+	int	i;
+	*From = *To = -1;
+	for(i=0;i<m->nrels;i++)
+	{
+		struct mrs_ep	*ep = m->rels+i;
+		if(mrs_find_ep_role(ep, "ARG0") != x)continue;
+		if(!quantified && strstr(ep->pred, "_q_"))continue;
+		if(*From==-1 || *From>ep->cfrom)*From = ep->cfrom;
+		if(*To==-1 || *To<ep->cto)*To = ep->cto;
+	}
+}
+
+
 void	sprint_mrs_var(char	*str, struct mrs_var	*var)
 {
 	int	i;
@@ -461,7 +484,7 @@ void	print_mrs(struct mrs	*mrs)
 	{
 		struct mrs_ep	*ep = mrs->rels+i;
 		int				j;
-		printf("%c[ %s LBL: ", mrs_tab, ep->pred); print_mrs_var(ep->lbl);
+		printf("%c[ %s CFROM: %d CTO: %d LBL: ", mrs_tab, ep->pred, ep->cfrom, ep->cto); print_mrs_var(ep->lbl);
 		for(j=0;j<ep->nargs;j++)
 			{ printf(" %s: ", ep->args[j].name);
 				if(ep->args[j].value)print_mrs_var(ep->args[j].value);
@@ -527,14 +550,16 @@ int pred_subsumes(char *in, char *out)
 	tin = lookup_type(in);
 	if(!tin)
 	{
-		fprintf(stderr, "no such predicate type `%s' (when subsume(%s,%s) called)\n", in, in, out);
+		fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", in, in, out);
+		return 0;
 		exit(-1);
 	}
 	if(out[0]=='"')return descendent_of(strtype->tnum, tin);
 	tout = lookup_type(out);
 	if(!tout)
 	{
-		fprintf(stderr, "no such predicate type `%s' (when subsume(%s,%s) called)\n", out, in, out);
+		fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", out, in, out);
+		return 0;
 		exit(-1);
 	}
 	return descendent_of(tout->tnum, tin);
@@ -657,5 +682,4 @@ int mrs_subsumes1(struct mrs *in, struct mrs *out, int hci, int *vmap, char *use
 	}
 	return 0;
 }
-
 #endif

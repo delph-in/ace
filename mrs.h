@@ -34,8 +34,8 @@ struct mrs_ep
 	int			nargs:15;
 	int			active:1;	// used in semantic lookup enumeration stage
 	unsigned	epnum:16;	// so we can just pass mrs_ep's around and know their ids
-
 	struct dg	*dg;
+	int	cfrom, cto;
 };
 
 struct mrs_hcons
@@ -84,5 +84,7 @@ void		*freeze_vpm();
 void		recover_vpm(void *vpm);
 struct mrs_var	*internal_to_external_mrs_var(struct mrs_var	*vin);
 struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin);
+
+void	mrs_crange_for_x(struct mrs	*m, struct mrs_var	*x, int	quantified, int	*From, int	*To);
 
 #endif
