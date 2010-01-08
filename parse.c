@@ -10,6 +10,9 @@
 #include	"morpho.h"
 #include	"mrs.h"
 #include	"unpack.h"
+#include	"token.h"
+#include	"lattice-mapping.h"
+#include	"lexical-parse.h"
 
 extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trace, used_total, pused_total;
 extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only;
@@ -27,9 +30,13 @@ static int	parse_process_edge(struct edge	*e)
 	static struct edge	**list = 0;
 	static int			alist = 0;
 
-	for(i=0;i<e->have;i++)
-		if(e->daughters[i]->frozen==1)
-			return 0;
+	if(e->daughters)
+		for(i=0;i<e->have;i++)
+			if(e->daughters[i]->frozen==1)
+			{
+				//printf("NOT giving edge #%d a chance to try to pack; daughter[%d] = edge #%d was frozen\n", e->id, i, e->daughters[i]->id);
+				return 0;
+			}
 
 #ifdef	LEVEL_TIMER
 	if(!e->lex && (e->to-e->from != level))
@@ -100,6 +107,7 @@ static int	parse_process_edge(struct edge	*e)
 			}
 		}
 	}
+	//printf(" edge #%d found %d potential neighbors\n", e->id, nlist);
 
 	if(!nlist)return 0;
 
@@ -233,7 +241,37 @@ void	halftime_analysis()
 		printf("	left sibling could be %s\n", rules[i]->name);
 }
 
-int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
+int	prepare_parse_chart(struct lattice	*lexical_chart)
+{
+	sort_lattice(lexical_chart);
+
+	int	nwords = lexical_chart->lattice_vertex_id_gen - 1;
+	//printf("... setting nwords = %d\n", nwords);
+
+	// setup the chart
+	clear_chart(nwords+1);
+
+	// put lexical edges into agenda
+	int i;
+	for(i=0;i<lexical_chart->nedges;i++)
+	{
+		struct lattice_edge	*le = lexical_chart->edges[i];
+		assert(le->edge != NULL);
+		if(! edge_is_ready_for_syntax(le->edge))continue;
+		le->edge->from = le->from->id;
+		le->edge->to = le->to->id;
+		add_agenda(le->edge);
+	}
+
+	// put syntax rules into agenda
+	//if(rtried)free(rtried);
+	//rtried = calloc(sizeof(int),nrules);
+	agenda_rules(nwords);
+
+	return nwords;
+}
+
+int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 {
 	int		i, count, didsent = 0, cforest;
 	int		num_parses = 0, num_entries;
@@ -243,15 +281,29 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 	struct edge	*edge;
 	clock_t	start = clock();
 
-	// setup the chart
-	clear_chart(nwords+1);
-	if(lexical_lookup(nwords, lemmas, forms)) { fprintf(stderr, "NOTE: lexical coverage gap\n");  return -1; }
-	if(reduce_chart(nwords, lemmas)) { fprintf(stderr, "NOTE: post reduction gap\n"); return -1; }
+	// a starting place for main-chart edge IDs
+	reset_edges();
 
-	//if(rtried)free(rtried);
-	//rtried = calloc(sizeof(int),nrules);
+	// setup a token lattice and do token mapping
+	struct lattice	*token_chart = build_token_chart(nwords, words, cfrom, cto);
+	if(!token_chart)return -1;
+	apply_token_mapping(token_chart);
 
-	agenda_rules(nwords+1);
+	// do lexical lookup
+	struct lattice	*lexical_chart = lexical_lookup_into_chart(token_chart);
+	if(!lexical_chart)return -1;
+
+	// do lexical parsing
+	lexical_parse_lattice(lexical_chart);
+
+	// do lexical filtering
+	apply_lexical_filtering(lexical_chart);
+
+	// setup the main parse chart
+	nwords = prepare_parse_chart(lexical_chart);
+
+	//if(lexical_lookup_into_chart(token_chart)) { fprintf(stderr, "NOTE: lexical coverage gap\n");  return -1; }
+	if(reduce_chart(nwords)) { fprintf(stderr, "NOTE: post reduction gap\n"); return -1; }
 
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
@@ -315,7 +367,7 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 	{
 		if(num_parses)
 			output_lui_trees(cells+chart_size-1, sentence, best_only, 0);
-		else output_lui_chart(lemmas);
+		else {}//output_lui_chart(words);
 	}
 
 	used_total += used_edges;
@@ -327,27 +379,28 @@ int	parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 		//extern long long ndecomposed;
 		//static long long ond = 0;
 		if(!f)f = fopen("/tmp/times", "w");
-		fprintf(f, "%d	%d	%f	%f	%f	%s\n", nwords, num_parses, t_setup, t_forest, t_unpack/*, (int)(ndecomposed - ond), passive_edges*/, sentence);
+		fprintf(f, "%d	%d	%f	%f	%f	%s\n", nwords, num_parses, t_setup, t_forest, t_unpack, sentence);
 		//ond = ndecomposed;
 		fflush(f);
 	}
 
-	if(do_itsdb)itsdb_report(nwords, lemmas, num_parses, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
+	if(do_itsdb)itsdb_report(nwords, words, num_parses, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
 
 	return num_parses;
 }
 
-int		wcap[1024];
+//int		wcap[1024];
 char	*current_sentence = "(not initialized)";
 
-void	preprocess_line(char	*string, int	*Nwords, char	***Lemmas, char	***Forms);
+void	preprocess_line(char	*string, int	*Nwords, char	***Words, int	**CFrom, int	**CTo);
 
 int	parse_line(char	*line)
 {
 	char	copy[10240];
 	int	nparse = 0;
 	int	nwords = 0, i, j;
-	char	**forms, **lemmas, *p, *q;
+	int		*cfrom, *cto;
+	char	**words, *p, *q;
 	extern int preprocess_only;
 
 	timer();
@@ -368,12 +421,15 @@ int	check_mbs(char	*mbs);
 
 	strcpy(copy, line);
 
-	preprocess_line(copy, &nwords, &lemmas, &forms);
+	preprocess_line(copy, &nwords, &words, &cfrom, &cto);
 	if(preprocess_only)
 	{
-		for(i=0;i<nwords;i++)
-			printf("%s%s", i?" ":"", forms[i]);
-		printf("\n");
+		if(!inhibit_results)
+		{
+			for(i=0;i<nwords;i++)
+				printf("%s%s", i?" ":"", words[i]);
+			printf("\n");
+		}
 		goto finished;
 	}
 
@@ -381,22 +437,13 @@ int	check_mbs(char	*mbs);
 	{
 		fprintf(stderr, "NOTE: 0 readings, too many words (60+)\n");
 		if(!inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
-		return 0;
+		goto finished;
 	}
 
-	for(j=0;j<nwords;j++)
-	{
-		wcap[j] = isupper(forms[j][0]);
-		for(i=0;forms[j][i];i++)
-		{
-			forms[j][i] = tolower(forms[j][i]);
-		}
-		//if(j<=nwords-3)printf("FORM %s %s %s\n", forms[j], forms[j+1], forms[j+2]);
-	}
 	current_sentence = line;
 	level = 0;
 	timer();
-	nparse = parse(nwords, lemmas, forms, current_sentence);
+	nparse = parse(nwords, words, cfrom, cto, current_sentence);
 	if(nparse<=0 && !inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
 
 #ifdef	LEVEL_TIMER
@@ -405,14 +452,14 @@ int	check_mbs(char	*mbs);
 #endif
 
 	if(nparse==-1)fprintf(stderr, "NOTE: ignoring `%s'\n", current_sentence);
-	if(do_itsdb && nparse==-1)itsdb_report(nwords, lemmas, -1, 0);
+	if(do_itsdb && nparse==-1)itsdb_report(nwords, words, -1, 0);
 
 finished:
 	clear_mrs();
 	clear_slab();
-	for(i=0;i<nwords;i++)free(forms[i]);
-	free(forms);
-	for(i=0;i<nwords;i++)free(lemmas[i]);
-	free(lemmas);
+	for(i=0;i<nwords;i++)free(words[i]);
+	free(words);
+	free(cfrom);
+	free(cto);
 	return nparse;
 }

@@ -16,6 +16,7 @@
 #ifdef	POST
 #include	"post.h"
 #endif
+#include	"lattice-mapping.h"
 
 extern void		**oldslabs;
 extern int		noldslabs, aoldslabs, currslabsize;
@@ -28,18 +29,18 @@ void	*freeze_rule_filter();
 void	recover_rule_filter(void *rf);
 void	*freeze_conf();
 void	recover_conf(void	*vc);
-void	*freeze_fspp();
-void	recover_fspp(void	*ptr);
+void	*freeze_repp();
+void	recover_repp(void	*ptr);
 void	*freeze_instances();
 void	recover_instances(void	*ptr);
 
 extern char	*grammar_version, *grammar_dir;
 
 // copy all grammar objects to flat blocks
-extern int	ntypes, nlexemes, nrules, norules, ninstances, nfnames, nstrings;
+extern int	ntypes, nlexemes, nrules, norules, ninstances, nfnames, nstrings, ngeneric_les;
 extern struct type	**types;
 extern struct rule	**rules;
-extern struct lexeme	**lexemes;
+extern struct lexeme	**lexemes, **generic_les;
 extern struct orule	**orules;
 extern struct type	**strings;
 extern struct type	*strtype;
@@ -52,10 +53,10 @@ extern unsigned int generation;
 struct grammar
 {
 	char		message[128];
-	int		ntypes, nlexemes, nrules, norules, nfnames, nstrings;
+	int		ntypes, nlexemes, nrules, norules, nfnames, nstrings, ngeneric_les;
 	struct type	**types;
 	struct rule	**rules;
-	struct lexeme	**lexemes;
+	struct lexeme	**lexemes, **generic_les;
 	struct orule	**orules;
 	struct type	**strings;
 	char		**fnames;
@@ -69,9 +70,11 @@ struct grammar
 	void	*vpm;
 	void	*labels;
 	void	*conf;
-	void	*fspp;
+	void	*repp;
 	void	*instances;
 	void	*post;
+	void	*token_mapping_rules;
+	void	*lexical_filtering_rules;
 };
 
 extern void	*slab_alloc(int	len);
@@ -286,6 +289,13 @@ int	freeze_grammar()
 			lexemes[i]->stem[j] = strings[lexemes[i]->stem[j]->tnum];
 	}
 
+	for(i=0;i<ngeneric_les;i++)
+	{
+		if(generic_les[i]->dg)patch_dg(generic_les[i]->dg);
+		for(j=0;j<generic_les[i]->stemlen;j++)
+			generic_les[i]->stem[j] = FT(generic_les[i]->stem[j]);
+	}
+
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 
 	for(i=0;i<nrules;i++)rules[i] = freeze_rule(rules[i]);
@@ -298,6 +308,7 @@ int	freeze_grammar()
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 
 	for(i=0;i<nlexemes;i++)lexemes[i] = freeze_lexeme(lexemes[i]);
+	for(i=0;i<ngeneric_les;i++)generic_les[i] = freeze_lexeme(generic_les[i]);
 	freezer_note("lex-info");
 
 	for(i=0;i<nfnames;i++)fnames[i] = freeze_string(fnames[i]);
@@ -321,25 +332,32 @@ int	freeze_grammar()
 
 		if(lexemes[i]->dg)lexemes[i]->dg = copy_dg(lexemes[i]->dg);
 	}
+	for(i=0;i<ngeneric_les;i++)
+	{
+		if(generation > MAX_GEN_RESET)generation = 11;
+		if(generic_les[i]->dg)generic_les[i]->dg = copy_dg(generic_les[i]->dg);
+	}
 	freezer_note("lex-dgs");
 
 	G->ntypes = ntypes;
 	G->nrules = nrules;
 	G->norules = norules;
 	G->nlexemes = nlexemes;
+	G->ngeneric_les = ngeneric_les;
 	G->nfnames = nfnames;
 	G->nstrings = nstrings;
 	G->types = slab_alloc(sizeof(void*) * G->ntypes);	memcpy(G->types, types, sizeof(void*) * G->ntypes);
 	G->rules = slab_alloc(sizeof(void*) * G->nrules);	memcpy(G->rules, rules, sizeof(void*) * G->nrules);
 	G->orules = slab_alloc(sizeof(void*) * G->norules);	memcpy(G->orules, orules, sizeof(void*) * G->norules);
 	G->lexemes = slab_alloc(sizeof(void*) * G->nlexemes);	memcpy(G->lexemes, lexemes, sizeof(void*) * G->nlexemes);
+	G->generic_les = slab_alloc(sizeof(void*) * G->nlexemes);	memcpy(G->generic_les, generic_les, sizeof(void*) * G->ngeneric_les);
 	G->fnames = slab_alloc(sizeof(void*) * G->nfnames);	memcpy(G->fnames, fnames, sizeof(char*) * G->nfnames);
 	G->strings = slab_alloc(sizeof(void*) * G->nstrings);	memcpy(G->strings, strings, sizeof(void*) * G->nstrings);
 	G->typehash = freeze_typehash();
 	G->vpm = freeze_vpm();
 	G->labels = freeze_labels();
 	G->conf = freeze_conf();
-	G->fspp = freeze_fspp();
+	G->repp = freeze_repp();
 	G->instances = freeze_instances();
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
@@ -356,6 +374,10 @@ int	freeze_grammar()
 	G->post = slab_alloc(post_image_size());
 	post_freeze(G->post);
 #endif
+
+extern void	*token_mapping_rules, *lexical_filtering_rules;
+	G->token_mapping_rules = freeze_lattice_rule_set(token_mapping_rules);
+	G->lexical_filtering_rules = freeze_lattice_rule_set(lexical_filtering_rules);
 
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 
@@ -380,6 +402,7 @@ static int	load_freeze()
 
 	ntypes = G->ntypes;
 	nlexemes = G->nlexemes;
+	ngeneric_les = G->ngeneric_les;
 	nrules = G->nrules;
 	norules = G->norules;
 	nfnames = G->nfnames;
@@ -387,6 +410,7 @@ static int	load_freeze()
 
 	types = G->types;
 	lexemes = G->lexemes;
+	generic_les = G->generic_les;
 	rules = G->rules;
 	orules = G->orules;
 	strings = G->strings;
@@ -400,7 +424,7 @@ static int	load_freeze()
 
 	recover_rule_filter(G->rule_filter);
 	recover_typehash(G->typehash);
-	recover_fspp(G->fspp);
+	recover_repp(G->repp);
 	recover_conf(G->conf);
 	recover_instances(G->instances);
 	recover_labels(G->labels);
@@ -411,6 +435,13 @@ static int	load_freeze()
 #ifdef	POST
 	post_recover(G->post);
 #endif
+
+extern void	*token_mapping_rules;
+extern void	*lexical_filtering_rules;
+	token_mapping_rules = G->token_mapping_rules;
+	compile_lattice_rule_set(token_mapping_rules);
+	lexical_filtering_rules = G->lexical_filtering_rules;
+	compile_lattice_rule_set(lexical_filtering_rules);
 
 	for(i=0;i<256;i++)
 	{

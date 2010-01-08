@@ -15,6 +15,9 @@
 struct lexeme	**lexemes;
 int		nlexemes;
 
+struct lexeme	**generic_les;
+int		ngeneric_les;
+
 extern unsigned int	generation;
 
 extern int trace, gen_qc;
@@ -23,6 +26,10 @@ extern unsigned int require_ep_span;
 #define		SIMPLE_LEXICON
 
 struct dg	*constrain_lex_rels(struct dg *dg, struct dg *rels);
+
+// TODO: make this accept the dg of the first TOKEN that will be unified in
+// ... that will allow rejection of most generic LEs without forming a full lexical edge
+// ... might have to store a complete wellformed dag for each generic LE to make that work optimally?
 
 struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 {
@@ -77,13 +84,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 	edge->from = i;
 	edge->to = i+len;
 	edge->lex = lex;
-	edge->qc = gen_qc?0:extract_qc(edge->dg);
-
-	if(trace)
-	{
-		printf("added lexeme `%s' = #%d\n", lex->word, edge->id);
-		if(trace>1){print_dg(edge->dg); printf("\n\n");}
-	}
+	edge->qc = gen_qc?NULL:extract_qc(edge->dg);
 
 	return edge;
 }
@@ -235,8 +236,9 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
 struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk) { return 0; }
 #endif
 
-int	wstrcmp(char	*a, char	*b)
+int	lex_strcmp(char	*a, char	*b)
 {
+	return strcasecmp(a, b);
 	while(*a)if(*b++!=*a++)return a[-1]-b[-1];
 	if(*b)return -*b;
 	return 0;
@@ -252,7 +254,7 @@ int	visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex))
 	for(i=0,j=nlexemes-1;i<=j;)
 	{
 		k = (i+j)/2;
-		r = wstrcmp(lexemes[k]->stem[0]->name, stemcmp);
+		r = lex_strcmp(lexemes[k]->stem[0]->name, stemcmp);
 		if(r==0)break;
 		if(r<0)i = k+1;
 		else j = k-1;
@@ -260,9 +262,9 @@ int	visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex))
 	if(r==0)
 	{
 		i=k;
-		for(i=k;i<nlexemes && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
+		for(i=k;i<nlexemes && !lex_strcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
 			num += visitor(lexemes[i]);
-		for(i=k-1;i>=0 && !wstrcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
+		for(i=k-1;i>=0 && !lex_strcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
 			num += visitor(lexemes[i]);
 	}
 	return num;
@@ -477,7 +479,7 @@ void print_lexeme(char *name)
 	}
 }
 
-void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
+struct lexeme	*make_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 {
 	struct lexeme	*l = malloc(sizeof(struct lexeme));
 	struct dg	*stem, *str, *synsem, *lkeys, *keyrel, *pred, *compkey, *ocompkey;
@@ -488,9 +490,6 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 	// XXX hack!
 
 	if(synsemfeat==-1)init_fnums();
-	nlexemes++;
-	lexemes = realloc(lexemes, sizeof(struct lexeme)*nlexemes);
-	lexemes[nlexemes-1] = l;
 	l->word = strdup(word);
 	l->dg = dg;
 	l->stemlen = 0;
@@ -498,6 +497,11 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 	l->lextype = type;
 	l->pred = 0;
 	l->select = 0;
+
+	// look up a few interesting ERG-specific paths in lexemes:
+	// SYNSEM.LKEYS.COMPKEY is a predsort that the lexeme requires to be present elsewhere
+	// SYNSEM.LKEYS.OCOMPKEY is a predsort that the lexeme requires to be present elsewhere
+	// SYNSEM.LKEYS.KEYREL.PRED is a predsort that the lexeme provides to satisfy another
 
 	synsem = dg_hop(fulldg, synsemfeat);
 	if(synsem)
@@ -559,6 +563,16 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 		fprintf(stderr, "lexeme `%s' has open ended stem list!\n", word);
 		exit(-1);
 	}
+
+	return l;
+}
+
+void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
+{
+	struct lexeme	*l = make_lexeme(word, dg, type, fulldg);
+	nlexemes++;
+	lexemes = realloc(lexemes, sizeof(struct lexeme)*nlexemes);
+	lexemes[nlexemes-1] = l;
 
 #ifdef	SIMPLE_LEXICON
 	simplify_lexeme(l);
@@ -637,6 +651,17 @@ int	study_lexicon(char	*lhs, struct dg	*dg)
 	return 0;
 }
 
+int	study_generic_le(char	*name, struct dg	*dg)
+{
+	wellform(dg, name);
+	//printf("generic_le '%s'\n", name);
+	struct lexeme	*l = make_lexeme(name, dg, dg->xtype, dg);
+	ngeneric_les++;
+	generic_les = realloc(generic_les, sizeof(struct lexeme)*ngeneric_les);
+	generic_les[ngeneric_les-1] = l;
+	return 0;
+}
+
 int	lexcomp(const void	*a, const void	*b)
 {
 	const struct lexeme	*la = *(const struct lexeme**)a, *lb = *(const struct lexeme**)b;
@@ -644,7 +669,7 @@ int	lexcomp(const void	*a, const void	*b)
 
 	if(la->stemlen==0)return -1;
 	if(lb->stemlen==0)return 1;
-	res = strcmp(la->stem[0]->name, lb->stem[0]->name);
+	res = strcasecmp(la->stem[0]->name, lb->stem[0]->name);
 	if(res)return res;
 	else return strcmp(la->word, lb->word);
 }
@@ -666,6 +691,12 @@ int	load_lexicon()
 		(tv2.tv_sec - tv1.tv_sec) + 0.000001*(tv2.tv_usec-tv1.tv_usec));
 
 	qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
+	show_task_name("generic lexemes");
+	if(process_tdl_dgs_status("generic-lex-entry", study_generic_le))
+	{
+		fprintf(stderr, "lexicon: unable to load generics, bailing out.\n");
+		exit(-1);
+	}
 	show_task_name("simple lexemes");
 	printf("%d / %d = %.2f%%\n", nsimpleform, nlexemes, 100*(float)nsimpleform / nlexemes);
 	return 0;

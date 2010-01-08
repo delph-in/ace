@@ -15,6 +15,15 @@ char		*g_list_type;
 char		*g_null_type;
 char		*g_diff_list_type;
 
+struct path	*chart_dependencies_from, *chart_dependencies_to;
+int			nchart_dependencies;
+
+struct path	token_form_path, token_from_path, token_to_path, token_id_path, token_postags_path, token_posprobs_path;
+struct path	lex_tokens_list_path, lex_tokens_last_path;
+struct path	lattice_mapping_input_path, lattice_mapping_output_path, lattice_mapping_context_path, lattice_mapping_position_path;
+
+char		*token_type;
+
 struct dg	*dg_path(struct dg	*dg, struct path	p)
 {
 	int i;
@@ -71,23 +80,28 @@ struct path	make_path(int count, ...)
 
 extern char	*get_conf(char	*lhs);
 
-static struct path get_conf_path(char	*lhs)
-{
-	char		*str = get_conf(lhs);
-	if(!str)
-	{
-		fprintf(stderr, "avm path `%s' not specified in configuration!\n", lhs);
-		exit(-1);
-	}
-	return path_from_string(str);
-}
-
-struct path	path_from_string(char	*str)
+struct path slab_string_to_path(char	*str)
 {
 	struct path	p;
 
 	p.count = 0;
-	p.fnums = 0;
+	p.fnums = NULL;
+
+	for(str = strtok(freeze_string(str), " \t");str;str = strtok(NULL, " \t"))
+	{
+		p.count++;
+		p.fnums = slab_realloc(p.fnums, sizeof(int)*(p.count-1), sizeof(int) * p.count);
+		p.fnums[p.count-1] = lookup_fname(str);
+	}
+	return p;
+}
+
+struct path	string_to_path(char	*str)
+{
+	struct path	p;
+
+	p.count = 0;
+	p.fnums = NULL;
 
 	str = strdup(str);
 	for(str = strtok(str, " \t");str;str = strtok(NULL, " \t"))
@@ -98,6 +112,17 @@ struct path	path_from_string(char	*str)
 	}
 	free(str);
 	return p;
+}
+
+static struct path get_conf_path(char	*lhs)
+{
+	char		*str = get_conf(lhs);
+	if(!str)
+	{
+		fprintf(stderr, "avm path `%s' not specified in configuration!\n", lhs);
+		exit(-1);
+	}
+	return string_to_path(str);
 }
 
 struct conf
@@ -113,6 +138,15 @@ struct conf
 	struct path	lex_pred_path;
 	struct path	rule_rels_path;
 	struct path	extract_mrs_path;
+
+	struct path	*chart_dependencies_to, *chart_dependencies_from;
+	int			nchart_dependencies;
+
+	char	*token_type;
+	struct path	token_form_path, token_from_path, token_to_path,
+		token_id_path, token_postags_path, token_posprobs_path;
+	struct path	lex_tokens_list_path, lex_tokens_last_path;
+	struct path	lattice_mapping_input_path, lattice_mapping_output_path, lattice_mapping_context_path, lattice_mapping_position_path;
 
 	char	*deleted_daughters;
 	char	*parsing_packing;
@@ -144,6 +178,30 @@ void	*freeze_conf()
 	c->lex_pred_path = freeze_path(lex_pred_path);
 	c->rule_rels_path = freeze_path(rule_rels_path);
 	c->extract_mrs_path = freeze_path(extract_mrs_path);
+	c->lex_tokens_list_path = freeze_path(lex_tokens_list_path);
+	c->lex_tokens_last_path = freeze_path(lex_tokens_last_path);
+	c->token_form_path = freeze_path(token_form_path);
+	c->token_from_path = freeze_path(token_from_path);
+	c->token_to_path = freeze_path(token_to_path);
+	c->token_id_path = freeze_path(token_id_path);
+	c->token_postags_path = freeze_path(token_postags_path);
+	c->token_posprobs_path = freeze_path(token_posprobs_path);
+	c->token_type = freeze_string(token_type);
+
+	c->lattice_mapping_input_path = freeze_path(lattice_mapping_input_path);
+	c->lattice_mapping_output_path = freeze_path(lattice_mapping_output_path);
+	c->lattice_mapping_context_path = freeze_path(lattice_mapping_context_path);
+	c->lattice_mapping_position_path = freeze_path(lattice_mapping_position_path);
+
+	int i;
+	for(i=0;i<nchart_dependencies;i++)
+	{
+		chart_dependencies_from[i] = freeze_path(chart_dependencies_from[i]);
+		chart_dependencies_to[i] = freeze_path(chart_dependencies_to[i]);
+	}
+	c->chart_dependencies_from = freeze_block(chart_dependencies_from, sizeof(struct path)*nchart_dependencies);
+	c->chart_dependencies_to = freeze_block(chart_dependencies_to, sizeof(struct path)*nchart_dependencies);
+	c->nchart_dependencies = nchart_dependencies;
 
 	c->deleted_daughters = freeze_block(deleted_daughters, restrictor_size);
 	c->parsing_packing = freeze_block(parsing_packing, restrictor_size);
@@ -169,6 +227,25 @@ void	recover_conf(void	*vc)
 	rule_rels_path = c->rule_rels_path;
 	extract_mrs_path = c->extract_mrs_path;
 
+	nchart_dependencies = c->nchart_dependencies;
+	chart_dependencies_from = c->chart_dependencies_from;
+	chart_dependencies_to = c->chart_dependencies_to;
+
+	lex_tokens_list_path = c->lex_tokens_list_path;
+	lex_tokens_last_path = c->lex_tokens_last_path;
+	token_form_path = c->token_form_path;
+	token_from_path = c->token_from_path;
+	token_to_path = c->token_to_path;
+	token_id_path = c->token_id_path;
+	token_postags_path = c->token_postags_path;
+	token_posprobs_path = c->token_posprobs_path;
+	token_type = c->token_type;
+
+	lattice_mapping_position_path = c->lattice_mapping_position_path;
+	lattice_mapping_input_path = c->lattice_mapping_input_path;
+	lattice_mapping_output_path = c->lattice_mapping_output_path;
+	lattice_mapping_context_path = c->lattice_mapping_context_path;
+
 	deleted_daughters = c->deleted_daughters;
 	parsing_packing = c->parsing_packing;
 	generating_packing = c->generating_packing;
@@ -193,6 +270,25 @@ int	load_conf()
 	lex_pred_path = get_conf_path("lex-pred-path");
 	rule_rels_path = get_conf_path("rule-rels-path");
 	extract_mrs_path = get_conf_path("semantics-path");
+
+	lex_tokens_list_path = get_conf_path("lexicon-tokens-path");
+	lex_tokens_last_path = get_conf_path("lexicon-last-token-path");
+	token_form_path = get_conf_path("token-form-path");
+	token_from_path = get_conf_path("token-from-path");
+	token_to_path = get_conf_path("token-to-path");
+	token_id_path = get_conf_path("token-id-path");
+	token_postags_path = get_conf_path("token-postags-path");
+	token_posprobs_path = get_conf_path("token-posprobs-path");
+
+	lattice_mapping_input_path = get_conf_path("lattice-mapping-input-path");
+	lattice_mapping_output_path = get_conf_path("lattice-mapping-output-path");
+	lattice_mapping_context_path = get_conf_path("lattice-mapping-context-path");
+	lattice_mapping_position_path = get_conf_path("lattice-mapping-position-path");
+
+	token_type = get_conf("token-type")?:"token";
+
+	load_chart_dependencies(get_conf("chart-dependencies"));
+
 	recover_conf(freeze_conf());
 }
 
@@ -207,6 +303,17 @@ int check_conf_list(char	*key, char	*word)
 	return p?1:0;
 }
 
+void iterate_conf_list(char	*key, int	(*callback)(char	*word))
+{
+	int	hits = 0;
+	char	*list = get_conf(key), *p;
+	if(!list)return;
+	list = strdup(list);
+	for(p=strtok(list, " \t\n");p;p=strtok(0, " \t\n"))
+		if(callback(p))break;
+	free(list);
+}
+
 void	configure_rule(struct rule	*r)
 {
 	r->gen_ignore = 0;
@@ -217,4 +324,51 @@ void	configure_rule(struct rule	*r)
 	r->frag_only = check_conf_list("fragment-only-rules", r->name);
 	r->hyper = check_conf_list("hyper-active-rules", r->name);
 	r->pad = 0;
+}
+
+void	load_chart_dependencies(char	*depstring)
+{
+	char	*strings[1024];
+	int		nstrings = 0;
+
+	depstring = trim_string(depstring);
+	while(depstring && *depstring)
+	{
+		char	*str = depstring;
+		if(*str != '"')
+		{
+			fprintf(stderr, "chart-dependencies parameter must be a list of path-strings\n");
+			exit(-1);
+		}
+		depstring = strchr(str+1, '"');
+		if(!depstring)
+		{
+			fprintf(stderr, "chart-dependencies parameter had mismatched quotes\n");
+			exit(-1);
+		}
+		*depstring = 0;
+		depstring = trim_string(depstring+1);
+		strings[nstrings++] = trim_string(str+1);
+	}
+
+	if(nstrings % 2 != 0)
+	{
+		fprintf(stderr, "chart-dependencies parameter paths must be in pairs\n");
+		exit(-1);
+	}
+
+	nchart_dependencies = nstrings/2;
+	chart_dependencies_from = malloc(sizeof(struct path)*nchart_dependencies);
+	chart_dependencies_to = malloc(sizeof(struct path)*nchart_dependencies);
+	int	i;
+	for(i=0;i<nchart_dependencies;i++)
+	{
+		chart_dependencies_from[i] = string_to_path(strings[2*i + 0]);
+		chart_dependencies_to[i] = string_to_path(strings[2*i + 1]);
+		/*printf("chart dep:  ");
+		print_path(chart_dependencies_from[i]);
+		printf(" => ");
+		print_path(chart_dependencies_to[i]);
+		printf("\n");*/
+	}
 }

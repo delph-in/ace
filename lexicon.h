@@ -28,6 +28,9 @@ struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk);
 void		record_carg(struct edge	*le, char	*carg_str);
 struct lexeme	*get_lex_by_name(char *name);
 
+int		ngeneric_les;
+struct lexeme	**generic_les;
+
 // semantic index
 void	add_semantic_index(struct lexeme *l, struct dg *full, int which);
 int		add_lexemes_for_relation(int	x, char	*rel, int (*skolemize)(struct edge	*e, struct lexeme	*lex));

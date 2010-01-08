@@ -5,20 +5,22 @@
 #include	<wchar.h>
 #include	<ctype.h>
 
+#define	USE_GENERICS
+
 static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, char	*stem, int type);
 struct lexeme	*proper_noun_lex(char	*name);
 
-extern int	wcap[1024];
+//extern int	wcap[1024];
 
+#include	"conf.h"
 #include	"rule.h"
 #include	"chart.h"
 #include	"morpho.h"
 #include	"tdl.h"
 #include	"lexicon.h"
 #include	"freeze.h"
-#ifdef POST
-#include "post.h"
-#endif
+
+#include	"token.h"
 
 #define	MAX_ORTH_RULES	5
 
@@ -45,7 +47,7 @@ struct ochart
 void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule);
 void	unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int nrules, int *rnums);
 
-void add_orules(struct edge *le)
+void add_orules_to_chart_agenda(struct edge *le)
 {
 	int i, j;
 
@@ -142,38 +144,28 @@ void add_mwe_routes(struct edge *e, struct ochart_edge *pre, struct ochart_edge 
 
 char	*disable_signs = 0;
 
-int	lexical_lookup(int	nwords, char	**lemmas, char	**forms)
+int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, struct token	**tokens))
 {
-	struct ochart	*charts = slab_alloc(sizeof(struct ochart)*nwords);
-	int				i, j, k, cover[nwords];
-	char	**tags;
-	int		*unk;
+	int				i, j, k;
 
-	tags = malloc(sizeof(char*) * nwords);
-	unk = malloc(sizeof(int) * nwords);
-#ifdef	POST
-	post_tag_sequence(nwords, lemmas, tags, unk);
-#else
-	for(i=0;i<nwords;i++)
-	{
-		tags[i] = "NNP";
-		unk[i] = 1;
-	}
-#endif
-//	for(i=0;i<nwords;i++)printf("%s%s ", tags[i], unk[i]?"?":"");
-//	printf("\n");
+	sort_lattice(tc);
+	//print_token_chart(tc);
 
-	// compute all the orthography variations
-	bzero(charts, sizeof(struct ochart)*nwords);
-	bzero(cover, sizeof(int)*nwords);
-	for(i=0;i<nwords;i++)
+	// compute all the orthography variations of each token
+	for(i=0;i<tc->nedges;i++)
 	{
-		add_ochart_edge(0, charts+i, forms[i], 0);
-		for(j=0;j<charts[i].nedges;j++)
-			unfold_oroutes(charts[i].edges[j], charts[i].edges[j], 0, 0);
+		struct lattice_edge	*lat_e = tc->edges[i];
+		struct token	*t = lat_e->token;
+		t->oc = slab_alloc(sizeof(struct ochart));
+		bzero(t->oc, sizeof(struct ochart));
+		// compute all possible stems, with dynamic programming
+		add_ochart_edge(0, t->oc, t->string, 0);
+		// enumerate all possible ways of reaching each possible stem
+		for(j=0;j<t->oc->nedges;j++)
+			unfold_oroutes(t->oc->edges[j], t->oc->edges[j], 0, 0);
 		/*for(j=0;j<charts[i].nedges;j++)
 		{
-			printf("%s -> %s\n", forms[i], charts[i].edges[j]->form);
+			printf("%s -> %s\n", words[i], charts[i].edges[j]->form);
 			for(k=0;k<charts[i].edges[j]->north_routes;k++)
 			{
 				struct orth_route *r = charts[i].edges[j]->orth_routes+k;
@@ -185,72 +177,144 @@ int	lexical_lookup(int	nwords, char	**lemmas, char	**forms)
 		}*/
 	}
 
-	// do lexical lookup on each variation
-	for(i=0;i<nwords;i++)
+	// do lexical lookup on each variation of each token
+	for(i=0;i<tc->nedges;i++)
 	{
-		for(j=0;j<charts[i].nedges;j++)
+		struct lattice_edge	*lat_e = tc->edges[i];
+		struct token	*t = lat_e->token;
+		struct ochart	*oc = t->oc;
+		//printf("LEXICAL_LOOKUP on token:\n"); print_dg(t->dg); printf("\n");
+		for(j=0;j<oc->nedges;j++)
 		{
-			struct ochart_edge *e = charts[i].edges[j];
+			struct ochart_edge *e = oc->edges[j];
+			struct token	*mwe_trace[10];
 
-			int lex_adder(struct lexeme *lex)
+			int	mwe_lex_handler(struct lexeme	*lex, struct lattice_edge	*mwe_lat_e, int	pos)
+			{
+				struct token	*tok = mwe_lat_e->token;
+				int	nles = 0, i;
+				mwe_trace[pos] = tok;
+				if(pos < lex->stemlen-1)
+				{
+					// try to align one more token to lex[pos]
+					if(pos==0)
+					{
+						// the 0th position in MWEs can only have prefix orules
+						if(!is_type_only_oedge(e, or_prefix))return 0;
+					}
+					else if(pos < (lex->stemlen - 1))
+					{
+						// the inner positions in MWEs can't have any orules
+						char	stemcmp[1024];
+						sprintf(stemcmp, "\"%s\"", tok->string);
+						if(strcasecmp(lex->stem[pos]->name, stemcmp))return 0;
+					}
+					for(i=0;i<mwe_lat_e->to->nfollowers;i++)
+						nles += mwe_lex_handler(lex, mwe_lat_e->to->followers[i], pos+1);
+					return nles;
+				}
+				else
+				{
+					int	noroutes = 0;
+					struct oroute	*oroutes = NULL;
+
+					// the end position in MWEs can only have suffix orules
+					// see if there's a hypothesized form that can be reached just by suffixes
+					// and that matches the MWE's stem form
+					for(i=0;i<tok->oc->nedges;i++)
+					{
+						struct ochart_edge	*e2 = tok->oc->edges[i];
+						char	stemcmp[1024];
+						sprintf(stemcmp, "\"%s\"", e2->form);
+						if(strcasecmp(lex->stem[pos]->name, stemcmp))continue;
+						if(is_type_only_oedge(e2, or_suffix))
+						{
+							// yes, 'e2' represents a plausible analysis of
+							//   this token as the last part of this MWE
+							break;
+						}
+					}
+					if(i==tok->oc->nedges)return 0;	// nope.
+
+					// we have a full alignment of lex onto the token chart,
+					// specifically lex[k] => mwe_trace[k]
+					struct edge	*le = lexical_edge(lex, lat_e->from->id, mwe_lat_e->to->id - lat_e->from->id, 0);
+					// go through the analyses of the last token again and record all the possible oroutes
+					for(i=0;i<tok->oc->nedges;i++)
+					{
+						struct ochart_edge	*e2 = tok->oc->edges[i];
+						char	stemcmp[1024];
+						sprintf(stemcmp, "\"%s\"", e2->form);
+						if(strcasecmp(lex->stem[pos]->name, stemcmp))continue;
+						if(is_type_only_oedge(e2, or_suffix))
+						{
+							// yes, 'e2' represents a plausible analysis of
+							//   this token as the last part of this MWE
+							add_mwe_routes(le, e, e2);
+						}
+					}
+					if(install_tokens_in_le(le, mwe_trace) != 0)return 0;
+					edge_handler(le, mwe_trace);
+					return 1;
+				}
+			}
+			int lex_handler(struct lexeme *lex)
 			{
 				int k;
 				struct edge			*le = 0;
 				if(disable_signs && strstr(disable_signs, lex->word))return 0;
 				if(lex->stemlen!=1)
-				{
-					char *last = lex->stem[lex->stemlen-1]->name;
-					char stemcmp[1024];
-					if(!is_type_only_oedge(e, or_prefix))return 0;
-					if(lex->stemlen + i > nwords)return 0;
-					for(k=1;k<lex->stemlen-1;k++)
-					{
-						sprintf(stemcmp, "\"%s\"", forms[i+k]);
-						// no inflection allowed on inner elements of MWEs
-						if(strcasecmp(lex->stem[k]->name, stemcmp))
-							return 0;
-					}
-					for(k=0;k<charts[i+lex->stemlen-1].nedges;k++)
-					{
-						struct ochart_edge *f = charts[i+lex->stemlen-1].edges[k];
-						sprintf(stemcmp, "\"%s\"", f->form);
-						if(!strcasecmp(stemcmp, last) && is_type_only_oedge(f, or_suffix))
-						{
-							le = lexical_edge(lex, i, lex->stemlen, 0);
-							add_mwe_routes(le, e, f);
-							break;
-						}
-					}
-				}
+					return mwe_lex_handler(lex, lat_e, 0);
 				else
 				{
-					le = lexical_edge(lex, i, lex->stemlen, 0);
-					if(strcasecmp(forms[i], lemmas[i]))
-						record_carg(le, lemmas[i]);
+					le = lexical_edge(lex, lat_e->from->id, lat_e->to->id-lat_e->from->id, 0);
 					le->north_routes = e->north_routes;
 					le->orth_routes = e->orth_routes;
-				}
-				if(le)
-				{
-					for(k=0;k<lex->stemlen;k++)
-						cover[i+k]++;
-					add_agenda(le);
-					add_orules(le);
-					//printf("added lexeme `%s' at %d\n", lex->word, i);
+					if(install_tokens_in_le(le, &t) != 0)return 0;
+					edge_handler(le, &t);
 					return 1;
 				}
-				else return 0;
 			}
-			visit_lexicon(e->form, lex_adder);
+			visit_lexicon(e->form, lex_handler);
 		}
+#ifdef	USE_GENERICS
+		char	*carg = get_token_carg(t);
+		//printf("carg='%s' for token; trying generic entries\n", carg);
+		struct ochart_edge	*carg_e = NULL;
+		for(j=0;j<oc->nedges;j++)if(!strcasecmp(carg, oc->edges[j]->form))carg_e = oc->edges[j];
+		//printf(" ... carg_e = %p\n", carg_e);
+		if(carg_e)
+		{
+			for(j=0;j<ngeneric_les;j++)
+			{
+				/*printf(" .. trying generic '%s', dag: ", generic_les[j]->word);
+				print_dg(generic_les[j]->dg); printf("\n");
+				printf(" .. token dag: ");
+				print_dg(t->dg);
+				printf("\n");*/
+				if(test_first_token_in_lex_dg(generic_les[j]->dg, t) != 0)
+				{
+					//fprintf(stderr, "TEST rejected generic '%s'\n", generic_les[j]->word);
+					continue;
+				}
+				struct edge	*le = lexical_edge(generic_les[j], lat_e->from->id, lat_e->to->id-lat_e->from->id, 0);
+				le->north_routes = carg_e->north_routes;
+				le->orth_routes = carg_e->orth_routes;
+				if(install_tokens_in_le(le, &t) != 0)continue;
+				//fprintf(stderr, "for carg '%s' and pos '%s', issued generic '%s'\n", carg, t->postag, le->lex->word);
+				edge_handler(le, &t);
+			}
+		}
+#endif
 	}
 
+/*
 #ifdef	UNKNOWN
 	for(i=0;i<nwords;i++)
 	{
 		if(cover[i] == 0)
 		{
-			char	*stem = freeze_string(forms[i]);
+			char	*stem = freeze_string(words[i]);
 			int		l;
 			struct edge *le;
 			while(stem[0]=='"' || stem[0]=='\'' || stem[0]=='[' || stem[0]=='(')stem++;
@@ -258,7 +322,7 @@ int	lexical_lookup(int	nwords, char	**lemmas, char	**forms)
 			while(l>=0 && (stem[l]=='"' || stem[l]=='\'' || stem[l]==']' || stem[l]==')' || stem[l]=='?' || stem[l]=='!' || stem[l]==',' || stem[l]=='.'))
 				l--;
 			stem[l+1] = 0;
-			//printf("NOTE: suffix removal from `%s' produced `%s'\n", forms[i], stem);
+			//printf("NOTE: suffix removal from `%s' produced `%s'\n", words[i], stem);
 			//for(j=0;j<charts[i].nedges;j++) printf(" choice `%s'\n", charts[i].edges[j]->form);
 			if(stem[0])
 			{
@@ -271,25 +335,16 @@ int	lexical_lookup(int	nwords, char	**lemmas, char	**forms)
 					le = unknown_lexical_edge(i, stem, tags[i], unk[i]);
 					le->north_routes = e->north_routes;
 					le->orth_routes = e->orth_routes;
-					add_agenda(le);
-					add_orules(le);
+					edge_handler(le);
 				}
 			}
 		}
 	}
 #endif
 	free(tags);
-	free(unk);
+	free(unk);*/
 
 	return 0;
-}
-
-int	*longer_rule_list(int nr, int *ru, struct orule	*or)
-{
-	int *r = slab_alloc(sizeof(int)*(nr+1));
-	memcpy(r+1,ru,sizeof(int)*nr);
-	r[0] = or->rule->rnum;
-	return r;
 }
 
 int	*longer_rule_list_rev(int nr, int *ru, struct orule	*or)
@@ -300,16 +355,23 @@ int	*longer_rule_list_rev(int nr, int *ru, struct orule	*or)
 	return r;
 }
 
+/* record that you can get to stem form 'e' from the 
+ * surface form by applying rules 'rnums' each in the backwards direction
+ */
 int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
 {
 	int i, j;
 
-	// see if this route is already packed on the edge
+	// see if this route is already recorded on the edge
+	// XXX can this actually happen?
 	for(i=0;i<e->north_routes;i++)
 	{
 		struct orth_route *r = e->orth_routes+i;
 		if(r->len == nrules && !memcmp(r->rules, rnums, sizeof(int)*nrules))
+		{
+			assert(!"duplicate oroute recorded");
 			return 0;
+		}
 	}
 
 	// check if it is doomed by transitive rule filter
@@ -336,6 +398,11 @@ int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
 	return 1;
 }
 
+/* enumerate all the paths of backwards rules that reach 'target'.
+ * 'visit' is an intermediate form, past which we've already determined
+ * a path of backwards rules leading to 'target'.
+ * so really we want to figure out how to get from start to 'visit'.
+ */
 void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int nrules, int *rnums)
 {
 	int i;
@@ -346,14 +413,29 @@ void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int n
 	for(i=0;i<visit->nparents;i++)
 	{
 		struct ochart_parent	*d = visit->parents+i;
-		int						*mnums = d->rule?longer_rule_list_rev(nrules, rnums, d->rule):0;
-		if(d->edge)unfold_oroutes(target, d->edge, nrules+1, mnums);
-		else record_oroute(target, nrules, rnums);
+		if(d->edge)
+		{
+			// we got here by applying d->rule backwards to d->edge
+			// recurse and see about ways to get to d->edge from the starting form.
+			assert(d->rule != NULL);
+			int		*mnums = longer_rule_list_rev(nrules, rnums, d->rule);
+			unfold_oroutes(target, d->edge, nrules+1, mnums);
+		}
+		else
+		{
+			// we're at the starting form;
+			// record the complete route to get here.
+			record_oroute(target, nrules, rnums);
+		}
 	}
 }
 
+/* record that you can reach the form 'daughter' from the form 'parent' by applying 'rule' backwards */
 void add_oparent(struct ochart_edge *daughter, struct ochart_edge *parent, struct orule *rule)
 {
+	int i;
+	for(i=0;i<daughter->nparents;i++)
+		if(daughter->parents[i].edge==parent && daughter->parents[i].rule == rule)return;
 	//if(parent)printf("add %p [`%s' %s] parent of %p `%s'\n", parent, parent->form, rule->rule->name, daughter, daughter->form);
 	daughter->nparents++;
 	daughter->parents = slab_realloc(daughter->parents,
@@ -363,10 +445,20 @@ void add_oparent(struct ochart_edge *daughter, struct ochart_edge *parent, struc
 	daughter->parents[daughter->nparents-1].rule = rule;
 }
 
+/* main orthographemic exploration system
+ *   on entry, we got to 'form' by applying 'rule' backwards to 'parent'
+ *   our task is to flush out the chart by producing all other forms
+ *   reachable from 'form' by applying more o-rules backwards
+ *
+ * note: we work in wchar_t's much of the time...
+ * note: 'parent' and 'rule' are either both NULL or both not NULL
+ */
 void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule)
 {
 	int	i;
 	struct ochart_edge *edge = 0;
+
+	assert( (parent==NULL && rule==NULL) || (parent!=NULL && rule!=NULL) );
 
 	// check for a compatible edge already in the chart
 	for(i=0;i<chart->nedges;i++)
