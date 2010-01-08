@@ -7,6 +7,8 @@
 #include	"dag.h"
 #include	"freeze.h"
 
+static void flat_print_dg(struct dg	*d);
+
 extern char	**fnames;
 extern char	*unify_restrictor, *copy_restrictor;
 void enable_trim(int trim);
@@ -497,11 +499,38 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 	t = glb(t1, t2);
 	if(!t)return -1;
 
-	if(t != t1 && t!= t2 && t->dg && t->dg->narcs)
+	if(t != t1 && t!= t2)
 	{
-		dagreset_c(t->dg);
-		extra = copy_dg_with_comp_arcs(t->dg);
-		dagreset_c(t->dg);
+		if(!t->dg && t->name[0]!='"' && !(t->name[0]=='G' && t->name[1]=='('))
+		{
+			extern struct type	*_current_building_type;
+			if(t != _current_building_type)
+			{
+				//printf(" .. possible extra glb constraints from type '%s' which hasn't been constrained yet. [ while unifying %s and %s ]\n", t->name, t1->name, t2->name);
+				if(_current_building_type)
+				{
+					//printf(" ... _current_building_type = %s\n", _current_building_type->name);
+					//printf(" ... going to try to go constrain that type while in the middle of unifying for this one...!\n");
+					struct type	*tmp = _current_building_type;
+					find_type(t->name, 1);
+					_current_building_type = tmp;
+				}
+				else
+				{
+					fprintf(stderr, "internal error: reached a non-string type with NULL dag\n");
+					exit(-1);
+				}
+			}
+		}
+		if(t->dg && t->dg->narcs)
+		{
+			dagreset_c(t->dg);
+			extra = copy_dg_with_comp_arcs(t->dg);
+			//printf(" .. extra glb constraint from type '%s'\n", t->name);
+			//flat_print_dg(extra);
+			//printf("\n");
+			dagreset_c(t->dg);
+		}
 	}
 	if(dg1->gen != generation)
 	{
@@ -821,8 +850,13 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 		}
 	}
 
-	if(t != t1 && t!= t2 && t->dg && t->dg->narcs)
+	if(t != t1 && t!= t2 && t->dg && t->dg->narcs
+		&& !(0
+		|| (t->name[0]=='G' && t->name[1]=='(')
+		))
 	{
+//		if(t->name[0]=='G' && t->name[1]=='(')
+//			printf("reached glbtype '%s' and will waste time unifying...\n", t->name);
 		if(t->dg->gen != generation)
 		{
 			extra = t->dg;
@@ -838,9 +872,11 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 			// it's REALLY obnoxious that we have to do this
 			extra = get_extra_type_dg(t);
 		}
+#ifdef	UNIFY_PATHS
 		uglb = extra->xtype;
 		//printf("applying glb constraint `%s'\n", uglb->name);
 		upathgl = upathl;
+#endif
 		if(unify1(dg1, extra))
 		{
 			if(!g_loaded)
@@ -850,7 +886,9 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 			}
 			return -1;
 		}
+#ifdef	UNIFY_PATHS
 		uglb = 0;
+#endif
 	}
 
 	return 0;
@@ -897,6 +935,16 @@ struct dg	*trim_copy(struct dg	*d)
 	return copy_dg_with_comp_arcs_ss(d, &ch);
 }
 
+void bump_generation()
+{
+	generation++;
+	if(generation==MAX_GEN)
+	{
+		fprintf(stderr, "ERROR: generation overflowed!\n");
+		exit(-1);
+	}
+}
+
 struct dg	*finalize_tmp(struct dg	*d, int trim)
 {
 	char		ch = 0;
@@ -906,12 +954,7 @@ struct dg	*finalize_tmp(struct dg	*d, int trim)
 	res = copy_dg_with_comp_arcs_ss(d, &ch);
 
 	if(!res)set_slabstate(&tmpstate);
-	generation++;
-	if(generation==MAX_GEN)
-	{
-		fprintf(stderr, "ERROR: generation overflowed!\n");
-		exit(-1);
-	}
+	bump_generation();
 
 	top_copies++;
 	return res;
@@ -1020,55 +1063,6 @@ static void dgmark(struct dg	*d)
 
 extern char	**fnames;
 
-static void	rprint_dg(struct dg	*d)
-{
-	int	i;
-	struct dg	**arcs;
-
-	d = p_dereference_dg(d);
-
-	if(d->copy)
-	{
-#ifdef	LP64
-		printf("<%lld>", (long)d->copy);
-#else
-		printf("<%ld>", (long)d->copy);
-#endif
-		return;
-	}
-
-	// multi-visited, give it a tag.
-	if(d->ncarcs>1)
-	{
-		d->copy = (struct dg*)(marker++);
-#ifdef	LP64
-		printf("<%lld>= ", (long)d->copy);
-#else
-		printf("<%ld>= ", (long)d->copy);
-#endif
-	}
-
-	//printf("(%p) ", d);
-	if(!d->narcs)
-	{
-		char	*tname = (d->gen==generation?d->type:d->xtype)->name;
-		if(tname[0]=='"' && tname[strlen(tname)-1]!='"')
-			printf("'%s", tname+1);	// funny types 'foo get internally stored as "foo
-		else printf("%s", tname);
-	}
-	else
-	{
-		printf("#D[%s", (d->gen==generation?d->type:d->xtype)->name);
-		arcs = DARCS(d);
-		for(i=0;i<d->narcs;i++)
-		{
-			printf(" %s: ", fnames[d->label[i]]);
-			rprint_dg(arcs[i]);
-		}
-		printf("]");
-	}
-}
-
 static void flat_print_dg(struct dg	*d)
 {
 	int	i;
@@ -1097,7 +1091,72 @@ static void flat_print_dg(struct dg	*d)
 	}
 }
 
-void	print_dg(struct dg	*d)
+int	dag_print_style = 0;
+
+static int	snrprint_dg(char	*str, int	maxlen, struct dg	*d)
+{
+	int	i, len = 0, tmp;
+	struct dg	**arcs;
+
+	d = p_dereference_dg(d);
+
+	if(dag_print_style == 0)
+	{
+		if(d->copy)
+			return snprintf(str, maxlen, "<%d>", (int)d->copy);
+
+		// multi-visited, give it a tag.
+		if(d->ncarcs>1)
+		{
+			d->copy = (struct dg*)(marker++);
+			tmp = snprintf(str, maxlen, "<%ld>= ", (int)d->copy);
+			if(str)str += tmp; maxlen -= tmp; len += tmp;
+			if(maxlen<0)maxlen=0;
+		}
+	}
+
+	//printf("(%p) ", d);
+	if(!d->narcs)
+	{
+		char	*tname = (d->gen==generation?d->type:d->xtype)->name;
+		char	cl;
+		if(tname[0]=='"' && (cl = tname[strlen(tname)-1])!='"')
+		{
+			if(cl!='$')
+				tmp = snprintf(str, maxlen, "'%s", tname+1);	// funny types 'foo get internally stored as "foo
+			else tmp = snprintf(str, maxlen, "^%s", tname+1);	// regex types ^foo$ get internally stored as "foo$
+		}
+		else tmp = snprintf(str, maxlen, "%s", tname);
+		if(str)str += tmp; maxlen -= tmp; len += tmp;
+		if(maxlen<0)maxlen=0;
+	}
+	else
+	{
+		if(dag_print_style==0)
+			tmp = snprintf(str, maxlen, "#D[%s", (d->gen==generation?d->type:d->xtype)->name);
+		else tmp = snprintf(str, maxlen, "%s [", (d->gen==generation?d->type:d->xtype)->name);
+		if(str)str += tmp; maxlen -= tmp; len += tmp;
+		if(maxlen<0)maxlen=0;
+		arcs = DARCS(d);
+		for(i=0;i<d->narcs;i++)
+		{
+			if(dag_print_style==0)
+				tmp = snprintf(str, maxlen, " %s: ", fnames[d->label[i]]);
+			else tmp = snprintf(str, maxlen, " %s ", fnames[d->label[i]]);
+			if(str)str += tmp; maxlen -= tmp; len += tmp;
+			if(maxlen<0)maxlen=0;
+			tmp = snrprint_dg(str, maxlen, arcs[i]);
+			if(str)str += tmp; maxlen -= tmp; len += tmp;
+			if(maxlen<0)maxlen=0;
+		}
+		tmp = snprintf(str, maxlen, "]");
+		if(str)str += tmp; maxlen -= tmp; len += tmp;
+		if(maxlen<0)maxlen=0;
+	}
+	return len;
+}
+
+int	snprint_dg(char	*str, int	maxlen, struct dg	*d)
 {
 	if(generation>=(MAX_GEN-15))
 	{
@@ -1109,8 +1168,17 @@ void	print_dg(struct dg	*d)
 	generation++;
 	dgmark(d);
 	marker = 1;
-	rprint_dg(d);
+	int	len = snrprint_dg(str, maxlen, d);
 	generation++;
 	dgreset_r(d);
 	generation++;
+	return len;
+}
+
+void	print_dg(struct dg	*d)
+{
+	int	len = snprint_dg(NULL, 0, d);
+	char	*p = malloc(len+1);
+	snprint_dg(p, len+1, d);
+	fwrite(p, len, 1, stdout);
 }
