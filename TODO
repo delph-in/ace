@@ -1,5 +1,21 @@
 TODO:
 
+- potentially use POS tagger to prune lexical ambiguity
+	- but POS tagger makes mistakes...
+
+- preprocessor characterization problem:
+	... hole for 'n'
+	... hole for '''
+	... hole for 't'
+	... lost 'n'=>4
+	filling hole 't' with 'n'
+	... lost '''=>5
+	... lost 't'=>6
+	 `(.) +n't' -> `\1n't' yields ` I don't know. '
+
+- have a unicode.c file with wide-char and mbs routines in it
+
+
 debug: I believe there are 15 747 724 136 275 002 577 605 653 961 181 555 468 044 717 914 527 116 709 366 231 425 076 185 631 031 296 296 protons in the universe and the same number of electrons.
 
 delete deleted daughters from daughters of rule, since they can't ever be present in unified-in daughters
