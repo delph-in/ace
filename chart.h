@@ -58,6 +58,9 @@ struct chart_cell
 
 // general chart processing equipment
 int		combine(struct edge	*a, struct edge	*b);
+int	filter(struct edge	*a, struct edge	*b);
+int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	force_noha);
+int	unify_and_build(struct edge	*a, struct edge	*b);
 void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge);
 void	add_edge_to_chart(struct edge	*edge);
 int		recall_hyper(struct edge	*b);
@@ -66,7 +69,7 @@ void	free_edge(struct edge	*edge);
 int		next_eid();
 
 // parser
-int		parse(int	nwords, char	**lemmas, char	**forms, char	*sentence);
+int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence);
 
 // display
 void	output_lui_chart(char	*words[]);
@@ -81,11 +84,15 @@ char	*show_orth_leaves(struct edge	*e);
 struct edge	*next_agenda(int	from_start);
 void		clear_agenda();
 void		add_agenda(struct edge	*e);
-int			reduce_chart(int	length, char **words);
+int			reduce_chart(int	length);//, char **words);
 
 // packing
 int			pack_edge(struct edge	*edge);
 struct dg	*restrict_copy_dg(struct dg	*dg, int for_generation);
+
+// checking rule compatibility
+int	check_lexical_rule_constraints(struct rule	*rule, struct edge	*b);
+void	setup_lexrule_edge(struct edge	*e);
 
 extern struct chart_cell	*cells;
 extern int					chart_size;

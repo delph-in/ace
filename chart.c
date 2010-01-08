@@ -17,7 +17,8 @@
 #define	ENABLE_HYPERACTIVE	1
 //#define	RULE_STATS
 
-int	nofragments = 1;
+//int	nofragments = 1;
+int	nofragments = 0;
 
 int	inhibit_results = 0;
 extern int inhibit_pack;
@@ -49,12 +50,18 @@ unsigned long long unify_clock, unify_count;
 struct edge	*sentential = 0;
 
 //#define	MAX_CHUNKS	2560	// when to give up on a parse
+//#define	MAX_CHUNKS	1200		// when to give up on a parse
 #define	MAX_CHUNKS	800		// when to give up on a parse
 //#define	MAX_CHUNKS	71	// when to give up on a parse
 
 //#define	EXCURSION
 
 extern unsigned int	generation;
+
+void	reset_edges()
+{
+	edge_id = 1;
+}
 
 void	clear_chart(int	size)
 {
@@ -79,7 +86,6 @@ void	clear_chart(int	size)
 		free(cells);
 	}
 	clear_agenda();
-	edge_id = 1;
 
 	//clear_slab();
 
@@ -131,7 +137,53 @@ int	trace = 0, gen_qc = 0;
 //#define TIM
 //double base_unify_time = 0, base_finalize_time = 0;
 
-int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force_noha)
+void	setup_lexrule_edge(struct edge	*e)
+{
+	struct edge	*b = e->daughters[0];
+	e->lex = b->lex;
+	if(g_mode == PARSING)
+	{
+		if(!e->rule->orth)
+		{
+			e->north_routes = b->north_routes;
+			e->orth_routes = b->orth_routes;
+		}
+		else
+		{
+			int i;
+			if(b->north_routes==-1)
+			{
+				e->north_routes = -1;
+				e->orth_routes = 0;
+			}
+			else
+			{
+				e->north_routes = 0;
+				e->orth_routes = slab_alloc(sizeof(struct orth_route)*b->north_routes);
+				for(i=0;i<b->north_routes;i++)
+				{
+					struct orth_route *r = b->orth_routes+i;
+					if(r->len && r->rules[0]==e->rule->rnum)
+					{
+						e->north_routes++;
+						e->orth_routes[e->north_routes-1].len = r->len-1;
+						e->orth_routes[e->north_routes-1].rules = slab_alloc(sizeof(int)*(r->len-1));
+						memcpy(e->orth_routes[e->north_routes-1].rules, r->rules+1, sizeof(int)*(r->len-1));
+					}
+				}
+			}
+			//printf("realloc %d routes down to %d\n", b->north_routes, e->north_routes);
+			//e->orth_routes = slab_realloc(e->orth_routes, sizeof(struct orth_route)*b->north_routes, sizeof(struct orth_route)*e->north_routes);
+		}
+	}
+	else // (g_mode == GENERATING)
+	{
+		e->north_routes = 0;
+		e->orth_routes = 0;
+	}
+}
+
+int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct edge	**Eout, int force_noha)
 {
 	struct edge	*e;
 	struct dg	*u;
@@ -141,6 +193,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 #ifdef	TIM
 	struct timeval	tv1, tv2;
 #endif
+
+	if(Eout)*Eout = NULL;
 
 	if(a->rtl)
 	{
@@ -307,49 +361,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	}
 
 	if(e->rule->lexical)
-	{
-		e->lex = b->lex;
-		if(g_mode == PARSING)
-		{
-			if(!e->rule->orth)
-			{
-				e->north_routes = b->north_routes;
-				e->orth_routes = b->orth_routes;
-			}
-			else
-			{
-				int i;
-				if(b->north_routes==-1)
-				{
-					e->north_routes = -1;
-					e->orth_routes = 0;
-				}
-				else
-				{
-					e->north_routes = 0;
-					e->orth_routes = slab_alloc(sizeof(struct orth_route)*b->north_routes);
-					for(i=0;i<b->north_routes;i++)
-					{
-						struct orth_route *r = b->orth_routes+i;
-						if(r->len && r->rules[0]==e->rule->rnum)
-						{
-							e->north_routes++;
-							e->orth_routes[e->north_routes-1].len = r->len-1;
-							e->orth_routes[e->north_routes-1].rules = slab_alloc(sizeof(int)*(r->len-1));
-							memcpy(e->orth_routes[e->north_routes-1].rules, r->rules+1, sizeof(int)*(r->len-1));
-						}
-					}
-				}
-				//printf("realloc %d routes down to %d\n", b->north_routes, e->north_routes);
-				//e->orth_routes = slab_realloc(e->orth_routes, sizeof(struct orth_route)*b->north_routes, sizeof(struct orth_route)*e->north_routes);
-			}
-		}
-		else // (g_mode == GENERATING)
-		{
-			e->north_routes = 0;
-			e->orth_routes = 0;
-		}
-	}
+		setup_lexrule_edge(e);
 	else
 	{
 		e->lex = 0;
@@ -391,7 +403,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 			(g_mode == PARSING && e->from==0 && e->to==chart_size-1)) &&
 			is_root(e->dg))
 		{
-			//printf("sentential\n");
+			fprintf(stderr, "sentential -- stopping\n");
 			e->used = 1;pused_edges++;
 			add_edge_to_chart(e);
 			sentential = e;	// stop the parser
@@ -413,7 +425,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, int force
 	}
 #endif
 
-	add_agenda(e);
+	*Eout = e;
 	return 0;
 }
 
@@ -506,7 +518,61 @@ int	recall_hyper(struct edge	*b)
 	return 0;
 }
 
-inline int	filter(struct edge	*a, struct edge	*b)
+int	edge_is_ready_for_syntax(struct edge	*b)
+{
+	int i;
+	for(i=0;i<b->north_routes;i++)
+		if(b->orth_routes[i].len == 0)break;
+	if(i==b->north_routes)return 0;
+	return 1;
+}
+
+int	check_lexical_rule_constraints(struct rule	*rule, struct edge	*b)
+{
+	if(rule->lexical)
+	{
+		if(!b->lex)return -1;	// lexical rules may apply only to lexical edges
+		// if 'a' is orthographemic, make sure it's the right one
+		if(rule->orth && g_mode == PARSING && b->north_routes != -1)
+		{
+			// look at each route 'b' allows and see if this is the first rule on it
+			int i;
+			for(i=0;i<b->north_routes;i++)
+			{
+				struct orth_route *r = b->orth_routes+i;
+				if(r->len && r->rules[0] == rule->rnum)
+					break;
+			}
+			if(i==b->north_routes)return -1;
+			//printf(" #%d admits rule %s as a next orthographemic\n", b->id, rule->name);
+		}
+		else if(!rule->orth && g_mode == PARSING && b->north_routes != -1)
+		{
+			extern char	**rf_tc;
+			// look at each route 'b' allows and see if this fits in the first rule on it
+			int i;
+			for(i=0;i<b->north_routes;i++)
+			{
+				struct orth_route *r = b->orth_routes+i;
+				if(!r->len || rf_tc[r->rules[0]][rule->rnum])
+					break;
+			}
+			if(i==b->north_routes)
+			{
+				//printf(" #%d rejects rule %s as a next nonorthographemic\n", b->id, rule->name);
+				return -1;
+			}
+		}
+	}
+	else if(b->lex && g_mode == PARSING)
+	{
+		// 'b' is lexical but 'a' is a syntax rule; see if 'b' might be done with its orthographemics
+		if(! edge_is_ready_for_syntax(b))return -1;
+	}
+	return 0;
+}
+
+int	filter(struct edge	*a, struct edge	*b)
 {
 	int	i, arg, gmode = g_mode;
 
@@ -523,46 +589,8 @@ inline int	filter(struct edge	*a, struct edge	*b)
 	if(trace>1)printf("[%8.8X #%d [lex %d orth %p] + %8.8X #%d [lex %p]] rule %s?\n",
 		0/*a->ep_span*/, a->id, a->rule->lexical, a->rule->orth, 0/*b->ep_span*/, b->id, b->lex, a->rule->name);
 
-	if(a->rule->lexical)
-	{
-		if(!b->lex)return 0;	// lexical rules may apply only to lexical edges
-		// if 'a' is orthographemic, make sure it's the right one
-		if(a->rule->orth && gmode == PARSING && b->north_routes != -1)
-		{
-			// look at each route 'b' allows and see if this is the first rule on it
-			for(i=0;i<b->north_routes;i++)
-			{
-				struct orth_route *r = b->orth_routes+i;
-				if(r->len && r->rules[0] == a->rule->rnum)
-					break;
-			}
-			if(i==b->north_routes)return 0;
-			//printf(" #%d admits rule %s as a next orthographemic\n", b->id, a->rule->name);
-		}
-		else if(!a->rule->orth && gmode == PARSING && b->north_routes != -1)
-		{
-			extern char	**rf_tc;
-			// look at each route 'b' allows and see if this fits in the first rule on it
-			for(i=0;i<b->north_routes;i++)
-			{
-				struct orth_route *r = b->orth_routes+i;
-				if(!r->len || rf_tc[r->rules[0]][a->rule->rnum])
-					break;
-			}
-			if(i==b->north_routes)
-			{
-				//printf(" #%d rejects rule %s as a next nonorthographemic\n", b->id, a->rule->name);
-				return 0;
-			}
-		}
-	}
-	else if(b->lex && gmode == PARSING)
-	{
-		// 'b' is lexical but 'a' is a syntax rule; see if 'b' might be done with its orthographemics
-		for(i=0;i<b->north_routes;i++)
-			if(b->orth_routes[i].len == 0)break;
-		if(i==b->north_routes)return 0;
-	}
+	// see if a or b is lexical and incompatible
+	if(check_lexical_rule_constraints(a->rule, b))return 0;
 
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
@@ -596,13 +624,15 @@ inline int	filter(struct edge	*a, struct edge	*b)
 	return 1;
 }
 
-inline int	unify_and_build(struct edge	*a, struct edge	*b)
+int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	force_noha)
 {
-	int	i, arg, force_noha = !ENABLE_HYPERACTIVE, res;
+	int	i, arg, res;
 	struct dg	*rdg, *pdg;
 #ifdef	TIM
 	struct timeval	tv1, tv2;
 #endif
+
+	if(Eout)*Eout = NULL;
 
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
@@ -716,7 +746,7 @@ inline int	unify_and_build(struct edge	*a, struct edge	*b)
 
 	if(!res)
 	{
-		if(build_edge(a, b, arg, rdg, force_noha) == -2)return -1;
+		if(build_edge(a, b, arg, rdg, Eout, force_noha) == -2)return -1;
 		if(noldslabs >= MAX_CHUNKS)
 		{
 			fprintf(stderr, "NOTE: terminating search, too much RAM\n");
@@ -737,7 +767,16 @@ inline int	unify_and_build(struct edge	*a, struct edge	*b)
 	return 0;
 }
 
-inline int	combine(struct edge	*a, struct edge	*b)
+int	unify_and_build(struct edge	*a, struct edge	*b)
+{
+	struct edge	*e = NULL;
+	int	res = unify_and_build1(a, b, &e, !ENABLE_HYPERACTIVE);
+	if(res == -1)return -1;
+	if(e)add_agenda(e);
+	return res;
+}
+
+int	combine(struct edge	*a, struct edge	*b)
 {
 	if(filter(a, b))
 		return unify_and_build(a, b);
@@ -768,6 +807,7 @@ char	*show_orth_leaves(struct edge	*e)
 		}
 		else return strdup("[null]");
 	}
+	if(!e->daughters)return strdup("*INVENTED*");
 	if(e->have==1)
 	{
 		sub = show_orth_leaves(e->daughters[0]);
