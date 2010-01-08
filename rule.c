@@ -174,6 +174,7 @@ struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels)
 	return dg;
 }
 
+// this only adds syntax rules, not lexical rules
 void	agenda_rules(int	count)
 {
 	int	i, j, rtl, nlf = 0;
@@ -191,13 +192,13 @@ void	agenda_rules(int	count)
 	}
 #endif
 
-	for(i=0;i<count;i++)
+	for(i=0;i<=count;i++)
 	{
 		for(j=0;j<nrules;j++)
 		{
-			rtl = rules[j]->rtl;
-			if(!rules[j]->orth)	// i-rules are added separately
+			if(!rules[j]->lexical)	// lex-rules have already been processed by lexical parsing
 			{
+				rtl = rules[j]->rtl;
 				if(	(!rtl && i+rules[j]->ndaughters <= count) ||
 					(rtl && i-rules[j]->ndaughters >= 0)	)
 				{
@@ -328,9 +329,20 @@ int	load_rules()
 {
 	if(process_tdl_dgs_status("rule", study_rule))
 	{
-		fprintf(stderr, "rules: unable to load constructions.tdl, bailing out.\n");
+		fprintf(stderr, "rules: unable to load rules, bailing out.\n");
 		exit(-1);
 	}
+	int	rule_does_not_exist(char	*name)
+	{
+		int	i;
+		for(i=0;i<nrules;i++)
+			if(!strcmp(rules[i]->name, name))return 0;
+		fprintf(stderr, "warning: config refers to nonexistant rule '%s'\n", name);
+		return 0;
+	}
+	iterate_conf_list("spanning-only-rules", rule_does_not_exist);
+	iterate_conf_list("xfragment-only-rules", rule_does_not_exist);
+	iterate_conf_list("hyper-active-rules", rule_does_not_exist);
 	return 0;
 }
 
@@ -411,6 +423,8 @@ struct rule_filters
 
 void setup_rule_filter()
 {
+	extern int g_loaded;
+	g_loaded = 1;	// make unify shut up about failures
 	filters = calloc(sizeof(*filters), 1);
 	filters->nopack = setup_rule_filter1(0);
 	filters->nopacks = rule_sfilter;
@@ -421,6 +435,7 @@ void setup_rule_filter()
 	rule_filter = filters->nopack;	// type_rxtc is applied before packing starts
 	rule_sfilter = filters->nopacks;
 	lex_filter_rules();
+	g_loaded = 0;
 }
 
 char	**freeze_rxtc(char	**ptr, int dim)
