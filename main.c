@@ -199,10 +199,8 @@ void	initialize_engine()
 		fprintf(stderr, "loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
 
 		freeze_grammar();
-	}
-
-	if(save_grammar_path)
 		exit(0);
+	}
 
 	setup_extra_type_dgs();
 	g_loaded = 1;
@@ -234,8 +232,10 @@ void	report_stats(struct job_stats	stats)
 			stats.success, stats.count, (int)(stats.ram / stats.count / 1024), (float)stats.time);
 
 	rule_stats();
+	report_unpacking();
 	if(debug_level)print_glb_stats();
 	final_chart_stats();
+	//show_me();
 }
 
 int	main(int	argc, char	*argv[])
@@ -249,6 +249,9 @@ int	main(int	argc, char	*argv[])
 	if(do_itsdb) itsdb_mode();
 	setup_signal_handlers();
 
+	//generalization_experiments();
+
+//treebank_control(); return 0;
 	stats = main_input_loop(open_sentence_source());
 
 	shutdown_net();
