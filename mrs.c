@@ -420,11 +420,13 @@ void	mrs_crange_for_x(struct mrs	*m, struct mrs_var	*x, int	quantified, int	*Fro
 {
 	int	i;
 	*From = *To = -1;
+	//printf("mrs finding crange for x%d\n", x->vnum);
 	for(i=0;i<m->nrels;i++)
 	{
 		struct mrs_ep	*ep = m->rels+i;
 		if(mrs_find_ep_role(ep, "ARG0") != x)continue;
 		if(!quantified && strstr(ep->pred, "_q_"))continue;
+		//printf(" ... pred '%s' %d-%d\n", ep->pred, ep->cfrom, ep->cto);
 		if(*From==-1 || *From>ep->cfrom)*From = ep->cfrom;
 		if(*To==-1 || *To<ep->cto)*To = ep->cto;
 	}

@@ -154,6 +154,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 	// compute all the orthography variations of each token
 	for(i=0;i<tc->nedges;i++)
 	{
+		//printf("edge %d\n", i);
 		struct lattice_edge	*lat_e = tc->edges[i];
 		struct token	*t = lat_e->token;
 		t->oc = slab_alloc(sizeof(struct ochart));
@@ -163,12 +164,12 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		// enumerate all possible ways of reaching each possible stem
 		for(j=0;j<t->oc->nedges;j++)
 			unfold_oroutes(t->oc->edges[j], t->oc->edges[j], 0, 0);
-		/*for(j=0;j<charts[i].nedges;j++)
+		/*for(j=0;j<t->oc->nedges;j++)
 		{
-			printf("%s -> %s\n", words[i], charts[i].edges[j]->form);
-			for(k=0;k<charts[i].edges[j]->north_routes;k++)
+			printf("%s -> %s\n", t->string, t->oc->edges[j]->form);
+			for(k=0;k<t->oc->edges[j]->north_routes;k++)
 			{
-				struct orth_route *r = charts[i].edges[j]->orth_routes+k;
+				struct orth_route *r = t->oc->edges[j]->orth_routes+k;
 				int					l;
 				printf("	");
 				for(l=0;l<r->len;l++)printf(" %s", rules[r->rules[l]]->name);
@@ -279,7 +280,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		}
 #ifdef	USE_GENERICS
 		char	*carg = get_token_carg(t);
-		//printf("carg='%s' for token; trying generic entries\n", carg);
+		//printf("carg='%s' for token; trying generic entries (postag = %s)\n", carg, t->postag);
 		struct ochart_edge	*carg_e = NULL;
 		for(j=0;j<oc->nedges;j++)if(!strcasecmp(carg, oc->edges[j]->form))carg_e = oc->edges[j];
 		//printf(" ... carg_e = %p\n", carg_e);

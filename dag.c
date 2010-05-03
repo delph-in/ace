@@ -31,6 +31,7 @@ long long	accum_ram_usage = 0;
 int	upath[1024];
 int	upathl, upathgl;
 struct type	*uglb;
+struct type	*ut1, *ut2;
 #endif
 
 int slab_usage() { return (noldslabs-1)*SLAB_SIZE + slabu; }
@@ -488,9 +489,11 @@ void	unify_backtrace()
 	fflush(stdout);
 	fprintf(stdout, "unify failed at path: ");
 	for(i=0;i<upathl;i++)fprintf(stdout, "%s ", fnames[upath[i]]);
-	if(uglb) fprintf(stderr, "    inside glb constraint for `%s' depth %d\n", uglb->name, upathgl);
 	fprintf(stdout, "\n");
 	fflush(stdout);
+	if(uglb) fprintf(stderr, "    inside glb constraint for `%s' depth %d\n", uglb->name, upathgl);
+	if(ut1 && ut2)
+		fprintf(stderr, "  might have been trying to unify types %s + %s\n", ut1->name, ut2->name);
 }
 
 struct path	unify_backtrace_path()

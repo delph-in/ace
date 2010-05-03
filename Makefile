@@ -11,7 +11,7 @@ CC=gcc
 CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char ${GRAM} -falign-loops=32 -funroll-loops ${CPU}
 #CFLAGS=-g -O2 -funsigned-char ${GRAM}
 #CFLAGS=-g -funsigned-char ${GRAM}
-CFLAGS+=-fnested-functions
+#CFLAGS+=-fnested-functions
 
 CFLAGS+=${DELPHIN_CFLAGS} ${POST_CFLAGS}
 

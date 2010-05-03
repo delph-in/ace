@@ -805,7 +805,7 @@ char	*show_orth_leaves(struct edge	*e)
 			}
 			return ret;
 		}
-		else return strdup("[null]");
+		return strdup("[null]");
 	}
 	if(!e->daughters)return strdup("*INVENTED*");
 	if(e->have==1)

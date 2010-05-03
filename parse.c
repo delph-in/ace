@@ -246,7 +246,6 @@ int	prepare_parse_chart(struct lattice	*lexical_chart)
 	sort_lattice(lexical_chart);
 
 	int	nwords = lexical_chart->lattice_vertex_id_gen - 1;
-	//printf("... setting nwords = %d\n", nwords);
 
 	// setup the chart
 	clear_chart(nwords+1);

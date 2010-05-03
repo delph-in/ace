@@ -4,6 +4,7 @@
 //#define	DEBUG_VERBOSE	printf
 //#define	SHOW_OUTPUT_TOKENS
 
+#include	<wctype.h>
 #include	<stdio.h>
 #include	<string.h>
 #include	<stdlib.h>
@@ -16,6 +17,7 @@
 #include	"conf.h"
 #include	"freeze.h"
 #include	"chart.h"
+#include	"type.h"
 
 #include	"lattice-mapping.h"
 #include	"token.h"
@@ -402,7 +404,7 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 				from += 3;
 				do_lowercase = 1;
 			}
-			if(!from || !pathstr || !cgnum_str || !isalpha(from[0]) || !isnumber(from[1]))
+			if(!from || !pathstr || !cgnum_str || !isalpha(from[0]) || !isdigit(from[1]))
 			{
 				badsyntax:
 				fprintf(stderr, "bad backref syntax: %s in rule '%s'\n", d->xtype->name, r->name);
@@ -458,7 +460,8 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 			}
 		}
 		DEBUG_VERBOSE("built string: `%S'\n", build);
-		d->xtype = d->type = temporary_string_type((char*)freeze_tombs(build));
+		d->xtype = d->type = temporary_string_type(freeze_tombs(build));
+		DEBUG_VERBOSE("... resulting in type '%s'\n", d->xtype->name);
 	}
 	else
 	{
@@ -486,7 +489,16 @@ struct token	*extract_token_from_dg(struct dg	*dg)
 	assert(cto_dg != NULL);
 	t->cfrom = atoi(cfrom_dg->xtype->name+1);
 	t->cto = atoi(cto_dg->xtype->name+1);
-	t->postag = NULL;
+	struct dg	*taglist_dg = dg_path(dg, token_postags_path);
+	struct dg	*tagfirst_dg = dg_hop(taglist_dg, 1);	// FIRST
+	if(tagfirst_dg)
+	{
+		t->postag = freeze_string(tagfirst_dg->xtype->name+1);
+		int	sl = strlen(t->postag);
+		assert(sl>0 && t->postag[sl-1]=='"');
+		t->postag[sl-1] = 0;
+	}
+	else t->postag = NULL;
 	t->oc = NULL;
 	return t;
 }

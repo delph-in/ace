@@ -62,6 +62,9 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 	struct edge	*e = le->edge;
 	int	i;
 
+//	printf("lexparsing edge #%d\n", le->edge->id);
+//	for(i=0;i<le->edge->north_routes;i++)
+//		printf("oroute %d: next rule %s\n", i, (le->edge->orth_routes[i].len>0)?(rules[le->edge->orth_routes[i].rules[0]]->name):"none");
 	for(i=0;i<nrules;i++)
 	{
 		if(!rules[i]->lexical)continue;

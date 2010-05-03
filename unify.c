@@ -29,6 +29,7 @@ struct darc	*realloc_carcs(struct darc	*ptr, int	old, int	new);
 extern int	upath[1024];
 extern int	upathl, upathgl;
 extern struct type *uglb;
+extern struct type	*ut1, *ut2;
 #endif
 
 #ifdef	COPY_COUNTS
@@ -745,6 +746,10 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 		if(!t)
 		{
 			//printf("no glb for %s and %s\n", t1->name, t2->name);
+#ifdef	UNIFY_PATHS
+			ut1 = t1;
+			ut2 = t2;
+#endif
 			return -1;
 		}
 	}
@@ -1027,7 +1032,7 @@ void dagreset_c(struct dg	*d)
 		dagreset_c(arcs[i]);
 }
 
-static void dgreset_r(struct dg	*d)
+void dgreset_r(struct dg	*d)
 {
 	int	i;
 	struct dg	**arcs;

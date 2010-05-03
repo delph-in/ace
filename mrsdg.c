@@ -265,7 +265,7 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	}
 	//printf("extract from cont: "); print_dg(cont); printf("\n");
 
-	dagreset_c(cont);
+	dgreset_r(cont);
 
 	load_ep_drop();
 	hook = dg_hop(cont, hookf);
