@@ -20,6 +20,8 @@ struct multifeature
 	char	*str;
 }	*multifeatures;
 
+int	inhibit_vpm = 0;
+
 // dag to mrs conversion
 
 static inline char	*mfpath(char	*sub, int prep)
@@ -136,9 +138,13 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 			for(i=0;i<dg->narcs;i++)
 				add_var_feats(var, dg->label[i], arcs[i]);
 
-			vnew = internal_to_external_mrs_var(var);
-			//free_mrs_var(var);
-			var = vnew; var->refs = 1;
+			if(!inhibit_vpm)
+			{
+				vnew = internal_to_external_mrs_var(var);
+				//free_mrs_var(var);
+				var = vnew;
+			}
+			var->refs = 1;
 		}
 
 		vlist->nvars++;
