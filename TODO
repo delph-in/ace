@@ -33,8 +33,6 @@ freeze qc settings into grammar file
 
 ignore punctuation-chars for jacy
 
-configurable-ize POST
-
 try to prove/analyze interesting things at grammar compile time
 	- *intelligently* auto pick quickcheck paths
 		- make quickcheck used for packing ignore packing restrictor
@@ -46,8 +44,6 @@ try to prove/analyze interesting things at grammar compile time
 	- for each type of rule, precompute segments of the rule which are non-reentrant with ARGS[k]
 		- then on filling in ARGS[k], copy() can know to structure-share without looking at those segments
 
-find a way of making web / email ersatz work; preprocessor breaks them now, thanks to new treatment which separates U.S. into U. S. and X/Y into X / Y...
-
 optimize lexicon storage; maybe use provided lexdb schema
 maybe support lexdb
 
@@ -56,6 +52,3 @@ make STEM actually be updated by ortho rules; apparently some grammars depend on
 make unpacking support 2+-ary
 
 loading: use an instance to define configuration paths?
-
-check correctness of unicode support for preprocessor and morphology somehow
-	- possibly still need a call to setlocale() in main()

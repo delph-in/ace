@@ -87,4 +87,6 @@ struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin);
 
 void	mrs_crange_for_x(struct mrs	*m, struct mrs_var	*x, int	quantified, int	*From, int	*To);
 
+int pred_subsumes(char *in, char *out);
+
 #endif

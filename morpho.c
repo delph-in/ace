@@ -59,7 +59,8 @@ void add_orules_to_chart_agenda(struct edge *le)
 	}
 }
 
-int	check_mbs(char	*mbs)
+int	check_mbs(char	*mbs);
+/*int	check_mbs(char	*mbs)
 {
 	int		len = strlen(mbs);
 	wchar_t	*wide = malloc(sizeof(wchar_t)*(len+1));
@@ -73,9 +74,10 @@ int	check_mbs(char	*mbs)
 		free(wide);
 		return 0;
 	}
-}
+}*/
 
-wchar_t	*towide(char	*mbs)
+wchar_t	*towide(char	*mbs);
+/*wchar_t	*towide(char	*mbs)
 {
 	int		len = strlen(mbs);
 	wchar_t	*wide = malloc(sizeof(wchar_t)*(len+1));
@@ -90,7 +92,7 @@ wchar_t	*towide(char	*mbs)
 		exit(-1);
 	}
 	return wide;
-}
+}*/
 
 char	*freeze_tombs(wchar_t	*w)
 {
@@ -551,12 +553,12 @@ void	set_lgroup(int	group, wchar_t	*letters)
 		lgroups[group][255 & ((int)*letters++)] = 1;
 }
 
-wchar_t	*wcsdup(wchar_t	*str)
+/*wchar_t	*wcsdup(wchar_t	*str)
 {
 	int len = wcslen(str);
 	wchar_t	*w = malloc((len+1)*sizeof(wchar_t));
 	return memcpy(w, str, (len+1)*sizeof(wchar_t));
-}
+}*/
 
 wchar_t	*wcsdup_esc(wchar_t	*str)
 {

@@ -735,7 +735,9 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 		// check whether orthographemic component accepts
 		// XXX this is sooo slow.
 		char *sub = show_orth_leaves(b), *foo;
+		if(trace > 1)printf(" .. yield of b is `%s'\n", sub);
 		foo = inflect(a->rule->orth, sub);
+		if(trace > 1)printf(" .. would inflect to `%s'\n", foo);
 		free(sub);
 		if(!foo)
 		{

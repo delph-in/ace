@@ -353,7 +353,9 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		free_mrs(mrs);
 		return 1;
 	}
-	num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
+	if(chart_size>0)
+		num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
+	else num_parses = 0;
 	if(num_parses && !inhibit_results)printf("\n\n");
 	fflush(stdout);
 

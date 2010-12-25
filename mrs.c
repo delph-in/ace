@@ -266,6 +266,16 @@ struct mrs_hcons	*parse_mrs_hcons(struct mrs_vlist	*vlist, char **P, int	*Nhcons
 	return hcons;
 }
 
+char	*preddup(char	*pred)
+{
+	char	*b = strchr(pred, '<');
+	if(!b)return strdup(pred);
+	char	*d = malloc(b-pred+1);
+	memcpy(d, pred, b-pred);
+	d[b-pred]=0;
+	return d;
+}
+
 struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 {
 	int				nrels = 0, arels = 8;
@@ -287,7 +297,7 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		}
 		ep = eps+nrels-1;
 		bzero(ep,sizeof(*ep));
-		ep->pred = (word=parse_word(P,1))?strdup(word):0;
+		ep->pred = (word=parse_word(P,1))?preddup(word):0;
 		ep->epnum = nrels-1;
 		struct mrs_ep_role	args[10];
 		while((word=parse_word(P,1)) && strcmp(word,"]"))
@@ -552,7 +562,9 @@ int pred_subsumes(char *in, char *out)
 	tin = lookup_type(in);
 	if(!tin)
 	{
-		fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", in, in, out);
+		// the VPM can introduce some types that aren't in the heirarchy;
+		// apparently the correct behavior is to treat them as having no inheritance
+		//fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", in, in, out);
 		return 0;
 		exit(-1);
 	}
@@ -560,7 +572,7 @@ int pred_subsumes(char *in, char *out)
 	tout = lookup_type(out);
 	if(!tout)
 	{
-		fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", out, in, out);
+		//fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", out, in, out);
 		return 0;
 		exit(-1);
 	}
@@ -623,15 +635,19 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 	{
 		char	hused[in->nhcons];
 		bzero(hused, in->nhcons);
+		//printf("checking HCONS subsumption\n");
 		return mrs_subsumes1(in, out, 0, vmap, hused);
 	}
 
+	//printf("checking input pred '%s' subsumption\n", ep->pred);
 	for(i=0;i<out->nrels;i++) if(!used[i])
 	{
 		op = out->rels+i;
 		if(!pred_subsumes(ep->pred, op->pred))continue;
+		//printf(" ... might match output pred '%s'\n", op->pred);
 		memcpy(vm, vmap, sizeof(int)*in->vlist.nvars);
 		if(ep->lbl && !var_subsume(ep->lbl, op->lbl, vm, in->vlist.nvars))continue;
+		//printf(" ... label ok\n");
 		for(j=0;j<ep->nargs;j++)
 		{
 			for(k=0;k<op->nargs;k++)

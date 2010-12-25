@@ -33,6 +33,8 @@ void	*freeze_repp();
 void	recover_repp(void	*ptr);
 void	*freeze_instances();
 void	recover_instances(void	*ptr);
+void	*freeze_transfer();
+void	recover_transfer(void	*ptr);
 
 extern char	*grammar_version, *grammar_dir;
 
@@ -75,6 +77,7 @@ struct grammar
 	void	*post;
 	void	*token_mapping_rules;
 	void	*lexical_filtering_rules;
+	void	*transfer;
 };
 
 extern void	*slab_alloc(int	len);
@@ -363,6 +366,7 @@ int	freeze_grammar()
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
 	G->semindex = freeze_semantic_index();
+	G->transfer = freeze_transfer();
 	freezer_note("sem-index");
 	G->stochmodel = freeze_stochastic_model();
 	freezer_note("stochastic-model");
@@ -430,6 +434,7 @@ static int	load_freeze()
 	recover_labels(G->labels);
 	recover_vpm(G->vpm);
 	recover_semantic_index(G->semindex);
+	recover_transfer(G->transfer);
 	recover_stochastic_model(G->stochmodel);
 
 #ifdef	POST

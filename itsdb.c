@@ -64,6 +64,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 		readings = parse_line(i_input);
 	else
 	{
+		printf("mrs input: `%s'\n", i_input);
 		struct mrs *m = parse_mrs(i_input);
 		if(!m)
 		{
@@ -72,7 +73,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 		}
 		else
 		{
-			print_mrs(m);
+			//print_mrs(m);
 			readings = generate(m);
 			free_mrs(m);
 		}
@@ -121,11 +122,14 @@ itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 {
 	char		*esc = malloc(strlen(hyp->string)*2+1), *p, *q;
 
-#ifndef capi_printf
-	capi_printf("((:result-id . %d) (:derivation . \"", id++);
+	capi_printf("((:result-id . %d)", id++);
+	
+//#ifndef capi_printf
+/*	capi_printf("(:derivation . \"");
 	print_hypothesis(hyp, capi_printf);
-	capi_printf("\") ");
-#endif
+	capi_printf("\") ");*/
+//#endif
+
 
 	for(q=esc,p=hyp->string;*p;p++)
 	{
@@ -133,7 +137,9 @@ itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 		*q++ = *p;
 	}
 	*q=0;
+	capi_printf("(:surface . \"%s\") ", esc);
 	capi_printf("(:tree . \"%s\") ", esc);
+	fprintf(stderr, "ITSDB output '%s'\n", esc);
 	free(esc);
 	capi_printf("(:score . %f)) ", hyp->score);
 }

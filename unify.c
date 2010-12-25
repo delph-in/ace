@@ -901,6 +901,11 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 
 static struct slab_state	tmpstate;
 
+void	setup_tmp()
+{
+	get_slabstate(&tmpstate);
+}
+
 int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 {
 	struct dg	*to;

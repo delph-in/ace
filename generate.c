@@ -137,8 +137,8 @@ int	generate(struct mrs	*mrs)
 	if(do_itsdb)itsdb_report_gen(count);
 	if(debug_level)printf("unpacked %.4f\n", timer());
 
-	printf("NOTE: %d passive, %d active edges in final generation chart\n",
-		cells->p_nedges, cells->al_nedges + cells->ar_nedges);
+	fprintf(stderr, "NOTE: %d passive, %d active edges in final generation chart [%d results]\n",
+		cells->p_nedges, cells->al_nedges + cells->ar_nedges, count);
 
 	/*if(lui_chart)
 	{

@@ -93,6 +93,22 @@ void	clear_mrs()
 	}
 }
 
+struct mrs_var	*invent_mrs_var(char	*type, struct mrs_vlist	*vlist)
+{
+	struct mrs_var	*var = slab_calloc(sizeof(struct mrs_var), 1);
+	var->dg = NULL;
+	var->type = strdup(type);
+	var->name = strdup(type);
+	var->vnum = vlist->nvars;
+	var->refs = 1;
+
+	vlist->nvars++;
+	vlist->vars = slab_realloc(vlist->vars, sizeof(struct mrs_var*)*(vlist->nvars-1),
+											sizeof(struct mrs_var*)*vlist->nvars);
+	vlist->vars[vlist->nvars-1] = var;
+	return var;
+}
+
 struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 {
 	static struct type *semarg = 0;
@@ -279,7 +295,9 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	hcons = dg_hop(cont, hconsf);
 	if(hook)
 	{
-		mrs->ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
+		// XXX hack see chat w/ oe 2010-08-30
+		//mrs->ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
+		mrs->ltop = invent_mrs_var("h", &mrs->vlist);
 		mrs->index = dg_to_mrs_var(dg_hop(hook, indexf), &mrs->vlist);
 		mrs->xarg = dg_to_mrs_var(dg_hop(hook, xargf), &mrs->vlist);
 	}
@@ -316,6 +334,12 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 	struct mrs_var *var;
 	int			i, path[16], len;
 
+	if(evar->is_const)
+	{
+		evar->dg = atomic_dg("*top*");
+		evar->dg->type = evar->dg->xtype = temporary_string_type(evar->name);
+		return;
+	}
 	var = external_to_internal_mrs_var(evar);
 	dg = atomic_dg(var->type);
 	for(i=0;i<var->nprops;i++)
@@ -331,7 +355,12 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
 	}
 	dg = add_dg_feature(dg, "INSTLOC", skolem);
+	//printf("before wellforming:\n");
+	//print_dg(dg);printf("\n");
 	evar->dg = wellform_dg(dg);
+	//printf("after wellforming:\n");
+	//print_dg(evar->dg);
+	//printf("\n");
 
 	//free_mrs_var(var);
 }

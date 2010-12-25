@@ -3,11 +3,16 @@
 #include	<string.h>
 #include	<assert.h>
 
+// thoughts on the 'relatives' system
+// 1. in activation, need to activate SPNs that are *supertypes* of the input preds
+// 2. in enumeration, need to align to input preds that are *subtypes* of the entity's preds
+
 #include	"dag.h"
 #include	"lexicon.h"
 #include	"hash.h"
 #include	"mrs.h"
 #include	"freeze.h"
+#include	"transfer.h"
 
 #define	VACUOUS	"vacuous"
 
@@ -27,6 +32,7 @@ struct semindex_pred_node
 
 	// complete list of semindex_pred_node's which are heirarchically related to this one,
 	//   i.e. should be activated when this one is
+	// sweaglesw 2010-08-29: actually, we should activate supertypes, and enumerate subtypes
 	int							nrelatives;
 	struct semindex_pred_node	**relatives;
 
@@ -114,10 +120,6 @@ void add_relative_to_spn(struct semindex_pred_node *rel, struct semindex_pred_no
 	node->relatives[node->nrelatives-1] = rel;
 	rel->relatives = realloc(rel->relatives, sizeof(struct semindex_pred_node*)*++rel->nrelatives);
 	rel->relatives[rel->nrelatives-1] = node;
-}
-
-void	add_entity_to_spn(struct grammar_entity *e, struct semindex_pred_node *node)
-{
 }
 
 void	entity_add_semantic_index(short what, struct dg *indpred, char *indkey, void *entity, struct dg *rels, int pidx)
@@ -258,9 +260,9 @@ void	recover_semantic_index(void *frozen)
 
 
 /* semantic lookup at generation time: efficient two-phase process
-	- activation: for each predication in the input mrs, 'activate' the corresponding index nodes and their relatives
-	- enumeration: traverse the activated nodes, filtering those which require inactive preds, and finding all alignments
-		- constraints: we call back to generate.c to implement the constraints specified in the alignmnts
+	- activation: for each predication in the input mrs, 'activate' the corresponding index nodes and their supertype relatives
+	- enumeration: traverse the activated nodes, filtering those which require inactive preds, and finding all alignments, including against subtype relatives
+		- constraints: we call back to generate.c to implement the constraints specified in the alignments
 
 	- as an after-thought we add semantically vacuous rules and those lexemes which are licensed
  */
@@ -328,7 +330,8 @@ struct spn_list	*activate_semindex(struct mrs_ep *ep, struct spn_list	*rest)
 	if(!node)return rest;
 	ep->active = 0;
 	for(i=0;i<node->nrelatives;i++)
-		rest = activate_semindex_node(node->relatives[i], ep, rest);
+		if(pred_subsumes(node->relatives[i]->pred, node->pred))
+			rest = activate_semindex_node(node->relatives[i], ep, rest);
 	if(carg)
 	{
 		// grammar entities with CARG's aren't put into their pred's index slot, but into the carg's index slot.
@@ -341,58 +344,107 @@ struct spn_list	*activate_semindex(struct mrs_ep *ep, struct spn_list	*rest)
 
 // enumeration
 
-int	enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int ai, int ei, struct mrs_ep	*align[]);
+struct ep_alignment	*enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int ai, int ei, struct mrs_ep	*align[], struct ep_alignment	*rest);
 //int constrain_gen_edge(struct edge *e, struct dg	*cont, int	neps, struct mrs_ep	*eps[]);
 struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[]);
 
-int enumerate_alignments(struct grammar_entity	*e, int ei, struct mrs_ep	*align[])
+struct ep_alignment
+{
+	struct grammar_entity	*e;
+	struct mrs_ep			*align[32];
+	struct ep_alignment	*next;
+};
+
+int	instantiate_alignment(struct ep_alignment	*a)
+{
+	// we have produced a complete alignment of 'e' against the input semantics.
+	struct grammar_entity	*e = a->e;
+	struct mrs_ep			**align = a->align;
+	struct edge	*edge = 0;
+	struct dg	*rels = dagify_rels_from_eps(1+e->nextra_preds, align);
+	int			result, i;
+	struct slab_state slab;
+
+	get_slabstate(&slab);
+	if(e->what == LEXEME)
+	{
+		//printf("aligned `%s' to eps ", e->lex->word);
+		//for(i=0;i<=e->nextra_preds;i++)printf(" %d", align[i]->epnum); printf("\n");
+		edge = lexical_edge(e->lex, 0, 0, rels);
+		//cont = walk_dg(edge->dg, savef, "SYNSEM", "LOCAL", "CONT", NULL);
+	}
+	if(e->what == RULE)
+	{
+		//printf("aligned `%s' to eps ", e->rule->name);
+		//for(i=0;i<=e->nextra_preds;i++)printf(" %d", align[i]->epnum); printf("\n");
+		edge = epsilon_edge(e->rule, 0, e->rule->rtl, rels);
+		//cont = walk_dg(edge->dg, rsavef, "C-CONT", NULL);
+	}
+	if(!edge)set_slabstate(&slab);
+	else
+	{
+		int i;
+		for(i=0;i<=e->nextra_preds;i++)
+			edge->ep_span |= 1<<align[i]->epnum;
+		add_agenda(edge);
+	}
+	return edge?1:0;
+}
+
+struct ep_alignment	*record_alignment(struct grammar_entity	*e, struct mrs_ep	*align[], struct ep_alignment	*rest)
+{
+	struct ep_alignment	*a;
+	int	i;
+
+	for(a=rest;a;a=a->next)
+	{
+		if(a->e != e)continue;
+		for(i=0;i<=e->nextra_preds;i++)
+			if(a->align[i] != align[i])break;
+		if(i<=e->nextra_preds)continue;
+		// this is identical to alignment 'a' which we already had.
+		//printf(" ... rejecting duplicate alignment\n");
+		return rest;
+	}
+	// this alignment is not found in 'rest'.
+	a = slab_alloc(sizeof(struct ep_alignment));
+	a->e = e;
+	memcpy(a->align, align, sizeof(struct mrs_ep*)*(1+e->nextra_preds));
+	a->next = rest;
+	/*printf(" ... accepting new alignment: ");
+	for(i=0;i<=e->nextra_preds;i++)
+		printf(" %s/%p", align[i]->pred, align[i]);
+	printf("\n");*/
+	return a;
+}
+
+struct ep_alignment	*enumerate_alignments(struct grammar_entity	*e, int ei, struct mrs_ep	*align[], struct ep_alignment	*rest)
 {
 	if(ei == e->nextra_preds)
 	{
 		// we have produced a complete alignment of 'e' against the input semantics.
-		struct edge	*edge = 0;
-		struct dg	*rels = dagify_rels_from_eps(1+e->nextra_preds, align);
-		int			result, i;
-		struct slab_state slab;
-
-		get_slabstate(&slab);
-		if(e->what == LEXEME)
-		{
-			//printf("aligned `%s' to eps ", e->lex->word);
-			//for(i=0;i<=e->nextra_preds;i++)printf(" %d", align[i]->epnum); printf("\n");
-			edge = lexical_edge(e->lex, 0, 0, rels);
-			//cont = walk_dg(edge->dg, savef, "SYNSEM", "LOCAL", "CONT", NULL);
-		}
-		if(e->what == RULE)
-		{
-			//printf("aligned `%s' to eps ", e->rule->name);
-			//for(i=0;i<=e->nextra_preds;i++)printf(" %d", align[i]->epnum); printf("\n");
-			edge = epsilon_edge(e->rule, 0, e->rule->rtl, rels);
-			//cont = walk_dg(edge->dg, rsavef, "C-CONT", NULL);
-		}
-		if(!edge)set_slabstate(&slab);
-		else
-		{
-			int i;
-			for(i=0;i<=e->nextra_preds;i++)
-				edge->ep_span |= 1<<align[i]->epnum;
-			add_agenda(edge);
-		}
-		return edge?1:0;
+		// record it.
+		return record_alignment(e, align, rest);
 	}
 	else
 	{
 		// we've finished aligning up to but not including extra_preds[ei].
 		struct semindex_pred_node	*next = e->extra_preds[ei];
-		int	count = 0, i;
-		count = enumerate_eps(e, next, (ei<e->pidx)?(ei):(ei+1), ei+1, align);
+		int	i;
+		//printf("enumerating '%s' [%d]\n", next->pred, ei);
+		rest = enumerate_eps(e, next, (ei<e->pidx)?(ei):(ei+1), ei+1, align, rest);
+		//printf(" has %d relatives\n", next->nrelatives);
 		for(i=0;i<next->nrelatives;i++)
-			count += enumerate_eps(e, next->relatives[i], (ei<e->pidx)?(ei):(ei+1), ei+1, align);
-		return count;
+			if(pred_subsumes(next->pred, next->relatives[i]->pred))
+			{
+				//printf(" rel = %s\n", next->relatives[i]->pred);
+				rest = enumerate_eps(e, next->relatives[i], (ei<e->pidx)?(ei):(ei+1), ei+1, align, rest);
+			}
+		return rest;
 	}
 }
 
-int enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int ai, int ei, struct mrs_ep	*align[])
+struct ep_alignment	*enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int ai, int ei, struct mrs_ep	*align[], struct ep_alignment	*rest)
 {
 	struct ep_list *epl;
 	int count = 0;
@@ -402,13 +454,13 @@ int enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int
 		if(epl->ep->active)continue;
 		align[ai] = epl->ep;
 		epl->ep->active = 1;
-		count += enumerate_alignments(e, ei, align);
+		rest = enumerate_alignments(e, ei, align, rest);
 		epl->ep->active = 0;
 	}
-	return count;
+	return rest;
 }
 
-int enumerate_semindex(struct semindex_pred_node *node)
+struct ep_alignment	*enumerate_semindex(struct semindex_pred_node *node, struct ep_alignment	*rest)
 {
 	int i, j, count = 0;
 	struct ep_list	*epl;
@@ -428,9 +480,13 @@ int enumerate_semindex(struct semindex_pred_node *node)
 		if(j < e->nextra_preds)continue;
 		assert(e->nextra_preds+1 <= 32);
 		//printf("consider grammar entity `%s'\n", (e->what==RULE)?e->rule->name:e->lex->word);
-		count += enumerate_eps(e, node, e->pidx, 0, align);
+		//printf(" extra EPs: ");
+		//for(j=0;j<e->nextra_preds;j++)
+		//	printf(" '%s'", e->extra_preds[j]->pred);
+		//printf("\n");
+		rest = enumerate_eps(e, node, e->pidx, 0, align, rest);
 	}
-	return count;
+	return rest;
 }
 
 int evacuate(int nvaclex, char **vaclex)
@@ -453,6 +509,7 @@ int evacuate(int nvaclex, char **vaclex)
 			for(j=0;j<nvaclex;j++)
 				if(!strcmp(vaclex[j], e->lex->word))break;
 			if(j==nvaclex)continue;
+			//printf("trying to add vacuous lexeme '%s'\n", e->lex->word);
 			add_agenda(lexical_edge(e->lex, 0, 0, 0));
 			count++;
 		}
@@ -473,14 +530,53 @@ void semantic_lookup(struct mrs	*mrs)
 		active = activate_semindex(mrs->rels+i, active);
 
 	// enumerate grammar entity alignments
+	struct ep_alignment	*alignments = NULL, *awalk;
 	for(walk=active;walk;walk=walk->next)
-		count += enumerate_semindex(walk->node);
+		alignments = enumerate_semindex(walk->node, alignments);
 
 	// clear activation records
 	while(active) { active->node->activation = 0; active = active->next; }
 
+	// add entities according to the unique alignments we found
+	for(awalk=alignments;awalk;awalk=awalk->next)
+		count += instantiate_alignment(awalk);
+
 	// finally, add vacuous entities
-	count += evacuate(mrs->ntriggers, mrs->triggers);
+	int	ntriggers = 0;
+	char	**triggers = NULL;
+	void	add_vac(char	*lexid)
+	{
+		int	i;
+		for(i=0;i<ntriggers;i++)
+			if(!strcmp(lexid, triggers[i]))break;
+		if(i<ntriggers)return;
+		ntriggers++;
+		triggers = realloc(triggers, sizeof(char*)*ntriggers);
+		triggers[ntriggers-1] = strdup(lexid);
+	}
+	activate_trigger_rules(mrs, add_vac);
+	count += evacuate(ntriggers, triggers);
+	//count += evacuate(mrs->ntriggers, mrs->triggers);
+	if(1)
+	{
+		int	j;
+		for(i=0;i<mrs->ntriggers;i++)
+		{
+			for(j=0;j<ntriggers;j++)
+				if(!strcmp(triggers[j], mrs->triggers[i]))break;
+			if(j==ntriggers)
+				fprintf(stderr, "TRIGGER_DEBUG: '%s' missing\n", mrs->triggers[i]);
+		}
+		for(i=0;i<ntriggers;i++)
+		{
+			for(j=0;j<mrs->ntriggers;j++)
+				if(!strcmp(triggers[i], mrs->triggers[j]))break;
+			if(j==mrs->ntriggers)
+				fprintf(stderr, "TRIGGER_DEBUG: '%s' extra\n", triggers[i]);
+		}
+	}
+	for(i=0;i<ntriggers;i++)free(triggers[i]);
+	if(triggers)free(triggers);
 
 	if(debug_level)printf("added %d grammar entities\n", count);
 }

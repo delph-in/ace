@@ -4,11 +4,13 @@
 #include	<stdlib.h>
 #include	<sys/time.h>
 
+#include	"tdl.h"
 #include	"preprocessor.h"
 #include	"morpho.h"
 #include	"rule.h"
 #include	"lexicon.h"
 #include	"dag.h"
+#include	"transfer.h"
 #include	"hash.h"
 #include	"conf.h"
 
@@ -88,7 +90,7 @@ char	*get_conf_file_path(char	*dir, char	*lhs)
 {
 	char	*u = get_conf_unq(lhs), *p = 0;
 	if(!u)return 0;
-	asprintf(&p, "%s/%s", dir, u);
+	assert(-1 != asprintf(&p, "%s/%s", dir, u));
 	return p;
 }
 
@@ -407,7 +409,7 @@ int	process_tdl_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	
 	return 0;
 }
 
-int	process_tdl_dgs_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	*ref))
+int	process_tdl_dgs_status(char	*status, int	(*callback)(char	*lhs, struct dg	*dg))
 {
 	return process_tdl_status(status, dagify_tdl_line, callback);
 }
@@ -1056,7 +1058,7 @@ int	typify_tdl_line(char	*lhs, char	*rhs_save, void	*ref)
 	return res;
 }
 
-int	iterate_tdl_dgs(char	*path, int	(*callback)(char	*rhs, struct dg	*dg))
+/*int	iterate_tdl_dgs(char	*path, int	(*callback)(char	*lhs, struct dg	*dg))
 {
 	if(callback == constrain_type)enable_out_of_order = 1;
 	else enable_out_of_order = 0;
@@ -1069,7 +1071,7 @@ int	iterate_tdl_lex(char	*path)
 	enable_out_of_order = 0;
 
 	return iterate_tdl(path, lexify_tdl_line, 0);
-}
+}*/
 
 int	g_loaded = 0;
 extern int	ntypes, nlexemes, nrules, norules, ninstances, glb_type_count, debug_level, nfnames, nstrings;
@@ -1120,6 +1122,15 @@ void	load_version(char *path)
 		show_task_name("grammar version");
 		printf("%s\n", grammar_version);
 	}
+}
+
+void	load_triggers(char	*path)
+{
+	if(!path)return;
+	tdl_push_status("trigger-rule");
+	load_tdl(path);
+	tdl_pop_status();
+	process_tdl_dgs_status("trigger-rule", study_trigger_rule);
 }
 
 char	*grammar_dir;
@@ -1186,6 +1197,8 @@ int load_grammar(char	*path)
 	load_expedients(get_conf_file_path(confdir, "generation-ignore-signs"));	// before grammar loading so the semindex knows how to build
 	load_grammar_top(get_conf_file_path(confdir, "grammar-top"));
 
+	load_triggers(get_conf_file_path(confdir, "generation-trigger-rules"));
+
 	// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...
 	tdl_push_status("tree-node-label");
 	load_tdl(get_conf_file_path(confdir, "parse-node-labels"));
@@ -1202,6 +1215,9 @@ int load_grammar(char	*path)
 	// make sure none of the grammar is auto-freed when the first parse is over
 	free_tdl();
 	commit_slab();
+
+	// make sure all string types have numbers
+	number_strings();
 
 	return 0;
 }

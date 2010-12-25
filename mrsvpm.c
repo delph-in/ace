@@ -291,19 +291,27 @@ static inline void	*slab_calloc(int a, int b) { int l = a*b; void *p = slab_mall
 
 char	*vpm_map(char	*vartype, char	**input, struct vpm_context	*ctx, int	output_slot)
 {
-	int	i, j;
+	int	i, j, dbg = 0;
+
+	/*if(ctx->ninput==1 && !strcmp(ctx->input[0], "TENSE"))
+	{
+		printf("mapping TENSE '%s' for vartype '%s'\n", input[0], vartype);
+		dbg = 1;
+	}*/
 
 	for(i=0;i<ctx->nrules;i++)
 	{
 		struct vpm_rule	*r = ctx->rules+i;
 		if(! (r->direction & VPM_INPUT_TO_OUTPUT))
 			continue;	// only consider rules working forward
+		//if(dbg)printf(" ... check rule '%s' => '%s'\n", r->input[0], r->output[0]);
 		for(j=0;j<ctx->ninput;j++)
 			if(vpm_test(vartype, input[j], r->input[j]) != 0)
 				break;
 		if(j<ctx->ninput)continue;
 		// else the rule applies.
 		char	*rout = r->output[output_slot];
+		//if(dbg)printf(" ... rule '%s' fires\n", rout);
 		if(!strcmp(rout, "*"))
 		{
 			assert(output_slot < ctx->ninput);
@@ -335,7 +343,7 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 		if(ctx->ninput==1 && !*ctx->input[0] && ctx->noutput==1 && !*ctx->output[0])
 		{
 			// context matches root level, i.e. variable types
-			vout->type = vpm_map(vout->type, &vin->type, ctx, 0);
+			vout->type = vpm_map(vin->type, &vin->type, ctx, 0);
 			assert(vout->type != NULL);
 		}
 		else
@@ -361,7 +369,7 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 			}
 			for(j=0;j<ctx->noutput;j++)
 			{
-				char	*nval = vpm_map(vout->type, values, ctx, j);
+				char	*nval = vpm_map(vin->type, values, ctx, j);
 				//printf("mapping values: %s...; result = %s\n", values[0], nval);
 				if(!nval)continue; // don't include NULL outputs (the VPM rule drops this property in this case)
 				vout->nprops++;

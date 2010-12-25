@@ -171,7 +171,16 @@ void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mr
 		void rtree(struct hypothesis *h, char *surf)
 		{
 			struct edge *e = h->dec->edge;
-			char	*sign = e->rule?e->rule->name:e->lex->word;
+			char	*sign;
+			if(e->rule)
+				sign = e->rule->name;
+			else
+			{
+				// XXX switch here
+				sign = e->lex->word;
+				//sign = e->lex->lextype->name;
+			}
+			//char	*sign = e->rule?e->rule->name:e->lex->word;
 			char	*label = label_dag(h->dg, sign);
 			int arity = e->have, i;
 

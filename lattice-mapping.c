@@ -392,7 +392,7 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 			backref_end = strchr(backref, '}');
 			if(!backref_end)goto badsyntax;
 			last = backref_end+1;
-			sprintf(expr, "%.*s", backref_end - (backref+2), backref+2);
+			sprintf(expr, "%.*s", (int)(backref_end - (backref+2)), backref+2);
 			int	l = strlen(expr);
 			char	*from = strtok(expr, ":");
 			char	*pathstr = strtok(NULL, ":");
@@ -428,7 +428,7 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 			}
 			if(cgnum >= rec->re[i].re_nsub)
 			{
-				fprintf(stderr, "bad backref %s in rule '%s': asked for capture group %d (but only have %d)\n", d->xtype->name, r->name, cgnum+1, rec->re[i].re_nsub);
+				fprintf(stderr, "bad backref %s in rule '%s': asked for capture group %d (but only have %d)\n", d->xtype->name, r->name, (int)(cgnum+1), (int)(rec->re[i].re_nsub));
 				exit(-1);
 			}
 			DEBUG_VERBOSE("should patch from %d path %s refid %d -- and found it (source string '%S')\n", from_which, pathstr, cgnum, mat->strings[i]);
@@ -725,10 +725,10 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 						mats[i].matches[j] = slab_alloc(sizeof(regmatch_t) * (re.re_nsub+1));
 						M = mats[i].matches[j];
 					}
-					if(0 == regexec(&re, wcopy, re.re_nsub+1, M, 0))
+					if(0 == regexec(&re, wcopy, re.re_nsub+1, M, 0) && M[0].rm_so==0 && M[0].rm_eo == wstrlen(wcopy))
 					{
 						free(wcopy);
-						DEBUG_VERBOSE(" ... matched!\n");
+						DEBUG_VERBOSE(" ... matched!");// M[0].rm_so = %d, M[0].rm_eo = %d\n", M[0].rm_so, M[0].rm_eo);
 					}
 					else
 					{

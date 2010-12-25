@@ -176,6 +176,8 @@ int	reduce_chart(int	length)//, char **words)
 	char		cover[1024];
 	int		i;
 
+	if(length<=0)return 0;
+
 	/*if(!dep_init)
 	{
 		dep_init = 1;

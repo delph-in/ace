@@ -701,20 +701,27 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 					len += print_tree0(hyp->rhs[i], surf, from+len, 0);
 			else if(e->lex)
 			{
-				int	ntokens = e->lex->stemlen;
-				for(i=0;i<ntokens;i++)
+				if(g_mode == PARSING)
 				{
-					struct token	*tok = (struct token*)e->daughters[i];
-					char	*form = tok->string;
-					char	token_str[1024];
-					int	id = ((int)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
-					extern int dag_print_style;
-					dag_print_style = 1;
-					snprint_dg(token_str, 1023, tok->dg);
-					dag_print_style = 0;
-					printf(" (\"%s\" %d \"%s\")", slab_escape(form), id, slab_escape(token_str));
+					int	ntokens = e->lex->stemlen;
+					for(i=0;i<ntokens;i++)
+					{
+						struct token	*tok = (struct token*)e->daughters[i];
+						char	*form = tok->string;
+						char	token_str[1024];
+						int	id = ((int)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
+						extern int dag_print_style;
+						dag_print_style = 1;
+						snprint_dg(token_str, 1023, tok->dg);
+						dag_print_style = 0;
+						print(" (\"%s\" %d \"%s\")", slab_escape(form), id, slab_escape(token_str));
+					}
+					//print(" (\\\"%s\\\" %d %d)", surf, from, from+len);
 				}
-				//print(" (\\\"%s\\\" %d %d)", surf, from, from+len);
+				else if(g_mode == GENERATING)
+				{
+					print(" (\"-\" 0 \"-\")");
+				}
 			}
 			print(")");
 		}
