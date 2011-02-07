@@ -26,7 +26,7 @@ char	*get_token_carg(struct token	*t)
 	if(c && c->xtype->name[0]=='"')
 	{
 		char	buffer[1024];
-		sprintf(buffer, "%.*s", strlen(c->xtype->name+1)-1, c->xtype->name+1);
+		sprintf(buffer, "%.*s", (int)(strlen(c->xtype->name+1)-1), c->xtype->name+1);
 		return freeze_string(buffer);
 	}
 	return NULL;
@@ -207,8 +207,21 @@ int	test_first_token_in_lex_dg(struct dg	*le_dg, struct token	*tok)
 	return 0;
 }
 
+struct dg	*build_token_list(int	n, struct token	**toks, struct dg	**last_token_dg)
+{
+	if(n<=0)return atomic_dg(g_null_type);
+	struct dg	*list = atomic_dg(g_cons_type);
+	struct dg	*first = copy_dg(toks[0]->dg);
+	struct dg	*rest = build_token_list(n-1, toks+1, last_token_dg);
+	if(n==1)*last_token_dg = first;
+	list = add_dg_feature(list, "FIRST", first);
+	list = add_dg_feature(list, "REST", rest);
+	return list;
+}
+
 int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 {
+/*
 	struct dg	*toklist = dg_path(le->dg, lex_tokens_list_path), *last_token_dg = NULL;
 	int i;
 	for(i=0;i<le->lex->stemlen;i++)
@@ -222,13 +235,13 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 			//printf("candidate token site: "); print_dg(lex_tok_dg); printf("\n");
 			if(0 != unify_dg_infrom(lex_tok_dg, tok_dg))
 			{
-				/*fprintf(stderr, " failed to unify token with lexeme!\n");
+				fprintf(stderr, " failed to unify token with lexeme!\n");
 				printf("trying to unify in token dag:\n");
 				print_dg(tokens[i]->dg);
 				printf("\n");
 #ifdef	UNIFY_PATHS
 			unify_backtrace();
-#endif*/
+#endif
 				return -1;
 			}
 			//else printf("SUCESSFULLY unified in token dag\n");
@@ -257,9 +270,28 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 		fprintf(stderr, " failed to unify tokens LAST pointer\n");
 		return -1;
 	}
+*/
+
+	struct dg	*le_toklist = dg_path(le->dg, lex_tokens_list_path);
+	struct dg	*le_toklast = dg_path(le->dg, lex_tokens_last_path);
+	struct dg	*in_toklist, *in_toklast;
+	in_toklist = build_token_list(le->lex->stemlen, tokens, &in_toklast);
+	assert(le_toklist && le_toklast && in_toklist && in_toklast);
+
+	if(0 != unify_dg_infrom(le_toklist, in_toklist))
+	{
+		if(trace)fprintf(stderr, "failed to unfiy tokens LIST\n");
+		return -1;
+	}
+	if(0 != unify_dg_infrom(le_toklast, in_toklast))
+	{
+		if(trace)fprintf(stderr, "failed to unify tokens LAST\n");
+		return -1;
+	}
 
 	assert(le->daughters == NULL);
 	le->daughters = slab_alloc(sizeof(struct token*) * le->lex->stemlen);
+	int	i;
 	for(i=0;i<le->lex->stemlen;i++)
 		le->daughters[i] = (struct edge*)tokens[i];
 
