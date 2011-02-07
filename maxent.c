@@ -10,9 +10,10 @@
 
 struct maxent_feature
 {
+	float	score;
+	// XXX features below this comment are not accessible at parse time -- only at grammar load time
 	char	*head;
 	char	*rhs[2];
-	float	score;
 
 	int		ngp;
 	char	**gp;
@@ -182,7 +183,10 @@ void	*freeze_stochastic_model()
 		for(walk=mem->buckets[i];walk;walk=walk->next)
 		{
 			struct maxent_feature *fi = walk->value;
-			struct maxent_feature *fo = slab_alloc(sizeof(struct maxent_feature));
+			struct maxent_feature *fo = slab_alloc(sizeof(float));//slab_alloc(sizeof(struct maxent_feature));
+			fo->score = fi->score;
+			walk->value = fo;
+			/*struct maxent_feature *fo = slab_alloc(sizeof(struct maxent_feature));
 			fo->head = freeze_string(fi->head);
 			fo->rhs[0] = freeze_string(fi->rhs[0]);
 			fo->rhs[1] = freeze_string(fi->rhs[1]);
@@ -191,7 +195,7 @@ void	*freeze_stochastic_model()
 			fo->gp = slab_alloc(sizeof(char*)*fo->ngp);
 			for(j=0;j<fo->ngp;j++)
 				fo->gp[j] = freeze_string(fi->gp[j]);
-			walk->value = fo;
+			walk->value = fo;*/
 		}
 	return freeze_hash(mem);
 }
