@@ -146,8 +146,10 @@ void	extract_regex_constraints(struct dg	*d, struct lattice_regex_constraints	*r
 		int	l = strlen(d->xtype->name);
 		if(d->xtype->name[l-1]=='$')
 		{
-			char	*re = strdup(d->xtype->name);
-			re[0] = '^';
+			// d->xtype->name looks like: "myregex$
+			char	*re = malloc(l + 7);
+			sprintf(re, "^(?:%.*s)$", l-2, d->xtype->name+1);
+			//printf("extracted RE: %s\n", re);
 			rec->count++;
 			rec->paths = realloc(rec->paths, sizeof(struct path)*rec->count);
 			rec->regexs = realloc(rec->regexs, sizeof(wchar_t*)*rec->count);
@@ -273,7 +275,7 @@ struct lattice_rule_set	*load_lattice_rules(char	*tdl_status)
 	struct lattice_rule_set	*rs = calloc(sizeof(*rs),1);
 	int	callback(char	*name, struct dg	*dg)
 	{
-		struct lattice_rule	*r = study_lattice_rule(name, dg);
+		struct lattice_rule	*r = study_lattice_rule(name, wellform_dg(dg));
 		if(!r)return -1;
 		rs->nrules++;
 		rs->rules = realloc(rs->rules, sizeof(struct lattice_rule*)*rs->nrules);
@@ -490,6 +492,7 @@ struct token	*extract_token_from_dg(struct dg	*dg)
 	t->cfrom = atoi(cfrom_dg->xtype->name+1);
 	t->cto = atoi(cto_dg->xtype->name+1);
 	struct dg	*taglist_dg = dg_path(dg, token_postags_path);
+	assert(taglist_dg != NULL);
 	struct dg	*tagfirst_dg = dg_hop(taglist_dg, 1);	// FIRST
 	if(tagfirst_dg)
 	{
@@ -505,6 +508,8 @@ struct token	*extract_token_from_dg(struct dg	*dg)
 
 int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, struct lattice_edge	**inputs, struct re_match_set	*mats, struct dg	**out_dg)
 {
+	int	did_add = 0, did_remove = 0;
+
 	// first step: iterate through all the out_dg's and replace backreferences
 	int i, j;
 	for(i=0;i<r->noutput;i++)
@@ -512,6 +517,7 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 	// second step: build and insert edge structures for the new tokens
 	// determining the from/to vertices for each output edge is a bit tricky
 
+/*
 	// if we are splitting an edge into several consecutive ones,
 	// the POSITION constraints *must* define '<' constraints on each side of each output token except the outside ones
 	// and this determines a total order, so let's find the order
@@ -595,7 +601,6 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 		for(i=1;i<r->noutput;i++)verts[i] = new_lattice_vertex(lat);
 	}
 	// finally, go ahead and make the new tokens
-	int	did_add = 0, did_remove = 0;
 	for(i=0;i<r->noutput;i++)
 	{
 		struct lattice_vertex	*from,*to;
@@ -611,7 +616,7 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 		}
 		assert(from && to);
 #ifdef	SHOW_OUTPUT_TOKENS
-		printf("want to add token dag: \n"); print_dg(out_dg[i]); printf("\n");
+		printf("want to add token dag [%d -> %d]: \n", from->id, to->id); print_dg(out_dg[i]); printf("\n");
 #endif
 		for(j=0;j<from->nfollowers;j++)
 		{
@@ -634,9 +639,121 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 		add_lattice_edge(lat, le);
 		did_add++;
 	}
+	*/
+
+	// allocate blank output edges
+	struct lattice_edge	*le = slab_alloc(sizeof(*le) * r->noutput);
+	bzero(le,sizeof(*le)*r->noutput);
+	// determine vertices
+	for(i=0;i<r->nposition_constraints;i++)
+	{
+		struct lattice_position_constraint	*lpc = r->position_constraints+i;
+		switch(lpc->type)
+		{
+			case	lpcImmediatelyPreceeds:
+				if(lpc->lhs_what=='O' && lpc->rhs_what=='O')
+				{
+					// invent a new vertex for lhs's TO and rhs's FROM
+					struct lattice_vertex	*v = new_lattice_vertex(lat);
+					le[lpc->lhs_which].to = v;
+					le[lpc->rhs_which].from = v;
+				}
+				else if(lpc->lhs_what=='O')
+				{
+					// set lhs's TO to rhs's FROM
+					int	which = lpc->rhs_which;
+					if(lpc->rhs_what == 'C')which += r->ninput;
+					le[lpc->lhs_which].to = inputs[which]->from;
+				}
+				else if(lpc->rhs_what=='O')
+				{
+					// set rhs's FROM to lhs's TO
+					int	which = lpc->lhs_which;
+					if(lpc->lhs_what == 'C')which += r->ninput;
+					le[lpc->rhs_which].from = inputs[which]->to;
+				}
+				break;
+			case	lpcCovers:
+				if(lpc->lhs_what=='O' && lpc->rhs_what=='O')
+				{
+					assert(!"don't know how to implement Ox@Oy positional constraints");
+				}
+				else if(lpc->lhs_what=='O')
+				{
+					// make sure lhs covers rhs
+					// if lhs has NULL endpoints, copy rhs's
+					int	which = lpc->rhs_which;
+					if(lpc->rhs_what == 'C')which += r->ninput;
+					struct lattice_edge	*rhs = inputs[which];
+					struct lattice_edge	*lhs = &le[lpc->lhs_which];
+					if(!lhs->to || lattice_vertex_follows(lat, rhs->to, lhs->to))
+						lhs->to = rhs->to;
+					if(!lhs->from || lattice_vertex_follows(lat, lhs->from, rhs->from))
+						lhs->from = rhs->from;
+				}
+				else if(lpc->rhs_what=='O')
+				{
+					// verify that lhs covers rhs
+					// if rhs has NULL endpoints, copy lhs's
+					int	which = lpc->lhs_which;
+					if(lpc->lhs_what == 'C')which += r->ninput;
+					struct lattice_edge	*lhs = inputs[which];
+					struct lattice_edge	*rhs = &le[lpc->rhs_which];
+					if(!rhs->to)rhs->to = lhs->to;
+					else if(lattice_vertex_follows(lat, rhs->to, lhs->to))
+						assert(!"inconsistant lattice mapping positional constraints");
+					if(!rhs->from)rhs->from = lhs->from;
+					else if(lattice_vertex_follows(lat, lhs->from, rhs->from))
+						assert(!"inconsistant lattice mapping positional constraints");
+				}
+				break;
+		}
+	}
+
+	struct lattice_edge	*save_le[r->noutput];
+
+	// add them to the lattice
+	for(i=0;i<r->noutput;i++)
+	{
+		if(!le[i].from || !le[i].to)
+			assert(!"incomplete lattice mapping positional constraints");
+
+		int	j;
+		struct lattice_vertex	*from = le[i].from, *to = le[i].to;
+
+#ifdef	SHOW_OUTPUT_TOKENS
+		printf("want to add token dag [%d -> %d]: \n", from->id, to->id); print_dg(out_dg[i]); printf("\n");
+#endif
+
+		for(j=0;j<from->nfollowers;j++)
+		{
+			struct lattice_edge	*e = from->followers[j];
+			if(e->to != to)continue;
+			//printf("checking for eq with %p\n", e);
+			//printf("which is:\n");print_dg(lattice_dg(e));printf("\n");
+			if(equivalent_dg(out_dg[i], lattice_dg(e), 1, 1) == 2)break;
+		}
+		if(j<from->nfollowers)
+		{
+			DEBUG("... not adding that edge, since we had an identical one already.\n");
+			save_le[i] = from->followers[j];
+			continue;
+		}
+		save_le[i] = NULL;
+
+		le[i].token = extract_token_from_dg(out_dg[i]);
+		DEBUG("O%d = `%s' [%d - %d] = %p\n", i+1, le[i].token->string, le[i].from->id, le[i].to->id, &le[i]);
+		add_lattice_edge(lat, &le[i]);
+		did_add++;
+	}
+
 	// third step: remove input edge structures
 	for(i=0;i<r->ninput;i++)
 	{
+		for(j=0;j<r->noutput;j++)
+			if(save_le[j] == inputs[i])
+				break;
+		if(j<r->noutput)continue;
 		remove_lattice_edge(lat, inputs[i]);
 		did_remove++;
 	}
@@ -725,14 +842,15 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 						mats[i].matches[j] = slab_alloc(sizeof(regmatch_t) * (re.re_nsub+1));
 						M = mats[i].matches[j];
 					}
-					if(0 == regexec(&re, wcopy, re.re_nsub+1, M, 0) && M[0].rm_so==0 && M[0].rm_eo == wstrlen(wcopy))
+					int	result = regexec(&re, wcopy, re.re_nsub+1, M, 0);
+					//int	wl = wstrlen(wcopy);
+					free(wcopy);
+					if(0 == result)// && M[0].rm_so==0 && M[0].rm_eo==wl)
 					{
-						free(wcopy);
-						DEBUG_VERBOSE(" ... matched!");// M[0].rm_so = %d, M[0].rm_eo = %d\n", M[0].rm_so, M[0].rm_eo);
+						DEBUG_VERBOSE(" ... matched!\n");
 					}
 					else
 					{
-						free(wcopy);
 						DEBUG_VERBOSE(" ... didn't match.\n");
 						return 0;
 					}
@@ -753,7 +871,7 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 		DEBUG("found an alignment of rule '%s'\n", r->name);
 		if(inputs[0]->token)
 		{
-			for(i=0;i<r->ninput;i++)DEBUG("I%d = '%s'\n", i+1, inputs[i]->token->string);
+			for(i=0;i<r->ninput;i++)DEBUG("I%d = '%s' = %p\n", i+1, inputs[i]->token->string, inputs[i]);
 			for(i=0;i<r->ncontext;i++)DEBUG("C%d = '%s'\n", i+1, inputs[r->ninput+i]->token->string);
 		}
 		else
