@@ -2,6 +2,7 @@
 #include	<stdlib.h>
 #include	<string.h>
 #include	<assert.h>
+#include	<stdarg.h>
 
 #include "dag.h"
 #include "chart.h"
@@ -728,6 +729,28 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 		return len;
 	}
 	print_tree0(hyp, 0, 0, 0);
+}
+
+char	*hypothesis_to_dstring(struct hypothesis	*h)
+{
+	char	*derivation = malloc(10240);
+	int		dalen = 10240, dlen = 0;
+	*derivation = 0;
+	int	dprintf(const char	*fmt, ...)
+	{
+		va_list	v, v2;
+		va_start(v, fmt);
+		va_copy(v2, v);
+		int	l = vsnprintf(NULL, 0, fmt, v);
+		if(dlen+l+1 > dalen) { dalen += l + 10240 ; derivation = realloc(derivation, dalen); }
+		vsnprintf(derivation+dlen, dalen-dlen, fmt, v2);
+		dlen += l;
+		va_end(v);
+		va_end(v2);
+		return l;
+	}
+	print_hypothesis(h, dprintf);
+	return derivation;
 }
 
 int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest)

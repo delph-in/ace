@@ -4,6 +4,7 @@
 #include	<stdlib.h>
 #include	<time.h>
 #include	<sys/time.h>
+#include	<stdarg.h>
 
 #ifdef	TSDB
 #include	<itsdb.h>
@@ -145,22 +146,32 @@ itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 }
 
 #define DER_PRINTF capi_printf
+//#define DER_PRINTF(x...) fprintf(stderr, x)
 capi_print_derivations(int nwords, char **words)
 {
 	int id;
 
 #ifdef	TSDB
-	DER_PRINTF("(:results . (");
+	capi_printf("(:results . (");
 	id = 0;
 	int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
-		DER_PRINTF("((:result-id . %d) (:derivation .\"", id++);
-		print_hypothesis(hyp, capi_printf);
-		DER_PRINTF("\") (:score . %f))", hyp->score);
+		char	*derivation = hypothesis_to_dstring(hyp);
+		char	*esc = slab_escape(derivation);
+		free(derivation);
+		capi_printf("((:result-id . %d) (:derivation .\"", id++);
+		// capi_printf can only handle 1kb chunks at a time... :blink:
+		while(strlen(esc) > 1000)
+		{
+			capi_printf("%.*s", 1000, esc);
+			esc += 1000;
+		}
+		capi_printf("%s", esc);
+		capi_printf("\") (:score .%f))", hyp->score);
 		return 1;
 	}
 	iterate_cell_root_hypotheses(&cells[chart_size-1], capi_print_tree, best_only);
-	DER_PRINTF("))");
+	capi_printf("))");
 #endif
 }
 

@@ -52,3 +52,5 @@ struct unpack_info	// used by hypothesize_edge() to keep track of what hypothesi
 struct mrs;
 int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest);
 struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_ancestry	ancestry, struct hypagenda_item	**customAgenda);
+char	*hypothesis_to_dstring(struct hypothesis	*h);
+char	*slab_escape(char	*str);
