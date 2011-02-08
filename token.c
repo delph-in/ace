@@ -184,8 +184,8 @@ void	print_token_chart(struct lattice	*tc)
 	{
 		struct lattice_edge	*e = tc->edges[i];
 		struct token	*t = e->token;
-		printf("token vtx [%d-%d] char [%d-%d] string '%s' dag ",
-			e->from->id, e->to->id, t->cfrom, t->cto, t->string);
+		printf("token le %p vtx [%d-%d] char [%d-%d] string '%s' dag ",
+			e, e->from->id, e->to->id, t->cfrom, t->cto, t->string);
 		print_dg(t->dg);
 		printf("\n");
 	}
@@ -224,15 +224,16 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 /*
 	struct dg	*toklist = dg_path(le->dg, lex_tokens_list_path), *last_token_dg = NULL;
 	int i;
+	printf("installing tokens in lexeme '%s'\n", le->lex->word);
 	for(i=0;i<le->lex->stemlen;i++)
 	{
-		//printf(" .. token %s\n", tokens[i]->string);
+		printf(" .. token %s %p\n", tokens[i]->string, tokens[i]);
 		assert(toklist);
 		struct dg	*lex_tok_dg = dg_hop(toklist, 1);	// FIRST
 		if(lex_tok_dg)
 		{
 			struct dg	*tok_dg = copy_dg(tokens[i]->dg);
-			//printf("candidate token site: "); print_dg(lex_tok_dg); printf("\n");
+			printf("candidate token site: "); print_dg(lex_tok_dg); printf("\n");
 			if(0 != unify_dg_infrom(lex_tok_dg, tok_dg))
 			{
 				fprintf(stderr, " failed to unify token with lexeme!\n");
@@ -244,7 +245,7 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 #endif
 				return -1;
 			}
-			//else printf("SUCESSFULLY unified in token dag\n");
+			else printf("SUCESSFULLY unified in token dag\n");
 			last_token_dg = lex_tok_dg;
 		}
 		else
