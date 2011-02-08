@@ -334,35 +334,33 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 	struct mrs_var *var;
 	int			i, path[16], len;
 
-	if(evar->is_const)
+	if(!evar->is_const)
 	{
-		evar->dg = atomic_dg("*top*");
-		evar->dg->type = evar->dg->xtype = temporary_string_type(evar->name);
-		return;
-	}
-	var = external_to_internal_mrs_var(evar);
-	dg = atomic_dg(var->type);
-	for(i=0;i<var->nprops;i++)
-	{
-		char	*vtype = var->props[i].value, *str = strdup(var->props[i].name), *p = str, *p2;
-		len = 0; do
+		var = external_to_internal_mrs_var(evar);
+		dg = atomic_dg(var->type);
+		for(i=0;i<var->nprops;i++)
 		{
-			p2 = strchr(p, '.');
-			if(p2)*p2 = 0;
-			path[len++] = lookup_fname(p);
-			p = p2?(p2+1):0;
-		} while(p);
-		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
+			char	*vtype = var->props[i].value, *str = strdup(var->props[i].name), *p = str, *p2;
+			len = 0; do
+			{
+				p2 = strchr(p, '.');
+				if(p2)*p2 = 0;
+				path[len++] = lookup_fname(p);
+				p = p2?(p2+1):0;
+			} while(p);
+			dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
+		}
+		dg = add_dg_feature(dg, "INSTLOC", skolem);
+		evar->dg = wellform_dg(dg);
 	}
-	dg = add_dg_feature(dg, "INSTLOC", skolem);
-	//printf("before wellforming:\n");
-	//print_dg(dg);printf("\n");
-	evar->dg = wellform_dg(dg);
-	//printf("after wellforming:\n");
-	//print_dg(evar->dg);
-	//printf("\n");
-
-	//free_mrs_var(var);
+	else
+	{
+		// dagify a const? hmm.
+		char	string[strlen(evar->name)+10];
+		sprintf(string, "%.*s", strlen(evar->name)-2, evar->name+1);
+		evar->dg = atomic_dg(get_top()->name);
+		evar->dg->type = evar->dg->xtype = temporary_string_type(freeze_string(string));
+	}
 }
 
 void dagify_mrs_ep(struct mrs_ep *ep)
