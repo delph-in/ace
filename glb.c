@@ -76,7 +76,12 @@ struct type	*calc_glb(struct type	*a, struct type	*b)
 
 	if(a->name[0]=='"')
 	{
-		if(b->name[0]=='"')return 0;
+		if(b->name[0]=='"')
+		{
+			if(a->tnum==-1 && b->tnum==-1 && !strcmp(a->name, b->name))
+				return a;
+			return 0;
+		}
 		else if(strtype && descendent_of(strtype->tnum, b))return a;
 		else return 0;
 	}

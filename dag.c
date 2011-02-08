@@ -256,6 +256,8 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	extern unsigned int	generation;
 	struct dg	**aarcs, **barcs;
 
+	//printf("ssdg1 %p %s [%d] %p %s [%d]?\n", a, a->xtype->name, a->xtype->tnum, b, b->xtype->name, b->xtype->tnum);
+
 	a = p_dereference_dg(a);
 	b = p_dereference_dg(b);
 
@@ -275,7 +277,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		b->gen = generation;
 	}
 
-	if(a->xtype != b->xtype)
+	int	types_identical = (a->xtype == b->xtype) || (a->xtype->tnum==-1 && b->xtype->tnum==-1 && !strcmp(a->xtype->name, b->xtype->name));
+
+	if(!types_identical)
 	{
 		if(!descendent_of(b->xtype->tnum, a->xtype))subsume_forward = 0;
 		if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
@@ -290,11 +294,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	a->copy = b;
 	b->forward = a;
 
-	//printf("maybe %p <=> %p\n", a, b);
+	//printf("maybe %p [%s] <=> %p [%s]\n", a, a->xtype->name, b, b->xtype->name);
 
 	aarcs = DARCS(a);
 	barcs = DARCS(b);
-	if(a->xtype==b->xtype && a->narcs==b->narcs)
+	if(types_identical && a->narcs==b->narcs)
 	{
 		// well-formedness and sortedness conditions guarantee that since
 		// types match exactly, arc labels match exactly...
