@@ -288,6 +288,8 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	if(!token_chart)return -1;
 	apply_token_mapping(token_chart);
 
+	if(trace)print_token_chart(token_chart);
+
 	// do lexical lookup
 	struct lattice	*lexical_chart = lexical_lookup_into_chart(token_chart);
 	if(!lexical_chart)return -1;
@@ -300,6 +302,8 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 
 	// setup the main parse chart
 	nwords = prepare_parse_chart(lexical_chart);
+	assert(nwords >= 0);
+	if(!nwords)return -1;
 
 	//if(lexical_lookup_into_chart(token_chart)) { fprintf(stderr, "NOTE: lexical coverage gap\n");  return -1; }
 	if(reduce_chart(nwords)) { fprintf(stderr, "NOTE: post reduction gap\n"); return -1; }
@@ -351,6 +355,8 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 			else print_mrs(mrs);
 		}
 		free_mrs(mrs);
+		//printf("\n");
+		//printf("dstring = `%s'\n", slab_escape(hypothesis_to_dstring(hyp)));
 		return 1;
 	}
 	if(chart_size>0)
