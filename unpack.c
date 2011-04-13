@@ -15,7 +15,8 @@
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
 
-#define	MAX_UNPACK_CHUNKS	1000
+//#define	MAX_UNPACK_CHUNKS	70000
+#define	MAX_UNPACK_CHUNKS	7000
 extern int noldslabs;
 
 extern int debug_level, inhibit_pack;
@@ -55,7 +56,7 @@ void score_hypothesis(struct hypothesis *h)
 		for(i=0;i<h->dec->edge->have;i++)
 		{
 			h->score += h->rhs[i]->score;
-			if(!h->dec->edge->lex &&  h->rhs[i]->dec->edge->lex)
+			/*if(!h->dec->edge->lex &&  h->rhs[i]->dec->edge->lex)
 			{
 				// syntax edge with lexical daughter.
 				// this is the first place in the hypothesis tree where we
@@ -63,12 +64,38 @@ void score_hypothesis(struct hypothesis *h)
 				char surf[512];
 				assert(h->rhs[i]->string);
 				sprintf(surf, "\"%s\"", h->rhs[i]->string);
+				//printf("should score surface `%s'\n", surf);
 				// TODO think carefully about how to score this... what LHS, what ancestry?
 				//h->score += maxent_score(h->rhs[i]->dec->edge->lex->lextype->name, surf, NULL, 0, &h->anc);
-			}
+			}*/
 		}
 	}
-	// we have to score leaf nodes later since their surface form changes around
+	else
+	{
+		// 'h' is a leaf node
+		// construct the cannonical surface form
+		extern char	*current_sentence;
+		char	surface[1024], *sp = surface;
+		int	i;
+		struct edge	*e = h->dec->edge;
+		struct lexeme	*lex = e->lex;
+		assert(lex);
+		sp += sprintf(sp, "\"");
+		for(i=0;i<lex->stemlen;i++)
+		{
+			struct token	*tok = (struct token*)e->daughters[i];
+			if(strlen(tok->string) + (sp-surface) > 1000)return;
+			if(tok->cfrom==-1 || tok->cto==-1)return;
+			// if we wanted to preserve capitalization, we would do:
+			//sp += sprintf(sp, "%s%.*s", i?" ":"", tok->cto-tok->cfrom, current_sentence + tok->cfrom);
+			// since we (in general, except names?) don't, we do:
+			sp += sprintf(sp, "%s%s", i?" ":"", tok->string);
+		}
+		sp += sprintf(sp, "\"");
+		//printf("should score surface `%s'\n", surface);
+		char	*lhs_sign = edge_sign(e);
+		h->score = maxent_score(lhs_sign, surface, NULL, 0, &h->ancestry);
+	}
 }
 
 struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
@@ -79,12 +106,25 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	ndecomposed++;
 	if(edge->frozen && edge->qc)
 	{
+		// ->frozen means either frozen or frosted
+		// ->qc is NULLed when we frost an edge
+		// so, this edge is frozen
+		// shouldn't get here because we delete frozen edges from the chart
+		// and don't build on top of them
 		fprintf(stderr, "ERROR: edge #%d frozen but not removed from chart\n", edge->id);
 		exit(-1);
 	}
 
 	for(i=0;i<edge->have;i++)n *= edge->daughters[i]->npack + 1;
-	d = dec = slab_alloc(sizeof(struct decomposition) * n);
+	// this has been known to exceed the slab segment size:
+	int	len = sizeof(struct decomposition) * n;
+	extern int currslabsize;
+	if(len >= currslabsize)
+	{
+		printf("NOTE: couldn't allocate %d decompositions, giving up\n",n);
+		return NULL;
+	}
+	d = dec = slab_alloc(len);
 
 	for(i=0;i<n;i++)
 	{
@@ -223,6 +263,8 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypagenda_it
 	h->rhs[1] = rhs[1];
 	h->dg = NULL; h->string = NULL;
 	h->checkup = 0;
+	h->toklen = rhs[0]->toklen;
+	if(rhs[1])h->toklen += rhs[1]->toklen;
 
 	if(dec->edge->lex)
 	{
@@ -257,6 +299,7 @@ struct hypothesis *leaf_hypothesis(struct edge *e, struct scoring_ancestry	ances
 	dec->ni2 = dec->ai2 = 0;
 	dec->seeni1 = NULL;
 	hyp->dec = dec;
+	hyp->toklen = e->lex->stemlen;
 
 	for(i=0;i<e->lex->stemlen;i++)slen += strlen(e->lex->stem[i]->name) + 1 - 2;
 	if(slen%4)slen = (slen&~3)+4;
@@ -285,7 +328,7 @@ static int g_checkup;
 static inline void checkup(struct hypothesis *h)
 {
 	if(h->dg)return; // if we already know failure/success status, don't recurse
-	if(h->checkup>=0 && h->checkup < g_checkup)
+	if(h->checkup>=0 && h->checkup != g_checkup)
 	{
 		int i, arity = h->dec->edge->have;
 		for(i=0;i<arity;i++)
@@ -549,6 +592,7 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 		struct decomposition *decs;
 		// initialize agenda with (0,...,0) index vector for each decomposition
 		decs = decompose_edge(e, &ndecs);
+		if(!decs)return NULL;
 		indent++;
 
 		struct scoring_ancestry	sub_ancestry;
@@ -578,6 +622,8 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 	//set_cui_hypothesis(cui, rank, hyp);
 	return hyp;
 }
+
+unsigned long long total_reconstructed_nodes;
 
 int instantiate_hypothesis(struct hypothesis *h)
 {
@@ -628,6 +674,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 		}
 		else
 		{
+			total_reconstructed_nodes++;
 			struct dg *rdg = h->dec->edge->rule->dg;
 			for(i=0;i<arity;i++)
 				if(unify_dg_tmp(h->rhs[i]->dg, rdg, i))
@@ -671,64 +718,102 @@ char	*slab_escape(char	*str)
 	return esc;
 }
 
+struct dstr_cache
+{
+	char	*str;
+	struct hypothesis	*h;
+	int					o;
+	int		gen;
+};
+
+#define	DSTR_CACHE_SIZE	102397
+static struct dstr_cache	dstr_cache[DSTR_CACHE_SIZE];
+int		dstr_cache_gen = 1;
+
+#define	DSTR_HASH(h,o)	(int)((((unsigned long long)h)^o) % (DSTR_CACHE_SIZE))
+
+char	*dstr_lookup(struct hypothesis	*h, int	o)
+{
+	int	hc = DSTR_HASH(h,o);
+	if(dstr_cache[hc].h == h && dstr_cache[hc].o == o && dstr_cache[hc].gen == dstr_cache_gen)
+		return dstr_cache[hc].str;
+	return NULL;
+}
+
+void	dstr_save(struct hypothesis	*h, int	o, char	*str)
+{
+	int	hc = DSTR_HASH(h,o);
+	dstr_cache[hc].h = h;
+	dstr_cache[hc].o = o;
+	dstr_cache[hc].str = str;
+	dstr_cache[hc].gen = dstr_cache_gen;
+}
+
 void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 {
-	int print_tree0(struct hypothesis *hyp, char *surf, int from, int quiet)
+	void	print_tree0(struct hypothesis *hyp, int from)
 	{
-		int i, len = 0;
+		int i;
 		struct edge *e = hyp->dec->edge;
-		if(e && e->lex && !surf)
-			surf = hyp->string;	// grab tree-top string and pass it down till we get to the lexeme
 
-		// first silently traverse subtree and compute its word length
-		if(e->have)
-			for(i=0;i<e->have;i++)
-				len += print_tree0(hyp->rhs[i], surf, from+len, 1);
-		else if(e->lex) len = e->lex->stemlen;
-
-		// now possibly actually print out the edge, with span information
-		if(!quiet)
+		// print out the edge, with span information
+		char	*sign = "no-sign";
+		if(e->rule)sign = e->rule->name;
+		else if(e->lex)
 		{
-			char	*sign = "no-sign";
-			if(e->rule)sign = e->rule->name;
-			else if(e->lex)
+			sign = e->lex->word;
+			//sign = e->dg->type->name;
+		}
+		print(" (%d %s %f %d %d", e->id, sign, hyp->score, from, from+hyp->toklen);
+		if(e->have)
+		{
+			for(i=0;i<e->have;i++)
 			{
-				sign = e->lex->word;
-				//sign = e->dg->type->name;
+				print_tree0(hyp->rhs[i], from);
+				from += hyp->rhs[i]->toklen;
 			}
-			print(" (%d %s %f %d %d", e->id, sign, hyp->score, from, from+len);
-			if(e->have)
-				for(len=i=0;i<e->have;i++)
-					len += print_tree0(hyp->rhs[i], surf, from+len, 0);
-			else if(e->lex)
+		}
+		else if(e->lex)
+		{
+			if(g_mode == PARSING)
 			{
-				if(g_mode == PARSING)
+				int	ntokens = e->lex->stemlen;
+				for(i=0;i<ntokens;i++)
 				{
-					int	ntokens = e->lex->stemlen;
-					for(i=0;i<ntokens;i++)
+					struct token	*tok = (struct token*)e->daughters[i];
+					int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
+					char	*form = tok->string;
+					char	*tokstr = dstr_lookup((void*)tok, from);
+					if(!tokstr)
 					{
-						struct token	*tok = (struct token*)e->daughters[i];
-						char	*form = tok->string;
-						char	token_str[1024];
-						int	id = ((int)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
+						char	token_str[10240];
 						extern int dag_print_style;
 						dag_print_style = 1;
-						snprint_dg(token_str, 1023, tok->dg);
+						snprint_dg(token_str, 10239, tok->dg);
+						//*token_str = 0;
 						dag_print_style = 0;
-						print(" (\"%s\" %d \"%s\")", slab_escape(form), id, slab_escape(token_str));
+						tokstr = slab_escape(token_str);
+						dstr_save((void*)tok, from, tokstr);
 					}
-					//print(" (\\\"%s\\\" %d %d)", surf, from, from+len);
-				}
-				else if(g_mode == GENERATING)
-				{
-					print(" (\"-\" 0 \"-\")");
+					print(" (\"%s\" %d \"%s\")", slab_escape(form), id, tokstr);
 				}
 			}
-			print(")");
+			else if(g_mode == GENERATING)
+			{
+				print(" (\"-\" 0 \"-\")");
+			}
 		}
-		return len;
+		print(")");
 	}
-	print_tree0(hyp, 0, 0, 0);
+	static int timer = -1;
+	if(timer==-1)timer = new_timer("derivation printing");
+	start_timer(timer);
+	//struct slab_state	st;
+	//get_slabstate(&st);	// the slab_escape() nonsense for escaping token structures shouldn't stay with us forever!
+	// actually, it should since we're caching them now
+	print_tree0(hyp, 0);
+	//set_slabstate(&st);
+	stop_timer(timer, 1);
 }
 
 char	*hypothesis_to_dstring(struct hypothesis	*h)
@@ -738,20 +823,27 @@ char	*hypothesis_to_dstring(struct hypothesis	*h)
 	*derivation = 0;
 	int	dprintf(const char	*fmt, ...)
 	{
-		va_list	v, v2;
+		va_list	v;
 		va_start(v, fmt);
-		va_copy(v2, v);
-		int	l = vsnprintf(NULL, 0, fmt, v);
-		if(dlen+l+1 > dalen) { dalen += l + 10240 ; derivation = realloc(derivation, dalen); }
-		vsnprintf(derivation+dlen, dalen-dlen, fmt, v2);
-		dlen += l;
+		int	l = vsnprintf(derivation+dlen, dalen-dlen, fmt, v);
 		va_end(v);
-		va_end(v2);
+		if(l >= dalen-dlen)
+		{
+			va_list v2;
+			va_start(v2, fmt);
+			dalen += l + 10240 ;
+			derivation = realloc(derivation, dalen);
+			l = vsnprintf(derivation+dlen, dalen-dlen, fmt, v2);
+			va_end(v2);
+		}
+		dlen += l;
 		return l;
 	}
 	print_hypothesis(h, dprintf);
 	return derivation;
 }
+
+int want_mrs = 1;
 
 int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest)
 {
@@ -762,10 +854,12 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 
 	static struct scoring_ancestry	root_ancestry = {.nparent_types=0,.parent_types=NULL, .rooted = 1};
 
+	dstr_cache_gen++;
+
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		edge = cell->p_edges[i];
-		if( (g_mode!=GENERATING || edge->ep_span == require_ep_span) && is_root(edge->dg) )
+		if( (g_mode!=GENERATING || edge->ep_span == require_ep_span) && is_root(edge->dg) && !edge->frozen )
 		{
 			DEBUG("edge #%d can be root...\n", edge->id);
 			for(j=-1;j<edge->npack;j++)
@@ -787,24 +881,46 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 		}
 	}
 
-	while( !(nbest && count>=nbest) &&  (hyp = process_hypagenda(&agenda)) )
+	static int	hyp_timer = -1, inst_timer = -1, mrs_timer = -1;
+	if(hyp_timer==-1)hyp_timer = new_timer("hypothesize");
+	if(inst_timer==-1)inst_timer = new_timer("instantiate");
+	if(mrs_timer==-1)mrs_timer = new_timer("mrs");
+	while( !(nbest && count>=nbest) )
 	{
+		start_timer(hyp_timer);
+		hyp = process_hypagenda(&agenda);
+		stop_timer(hyp_timer, 1);
+		if(!hyp)break;
 		nhyp++;
 		if(hyp->dec->edge->have == 2)
 			DEBUG("try a hyp %p score %f ind %d %d on decomp %p [#%d,#%d] of edge #%d\n", hyp, hyp->score, hyp->indices[0], hyp->indices[1], hyp->dec, hyp->dec->rhs[0]->id, hyp->dec->rhs[1]->id, hyp->dec->edge->id);
 		else DEBUG("try a hyp %p score %f ind %d on decomp %p [#%d] of edge #%d\n", hyp, hyp->score, hyp->indices[0], hyp->dec, hyp->dec->rhs[0]->id, hyp->dec->edge->id);
-		if(0 == instantiate_hypothesis(hyp))
+		start_timer(inst_timer);
+		int	ires = instantiate_hypothesis(hyp);
+		stop_timer(inst_timer, 1);
+		if(0 == ires)
 		{
 			if(is_root(hyp->dg))
 			{
-				struct mrs	*m = extract_mrs(hyp->dg);
+				struct mrs	*m = NULL;
+				if(want_mrs)
+				{
+					start_timer(mrs_timer);
+					m = extract_mrs(hyp->dg);
+					stop_timer(mrs_timer, 1);
+				}
+				//printf("hyp = %p\n", hyp);
 				//printf("\n"); print_hypothesis(h, printf); printf("\n");
 				count += process(hyp, m);
 			}
 			else DEBUG("... wasn't root after unpacking\n");
 		}
 		else g_checkup++;	// mark that we need to look for subfailures before hypothesizing
-		if(noldslabs >= MAX_UNPACK_CHUNKS)break;
+		if(noldslabs >= MAX_UNPACK_CHUNKS)
+		{
+			printf("NOTE: hit RAM limit while unpacking\n");
+			break;
+		}
 	}
 	if(debug_level)
 	{
@@ -816,5 +932,6 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 report_unpacking()
 {
 	if(!debug_level)return;
-	printf("%d total hypotheses generated\n", total_hyps);
+	fprintf(stderr, "%d total hypotheses generated\n", total_hyps);
+	fprintf(stderr, "%ld total nodes reconstructed\n", total_reconstructed_nodes);
 }

@@ -20,6 +20,8 @@ struct hypothesis
 	char				*string;	// surface yield
 	int					checkup;
 
+	int	toklen;	// how many tokens this tree spans
+
 	// internal to a hypothesis as a scored tree
 	// this part will be different for different ancestry contexts
 	int					indices[2];
