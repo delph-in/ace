@@ -58,7 +58,7 @@ void	build_token_dag(struct token	*t)
 	dg = dg_path_add(dg, token_form_path, temporary_string_type(freeze_string(bigger_string))->dg);
 	dg = dg_path_add(dg, token_from_path, temporary_string_type(freeze_string(c_from_str))->dg);
 	dg = dg_path_add(dg, token_to_path, temporary_string_type(freeze_string(c_to_str))->dg);
-	dg = dg_path_add(dg, token_postags_path, build_pos_tags_list(t->postag));
+	if(t->postag)dg = dg_path_add(dg, token_postags_path, build_pos_tags_list(t->postag));
 	dg = wellform_dg(dg);
 	t->dg = dg;
 	//printf("token '%s' pos '%s'\n", t->string, t->postag);
@@ -276,17 +276,23 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 	struct dg	*le_toklist = dg_path(le->dg, lex_tokens_list_path);
 	struct dg	*le_toklast = dg_path(le->dg, lex_tokens_last_path);
 	struct dg	*in_toklist, *in_toklast;
+	if(!le_toklist || !le_toklast)
+	{
+		fprintf(stderr, "ERROR: toklist or toklast missing on a token\n");
+		return -1;
+	}
 	in_toklist = build_token_list(le->lex->stemlen, tokens, &in_toklast);
+	//printf(" ... in_toklist.first = %p ; in_toklast = %p\n", dg_hop(in_toklist,lookup_fname("FIRST")), in_toklast);
 	assert(le_toklist && le_toklast && in_toklist && in_toklast);
 
 	if(0 != unify_dg_infrom(le_toklist, in_toklist))
 	{
-		if(trace)fprintf(stderr, "failed to unfiy tokens LIST\n");
+		if(trace) { fprintf(stderr, "failed to unfiy tokens LIST\n"); unify_backtrace(); }
 		return -1;
 	}
 	if(0 != unify_dg_infrom(le_toklast, in_toklast))
 	{
-		if(trace)fprintf(stderr, "failed to unify tokens LAST\n");
+		if(trace) { fprintf(stderr, "failed to unify tokens LAST\n"); unify_backtrace(); }
 		return -1;
 	}
 
@@ -295,6 +301,9 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 	int	i;
 	for(i=0;i<le->lex->stemlen;i++)
 		le->daughters[i] = (struct edge*)tokens[i];
+
+	//printf("after unify, le_toklast:\n");print_dg(le_toklast);printf("\n");
+	//printf("after unify, in_toklast:\n");print_dg(in_toklast);printf("\n");
 
 	//printf("lexeme dag:\n");
 	//print_dg(le->dg);
