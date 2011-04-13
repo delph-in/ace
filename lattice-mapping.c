@@ -18,6 +18,7 @@
 #include	"freeze.h"
 #include	"chart.h"
 #include	"type.h"
+#include	"lexicon.h"
 
 #include	"lattice-mapping.h"
 #include	"token.h"
@@ -876,8 +877,8 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 		}
 		else
 		{
-			for(i=0;i<r->ninput;i++)DEBUG("I%d = '#%d'\n", i+1, inputs[i]->edge->id);
-			for(i=0;i<r->ncontext;i++)DEBUG("C%d = '#%d'\n", i+1, inputs[r->ninput+i]->edge->id);
+			for(i=0;i<r->ninput;i++)DEBUG("I%d = '#%d' %s %d-%d\n", i+1, inputs[i]->edge->id, inputs[i]->edge->lex->word, inputs[i]->edge->from, inputs[i]->edge->to);
+			for(i=0;i<r->ncontext;i++)DEBUG("C%d = '#%d' %s %d-%d\n", i+1, inputs[r->ninput+i]->edge->id, inputs[r->ninput+i]->edge->lex->word, inputs[r->ninput+i]->edge->from, inputs[r->ninput+i]->edge->to);
 		}
 		struct dg	*out_dg[r->noutput];
 		for(i=0;i<r->noutput;i++)
@@ -897,6 +898,11 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 			for(j=0;j<lat->vertices[i]->nfollowers;j++)
 			{
 				struct lattice_edge	*e = lat->vertices[i]->followers[j];
+				// make sure we don't already have 'e' in inputs[]
+				int k;
+				for(k=0;k<have;k++)
+					if(inputs[k] == e)break;
+				if(k<have)continue;
 				inputs[have] = e;
 				if(e->token)
 					DEBUG_VERBOSE(".. considering '%s' as inputs[%d] for rule %s\n", e->token->string, have, r->name);
