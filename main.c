@@ -24,6 +24,8 @@ char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 
+int	output_edge_vectors = 0;
+
 int	preprocess_only = 0;
 extern char mrs_line_breaks;
 
@@ -34,6 +36,8 @@ extern int	g_loaded, inhibit_results, trace;
 extern long long	accum_ram_usage;
 extern char			*use_roots, *disable_signs;
 float	stdin_time = 0;
+
+int	form_to_relation = 0;
 
 extern float timer();
 
@@ -80,7 +84,7 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "hvpfEPL:lXg:G:m:qtTRe1n:r:"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvpfEPL:lXg:G:m:qtTRe1n:r:jF"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
@@ -102,6 +106,8 @@ void	parse_args(int	argc, char	*argv[])
 		case	'T':	print_trees = 0;		break;
 		case	'e':	g_mode = GENERATING;	break;
 		case	'L':	disable_signs = optarg;	break;
+		case	'j':	output_edge_vectors = 1;	break;
+		case	'F':	form_to_relation = 1;	break;
 		case	'?':	goto usage;
 	}
 	if(optind<argc-1)goto usage;
@@ -206,6 +212,7 @@ void	initialize_engine()
 	g_loaded = 1;
 
 	install_rf(inhibit_pack?0:((g_mode == PARSING)?1:2));
+	init_rstats();
 
 	if(export_parts)
 	{
@@ -256,7 +263,7 @@ int	main(int	argc, char	*argv[])
 
 	shutdown_net();
 	report_stats(stats);
-	//if(debug_level)report_timers();
+	if(debug_level)freport_timers(stderr);
 	wait_for_lui();
 
 	if(stats.success<=0 && stats.count>0)return -1;
