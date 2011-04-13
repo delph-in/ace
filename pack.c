@@ -11,6 +11,8 @@
 extern int debug_level;
 extern unsigned int	generation;
 
+extern int *nptries;
+
 static int	same_cell_daughter(struct edge *par, struct edge *dtr)
 {
 	int i;
@@ -75,8 +77,15 @@ int	upward_kill(struct edge	*edge)
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	int					i, j, k, killed = 1, pass;
 
+	// what (I think) this is supposed to do:
+	// FROST `edge', which means mark it as frozen but leave it in the chart
+	// FREEZE all edges (packed or not) that are parents of `edge'
+	//	which means remove it from the chart.
+	//   since we are parsing each string length exhaustively before moving to longer constituents,
+	//		only need to search in the same cell
 	edge->frozen = 1;
 	PACKBUG("frost #%d\n", edge->id);
+	// algorithm: anything with a frozen daughter gets frozen, repeat till convergence
 	more: pass = 0;
 	for(i=0;i<c->p_nedges;i++)
 	{
@@ -84,7 +93,37 @@ int	upward_kill(struct edge	*edge)
 		for(k=-1;k<E->npack;k++)
 		{
 			struct edge *e = (k==-1)?E:E->pack[k];
-			if(e->frozen==1 && e->qc)continue;
+			// for each edge, packed or not
+			for(j=0;j<e->have;j++)
+				if(e->daughters[j]->frozen == 1)
+					break;
+			if(j==e->have)continue;	// no frozen daughters
+			// we have a frozen daughter
+			// FREEZE
+			PACKBUG("freeze #%d\n", e->id);
+			e->frozen = 1;	// mark so future scans see this edge as frozen
+			killed++;
+			// remove `e' from the chart
+			if(k==-1)
+			{
+				c->p_nedges--;
+				memmove(c->p_edges+i, c->p_edges+i+1, sizeof(struct edge*) * (c->p_nedges - i));
+				goto more;
+			}
+			else
+			{
+				E->npack--;
+				memmove(E->pack+k, E->pack+k+1, sizeof(struct edge*) * (E->npack - k));
+				k--;
+				continue;
+			}
+
+/* old implementation that might be broken:
+			if(e->frozen==1)
+			{
+				if(e->qc)continue;
+				continue;// just added this (feb-24-2011), seems to make no difference and I can't at the moment see why it's here.  breaks things when we are doing gen_qc.
+			}
 			for(j=0;j<e->have;j++)
 				if(e->daughters[j]->frozen == 1)
 				{
@@ -100,10 +139,12 @@ int	upward_kill(struct edge	*edge)
 						k--;
 					}
 					e->frozen = 1;
-					//printf("freeze #%d\n", e->id);
+					PACKBUG("freeze #%d\n", e->id);
 					killed++;
 					if(k==-1)pass = 1;	// we require that packed edges are not built on
+					break;
 				}
+*/
 		}
 	}
 	if(pass)goto more;
@@ -167,9 +208,11 @@ int	generalize_pack_edge(struct edge	*edge)
 int	pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
-	struct edge			*h, **candidates = (edge->have==edge->need)?c->p_edges:(edge->rule->rtl?c->ar_edges:c->al_edges);
-	int			i, ssd, ncandidates = (edge->have==edge->need)?c->p_nedges:(edge->rule->rtl?c->ar_nedges:c->al_nedges);
+	struct edge			*h, **candidates;
+	int			i, ssd, ncandidates;
 	int			already_packed = 0;
+
+	int	would_pack_as_ssd = 0;
 
 #ifdef	COPY_COUNTS
 	packcount++;
@@ -178,6 +221,8 @@ int	pack_edge(struct edge	*edge)
 	PACKBUG("trying to pack #%d `%s' somewhere\n", edge->id, show_orth_leaves(edge));
 
 	try_more:
+	candidates = (edge->have==edge->need)?c->p_edges:(edge->rule->rtl?c->ar_edges:c->al_edges);
+	ncandidates = (edge->have==edge->need)?c->p_nedges:(edge->rule->rtl?c->ar_nedges:c->al_nedges);
 	for(i=0;i<ncandidates && (h=candidates[i]);i++)
 		if( h->have == edge->have && h->need == edge->need
 		&& (g_mode != GENERATING || h->ep_span == edge->ep_span)
@@ -221,8 +266,16 @@ int	pack_edge(struct edge	*edge)
 			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
 			if(ssd == 1 || (ssd == 2 && !h->frozen))
 			{
+				// h subsumes edge
 				if(same_cell_daughter(edge, h))
 				{
+					// h is a descendent of edge
+					// packing would cause a loop in unpacking
+					// could happen if a rule produces a result
+					// that is compatible with but more specific than
+					// a descendent with the same span.
+					// sounds like poor grammar engineering, but conceivable.
+					// with ERG-1004 on 'CSLI' at least, this never happens.
 					//printf("blocked same-cell-daughter packing\n");
 					continue;
 				}
@@ -236,8 +289,15 @@ int	pack_edge(struct edge	*edge)
 			else if((ssd == -1 || ssd == 2) && 1)
 			{
 				int was_frozen = h->frozen;
+				// edge subsumes h
 				if(same_cell_daughter(h, edge))
 				{
+					// edge is a descendent of h
+					// packing would cause a loop in unpacking
+					// how could this happen?
+					// to build 'h', 'edge' would already have to be in the chart... 
+					// this should never be reached.
+					assert(!"not reached");
 					//printf("blocked same-cell-daughter packing\n");
 					continue;
 				}
@@ -267,7 +327,7 @@ int	pack_edge(struct edge	*edge)
 				}
 				else
 				{
-					//printf("claimed #%d also\n", h->id);
+					PACKBUG("claimed #%d also\n", h->id);
 					if(h->npack)
 					{
 						edge->pack = memcpy(slab_alloc(sizeof(struct edge*)*(edge->npack+h->npack)), edge->pack, sizeof(struct edge*)*edge->npack);
@@ -285,9 +345,11 @@ int	pack_edge(struct edge	*edge)
 				}
 				already_packed = 1;
 				// keep going!
-				//candidates = c->p_edges;
-				//ncandidates = c->p_nedges;
-				//goto try_more;
+				// NOTE: this goto is here
+				// to force the loop to restart
+				// because we have no way to know how severely
+				// upward_kill() reorganized the list of candidates in the cell
+				goto try_more;
 				//return 2;	// tell caller the edge is in the chart but requires further processing
 			}
 			/*else
@@ -307,6 +369,9 @@ void packing_report()
 	fprintf(stderr, "NOTE: %lld packings (%.1f%% success), %lld / %lld = %.1f%% copies\n", packcount, 100*(float)packcount / packtry,
 		copycount, copytraverse, 100*(float)copycount / copytraverse);
 #endif
-	if(debug_level)fprintf(stderr, "NOTE: %lld subsumption tests; qc filters %.1f%% leaving %lld, of which ss passes %.1f%% = %lld\n",
-		packtry, 100 - 100*(float)packqc/packtry, packqc, 100*(float)packss/packqc, packss);
+	if(debug_level)
+	{
+		fprintf(stderr, "NOTE: %lld subsumption tests; qc filters %.1f%% leaving %lld, of which ss passes %.1f%% = %lld\n",
+			packtry, 100 - 100*(float)packqc/packtry, packqc, 100*(float)packss/packqc, packss);
+	}
 }
