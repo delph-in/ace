@@ -1,5 +1,6 @@
 #include	<stdio.h>
 #include	<stdlib.h>
+#include	<string.h>
 
 #define	LOAD_FACTOR	1.0
 #define	GROW_FACTOR 2.0
@@ -100,6 +101,74 @@ struct hash	*freeze_hash(struct hash	*ht)
 	*nh = *ht;
 	nh->buckets = slab_alloc(sizeof(struct hash_bucket*) * nh->size);
 	buck = slab_alloc(sizeof(struct hash_bucket) * nh->entries);
+	for(i=0;i<nh->size;i++)
+	{
+		Bp = &nh->buckets[i];
+		for(walk=ht->buckets[i];walk;walk=walk->next)
+		{
+			*Bp = buck;
+			Bp = &buck->next;
+			buck->key = freeze_string(walk->key);
+			buck->value = walk->value;
+			buck++;
+		}
+		*Bp = 0;
+	}
+	//printf("freezing hash %s bucket pointers at %p\n", ht->name, nh->buckets);
+	nh->name = freeze_string(ht->name);
+
+	return nh;
+}
+
+void	hash_free(struct hash	*ht)
+{
+	int	i;
+	for(i=0;i<ht->size;i++)
+	{
+		while(ht->buckets[i])
+		{
+			struct hash_bucket	*b = ht->buckets[i];
+			ht->buckets[i] = b->next;
+			free(b->key);
+			free(b);
+		}
+	}
+	free(ht->buckets);
+	free(ht);
+}
+
+size_t	hash_memory_usage(struct hash	*ht)
+{
+	size_t	len = sizeof(*ht);
+	int	i;
+	len += sizeof(struct hash_bucket*) * ht->size;
+	len += sizeof(struct hash_bucket) * ht->entries;
+	for(i=0;i<ht->size;i++)
+	{
+		struct hash_bucket	*b;
+		for(b = ht->buckets[i];b;b=b->next)
+			len += strlen(b->key) + 1;
+	}
+	len += strlen(ht->name) + 1;
+	return len;
+}
+
+struct hash	*hash_copy(struct hash	*ht, void*	(*alloc)(size_t	len))
+{
+	struct hash	*nh = alloc(sizeof(struct hash));
+	struct hash_bucket	*buck, **Bp, *walk;
+	int				i;
+
+	char	*freeze_string(char	*S)
+	{
+		char	*c = alloc(strlen(S)+1);
+		strcpy(c, S);
+		return c;
+	}
+
+	*nh = *ht;
+	nh->buckets = alloc(sizeof(struct hash_bucket*) * nh->size);
+	buck = alloc(sizeof(struct hash_bucket) * nh->entries);
 	for(i=0;i<nh->size;i++)
 	{
 		Bp = &nh->buckets[i];
