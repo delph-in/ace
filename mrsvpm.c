@@ -337,6 +337,10 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 	vout->nprops = 0;
 	vout->props = NULL;
 
+	static struct mrs_var_property	*tmp_props = NULL;
+	if(!tmp_props)tmp_props = malloc(sizeof(struct mrs_var_property) * 1024);
+	vout->props = tmp_props;
+
 	for(i=0;i<v->ncontexts;i++)
 	{
 		struct vpm_context *ctx = v->contexts+i;
@@ -373,13 +377,17 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 				//printf("mapping values: %s...; result = %s\n", values[0], nval);
 				if(!nval)continue; // don't include NULL outputs (the VPM rule drops this property in this case)
 				vout->nprops++;
-				vout->props = slab_realloc(vout->props, sizeof(struct mrs_var_property)*(vout->nprops-1),
-														sizeof(struct mrs_var_property)*vout->nprops);
+				assert(vout->nprops < 1024);
+//				vout->props = slab_realloc(vout->props, sizeof(struct mrs_var_property)*(vout->nprops-1),
+//														sizeof(struct mrs_var_property)*vout->nprops);
 				vout->props[vout->nprops-1].name = ctx->output[j];
 				vout->props[vout->nprops-1].value = nval;
 			}
 		}
 	}
+
+	vout->props = slab_alloc(sizeof(struct mrs_var_property) * vout->nprops);
+	memcpy(vout->props, tmp_props, sizeof(struct mrs_var_property) * vout->nprops);
 	//printf("input: ");print_mrs_var(vin);printf("\n");
 	//printf("converted: ");print_mrs_var(vout);printf("\n");
 	return vout;
