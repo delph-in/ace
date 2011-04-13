@@ -72,7 +72,11 @@ void	clear_slab()
 	}
 	else
 	{
-		if(noldslabs)accum_ram_usage += SLAB_SIZE*(noldslabs-1) + slabu;
+		if(noldslabs)
+		{
+			unsigned long long	ram = (unsigned long long)SLAB_SIZE*(noldslabs-1) + slabu;
+			accum_ram_usage += ram;
+		}
 		// leave up to 64 allocated slabs around for next parse!
 		if(aoldslabs>64)
 		{
@@ -133,11 +137,17 @@ struct dg	*walk_dg(struct dg	*dg, int *save, ...)
 	va_start(va, save);
 	if(save[0]==-1)
 	{
-		while((fname = va_arg(va, char*)) != 0)
-			if(dg)dg = dg_hop(dg, save[i++] = lookup_fname(fname));
+		while((fname = va_arg(va, char*)) != NULL)
+		{
+			save[i] = lookup_fname(fname);
+			if(dg)dg = dg_hop(dg, save[i]);
+			i++;
+		}
 	}
-	else while((fname = va_arg(va, char*)) != 0)
-			if(dg)dg = dg_hop(dg, save[i++]);
+	else while((fname = va_arg(va, char*)) != NULL)
+	{
+		if(dg)dg = dg_hop(dg, save[i++]);
+	}
 	va_end(va);
 	return dg;
 }
