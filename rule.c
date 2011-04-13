@@ -13,8 +13,6 @@
 #include	"freeze.h"
 #include	"lexicon.h"
 
-//#define	RULE_STATS
-
 struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels);
 
 struct rule	**rules;
@@ -51,8 +49,8 @@ void	rule_stats()
 		nptry+=nptries[i];
 	}
 	//nptry += nptries[nrules];
-	fprintf(stderr, "NOTE: %d active (%d hyper) / %d passive edges total (%d actives used, %d passives used, %d reformed) ; %d final edges\n", nact, nhact, npass, used_total, pused_total, nrec, nfinal);
-	fprintf(stderr, "NOTE: %d a-tries = %.1f%%, %d p-tries = %.1f%%\n", natry, 100*(float)natry / nact, nptry, 100*(float)nptry / npass);
+//	fprintf(stderr, "NOTE: %d active (%d hyper) / %d passive edges total (%d actives used, %d passives used, %d reformed) ; %d final edges\n", nact, nhact, npass, used_total, pused_total, nrec, nfinal);
+//	fprintf(stderr, "NOTE: %d a-tries = %.1f%%, %d p-tries = %.1f%%\n", natry, 100*(float)natry / nact, nptry, 100*(float)nptry / npass);
 	free(nactive);
 	free(npassive);
 	free(nhactive);
@@ -174,11 +172,8 @@ struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels)
 	return dg;
 }
 
-// this only adds syntax rules, not lexical rules
-void	agenda_rules(int	count)
+init_rstats()
 {
-	int	i, j, rtl, nlf = 0;
-
 #ifdef	RULE_STATS
 	if(!nactive)
 	{
@@ -191,6 +186,12 @@ void	agenda_rules(int	count)
 		nptries = calloc(sizeof(int),nrules+1);
 	}
 #endif
+}
+
+// this only adds syntax rules, not lexical rules
+void	agenda_rules(int	count)
+{
+	int	i, j, rtl, nlf = 0;
 
 	for(i=0;i<=count;i++)
 	{
@@ -341,7 +342,7 @@ int	load_rules()
 		return 0;
 	}
 	iterate_conf_list("spanning-only-rules", rule_does_not_exist);
-	iterate_conf_list("xfragment-only-rules", rule_does_not_exist);
+	iterate_conf_list("fragment-only-rules", rule_does_not_exist);
 	iterate_conf_list("hyper-active-rules", rule_does_not_exist);
 	return 0;
 }
