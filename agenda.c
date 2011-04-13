@@ -50,7 +50,7 @@ void	add_agenda(struct edge	*e)
 {
 	struct task	*t = slab_alloc(sizeof(struct task));
 
-	if(trace && e->lex && !e->need)
+	if(trace && e->lex && e->have==e->need)
 	{
 		struct lexeme	*lex = e->lex;
 		printf("added lexeme `%s' = #%d  [%d-%d]\n", lex->word, e->id, e->from, e->to);
@@ -82,6 +82,12 @@ void	add_agenda(struct edge	*e)
 	if(e->lex && !lstart[e->from])lstart[e->from] = t;
 
 	if(e->prio > highest)highest = e->prio;
+
+	if(e->have == e->need)
+	{
+		extern unsigned long long total_passives;
+		total_passives++;
+	}
 }
 
 struct edge	*next_agenda(int	from_start)
