@@ -52,3 +52,10 @@ make STEM actually be updated by ortho rules; apparently some grammars depend on
 make unpacking support 2+-ary
 
 loading: use an instance to define configuration paths?
+
+worthwhile experiment:
+	check to be sure we're actually doing maxent correctly!
+	- we weren't, quite: we were ignoring scores for surface strings
+	- we get the gold tree for CSLI 79.2% of the time now
+	- we get the gold tree for the first 70 trees in WS01 67.1% of the time
+	- looks like it's working properly.
