@@ -33,10 +33,12 @@ show_me()
 	fprintf(stderr, "MAXENT: %d visits / %d requests = %.1f per\n", nmaxent_visits, nmaxent_requests, (float)nmaxent_visits / nmaxent_requests);
 }
 
-float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl, struct scoring_ancestry	*anc)
+// visit all maxent features containing this local subtree and compatible with the ancestry
+// add up their scores
+float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl_unused, struct scoring_ancestry	*anc)
 {
 	float ret = 0;
-	char	*key = rtl?rhs2:rhs1;
+	//char	*key = rtl?rhs2:rhs1;
 	char	hkey[512];
 
 	void visitor(struct maxent_feature *feat)
