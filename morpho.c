@@ -4,6 +4,7 @@
 #include	<limits.h>
 #include	<wchar.h>
 #include	<ctype.h>
+#include	"unicode.h"
 
 #define	USE_GENERICS
 
@@ -146,6 +147,16 @@ void add_mwe_routes(struct edge *e, struct ochart_edge *pre, struct ochart_edge 
 
 char	*disable_signs = 0;
 
+show_form_to_relation(struct edge	*le, struct token	**toklist)
+{
+	if(le->lex->stemlen > 1)return 0;
+	// SYNSEM LKEYS KEYREL PRED
+	static int save[100] = {-1};
+	struct dg	*preddg = walk_dg(le->dg, save, "SYNSEM", "LKEYS", "KEYREL", "PRED", NULL);
+	if(!preddg) fprintf(stderr, "warning: lexeme `%s' has null pred\n", le->lex->word);
+	else printf("FORM-TO-RELATION	%s	%s\n", toklist[0]->string, preddg->xtype->name);
+}
+
 int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, struct token	**tokens))
 {
 	int				i, j, k;
@@ -274,13 +285,16 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 					le->north_routes = e->north_routes;
 					le->orth_routes = e->orth_routes;
 					if(install_tokens_in_le(le, &t) != 0)return 0;
+					extern int form_to_relation;
+					if(form_to_relation)
+						show_form_to_relation(le, &t);
 					edge_handler(le, &t);
 					return 1;
 				}
 			}
 			visit_lexicon(e->form, lex_handler);
 		}
-#ifdef	USE_GENERICS
+/*#ifdef	USE_GENERICS
 		char	*carg = get_token_carg(t);
 		//printf("carg='%s' for token; trying generic entries (postag = %s)\n", carg, t->postag);
 		struct ochart_edge	*carg_e = NULL;
@@ -290,11 +304,6 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		{
 			for(j=0;j<ngeneric_les;j++)
 			{
-				/*printf(" .. trying generic '%s', dag: ", generic_les[j]->word);
-				print_dg(generic_les[j]->dg); printf("\n");
-				printf(" .. token dag: ");
-				print_dg(t->dg);
-				printf("\n");*/
 				if(test_first_token_in_lex_dg(generic_les[j]->dg, t) != 0)
 				{
 					//fprintf(stderr, "TEST rejected generic '%s'\n", generic_les[j]->word);
@@ -305,6 +314,30 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 				le->orth_routes = carg_e->orth_routes;
 				if(install_tokens_in_le(le, &t) != 0)continue;
 				//fprintf(stderr, "for carg '%s' and pos '%s', issued generic '%s'\n", carg, t->postag, le->lex->word);
+				edge_handler(le, &t);
+			}
+		}
+#endif*/
+#ifdef	USE_GENERICS
+		int k;
+		for(k=0;k<oc->nedges;k++)
+		{
+			struct ochart_edge	*carg_e = oc->edges[k];
+			for(j=0;j<ngeneric_les;j++)
+			{
+				if(test_first_token_in_lex_dg(generic_les[j]->dg, t) != 0)
+				{
+					//fprintf(stderr, "TEST rejected generic '%s'\n", generic_les[j]->word);
+					continue;
+				}
+				struct edge	*le = lexical_edge(generic_les[j], lat_e->from->id, lat_e->to->id-lat_e->from->id, 0);
+				le->north_routes = carg_e->north_routes;
+				le->orth_routes = carg_e->orth_routes;
+				if(install_tokens_in_le(le, &t) != 0)continue;
+				//fprintf(stderr, "for carg '%s' and pos '%s', issued generic '%s'\n", carg, t->postag, le->lex->word);
+				extern int form_to_relation;
+				if(form_to_relation)
+					show_form_to_relation(le, &t);
 				edge_handler(le, &t);
 			}
 		}
