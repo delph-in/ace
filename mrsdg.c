@@ -24,6 +24,9 @@ int	inhibit_vpm = 0;
 
 // dag to mrs conversion
 
+// XXX a lot of strings in here are allocated to the heap,
+// and it doesn't look like anybody ever frees them...
+
 static inline char	*mfpath(char	*sub, int prep)
 {
 	extern char **fnames;
@@ -45,44 +48,57 @@ static inline char	*mfpath(char	*sub, int prep)
 static inline void	*slab_malloc(int l) { if(l%4)l += (4-(l%4)); return slab_alloc(l); }
 static inline void	*slab_calloc(int a, int b) { int l = a*b; void *p = slab_malloc(l); bzero(p, l); return p; }
 
-void add_var_feats(struct mrs_var *v, int label, struct dg *value)
+int add_var_feats(struct mrs_var *v, int label, struct dg *value)
 {
 	extern char **fnames;
-	int i, onp = v->nprops, flen = strlen(fnames[label]);
+	int i, flen = strlen(fnames[label]);
 
-	if(!strcmp(fnames[label], "INSTLOC"))return;
+	if(!strcmp(fnames[label], "INSTLOC"))return 0;
 
 	if(value->narcs)
 	{
 		struct dg **arcs = DARCS(value);
 		// walk inside
+		int	nnew = 0;
 		for(i=0;i<value->narcs;i++)
-			add_var_feats(v, value->label[i], arcs[i]);
+			nnew += add_var_feats(v, value->label[i], arcs[i]);
+		// prepend each of the new property names with label
+		if(v)
+		{
+			for(i=v->nprops - nnew;i<v->nprops;i++)
+				v->props[i].name = mfpath(v->props[i].name, label);
+		}
+		return nnew;
 	}
 	else
 	{
-		v->nprops++;
-		v->props = slab_realloc(v->props, sizeof(struct mrs_var_property)*(v->nprops-1),
-											sizeof(struct mrs_var_property)*v->nprops);
-		v->props[v->nprops-1].name = fnames[label];//strdup(fnames[label]);
-		v->props[v->nprops-1].value = strdup(value->xtype->name);
-		return;
+		if(v)
+		{
+			v->nprops++;
+			//v->props = slab_realloc(v->props, sizeof(struct mrs_var_property)*(v->nprops-1),
+			//									sizeof(struct mrs_var_property)*v->nprops);
+			v->props[v->nprops-1].name = fnames[label];//strdup(fnames[label]);
+			v->props[v->nprops-1].value = strdup(value->xtype->name);
+		}
+		return 1;
 	}
-	// prepend each of the new property names with label
-	for(i=onp;i<v->nprops;i++)
-		v->props[i].name = mfpath(v->props[i].name, label);
 }
 
-#define	VHSIZE	10240
+#define	VHSIZE	103928
 struct mrs_var	*varhash[VHSIZE];
 int				varind;
-static inline unsigned hashcode(struct dg	*dg) { return ((unsigned)dg>>2) % VHSIZE; }
+int	varhash_used = 0, varhash_collis = 0;
+static inline unsigned hashcode(struct dg	*dg) { return ((unsigned)dg>>5) % (VHSIZE-1); }
 
 void	clear_mrs()
 {
 	int i;
 
-	for(i=0;i<VHSIZE;i++)
+static int clear_mrs_timer = -1;
+if(clear_mrs_timer==-1)clear_mrs_timer = new_timer("mrs clear hash");
+start_timer(clear_mrs_timer);
+bzero(varhash, sizeof(struct mrs_var*) * VHSIZE);
+	/*for(i=0;i<VHSIZE;i++)
 	{
 		if(varhash[i])
 		{
@@ -90,7 +106,10 @@ void	clear_mrs()
 			//free_mrs_var(varhash[i]);
 			varhash[i] = 0;
 		}
-	}
+	}*/
+	varhash_used = 0;
+	varhash_collis = 0;
+stop_timer(clear_mrs_timer, 1);
 }
 
 struct mrs_var	*invent_mrs_var(char	*type, struct mrs_vlist	*vlist)
@@ -103,11 +122,12 @@ struct mrs_var	*invent_mrs_var(char	*type, struct mrs_vlist	*vlist)
 	var->refs = 1;
 
 	vlist->nvars++;
-	vlist->vars = slab_realloc(vlist->vars, sizeof(struct mrs_var*)*(vlist->nvars-1),
-											sizeof(struct mrs_var*)*vlist->nvars);
+	assert(vlist->nvars < 10240);
 	vlist->vars[vlist->nvars-1] = var;
 	return var;
 }
+
+int	nvars_extracted = 0;
 
 struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 {
@@ -133,45 +153,49 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 			var->refs = 2;
 			var->vnum = vlist->nvars;
 			//printf("reuse dg %p, think var %p\n", dg, varhash[hc]);
-			vlist->nvars++;
-			vlist->vars = slab_realloc(vlist->vars, sizeof(struct mrs_var*)*(vlist->nvars-1),
-													sizeof(struct mrs_var*)*vlist->nvars);
-			vlist->vars[vlist->nvars-1] = var;
-			dg->copy = (void*)var;
-			dg->gen = 1;
-			return var;
 		}
-
-		var = slab_calloc(sizeof(struct mrs_var), 1);
-		if(!descendent_of(dg->type->tnum, semarg)) var->is_const = 1;
-		var->dg = dg;
-		var->type = var->is_const?strdup("c"):strdup(dg->type->name);
-		var->name = strdup(dg->type->name);
-		var->vnum = vlist->nvars;
-		var->refs = 1;
-		if(!var->is_const)
+		else
 		{
-			for(i=0;i<dg->narcs;i++)
-				add_var_feats(var, dg->label[i], arcs[i]);
-
-			if(!inhibit_vpm)
-			{
-				vnew = internal_to_external_mrs_var(var);
-				//free_mrs_var(var);
-				var = vnew;
-			}
+			static int var_extract_timer = -1;
+			if(var_extract_timer == -1)var_extract_timer = new_timer("mrs var extr");
+			start_timer(var_extract_timer);
+			var = slab_calloc(sizeof(struct mrs_var), 1);
+			if(!descendent_of(dg->type->tnum, semarg)) var->is_const = 1;
+			var->dg = dg;
+			var->type = var->is_const?strdup("c"):strdup(dg->type->name);
+			var->name = strdup(dg->type->name);
+			var->vnum = vlist->nvars;
 			var->refs = 1;
+			if(!var->is_const)
+			{
+				int	nprops = 0;
+				for(i=0;i<dg->narcs;i++)
+					nprops += add_var_feats(NULL, dg->label[i], arcs[i]);
+				var->props = slab_alloc(sizeof(struct mrs_var_property)*nprops);
+				for(i=0;i<dg->narcs;i++)
+					add_var_feats(var, dg->label[i], arcs[i]);
+
+				if(!inhibit_vpm)
+				{
+					vnew = internal_to_external_mrs_var(var);
+					//free_mrs_var(var);
+					var = vnew;
+				}
+			}
+			//printf("new var %p dg %p\n", var, dg);
+			//if(varhash[hc])free_mrs_var(varhash[hc]);
+			if(varhash[hc])varhash_collis++;
+			else varhash_used++;
+			varhash[hc] = var; var->refs++;
+			nvars_extracted++;
+			stop_timer(var_extract_timer, 1);
 		}
 
 		vlist->nvars++;
-		vlist->vars = slab_realloc(vlist->vars, sizeof(struct mrs_var*)*(vlist->nvars-1),
-												sizeof(struct mrs_var*)*vlist->nvars);
+		assert(vlist->nvars < 10240);
 		vlist->vars[vlist->nvars-1] = var;
 		dg->copy = (void*)var;
 		dg->gen = 1;
-		//printf("new var %p dg %p\n", var, dg);
-		//if(varhash[hc])free_mrs_var(varhash[hc]);
-		varhash[hc] = var; var->refs++;
 		return var;
 	}
 	//printf("back to dg %p, think var %p\n", dg, dg->copy);
@@ -200,17 +224,24 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 		exit(-1);
 	}
 	bzero(ep, sizeof(*ep));
-	ep->pred = strdup(pred->xtype->name);;
+	ep->pred = strdup(pred->xtype->name);
 	ep->dg = dg;
 	ep->lbl = dg_to_mrs_var(dg_hop(dg, lblf), vlist);
+	int	neps = 0;
+	for(i=0;i<dg->narcs;i++)
+	{
+		extern char	**fnames;
+		if(dg->label[i] == lblf || dg->label[i]==predf)continue;
+		if(ep_drop[dg->label[i]])continue;
+		neps++;
+	}
+	ep->args = slab_alloc(sizeof(struct mrs_ep_role) * neps);
 	for(i=0;i<dg->narcs;i++)
 	{
 		extern char	**fnames;
 		if(dg->label[i] == lblf || dg->label[i]==predf)continue;
 		if(ep_drop[dg->label[i]])continue;
 		ep->nargs++;
-		ep->args = slab_realloc(ep->args, sizeof(struct mrs_ep_role)*(ep->nargs-1),
-											sizeof(struct mrs_ep_role)*ep->nargs);
 		ep->args[ep->nargs-1].name = freeze_string(fnames[dg->label[i]]);
 		ep->args[ep->nargs-1].value = dg_to_mrs_var(arcs[i], vlist);
 	}
@@ -275,6 +306,13 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	struct dg	*hook, *rels, *hcons;
 	struct mrs	*mrs = slab_calloc(sizeof(struct mrs), 1);
 
+	// allocate temporary space for lots and lots of mrs_var*'s
+	static struct mrs_var	**tmp_vlist = NULL;
+	if(!tmp_vlist)tmp_vlist = malloc(sizeof(struct mrs_var*) * 10240);
+	// take a chance on crashing or doing some other bad thing
+	// if the MRS has more than 10240 variables...
+	mrs->vlist.vars = tmp_vlist;
+
 	name = 0;
 	if(hookf==-1)
 	{
@@ -287,7 +325,13 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	}
 	//printf("extract from cont: "); print_dg(cont); printf("\n");
 
+	static int other_timer = -1;
+	if(other_timer==-1)other_timer = new_timer("reset CONT");
+	start_timer(other_timer);
 	dgreset_r(cont);
+	stop_timer(other_timer, 1);
+
+	nvars_extracted = 0;
 
 	load_ep_drop();
 	hook = dg_hop(cont, hookf);
@@ -301,20 +345,34 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		mrs->index = dg_to_mrs_var(dg_hop(hook, indexf), &mrs->vlist);
 		mrs->xarg = dg_to_mrs_var(dg_hop(hook, xargf), &mrs->vlist);
 	}
-	// XXX come on, just go count them first... slab_realloc is slow.
+	static int	rel_timer = -1;
+	if(rel_timer == -1)rel_timer = new_timer("extract EPs");
+	start_timer(rel_timer);
+	int	nrels = 0;
+	DO_DIFFLIST(rels, struct dg *rel, nrels++; );
+	mrs->rels = slab_alloc(sizeof(struct mrs_ep) * nrels);
 	DO_DIFFLIST(rels, struct dg *rel,
 		mrs->nrels++;
-		mrs->rels = slab_realloc(mrs->rels, sizeof(struct mrs_ep)*(mrs->nrels-1),
-											sizeof(struct mrs_ep)*mrs->nrels);
 		dg_to_mrs_ep(rel, &mrs->vlist, mrs->rels+mrs->nrels-1);
 		mrs->rels[mrs->nrels-1].epnum = mrs->nrels-1;
 	);
+	stop_timer(rel_timer, nrels);
+	static int	hc_timer = -1;
+	if(hc_timer == -1)hc_timer = new_timer("extract HCs");
+	start_timer(hc_timer);
+	int	nhc = 0;
+	DO_DIFFLIST(hcons, struct dg *hc, nhc++; );
+	mrs->hcons = slab_alloc(sizeof(struct mrs_hcons) * nhc);
 	DO_DIFFLIST(hcons, struct dg *hc,
 		mrs->nhcons++;
-		mrs->hcons = slab_realloc(mrs->hcons, sizeof(struct mrs_hcons)*(mrs->nhcons-1),
-												sizeof(struct mrs_hcons)*mrs->nhcons);
 		dg_to_mrs_hc(hc, &mrs->vlist, mrs->hcons+mrs->nhcons-1);
 	);
+	stop_timer(hc_timer, nhc);
+	// give ``mrs'' its own slab allocated vlist
+	mrs->vlist.vars = slab_alloc(sizeof(struct mrs_var*) * mrs->vlist.nvars);
+	memcpy(mrs->vlist.vars, tmp_vlist, sizeof(struct mrs_var*) * mrs->vlist.nvars);
+
+	//printf("extracted %d / %d vars ; %d / %d spots used in cache with %d collisions\n", nvars_extracted, mrs->vlist.nvars, varhash_used, VHSIZE, varhash_collis);
 	return mrs;
 }
 

@@ -485,6 +485,9 @@ char	*mrs_end = "\n";
 void	print_mrs(struct mrs	*mrs)
 {
 	int	i;
+	static int	timer = -1;
+	if(timer==-1)timer = new_timer("mrs printing");
+	start_timer(timer);
 
 	marked = calloc(sizeof(char), mrs->vlist.nvars);
 
@@ -519,6 +522,7 @@ void	print_mrs(struct mrs	*mrs)
 	printf(" > ]%s", mrs_end);
 
 	free(marked); marked = 0;
+	stop_timer(timer, 1);
 }
 
 #ifndef	NOTESTING
