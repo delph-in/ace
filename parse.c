@@ -49,7 +49,11 @@ static int	parse_process_edge(struct edge	*e)
 
 	if(!inhibit_pack && e->have == e->need)
 	{
+		static int packtimer = -1;
+		//if(packtimer==-1)packtimer = new_timer("packing");
+		//start_timer(packtimer);
 		pack = pack_edge(e);
+		//stop_timer(packtimer, 1);
 		if(pack==1)
 			return 0;	// big savings! woohoo!
 	}
@@ -292,7 +296,11 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 
 	// do lexical lookup
 	struct lattice	*lexical_chart = lexical_lookup_into_chart(token_chart);
-	if(!lexical_chart)return -1;
+	if(!lexical_chart)
+	{
+		fprintf(stderr, "NOTE: failed to build lexical chart\n");
+		return -1;
+	}
 
 	// do lexical parsing
 	lexical_parse_lattice(lexical_chart);
@@ -302,8 +310,17 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 
 	// setup the main parse chart
 	nwords = prepare_parse_chart(lexical_chart);
+	if(nwords < 0)
+	{
+		fprintf(stderr, "NOTE: negative lexical chart length\n");
+		return -1;
+	}
 	assert(nwords >= 0);
-	if(!nwords)return -1;
+	if(!nwords)
+	{
+		fprintf(stderr, "NOTE: nothing to parse\n");
+		return -1;
+	}
 
 	//if(lexical_lookup_into_chart(token_chart)) { fprintf(stderr, "NOTE: lexical coverage gap\n");  return -1; }
 	if(reduce_chart(nwords)) { fprintf(stderr, "NOTE: post reduction gap\n"); return -1; }
@@ -349,8 +366,12 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 			{
 				mrs_end = " ; ";
 				print_mrs(mrs);
-				print_hypothesis(hyp, printf);
-				printf((mrs_end = "\n"));
+				char	*dstr = hypothesis_to_dstring(hyp);
+				puts(dstr);
+				free(dstr);
+				mrs_end = "\n";
+				//print_hypothesis(hyp, printf);
+				//printf((mrs_end = "\n"));
 			}
 			else print_mrs(mrs);
 		}
@@ -359,17 +380,29 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		//printf("dstring = `%s'\n", slab_escape(hypothesis_to_dstring(hyp)));
 		return 1;
 	}
-	if(chart_size>0)
-		num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
-	else num_parses = 0;
-	if(num_parses && !inhibit_results)printf("\n\n");
-	fflush(stdout);
+	if(!do_itsdb)
+	{
+		if(chart_size>0)
+			num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
+		else num_parses = 0;
+		if(num_parses && !inhibit_results)printf("\n\n");
+		fflush(stdout);
+
+		fprintf(stderr, "NOTE: %d readings, added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
+			num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
+		print_slab_stats();
+	}
+	else
+	{
+		num_parses = itsdb_report(nwords, words, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
+	}
+
+//	extern int	output_edge_vectors;
+//	if(output_edge_vectors)
+//		do_output_edge_vectors();
 
 	t_unpack = timer();
 
-	fprintf(stderr, "NOTE: %d readings, added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
-		num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
-	print_slab_stats();
 	if(lui_mode)
 	{
 		if(num_parses)
@@ -390,8 +423,6 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		//ond = ndecomposed;
 		fflush(f);
 	}
-
-	if(do_itsdb)itsdb_report(nwords, words, num_parses, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
 
 	return num_parses;
 }
@@ -440,9 +471,9 @@ int	check_mbs(char	*mbs);
 		goto finished;
 	}
 
-	if(nwords>60)
+	if(nwords>70)
 	{
-		fprintf(stderr, "NOTE: 0 readings, too many words (60+)\n");
+		fprintf(stderr, "NOTE: 0 readings, too many words (70+)\n");
 		if(!inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
 		goto finished;
 	}

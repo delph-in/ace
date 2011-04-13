@@ -9,6 +9,7 @@
 #ifdef	TSDB
 #include	<itsdb.h>
 #else
+//#define capi_printf	printf
 #define capi_printf(fmt,...)
 #endif
 
@@ -87,21 +88,21 @@ static int process_item(int i_id, char *i_input, int parse_id,
 	if(error)capi_printf(" (:error \"%s\")", error);
 }
 
-itsdb_report(int nwords, char **words, int readings, int	tforest)
+itsdb_report(int nwords, char **words, int	tforest)
 {
 	extern int total_edges, real_edges, passive_edges, slab_usage();
+
+	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
+	capi_printf("(:tcpu . %d) ", tforest);
+
+	int	readings = capi_print_derivations(nwords, words);
 
 	capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
 		readings, passive_edges, real_edges - passive_edges);
 
 	capi_printf("(:others . %d) ", slab_usage());
 
-	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
-	capi_printf("(:tcpu . %d) ", tforest);
-
-	capi_print_derivations(nwords, words);
-
-	return 0;
+	return readings;
 }
 
 itsdb_report_gen(int readings)
@@ -145,19 +146,30 @@ itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 	capi_printf("(:score . %f)) ", hyp->score);
 }
 
-#define DER_PRINTF capi_printf
-//#define DER_PRINTF(x...) fprintf(stderr, x)
-capi_print_derivations(int nwords, char **words)
+char	*heap_escape(char	*str)
+{
+	int	len = strlen(str) * 2 + 1;
+	char	*esc = malloc(len), *ep = esc;
+	while(*str)
+	{
+		if(*str=='\\' || *str=='"')
+			*ep++ = '\\';
+		*ep++ = *str++;
+	}
+	*ep = 0;
+	return esc;
+}
+
+int	capi_print_derivations(int nwords, char **words)
 {
 	int id;
 
-#ifdef	TSDB
 	capi_printf("(:results . (");
 	id = 0;
 	int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
 		char	*derivation = hypothesis_to_dstring(hyp);
-		char	*esc = slab_escape(derivation);
+		char	*hesc = heap_escape(derivation), *esc = hesc;
 		free(derivation);
 		capi_printf("((:result-id . %d) (:derivation .\"", id++);
 		// capi_printf can only handle 1kb chunks at a time... :blink:
@@ -167,12 +179,18 @@ capi_print_derivations(int nwords, char **words)
 			esc += 1000;
 		}
 		capi_printf("%s", esc);
+		free(hesc);
 		capi_printf("\") (:score .%f))", hyp->score);
+#ifndef TSDB
+		capi_printf("\n");
+#endif
 		return 1;
 	}
-	iterate_cell_root_hypotheses(&cells[chart_size-1], capi_print_tree, best_only);
+	extern int want_mrs;
+	want_mrs = 0;
+	int	n = iterate_cell_root_hypotheses(&cells[chart_size-1], capi_print_tree, best_only);
 	capi_printf("))");
-#endif
+	return n;
 }
 
 static int complete_test_run(int run_id, char *custom)
