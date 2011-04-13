@@ -49,9 +49,11 @@ unsigned long long unify_clock, unify_count;
 
 struct edge	*sentential = 0;
 
+//#define	MAX_CHUNKS	60000	// when to give up on a parse
+#define	MAX_CHUNKS	6000	// when to give up on a parse
 //#define	MAX_CHUNKS	2560	// when to give up on a parse
 //#define	MAX_CHUNKS	1200		// when to give up on a parse
-#define	MAX_CHUNKS	800		// when to give up on a parse
+//#define	MAX_CHUNKS	800		// when to give up on a parse
 //#define	MAX_CHUNKS	71	// when to give up on a parse
 
 //#define	EXCURSION
@@ -106,7 +108,6 @@ void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge)
 		cell->p_edges = realloc(cell->p_edges, sizeof(struct edge*) * cell->p_nedges);
 		cell->p_edges[cell->p_nedges-1] = edge;
 		passive_edges++;
-		total_passives++;
 	}
 	else if(edge->rtl)
 	{
@@ -135,7 +136,8 @@ void	add_edge_to_chart(struct edge	*edge)
 int	trace = 0, gen_qc = 0;
 
 //#define TIM
-//double base_unify_time = 0, base_finalize_time = 0;
+double base_unify_time = 0, base_finalize_time = 0;
+long long nbase_unify = 0, nbase_finalize = 0;
 
 void	setup_lexrule_edge(struct edge	*e)
 {
@@ -216,7 +218,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 		if(!signtype)signtype = lookup_type("sign");
 
 		// building passive
-		if(a->dg && b->dg && !spanning && 0)
+		if(a->dg && b->dg && !spanning && !force_noha && 0)
 		{
 			// hyperpassive
 			hyperactive = 1;
@@ -246,6 +248,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
 			base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+			nbase_finalize++;
 #endif
 			if(!u)return -1;	// cycles might happen, check for them.
 #ifdef	GENERALIZE_TYPES
@@ -265,6 +268,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 	else
 	{
 		// building active
+		//a->rule->hyper = 1;	// XXX test; we've been parsing nonhyperactively
 		if(a->rule->hyper && !force_noha)
 		{
 			// hyperactive
@@ -302,6 +306,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
 			base_finalize_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+			nbase_finalize++;
 #endif
 			if(!u)return -1;	// cycles might happen, check for them.
 			qc = extract_qc_arg(u, a->rtl?(nneed-nhave-1):nhave);
@@ -416,12 +421,20 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 
 	e->hex = 0;
 #ifdef	EXCURSION
-	if(hyperactive && e->have==e->need)
+	//if(hyperactive && e->have==e->need)	// this looks wrong -- go on hyperactive excursions with passive edges???
+	if(hyperactive)
 	{
-		e->dg = dg;
-		hyperactive_excursion(e);
-		e->dg = 0;
+		if(e->have!=e->need)
+		{
+			e->dg = dg;
+			hyperactive_excursion(e);
+			e->dg = 0;
+		}
 		generation++;
+		// why we can't forget_tmp():
+		// ``e'', ``e->daughters'' and ``e->qc'' are on the slab,
+		// perhaps along with some other stuff.
+		//forget_tmp();
 	}
 #endif
 
@@ -458,7 +471,10 @@ static void	hyperactive_excursion(struct edge	*e)
 					if(b->rule && !check_rf(e->rule, b->rule, arg))continue;	// rule filter rejected this combination
 					if(!gen_qc && quickcheck(e->qc, b->qc))continue;			// quickcheck rejected this combination
 					//fprintf(stderr, "HEX %d+%d\n", e->id, b->id);
-					if(combine(e, b) == 1){}//fprintf(stderr, " +\n");
+					if(combine(e, b) == 1)
+					{
+						//fprintf(stderr, " +\n");
+					}
 					e->hex = b;
 					return;
 				}
@@ -478,7 +494,10 @@ static void	hyperactive_excursion(struct edge	*e)
 					if(b->rule && !check_rf(e->rule, b->rule, arg))continue;	// rule filter rejected this combination
 					if(!gen_qc && quickcheck(e->qc, b->qc))continue;			// quickcheck rejected this combination
 					//fprintf(stderr, "HEX %d+%d\n", e->id, b->id);
-					if(combine(e, b) == 1){}//fprintf(stderr, " +\n");
+					if(combine(e, b) == 1)
+					{
+						//fprintf(stderr, " +\n");
+					}
 					e->hex = b;
 					return;
 				}
@@ -486,6 +505,17 @@ static void	hyperactive_excursion(struct edge	*e)
 	}
 }
 #endif
+
+hyperfailure(struct edge	*e)
+{
+	printf("hyper reconstruction failed! edge #%d\n", e->id);
+	printf("rule: %s\n", e->rule->name);
+	printf("parent dag:\n");print_dg(e->ha_par);printf("\n");
+	printf("argument dag:\n");print_dg(e->ha_dg);printf("\n");
+	unify_backtrace();
+	print_current_sentence();
+	exit(-1);
+}
 
 int	recall_hyper(struct edge	*b)
 {
@@ -497,16 +527,14 @@ int	recall_hyper(struct edge	*b)
 #ifdef	RULE_STATS
 	nrecomb[b->rule->rnum]++;
 #endif
-	//printf("hyperpassive reconstruct #%d from %p[%d] <- %p\n", b->id, b->ha_dg, b->ha_arg, b->ha_par);
+	//printf("hyper reconstruct #%d from %p[%d] <- %p\n", b->id, b->ha_dg, b->ha_arg, b->ha_par);
 	if(unify_dg_tmp(b->ha_dg, b->ha_par, b->ha_arg))
-	{
-		fprintf(stderr, "hyperpassive: rescheduled unify failed!\n");
-		exit(-1);
-	}
+		hyperfailure(b);
 	b->dg = finalize_tmp(b->ha_par, (b->have==b->need)?1:0);
 #ifdef	TIM
 	gettimeofday(&tv2, 0);
 	base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+	nbase_unify++;
 #endif
 	if(!b->dg)
 	{
@@ -653,7 +681,8 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 	if(!a->dg)
 	{
 		// hyperactive parsing: we don't save active edges' dg's until they're actually used
-		if(a->ha_use > 2 || !b->dg)
+		//printf("reconstructing hyperactive #%d [%d]\n", a->id, a->ha_use);
+		if(a->ha_use > 200 || !b->dg)
 		{
 			if(recall_hyper(a))return 0;
 			rdg = a->dg;
@@ -666,11 +695,13 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 #ifdef	TIM
 			gettimeofday(&tv1, 0);
 #endif
-			unify_dg_tmp(a->ha_dg, a->ha_par, a->ha_arg);
+			int result = unify_dg_tmp(a->ha_dg, a->ha_par, a->ha_arg);
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
 			base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+			nbase_unify++;
 #endif
+			if(result != 0)hyperfailure(a);
 			rdg = a->ha_par;
 			force_noha = 1;
 			a->ha_use++;
@@ -681,7 +712,7 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 	if(!b->dg)
 	{
 		// hyperpassive parsing: we don't save passive edges' dg's until they're actually used
-		if(b->ha_use > 2 || 1)
+		if(b->ha_use > 200 || 1)
 		{
 			if(recall_hyper(b))return 0;
 			pdg = b->dg;
@@ -694,11 +725,13 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 #ifdef	TIM
 			gettimeofday(&tv1, 0);
 #endif
-			unify_dg_tmp(b->ha_dg, b->ha_par, b->ha_arg);
+			int result = unify_dg_tmp(b->ha_dg, b->ha_par, b->ha_arg);
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
 			base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+			nbase_unify++;
 #endif
+			if(result != 0)hyperfailure(b);
 			pdg = b->ha_par;
 			force_noha = 1;
 			b->ha_use++;
@@ -726,6 +759,7 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 #ifdef	TIM
 	gettimeofday(&tv2, 0);
 	base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+	nbase_unify++;
 #endif
 
 	if(!res)unify_attempts_success++;
@@ -772,6 +806,7 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 int	unify_and_build(struct edge	*a, struct edge	*b)
 {
 	struct edge	*e = NULL;
+	//printf("u_and_b #%d #%d?\n", a->id, b->id);
 	int	res = unify_and_build1(a, b, &e, !ENABLE_HYPERACTIVE);
 	if(res == -1)return -1;
 	if(e)add_agenda(e);
@@ -852,8 +887,8 @@ void	final_chart_stats()
 		fprintf(stderr, "NOTE: %lld / %lld (%.1f%%) passive edges were connected to roots\n", ndecomposed, total_passives, 100*(double)ndecomposed / total_passives);
 	}
 #ifdef TIM
-	fprintf(stderr, "NOTE: unify was %.4fs\n", base_unify_time);
-	fprintf(stderr, "NOTE: finalize was %.4fs\n", base_finalize_time);
+	fprintf(stderr, "NOTE: unify was %.4fs for %d ops = %gs\n", base_unify_time, nbase_unify, base_unify_time / nbase_unify);
+	fprintf(stderr, "NOTE: finalize was %.4fs for %d ops = %gs\n", base_finalize_time, nbase_finalize, base_finalize_time / nbase_finalize);
 	base_unify_time = 0;
 	base_finalize_time = 0;
 #endif

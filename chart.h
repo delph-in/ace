@@ -4,6 +4,8 @@
 #include	"dag.h"
 #include	"morpho.h"
 
+//#define	RULE_STATS
+
 #undef	CLOCKCOUNT
 #define	IFCLOCK(code)
 
