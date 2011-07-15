@@ -382,7 +382,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 	{
 		if(g_mode == GENERATING)
 		{
-			printf("generated #%d %d/%d from #%d, #%d for [%8.8X] with rule %s: ",
+			printf("generated #%d %d/%d from #%d, #%d for [%16.16llX] with rule %s: ",
 				e->id, e->have, e->need, a->id, b->id, e->ep_span, e->rule->name);
 			printf("%s\n", show_orth_leaves(e));
 		}

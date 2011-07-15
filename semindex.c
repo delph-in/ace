@@ -385,7 +385,7 @@ int	instantiate_alignment(struct ep_alignment	*a)
 	{
 		int i;
 		for(i=0;i<=e->nextra_preds;i++)
-			edge->ep_span |= 1<<align[i]->epnum;
+			edge->ep_span |= ((unsigned long long)1)<<align[i]->epnum;
 		add_agenda(edge);
 	}
 	return edge?1:0;
@@ -553,11 +553,13 @@ void semantic_lookup(struct mrs	*mrs)
 		ntriggers++;
 		triggers = realloc(triggers, sizeof(char*)*ntriggers);
 		triggers[ntriggers-1] = strdup(lexid);
+		//printf("trigger %s\n", lexid);
 	}
 	activate_trigger_rules(mrs, add_vac);
+	//printf("triggered %d vacuous lexemes\n", ntriggers);
 	count += evacuate(ntriggers, triggers);
 	//count += evacuate(mrs->ntriggers, mrs->triggers);
-	if(1)
+	if(0)
 	{
 		int	j;
 		for(i=0;i<mrs->ntriggers;i++)
@@ -565,14 +567,18 @@ void semantic_lookup(struct mrs	*mrs)
 			for(j=0;j<ntriggers;j++)
 				if(!strcmp(triggers[j], mrs->triggers[i]))break;
 			if(j==ntriggers)
-				fprintf(stderr, "TRIGGER_DEBUG: '%s' missing\n", mrs->triggers[i]);
+			{
+				//fprintf(stderr, "TRIGGER_DEBUG: '%s' missing\n", mrs->triggers[i]);
+			}
 		}
 		for(i=0;i<ntriggers;i++)
 		{
 			for(j=0;j<mrs->ntriggers;j++)
 				if(!strcmp(triggers[i], mrs->triggers[j]))break;
 			if(j==mrs->ntriggers)
-				fprintf(stderr, "TRIGGER_DEBUG: '%s' extra\n", triggers[i]);
+			{
+				//fprintf(stderr, "TRIGGER_DEBUG: '%s' extra\n", triggers[i]);
+			}
 		}
 	}
 	for(i=0;i<ntriggers;i++)free(triggers[i]);

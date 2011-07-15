@@ -229,6 +229,7 @@ int	pack_edge(struct edge	*edge)
 			)
 		{
 			int	fw = 1, bk = 1;
+			if(edge == h)continue;	// if we retroactively packed an existing passive into 'edge', then 'edge' is now in the chart, so be careful
 			// if nothing is subsumed by both rule schemata,
 			// then refinements of them cannot be in subsumption relations
 			if(edge->rule && h->rule)
@@ -276,6 +277,20 @@ int	pack_edge(struct edge	*edge)
 					// a descendent with the same span.
 					// sounds like poor grammar engineering, but conceivable.
 					// with ERG-1004 on 'CSLI' at least, this never happens.
+
+					// BUT it does happen with ERG-1010 on the following sentence:
+					// A bunkhouse is a hostel or barracks-like building that historically was used to house working cowboys on ranches in North America.
+					// hd_optcomp_c makes an infinite loop on [hostel or barracks- like]
+					// yuck.
+					if(ssd == 2)
+					{
+						// mother is completely equivalent to daughter.
+						// that is a loop in the grammar.
+						fprintf(stderr, "WARNING: grammar rule `%s' is loopy\n", edge->rule->name);
+						fprintf(stderr, "WARNING: edge #%d [%s] == edge #%d [%s]\n", edge->id, edge->rule->name, h->id, h->rule->name);
+						// pretend we packed it, but actually just discard it.
+						return 1;
+					}
 					//printf("blocked same-cell-daughter packing\n");
 					continue;
 				}

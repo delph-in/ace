@@ -291,6 +291,7 @@ static inline int	lexlast(struct type	*lt, int	rule)
 	return type_rltc[rule][lt->tnum];
 }
 
+// return 0 if there is at least one lexeme starting at 'x' that 'rule' can dominate on its lhs
 int	lexrulefilt_f(int	x, int	rule)
 {
 	extern char	**type_rftc;
@@ -305,6 +306,7 @@ int	lexrulefilt_f(int	x, int	rule)
 	return 1;
 }
 
+// return 0 if there is at least one lexeme ending at 'x' that 'rule' can dominate on its rhs
 int	lexrulefilt_l(int	x, int	rule)
 {
 	extern char	**type_rltc;

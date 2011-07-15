@@ -259,6 +259,7 @@ void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, 
 	if(place == tr->input.neps + tr->context.neps && place == total)
 	{
 		/*printf("produced a complete alignment for rule '%s' [%d input, %d ctx]: ", tr->name, tr->input.neps, tr->context.neps);
+		print_dg(tr->dg);
 		for(i=0;i<total;i++)
 			printf(" %d [%s]", alignment[i], mrs->rels[alignment[i]].pred);
 		printf("\n");*/

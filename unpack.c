@@ -74,6 +74,7 @@ void score_hypothesis(struct hypothesis *h)
 	{
 		// 'h' is a leaf node
 		// construct the cannonical surface form
+		if(g_mode == GENERATING)return;	// FIXME: realization ranking doesn't have access to surface forms because we have no tokens...
 		extern char	*current_sentence;
 		char	surface[1024], *sp = surface;
 		int	i;
@@ -852,6 +853,8 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 	struct hypothesis		*hyp;
 	struct edge			*edge;
 
+	if(!nbest)return exhaustive_unpack(cell);
+
 	static struct scoring_ancestry	root_ancestry = {.nparent_types=0,.parent_types=NULL, .rooted = 1};
 
 	dstr_cache_gen++;
@@ -933,5 +936,5 @@ report_unpacking()
 {
 	if(!debug_level)return;
 	fprintf(stderr, "%d total hypotheses generated\n", total_hyps);
-	fprintf(stderr, "%ld total nodes reconstructed\n", total_reconstructed_nodes);
+	fprintf(stderr, "%lld total nodes reconstructed\n", total_reconstructed_nodes);
 }

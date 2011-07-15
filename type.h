@@ -12,6 +12,10 @@ struct type
 	unsigned short	*descendents;	// we should probably do a bit vector
 
 	int		tnum;	// my type number
+
+	// immediate parents and daughters
+	int			nparents, ndaughters;
+	struct type	**parents, **daughters;
 };
 
 extern int		ntypes;
@@ -33,6 +37,8 @@ struct type	*temporary_string_type(char *string);
 struct dg	*type_dg(char		*name);
 
 struct type	*most_general_type_for_feat(int	feat);
+
+int make_glbs();
 
 void recover_typehash(void *frozen);
 void *freeze_typehash();

@@ -519,6 +519,11 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 				else
 				{
 					fprintf(stderr, "internal error: reached a non-string type with NULL dag\n");
+					fprintf(stderr, "glb of %s and %s\n", t1->name, t2->name);
+					fprintf(stderr, "type name: %s\n", t->name);
+					int k;
+					for(k=0;k<t->nparents;k++)
+						fprintf(stderr, " parent %d = %s\n", k, t->parents[k]->name);
 					exit(-1);
 				}
 			}

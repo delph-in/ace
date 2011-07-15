@@ -22,6 +22,7 @@ extern float timer();
 float	level_times[100];
 #endif
 int		level = 0;
+int	do_forest = 0;
 
 static int	parse_process_edge(struct edge	*e)
 {
@@ -380,7 +381,12 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		//printf("dstring = `%s'\n", slab_escape(hypothesis_to_dstring(hyp)));
 		return 1;
 	}
-	if(!do_itsdb)
+	if(do_forest)
+	{
+		output_forest(&cells[chart_size-1]);
+		num_parses = 1;
+	}
+	else if(!do_itsdb)
 	{
 		if(chart_size>0)
 			num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);

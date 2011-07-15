@@ -35,6 +35,7 @@ int	die = 0;
 extern int	g_loaded, inhibit_results, trace;
 extern long long	accum_ram_usage;
 extern char			*use_roots, *disable_signs;
+extern int do_forest;
 float	stdin_time = 0;
 
 int	form_to_relation = 0;
@@ -84,12 +85,13 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "hvpfEPL:lXg:G:m:qtTRe1n:r:jF"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "hvpfEPL:lXg:G:m:qtTRe1n:r:jFO"))!=255)switch(ch)
 	{
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
 		case	'G':	save_grammar_path = optarg;	break;
+		case	'O':	do_forest = 1;	break;
 		case	'E':	preprocess_only = 1;		break;
 		case	'P':	export_parts = 1;		break;
 		case	'm':	master_addr = optarg;	break;
@@ -128,6 +130,9 @@ struct job_stats	main_input_loop(FILE	*fin)
 	struct timeval		tv1, tv2;
 	float				stdin_time = 0;
 //	int	tid = new_timer((g_mode==PARSING)?"parsing":"generating");
+
+//	if(g_mode == GENERATING)	// Stephan suggested this, but it's actually slower.
+//		configure_rules_head_driven();
 
 	gettimeofday(&tv1, 0);
 	while(!die && !feof(fin))
@@ -257,6 +262,9 @@ int	main(int	argc, char	*argv[])
 	setup_signal_handlers();
 
 	//generalization_experiments();
+	/*printf("%d types\n", ntypes);
+	int i;
+	for(i=0;i<ntypes;i++)printf("%d	= %s\n", i, types[i]->name);*/
 
 //treebank_control(); return 0;
 	stats = main_input_loop(open_sentence_source());

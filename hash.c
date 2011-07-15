@@ -3,7 +3,7 @@
 #include	<string.h>
 
 #define	LOAD_FACTOR	1.0
-#define	GROW_FACTOR 2.0
+#define	GROW_FACTOR 4.0
 
 #include	"dag.h"
 #include	"hash.h"
@@ -15,6 +15,7 @@ struct hash	*hash_new(char	*name)
 	ht->name = name;
 	ht->size = 1024;
 	ht->entries = 0;
+	ht->has_flk = 0;
 	ht->buckets = calloc(sizeof(struct hash_bucket*), ht->size);
 	return ht;
 }
@@ -23,8 +24,20 @@ static inline unsigned hash_code(struct hash *ht, char	*key)
 {
 	unsigned code = 0, off = 0;
 
-	for(;*key;key++, off=(off+3)%25)
-		code ^= (*key)<<off;
+	if(ht->has_flk)
+	{
+		int	i;
+		for(i=0;i<ht->has_flk;i++)
+		{
+			int	b = i%24;
+			code ^= ((unsigned)key[i])<<b;
+		}
+	}
+	else
+	{
+		for(;*key;key++, off=(off+3)%25)
+			code ^= (*key)<<off;
+	}
 
 	return code % (ht->size - 1);
 }
@@ -75,6 +88,7 @@ void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitor)(void *value))
 	unsigned h = hash_code(ht, key);
 	struct hash_bucket	*bucket;
 	
+	assert(!ht->has_flk);
 	for(bucket=ht->buckets[h];bucket;bucket=bucket->next)
 	{
 		//printf(" visit `%s' found `%s'\n", key, bucket->key);
@@ -87,8 +101,16 @@ void		*hash_find(struct hash	*ht, char	*key)
 	unsigned h = hash_code(ht, key);
 	struct hash_bucket	*bucket;
 	
-	for(bucket=ht->buckets[h];bucket;bucket=bucket->next)
-		if(!strcmp(bucket->key, key))return bucket->value;
+	if(!ht->has_flk)
+	{
+		for(bucket=ht->buckets[h];bucket;bucket=bucket->next)
+			if(!strcmp(bucket->key, key))return bucket->value;
+	}
+	else
+	{
+		for(bucket=ht->buckets[h];bucket;bucket=bucket->next)
+			if(!memcmp(bucket->key, key, ht->has_flk))return bucket->value;
+	}
 	return 0;
 }
 
@@ -97,6 +119,8 @@ struct hash	*freeze_hash(struct hash	*ht)
 	struct hash	*nh = slab_alloc(sizeof(struct hash));
 	struct hash_bucket	*buck, **Bp, *walk;
 	int				i;
+
+	assert(!ht->has_flk);
 
 	*nh = *ht;
 	nh->buckets = slab_alloc(sizeof(struct hash_bucket*) * nh->size);

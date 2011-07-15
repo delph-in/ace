@@ -293,7 +293,7 @@ int	load_tdl(char	*path)
 		else tdlstatuses = "instances";
 	}
 
-	sprintf(doing, "loading %s", tdlstatuses); show_task_name(doing);
+	sprintf(doing, "reading %s", tdlstatuses); show_task_name(doing);
 	printf("from `%s'\n", path);
 
 	//tdllines = 0;
@@ -403,6 +403,7 @@ int	process_tdl_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	
 		if(callback(tdllines[i].lhs, tdllines[i].rhs, ref))
 		{
 			fprintf(stderr, "tdl: top-level error occured near %s:%d\n", tdllines[i].filename, tdllines[i].lnum);
+			exit(-1);
 			return -1;
 		}
 	}
@@ -1106,7 +1107,8 @@ void	load_version(char *path)
 	if(!f)
 	{
 		fprintf(stderr, "couldn't load version from `%s'\n", path);
-		exit(-1);
+		grammar_version = strdup("couldn't load version file");
+		return;
 	}
 	while(!feof(f))
 	{
@@ -1156,8 +1158,8 @@ int	load_grammar_top(char *toptdl)
 #endif
 
 	if(load_types())exit(-1);
-	if(load_rules())exit(-1);
-	if(load_lrules())exit(-1);
+	run_task("processing rules", load_rules);
+	run_task("processing lex-rules", load_lrules);
 	if(load_lexicon())exit(-1);
 	if(load_instances())exit(-1);
 	if(load_labels())exit(-1);
@@ -1166,7 +1168,7 @@ int	load_grammar_top(char *toptdl)
 
 	number_strings();
 
-	if(debug_level)
+	//if(debug_level)
 		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d orules, %d instances, %d strings, %d features\n",
 				ntypes, glb_type_count, nlexemes, nrules, norules, ninstances, nstrings, nfnames);
 	return 0;
@@ -1205,7 +1207,8 @@ int load_grammar(char	*path)
 	tdl_pop_status();
 
 	load_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
-	load_mem(get_conf_file_path(confdir, "maxent-model"));
+	int do_load_mem() { load_mem(get_conf_file_path(confdir, "maxent-model")); return 0; }
+	run_task("loading maxent model", do_load_mem);
 
 	setup_rule_filter();
 

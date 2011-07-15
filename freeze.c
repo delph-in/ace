@@ -365,6 +365,7 @@ int	freeze_grammar()
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
+	freezer_note("miscellaneous");
 	G->semindex = freeze_semantic_index();
 	G->transfer = freeze_transfer();
 	freezer_note("sem-index");
@@ -377,11 +378,13 @@ int	freeze_grammar()
 #ifdef	POST
 	G->post = slab_alloc(post_image_size());
 	post_freeze(G->post);
+	freezer_note("pos-tagger");
 #endif
 
 extern void	*token_mapping_rules, *lexical_filtering_rules;
 	G->token_mapping_rules = freeze_lattice_rule_set(token_mapping_rules);
 	G->lexical_filtering_rules = freeze_lattice_rule_set(lexical_filtering_rules);
+	freezer_note("latmap rules");
 
 	//printf("\n"); print_rule("sing_noun_infl_rule");
 

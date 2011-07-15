@@ -1,4 +1,4 @@
-PREFIX=~/local
+PREFIX=/usr/local
 
 
 
@@ -17,13 +17,14 @@ GRAM=-DERG # -DUNKNOWN=\"n_proper_le\"
 CC=gcc
 CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char ${GRAM} -falign-loops=32 -funroll-loops ${CPU}
 #CFLAGS=-g -O2 -funsigned-char ${GRAM}
+#CFLAGS=-g -O2 -pg -funsigned-char ${GRAM}
 #CFLAGS=-g -funsigned-char ${GRAM}
 #CFLAGS+=-fnested-functions
 #CFLAGS+=-fPIC
 
 CFLAGS+=${DELPHIN_CFLAGS} ${POST_CFLAGS} ${REPP_CFLAGS}
 
-OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o treebank-control.o token.o lattice-mapping.o lexical-parse.o generalize.o unicode.o transfer.o edge-vectors.o
+OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o treebank-control.o token.o lattice-mapping.o lexical-parse.o generalize.o unicode.o transfer.o edge-vectors.o forest-out.o exunpack.o semilattice.o rebuild-th.o
 
 PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o)
 

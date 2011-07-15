@@ -5,6 +5,7 @@ struct hash
 {
 	char	*name;
 	int		size, entries;
+	int		has_flk;	// fixed-length (binary) keys
 	struct hash_bucket
 	{
 		char	*key;

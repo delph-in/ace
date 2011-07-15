@@ -415,7 +415,7 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 	{
 		// dagify a const? hmm.
 		char	string[strlen(evar->name)+10];
-		sprintf(string, "%.*s", strlen(evar->name)-2, evar->name+1);
+		sprintf(string, "%.*s", (int)(strlen(evar->name)-2), evar->name+1);
 		evar->dg = atomic_dg(get_top()->name);
 		evar->dg->type = evar->dg->xtype = temporary_string_type(freeze_string(string));
 	}
@@ -427,6 +427,7 @@ void dagify_mrs_ep(struct mrs_ep *ep)
 	int			i;
 
 	dg = add_dg_feature(dg, "PRED", atomic_dg(ep->pred));
+	dg = add_dg_feature(dg, "LBL", ep->lbl->dg);
 	for(i=0;i<ep->nargs;i++)
 	{
 		if(ep->args[i].value->is_const == 0)

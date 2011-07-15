@@ -1,6 +1,7 @@
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
+#include	<stdarg.h>
 
 #ifndef	NODAG
 #include	"type.h"
@@ -93,10 +94,21 @@ static char	*parse_word(char	**P, int advance)
 	}
 	while(*p==' ')p++;
 	ret = p;
-	while(*p && *p!=' ')p++;
+	int inq = 0, esc = 0;
+	while(*p && (inq || *p!=' '))
+	{
+		if(esc) { esc = 1; }
+		else
+		{
+			if(*p=='\\')esc=1;
+			if(*p=='"')inq = !inq;
+		}
+		p++;
+	}
 	if(*p==' '){*p=0;p++;}
 	if(!advance)saved = ret;
 	*P = p;
+	if(inq) { fprintf(stderr, "MRS parsing error: bad word ended in quoted section\n"); return NULL; }
 	//if(ret)printf("word `%s'\n", ret);
 	return *ret?ret:0;
 }
@@ -299,7 +311,7 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		bzero(ep,sizeof(*ep));
 		ep->pred = (word=parse_word(P,1))?preddup(word):0;
 		ep->epnum = nrels-1;
-		struct mrs_ep_role	args[10];
+		struct mrs_ep_role	args[20];
 		while((word=parse_word(P,1)) && strcmp(word,"]"))
 		{
 			if(!strcmp(word, "LBL:"))ep->lbl = parse_mrs_var(vlist, P);
@@ -442,87 +454,131 @@ void	mrs_crange_for_x(struct mrs	*m, struct mrs_var	*x, int	quantified, int	*Fro
 	}
 }
 
-
-void	sprint_mrs_var(char	*str, struct mrs_var	*var)
+int	safe_snprintf(char	*str, int	len, char	*fmt, ...)
 {
-	int	i;
-	char *p = str;
-	p += sprintf(p, "[ %s", var->type);
+	va_list	v;
+	va_start(v, fmt);
+	if(len <= 0) { len = 0; str = NULL; }
+	int	r = vsnprintf(str, len, fmt, v);
+	va_end(v);
+	return r;
+}
+
+int	snprint_mrs_var_props(char	*str, int	len, struct mrs_var	*var)
+{
+	int	i, l=0;
+	l += safe_snprintf(str+l, len-l, "[ %s", var->type);
 	for(i=0;i<var->nprops;i++)
-		{ p += sprintf(p, " %s: %s", var->props[i].name, var->props[i].value); }
-	p += sprintf(p, " ]");
+		{ l += safe_snprintf(str+l, len-l, " %s: %s", var->props[i].name, var->props[i].value); }
+	l += safe_snprintf(str+l, len-l, " ]");
+	return l;
+}
+
+int	snprint_mrs_var(char	*str, int	len, struct mrs_var	*var)
+{
+	int	i, l=0;
+	if(!var) return safe_snprintf(str, len, "(null)");
+	if(var->is_const)return safe_snprintf(str, len, "%s", var->name);
+	else
+	{
+		l += safe_snprintf(str+l, len-l, "%s%d ", var->type, var->vnum);
+		l += snprint_mrs_var_props(str+l, len-l, var);
+		return l;
+	}
 }
 
 void	print_mrs_var_props(struct mrs_var	*var)
 {
 	char text[1024];
-	sprint_mrs_var(text, var);
+	snprint_mrs_var_props(text, 1024, var);
 	printf("%s", text);
 }
 
-char	*marked;
-
 void	print_mrs_var(struct mrs_var	*var)
 {
-	if(!var) { printf("(null)"); return; }
-	if(var->is_const)printf("%s", var->name);
-	else printf("%s%d", var->type, var->vnum);
-	if(marked && marked[var->vnum])return;
+	char	buffer[1024];
+	snprint_mrs_var(buffer, 1024, var);
+	printf("%s", buffer);
+}
+
+int	snprint_mrs_var_marked(char	*str, int	len, struct mrs_var	*var, char	*marked)
+{
+	if(marked && marked[var->vnum])
+		return safe_snprintf(str, len, "%s%d", var->type, var->vnum);
 	if(marked)marked[var->vnum] = 1;
-	if(var->nprops)
-	{
-		int	i;
-		printf(" [ %s", var->type);
-		for(i=0;i<var->nprops;i++)
-			{ printf(" %s: %s", var->props[i].name, var->props[i].value); }
-		printf(" ]");
-	}
+	return snprint_mrs_var(str, len, var);
 }
 
 char	mrs_line_breaks = ' ', mrs_tab = ' ';
 char	*mrs_end = "\n";
 
-void	print_mrs(struct mrs	*mrs)
+int	snprint_mrs(char	*str, int	len, struct mrs	*mrs)
 {
 	int	i;
 	static int	timer = -1;
 	if(timer==-1)timer = new_timer("mrs printing");
 	start_timer(timer);
 
-	marked = calloc(sizeof(char), mrs->vlist.nvars);
+	char	*marked = calloc(sizeof(char), mrs->vlist.nvars);
+	int	l = 0;
 
-	printf("[ LTOP: "); print_mrs_var(mrs->ltop);
-	printf("%cINDEX: ", mrs_line_breaks); print_mrs_var(mrs->index);
-//	printf("%cXARG: ", mrs_line_breaks); print_mrs_var(mrs->xarg);
-	printf("%cRELS: <", mrs_line_breaks);
+	l += safe_snprintf(str+l, len-l, "[ LTOP: ");
+	l += snprint_mrs_var_marked(str+l, len-l, mrs->ltop, marked);
+	l += safe_snprintf(str+l, len-l, "%cINDEX: ", mrs_line_breaks);
+	l += snprint_mrs_var(str+l, len-l, mrs->index);
+
+	l += safe_snprintf(str+l, len-l, "%cRELS: <", mrs_line_breaks);
 	for(i=0;i<mrs->nrels;i++)
 	{
 		struct mrs_ep	*ep = mrs->rels+i;
 		int				j;
-		printf("%c[ %s CFROM: %d CTO: %d LBL: ", mrs_tab, ep->pred, ep->cfrom, ep->cto); print_mrs_var(ep->lbl);
+		l += safe_snprintf(str+l, len-l, "%c[ %s CFROM: %d CTO: %d LBL: ", mrs_tab, ep->pred, ep->cfrom, ep->cto);
+		l += snprint_mrs_var_marked(str+l, len-l, ep->lbl, marked);
 		for(j=0;j<ep->nargs;j++)
-			{ printf(" %s: ", ep->args[j].name);
-				if(ep->args[j].value)print_mrs_var(ep->args[j].value);
-				else printf(" (null)"); }
-		printf(" ]");
-		if(i+1 != mrs->nrels)putchar(mrs_line_breaks);
+		{
+			l += safe_snprintf(str+l, len-l, " %s: ", ep->args[j].name);
+			if(ep->args[j].value)
+				l += snprint_mrs_var_marked(str+l, len-l, ep->args[j].value, marked);
+			else l += safe_snprintf(str+l, len-l, " (null)");
+		}
+		l += safe_snprintf(str+l, len-l, " ]");
+		if(i+1 != mrs->nrels)
+			l += safe_snprintf(str+l, len-l, "%c", mrs_line_breaks);
 	}
-	printf(" >");
-	printf("%cHCONS: <", mrs_line_breaks);
+	l += safe_snprintf(str+l, len-l, " >");
+	l += safe_snprintf(str+l, len-l, "%cHCONS: <", mrs_line_breaks);
 	for(i=0;i<mrs->nhcons;i++)
 	{
 		struct mrs_hcons	*hc = mrs->hcons+i;
-		printf(" "); print_mrs_var(hc->hi);
+		l += safe_snprintf(str+l, len-l, " ");
+		l += snprint_mrs_var_marked(str+l, len-l, hc->hi, marked);
 		switch(hc->type) {
-			case hcons_qeq: printf(" qeq "); break;
-			case hcons_leq: printf(" leq "); break;
-			case hcons_geq: printf(" geq "); break; }
-		print_mrs_var(hc->lo);
+			case hcons_qeq: l += safe_snprintf(str+l, len-l, " qeq "); break;
+			case hcons_leq: l += safe_snprintf(str+l, len-l, " leq "); break;
+			case hcons_geq: l += safe_snprintf(str+l, len-l, " geq "); break; }
+		l += snprint_mrs_var_marked(str+l, len-l, hc->lo, marked);
 	}
-	printf(" > ]%s", mrs_end);
+	l += safe_snprintf(str+l, len-l, " > ]%s", mrs_end);
 
-	free(marked); marked = 0;
+	free(marked);
 	stop_timer(timer, 1);
+	return l;
+}
+
+void	print_mrs(struct mrs	*m)
+{
+	int	blen = 1024 + 1024 * m->nrels;
+	char	buffer[blen];
+	int	l = snprint_mrs(buffer, blen, m);
+	if(l >= blen)
+	{
+		blen = l + 1;
+		char	*b2 = malloc(blen);
+		snprint_mrs(b2, blen, m);
+		fwrite(b2, l, 1, stdout);
+		free(b2);
+	}
+	else fwrite(buffer, l, 1, stdout);
 }
 
 #ifndef	NOTESTING

@@ -41,7 +41,8 @@ struct edge
 
 	struct unpack_info *unpack;
 
-	unsigned int	ep_span;
+	unsigned long long	ep_span;
+	unsigned long long	accessible_vars, inaccessible_vars;
 
 	int			ntries;
 	int			npack;
@@ -98,7 +99,7 @@ void	setup_lexrule_edge(struct edge	*e);
 
 extern struct chart_cell	*cells;
 extern int					chart_size;
-extern unsigned int			require_ep_span;
+extern unsigned long long	require_ep_span;
 
 #define PARSING 1
 #define GENERATING 2

@@ -72,6 +72,8 @@ void		print_mrs_var(struct mrs_var	*var);
 void		print_mrs_var_props(struct mrs_var	*var);
 struct mrs	*parse_mrs(char	*buffer);
 struct mrs	*read_mrs(FILE	*f);
+int			snprintf_mrs(char	*str, int	len, struct mrs	*mrs);
+int	snprint_mrs_var_props(char	*str, int	len, struct mrs_var	*var);
 void		free_mrs(struct mrs	*m);
 struct mrs_var	*mrs_find_ep_role(struct mrs_ep	*ep, char	*role);
 void		semantic_lookup(struct mrs	*mrs);

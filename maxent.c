@@ -89,10 +89,11 @@ void record_maxent_feature(char *head, char *rhs[2], float score, int	ngp, char	
 
 	kp += sprintf(key, "%s:%s:%s", head, rhs[0]?:"", rhs[1]?:"");
 	for(i=0;i<ngp;i++)kp += sprintf(kp, ":%s", gp[i]);
+	feat->score = score;
+
 	feat->head = strdup(head);
 	feat->rhs[0] = (rhs[0] && *rhs[0])?strdup(rhs[0]):NULL;
 	feat->rhs[1] = (rhs[1] && *rhs[1])?strdup(rhs[1]):NULL;
-	feat->score = score;
 	feat->ngp = ngp;
 	feat->gp = malloc(sizeof(char*)*ngp);
 	for(i=0;i<ngp;i++)feat->gp[i] = strdup(gp[i]);

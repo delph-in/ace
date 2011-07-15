@@ -4,6 +4,7 @@
 #include	<assert.h>
 #include	<sys/time.h>
 
+#include	"dag.h"
 #include "mrs.h"
 #include "lexicon.h"
 #include "chart.h"
@@ -11,17 +12,112 @@
 
 extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
 
-unsigned int	require_ep_span = 0;
+		extern int nstrings;
+		extern struct type	**strings;
+
+unsigned long long	require_ep_span = 0;
+
+unsigned long long collect_vars(struct dg	*dg)
+{
+	int	i;
+	dg = p_dereference_dg(dg);
+	struct dg	**arcs = DARCS(dg);
+	static int instloc = -1;
+	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
+
+	unsigned long long v = 0;
+	for(i=0;i<dg->narcs;i++)
+	{
+		if(dg->label[i] == instloc)
+		{
+			struct type	*t = arcs[i]->xtype;
+			if(t->name[0]!='"')return 0;;
+			int	tnum = t->tnum;
+			//int k;
+			//for(k=0;k<100;k++)
+			//	if(strings[k]==t)tnum = k;
+			//printf("instloc has tnum = %d = %s\n", tnum, t->name);
+			return ((unsigned long long)1)<<tnum;
+		}
+		else v |= collect_vars(arcs[i]);
+	}
+	return v;
+}
+
+unsigned long long accessible_vars(struct edge	*e)
+{
+	// look at SYNSEM.LKEYS
+	static int	save[3] = {-1,-1,-1};
+	struct dg	*lkeys = walk_dg(e->dg, save, "SYNSEM", "LKEYS", NULL);
+
+//	printf("lkeys:\n");
+//	print_dg(lkeys);
+//	printf("\n");
+
+	//assert(lkeys != NULL);
+	//return collect_vars(lkeys);
+	return collect_vars(e->dg);
+}
+
+struct mrs	*current_input_mrs;
+
+int	index_accessibility_filter_one_var(struct edge	*e, struct mrs_var	*v)
+{
+	return e->inaccessible_vars & (((unsigned long long)1)<<v->vnum);
+}
+
+int index_accessibility_filter_one_ep(struct edge	*e, struct mrs_ep	*ep)
+{
+	int i;
+	if(index_accessibility_filter_one_var(e, ep->lbl))return 1;
+	for(i=0;i<ep->nargs;i++)
+		if(index_accessibility_filter_one_var(e, ep->args[i].value))return 1;
+	return 0;
+}
+
+int	index_accessibility_filter(struct edge	*e)
+{
+	int	i;
+	for(i=0;i<current_input_mrs->nrels;i++)
+		if(!(e->ep_span & (((unsigned long long)1)<<i)))
+			if(index_accessibility_filter_one_ep(e, current_input_mrs->rels+i))
+				return 1;
+	return 0;
+}
 
 // chart
+
+#define	INDEX_ACCESSIBILITY_FILTERING
 
 int	gen_process_edge(struct edge	*e)
 {
 	struct chart_cell	*c = cells;
 	int	i, pack = 0;
 
+	e->accessible_vars = 0;
+	e->inaccessible_vars = 0;
 	for(i=0;i<e->have;i++)
+	{
 		if(e->daughters[i]->frozen==1)return 0;
+		e->accessible_vars |= e->daughters[i]->accessible_vars;
+		e->inaccessible_vars |= e->daughters[i]->inaccessible_vars;
+	}
+
+#ifdef	INDEX_ACCESSIBILITY_FILTERING
+	if(e->have == e->need)
+	{
+		unsigned long long	really_accessible = accessible_vars(e);
+		e->inaccessible_vars |= e->accessible_vars & ~really_accessible;
+		e->accessible_vars = really_accessible;
+		if(index_accessibility_filter(e))
+		{
+			//printf("filtered.\n");
+			return 0;
+		}
+		//if(e->accessible_vars)printf("#%d has accessibility: %16.16llX\n", e->id, e->accessible_vars);
+		//if(e->inaccessible_vars)printf("#%d has inaccessibility: %16.16llX\n", e->id, e->inaccessible_vars);
+	}
+#endif
 
 	if(!inhibit_pack && e->have == e->need)
 	{
@@ -72,6 +168,8 @@ int	generate(struct mrs	*mrs)
 	char		*str;
 	int			i, count = 0;
 
+	current_input_mrs = mrs;
+
 	timer();
 	reset_edges();
 	clear_chart(1);
@@ -82,21 +180,33 @@ int	generate(struct mrs	*mrs)
 		print_mrs(mrs); printf("\n");
 	}
 
-	if(mrs->nrels > 32)
+	fprintf(stderr, "NOTE: input semantics had %d EPs and %d variables\n", mrs->nrels, mrs->vlist.nvars);
+
+	if(mrs->nrels > 64 || mrs->vlist.nvars > 64)
 	{
-		fprintf(stderr, "ERROR: generator cannot currently function with more than 32 EPs\n");
+		fprintf(stderr, "ERROR: generator cannot currently function with more than 64 EPs and 64 vars\n");
 		return 0;
 	}
-	require_ep_span = (1<<mrs->nrels)-1;
+	require_ep_span = (((unsigned long long)1)<<mrs->nrels)-1;
 
 	// set up the skolemization and specialization dags we'll need.
+	struct dg	*skar[mrs->vlist.nvars];
 	for(i=0;i<mrs->vlist.nvars;i++)
 	{
-		extern struct type	**strings;
 		struct dg			*skolem;
 		skolem = atomic_dg("*top*");
+		assert(i<nstrings);
 		skolem->type = skolem->xtype = strings[i];
-		dagify_mrs_var(mrs->vlist.vars[i], skolem);
+		skar[i] = skolem;
+	}
+	for(i=0;i<mrs->nhcons;i++)
+		skar[mrs->hcons[i].hi->vnum] = skar[mrs->hcons[i].lo->vnum];
+	for(i=0;i<mrs->vlist.nvars;i++)
+	{
+		dagify_mrs_var(mrs->vlist.vars[i], skar[i]);
+		//printf("dag for %s: \n", mrs->vlist.vars[i]->name);
+		//print_dg(mrs->vlist.vars[i]->dg);
+		//printf("\n");
 	}
 	for(i=0;i<mrs->nrels;i++)
 		dagify_mrs_ep(mrs->rels+i);
@@ -128,6 +238,7 @@ int	generate(struct mrs	*mrs)
 		if(!inhibit_results)printf("%s\n", hyp->string);
 		if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, count);
 		count++;
+		if(trace>0){ print_mrs(mrs_res); printf("\n"); }
 		free_mrs(mrs_res);
 		return 1;
 	}

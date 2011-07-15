@@ -14,6 +14,7 @@
 
 struct lexeme	**lexemes;
 int		nlexemes;
+int		alexemes = 0;
 
 struct lexeme	**generic_les;
 int		ngeneric_les;
@@ -21,7 +22,6 @@ int		ngeneric_les;
 extern unsigned int	generation;
 
 extern int trace, gen_qc;
-extern unsigned int require_ep_span;
 
 #define		SIMPLE_LEXICON
 
@@ -62,6 +62,8 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 		while(1)sleep(1);
 		exit(-1);
 	}
+	wellform(dg, lex->word);
+	//return wellform_dg(dg);
 	return dg;
 }
 
@@ -325,16 +327,17 @@ void	dump_parts_of_speech()
 	pclose(f);
 }
 
-static int	stemfeat = -1, rfeat = 2, ffeat = 1, synsemfeat = -1, lkeysfeat, keyrelfeat,
-			predfeat, compkeyfeat, ocompkeyfeat, phonfeat, onsetfeat, listfeat;
-static struct type	*predsort, *con, *voc;
+static int	orthfeat = -1, rfeat = 2, ffeat = 1, synsemfeat = -1, lkeysfeat, keyrelfeat,
+			predfeat, compkeyfeat, ocompkeyfeat, phonfeat, onsetfeat, listfeat, __tlfeat;
+static struct type	*predsort, *con, *voc, *native_token_list;
 
 int	nsimpleform = 0;
 
 void	init_fnums()
 {
 #ifdef	ERG
-	stemfeat = lookup_fname("STEM");
+	orthfeat = lookup_fname("ORTH");
+	__tlfeat = lookup_fname("--TL");
 #endif
 	synsemfeat = lookup_fname("SYNSEM");
 	lkeysfeat = lookup_fname("LKEYS");
@@ -348,6 +351,7 @@ void	init_fnums()
 	predsort = lookup_type("predsort");
 	con = lookup_type("con");
 	voc = lookup_type("voc");
+	native_token_list = lookup_type("native_token_list");
 }
 
 struct dg	*constrain_lex_rels(struct dg *dg, struct dg *rels)
@@ -365,14 +369,14 @@ struct type *predict_onset(char *form)
 void	simplify_lexeme(struct lexeme	*l)
 {
 #ifdef	ERG
-	struct dg	*dg = l->dg, *ss, *lk, *kr, *pr, *ph, *on;
+	struct dg	*dg = l->dg, *ss, *lk, *kr, *pr, *ph, *on, *__tl;
 
 	// check for most common structures and just store parameters for them
 	if(l->stemlen != 1)return;
 	if(dg->narcs != 2)return;
 
-	// we want just 'STEM' and 'SYNSEM' features
-	if(dg->label[0] != stemfeat && dg->label[1] != stemfeat)return;
+	// we want just 'ORTH' and 'SYNSEM' features
+	if(dg->label[0] != orthfeat && dg->label[1] != orthfeat)return;
 	if(dg->label[0] != synsemfeat && dg->label[1] != synsemfeat)return;
 
 	ss = dg_hop(dg, synsemfeat);
@@ -407,8 +411,13 @@ void	simplify_lexeme(struct lexeme	*l)
 		// we want just 'ONSET'
 		if(ph->narcs != 1 || ph->label[0] != onsetfeat)return;
 		on = dg_hop(ph, onsetfeat);
+		// we want just '--TL'
+		if(on->narcs != 1 || on->label[0] != __tlfeat)return;
+		__tl = dg_hop(on, __tlfeat);
+		// we want 'native_token_list' with no arcs
+		if(__tl->type != native_token_list || __tl->narcs != 0)return;
 		// we want predictable onset
-		if(on->narcs != 0 || on->type != predict_onset(l->stem[0]->name))return;
+		if(on->type != predict_onset(l->stem[0]->name))return;
 		l->onset = 1;
 	}
 
@@ -422,11 +431,11 @@ void	simplify_lexeme(struct lexeme	*l)
 
 struct dg	*expand_lexeme(struct lexeme	*l)
 {
-	struct dg	*dg, *ss, *lk, *kr, *pr, *st, *f, *ph, *on;
+	struct dg	*dg, *ss, *lk, *kr, *pr, *st, *f, *ph, *on, *__tl;
 
 	if(l->dg)return l->dg;
 #ifdef	ERG
-	if(stemfeat==-1)init_fnums();
+	if(orthfeat==-1)init_fnums();
 
 	pr = atomic_dg("*top*");
 	pr->xtype = pr->type = l->pred;
@@ -436,8 +445,10 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 
 	if(l->onset)
 	{
+		__tl = atomic_dg("native_token_list");
 		on = atomic_dg("*top*");
 		on->xtype = on->type = predict_onset(l->stem[0]->name);
+		on = add_dg_hop(on, __tlfeat, __tl);
 		ph = add_dg_hop(atomic_dg("*top*"), onsetfeat, on);
 		ss = add_dg_hop(ss, phonfeat, ph);
 	}
@@ -446,7 +457,7 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 	f->xtype = f->type = l->stem[0];
 	st = add_dg_hop(atomic_dg("*top*"), ffeat, f);
 	dg = atomic_dg("*top*");
-	dg = add_dg_hop(dg, stemfeat, st);
+	dg = add_dg_hop(dg, orthfeat, st);
 	dg = add_dg_hop(dg, synsemfeat, ss);
 
 	//printf("expanded `%s':\n", l->word);
@@ -571,7 +582,11 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 {
 	struct lexeme	*l = make_lexeme(word, dg, type, fulldg);
 	nlexemes++;
-	lexemes = realloc(lexemes, sizeof(struct lexeme)*nlexemes);
+	if(nlexemes > alexemes)
+	{
+		alexemes += 2048;
+		lexemes = realloc(lexemes, sizeof(struct lexeme)*alexemes);
+	}
 	lexemes[nlexemes-1] = l;
 
 #ifdef	SIMPLE_LEXICON
@@ -582,7 +597,7 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 		add_semantic_index(l, fulldg, 0);
 
 	//printf("lexeme %s has %d-long stem starting %s\n", word, l->stemlen, l->stem[0]->name);
-	if(nlexemes%100 == 0)printf("lexeme %s             \r", word); fflush(stdout);
+	//if(nlexemes%100 == 0)printf("lexeme %s             \r", word); fflush(stdout);
 	/*printf("lexeme %s  --> ", word);
 	print_dg(dg);
 	printf("\n");*/
@@ -631,6 +646,8 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 {
 	struct dg	*fulldg;
 
+	//wellform(dg, name);
+
 	fulldg = unify_dg_noss(dg, t->dg, -1);
 	if(!fulldg)
 	{
@@ -638,16 +655,20 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 		return -1;
 	}
 
+	// example of why we must wellform lexemes before using them,
+	// even when t->dg is already wellformed:
+	// tuesday_n1 stipulates a CARG value, while its type does not
+	// CARG is introduced on const_value_relation,
+	// while the lexical type has a nom_relation.
+	// wellformedness pushes the relation's type down to the GLB of those.
+	// ... note that if 'dg' were already wellformed,
+	// then wellformed unification would guarantee that fulldg was already wellformed.
+	// however, 'dg' is usually far from wellformed,
+	// and wellform-ing it is no cheaper than wellforming fulldg.
 	wellform(fulldg, name);
 
 	add_lexeme(name, dg, t, fulldg);
 
-	return 0;
-}
-
-int	study_lexicon(char	*lhs, struct dg	*dg)
-{
-	add_lexeme(lhs, dg, dg->xtype, dg);
 	return 0;
 }
 
@@ -679,24 +700,30 @@ int	load_lexicon()
 	extern int	lexify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 	struct timeval tv1, tv2;
 
-	gettimeofday(&tv1, 0);
-	if(process_tdl_status("lex-entry", lexify_tdl_line, 0))
+	int load_lexicon()
 	{
-		fprintf(stderr, "lexicon: unable to load, bailing out.\n");
-		exit(-1);
-	}
-	gettimeofday(&tv2, 0);
-	show_task_name("loading lexicon...");
-	printf("%.1f secs\n",
-		(tv2.tv_sec - tv1.tv_sec) + 0.000001*(tv2.tv_usec-tv1.tv_usec));
+		//gettimeofday(&tv1, 0);
+		if(process_tdl_status("lex-entry", lexify_tdl_line, 0))
+		{
+			fprintf(stderr, "lexicon: unable to load, bailing out.\n");
+			exit(-1);
+		}
+		//gettimeofday(&tv2, 0);
+		//show_task_name("loading lexicon...");
+		//printf("%.1f secs\n",
+			//(tv2.tv_sec - tv1.tv_sec) + 0.000001*(tv2.tv_usec-tv1.tv_usec));
+		qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
 
-	qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
-	show_task_name("generic lexemes");
-	if(process_tdl_dgs_status("generic-lex-entry", study_generic_le))
-	{
-		fprintf(stderr, "lexicon: unable to load generics, bailing out.\n");
-		exit(-1);
+		//show_task_name("generic lexemes");
+		if(process_tdl_dgs_status("generic-lex-entry", study_generic_le))
+		{
+			fprintf(stderr, "lexicon: unable to load generics, bailing out.\n");
+			exit(-1);
+		}
+		return 0;
 	}
+	run_task("processing lexicon...", load_lexicon);
+
 	show_task_name("simple lexemes");
 	printf("%d / %d = %.2f%%\n", nsimpleform, nlexemes, 100*(float)nsimpleform / nlexemes);
 	return 0;

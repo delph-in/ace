@@ -3,6 +3,7 @@
 #include	<stdlib.h>
 #include	<sys/time.h>
 
+#include	"hash.h"
 #include	"tdl.h"
 #include	"type.h"
 #include	"freeze.h"
@@ -161,11 +162,19 @@ void	add_descendent(struct type	*anc, int	dec)
 {
 	int	i;
 
-	if(dec==ntypes-1)i=anc->ndescendents;
+	if(dec==ntypes-1)
+	{
+		i=anc->ndescendents;
+		if(i && anc->descendents[i-1] == dec)
+			return;
+	}
 	else
 	{
 		for(i=0;i<anc->ndescendents;i++)
+		{
+			if(dec == anc->descendents[i])return;
 			if(dec < anc->descendents[i])break;
+		}
 	}
 	anc->ndescendents++;
 	anc->descendents = realloc(anc->descendents, sizeof(short)*anc->ndescendents);
@@ -266,44 +275,57 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 	t->ndescendents = 0;
 	t->descendents = 0;
 	t->dg = 0;
-	if(!strcasecmp(name, "string"))strtype = t;
+	if(!strcasecmp(name, "string"))strtype = t;	// XXX hardcoded type name
+	t->tnum = ntypes-1;
+	th_add(name, t);
+
+	if(npar>=0)setup_type_lineage(t, npar, par);
+}
+
+void	add_to_ancestors(struct type	*a, int	tnum)
+{
+	if(descendent_of(tnum, a))return;
+	add_descendent(a, tnum);
+	int i;
+	for(i=0;i<a->nparents;i++)
+		add_to_ancestors(a->parents[i], tnum);
+}
+
+setup_type_lineage(struct type	*t, int	npar, struct type	**par)
+{
+	int i;
+	t->nparents = npar;
+	t->parents = malloc(sizeof(struct type*) * npar);
+	memcpy(t->parents, par, sizeof(struct type*) * npar);
+
+	for(i=0;i<npar;i++)
+	{
+		struct type	*p = par[i];
+		p->ndaughters++;
+		p->daughters = realloc(p->daughters, sizeof(struct type*) * p->ndaughters);
+		p->daughters[p->ndaughters-1] = t;
+	}
 
 	//fprintf(stderr, " - linking\n");
-	t->tnum = ntypes-1;
-	for(i=0;i<ntypes-1;i++)
+	add_to_ancestors(t, t->tnum);
+	/*for(i=0;i<ntypes-1;i++)
 	{
+		int	pari;
 		for(pari=0;pari<npar;pari++)
 			if(descendent_of(par[pari]->tnum, types[i]))
 			{
-				if(!strcmp(par[pari]->name, "word_or_lexrule"))lexical = 1;
-				if(!descendent_of(ntypes-1, types[i]))
-					add_descendent(types[i], ntypes-1);
+				//if(!descendent_of(ntypes-1, types[i]))
+				add_descendent(types[i], ntypes-1);
 				break;
 			}
 	}
-	add_descendent(t, ntypes-1);
+	add_descendent(t, ntypes-1);*/
 	//fprintf(stderr, " - done adding\n");
-
-	/*if(!lexical)
-	{
-		static FILE	*f = 0;
-		if(!f)f = fopen("/tmp/type-heirarchy.dot", "a");
-		if(f)
-		{
-			for(i=0;i<npar;i++)
-				fprintf(f, "	\"%s\" -> \"%s\";\n", par[i]->name, name);
-			fflush(f);
-		}
-	}*/
-
-	th_add(name, t);
 
 	return 0;
 }
 
 extern int		g_loaded;
-
-int	intcomp(const void	*a, const void	*b) { return *(int*)a - *(int*)b; }
 
 int	constrain_type(char	*name, struct dg	*dg)
 {
@@ -321,225 +343,6 @@ int	constrain_type(char	*name, struct dg	*dg)
 
 	//printf("\ntype: %s	definition: ", type->name);
 	//print_dg(type->dg); printf("\n");
-	return 0;
-}
-
-static struct glb_fix
-{
-	struct type	*para, *parb, *glb;
-}		*fixes;
-static int	nfixes;
-
-int	constrain_glb_type(struct type	*g)
-{
-	int		i;
-	struct glb_fix	*f;
-
-	if(g->dg)return 0;
-	for(i=0;i<nfixes;i++)
-		if(fixes[i].glb==g)break;
-	if(i>=nfixes)
-	{
-		fprintf(stderr, "glb-fix: no glb type `%p' (%s) was recorded\n", g, g->name);
-		exit(-1);
-	}
-	f = fixes+i;
-
-	if(!f->para->dg)constrain_glb_type(f->para);
-	if(!f->parb->dg)constrain_glb_type(f->parb);
-	g->dg = unify_dg(f->para->dg, f->parb->dg, -1);
-	if(!g->dg)
-	{
-		fprintf(stderr, "glb-fix: unexpected error! glb type `%s' is inconsistent.\n", g->name);
-#ifdef	UNIFY_PATHS
-		unify_backtrace();
-#endif
-		exit(-1);
-	}
-	return 0;
-}
-
-void	fix_glbs()
-{
-	int	i;
-
-	for(i=0;i<nfixes;i++)
-		constrain_glb_type(fixes[i].glb);
-	nfixes = 0;
-	if(fixes)free(fixes);
-}
-
-#define	CSTSIZE	(16384*2-1)
-//static char	csthashres[CSTSIZE];
-static struct type	*csthasha[CSTSIZE];
-static struct type	*csthashb[CSTSIZE];
-int					ncsthash_collisions = 0, ncsthash_requests = 0;
-
-int	find_common_subtypes(struct type	*a, struct type	*b, unsigned short	*_glb_common)
-{
-	int	_glb_ncommon = 0, ia, ib, and, bnd;
-	unsigned short *ad, *bd;
-	unsigned long	h = (((unsigned long)a<<5) ^ ((unsigned long)b>>5)) % (CSTSIZE);
-
-	ncsthash_requests++;
-	for(ia=0;ia<4;ia++)
-		if(csthasha[(h+17*ia)%CSTSIZE]==a && csthashb[(h+17*ia)%CSTSIZE]==b)return 0;// && !csthashres[h])return 0;
-
-	ia = ib = 0;
-	and = a->ndescendents;
-	bnd = b->ndescendents;
-	ad = a->descendents;
-	bd = b->descendents;
-	while(ia < and && ib < bnd)
-	{
-		if(*ad == *bd)
-		{
-			//if(ia==0 || ib==0)return -1;	// one type is a descendent of the other
-			if((_glb_ncommon+1) >= 10000)
-			{
-				fprintf(stderr, "too many common types for our buffer!\n");
-				exit(-1);
-			}
-			_glb_common[_glb_ncommon++] = *ad;
-			ia++;ad++;
-			ib++;bd++;
-		}
-		else if(*ad < *bd){ia++;ad++;}
-		else {ib++;bd++;}
-	}
-
-	// try to find a free hash slot
-	for(ia=0;ia<4;ia++)
-		if(!csthasha[(h+17*ia)%CSTSIZE])break;
-	if(ia==4)ia=0;
-	h = (h+17*ia)%CSTSIZE;
-	if(csthasha[h])ncsthash_collisions++;
-	csthasha[h] = a;
-	csthashb[h] = b;
-	//csthashres[h] = _glb_ncommon?1:0;
-	return _glb_ncommon;
-}
-
-int	check_for_glb(struct type	*a, struct type	*b)
-{
-	unsigned short	_glb_common[10000];
-	int				_glb_ncommon;
-	int	ia, i, j, mi, resort, resort_key=-1;
-	struct type	*ar[2] = {a, b};
-	char	name[1024];
-	struct type	*g;
-
-	_glb_ncommon = find_common_subtypes(a, b, _glb_common);
-	//if(_glb_ncommon==-1)return 0;	// one type is a descendent of the other
-
-	if(_glb_ncommon==0)return 0;	// no types in common, no glb
-	if(_glb_ncommon==1)return 0;	// one type in common, it must be the glb
-
-	// check first common descendent to see if it's the glb
-	g = types[_glb_common[0]];
-	if(g->ndescendents == _glb_ncommon)
-	{
-		for(j=0;j<_glb_ncommon;j++)
-			if(g->descendents[j] != _glb_common[j])
-				break;
-		if(j==_glb_ncommon)return 0;	// this is the glb
-	}
-
-	// no glb existed; make one!
-	sprintf(name, "G(%s,%s)", a->name, b->name);
-	add_type_only(name, 2, ar);
-	//printf("add `%s'\n", name);
-
-	_glb_common[_glb_ncommon++] = ntypes-1;	// a,b have a new common descendent
-
-	g = types[ntypes-1];
-	g->ndescendents = _glb_ncommon;
-	g->descendents = realloc(g->descendents, sizeof(short)*_glb_ncommon);
-	memcpy(g->descendents, _glb_common, sizeof(short)*_glb_ncommon);
-
-	nfixes++;
-	fixes = realloc(fixes, sizeof(struct glb_fix)*nfixes);
-	fixes[nfixes-1].glb = g;
-	fixes[nfixes-1].para = a;
-	fixes[nfixes-1].parb = b;
-
-	// compute where to put the new type wrt the partial order 'descendent_of'
-	mi=0;
-	for(i=0;i<ntypes-1;i++)
-		if(descendent_of(ntypes-1, types[i]))mi = i;
-	mi++;
-	//printf("  *** goes at %d / %d\n", mi, ntypes-1);
-	//printf("  after which: ");
-	//for(i=mi;i<ntypes-1;i++)printf("%s ", types[i]->name);
-	//printf("\n");
-
-	if(mi != ntypes-1)
-	{
-		g = types[ntypes-1];
-		memmove(types+mi+1, types+mi, sizeof(struct type*)*(ntypes-1-mi));
-		types[mi] = g;
-		g->tnum = mi;
-		// relocate 'descendents' of everybody who pointed at someone who got moved
-		for(i=0;i<ntypes;i++)
-		{
-			unsigned short ndesc, ntm1, *desc;
-			g = types[i];
-			if(i>mi)g->tnum++;
-			resort = 0;
-			desc = g->descendents;
-			ndesc = g->ndescendents;
-			ntm1 = ntypes-1;
-			for(ia=0;ia<ndesc;ia++,desc++)
-			{
-				if(*desc==ntm1){resort=1;resort_key = ia;*desc=mi;}
-				else if(*desc>=mi)(*desc)++;
-			}
-			if(resort && g->ndescendents>1)
-			{
-				// item "resort_key" is in the wrong place; fix it!
-				if(resort_key != g->ndescendents-1)
-				{
-					fprintf(stderr, "WRONG: resort_key = %d / %d\n", resort_key, g->ndescendents);
-					qsort(g->descendents, g->ndescendents, sizeof(short), intcomp);
-				}
-				else
-				{
-					// find out where 'mi' belongs and put it there
-					for(ia=0;ia<g->ndescendents-1;ia++)
-						if(mi < g->descendents[ia])break;
-					memmove(g->descendents+ia+1, g->descendents+ia, sizeof(short)*(g->ndescendents-1-ia));
-					g->descendents[ia] = mi;
-				}
-			}
-		}
-	}
-	glb_type_count++;
-	return 1;
-}
-
-int	make_glbs()
-{
-	int	i, j;
-
-	// don't do 0; finding glb's of *top* with things is a big waste of time!
-	for(i=ntypes-1;i>0;i--)
-	{
-		more:
-		if(types[i]->ndescendents == 1)continue;
-		for(j=ntypes-1;j>i;j--)
-		{
-			if(types[j]->ndescendents == 1)continue;
-			if(check_for_glb(types[i], types[j]))
-			{
-				// check the newly created type against everything
-				//i = ntypes-1;
-				i++;
-				//printf(" +%d\n", ntypes);
-				goto more;
-			}
-		}
-	}
-	//printf("%d cst hash collisions / %d R  ", ncsthash_collisions, ncsthash_requests);
 	return 0;
 }
 

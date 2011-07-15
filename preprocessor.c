@@ -39,7 +39,9 @@ void	preprocess_line(char	*mbstring, int	*Nwords, char	***Words, int	**CFrom, in
 
 void	load_preprocessor(char	*confdir)
 {
-	load_repp(get_conf_file_path(confdir, "preprocessor"));
+	char	*path = get_conf_file_path(confdir, "preprocessor");
+	if(!path)return;
+	load_repp(path);
 	int	repp_module_callback(char	*path) {
 		char	*modpath;
 		asprintf(&modpath, "%s/%s", confdir, path);

@@ -60,7 +60,7 @@ void	rule_stats()
 	free(nptries);
 }
 
-int	rule_is_rtl(struct rule	*r)
+int	rule_is_rtl_key(struct rule	*r)
 {
 	//struct dg	*hd = dg_hop(r->dg, lookup_fname("HEAD-DTR"));
 	struct type	*plus = lookup_type("+");
@@ -78,6 +78,40 @@ int	rule_is_rtl(struct rule	*r)
 	// ARGS REST FIRST KEY-ARG
 
 	if(afkey && afkey->xtype == plus)
+	//if(asec==hd)
+	{
+		//fprintf(stderr, "rule `%s' is right-to-left\n", r->name);
+		return 1;
+	}
+	else
+	{
+		//fprintf(stderr, "rule `%s' is left-to-right\n", r->name);
+		return 0;
+	}
+}
+
+struct rule	*lookup_rule(char	*name)
+{
+	int	i;
+	for(i=0;i<nrules;i++)
+		if(!strcmp(rules[i]->name, name))return rules[i];
+	return NULL;
+}
+
+int	rule_is_rtl_head(struct rule	*r)
+{
+	struct dg	*args, *asec, *hddtr;
+
+	args = dg_hop(r->dg, lookup_fname("ARGS"));
+	if(!args)return 0;
+	args = dg_hop(args, lookup_fname("REST"));
+	if(!args)return 0;
+	asec = dg_hop(args, lookup_fname("FIRST"));
+	if(!asec)return 0;
+	hddtr = dg_hop(r->dg, lookup_fname("HD-DTR"));
+	// ARGS REST FIRST =? HD-DTR
+
+	if(hddtr == asec)
 	//if(asec==hd)
 	{
 		//fprintf(stderr, "rule `%s' is right-to-left\n", r->name);
@@ -203,7 +237,10 @@ void	agenda_rules(int	count)
 				if(	(!rtl && i+rules[j]->ndaughters <= count) ||
 					(rtl && i-rules[j]->ndaughters >= 0)	)
 				{
-					if(!rtl && lexrulefilt_f(i, j))
+					// these filters do occassionally fire,
+					// but empirically they make so little difference to performance
+					// that they aren't worthwhile.
+					/*if(!rtl && lexrulefilt_f(i, j))
 					{
 						//printf(" rule %s F-filtered for position %d\n", rules[j]->name, i);
 						nlf++;
@@ -214,7 +251,7 @@ void	agenda_rules(int	count)
 						//printf(" rule %s L-filtered for position %d\n", rules[j]->name, i);
 						nlf++;
 						continue;
-					}
+					}*/
 					add_agenda(epsilon_edge(rules[j], i, rtl, 0));
 				}
 			}
@@ -256,7 +293,7 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 	r->orth = 0;
 	r->lexical = 0;
 	r->rnum = nrules-1;
-	r->rtl = rule_is_rtl(r);
+	r->rtl = rule_is_rtl_key(r);
 
 	configure_rule(r);
 
@@ -364,6 +401,32 @@ char	*setup_rule_filter1(int pack)
 	rule_filter = calloc(sizeof(char), nrules*nrules);
 	rule_sfilter = calloc(sizeof(char), nrules*nrules);
 
+	struct slab_state	ost;
+	get_slabstate(&ost);
+
+	struct qc	***rqc = malloc(sizeof(struct qc**) * nrules);
+	for(i=0;i<nrules;i++)
+	{
+		struct rule	*m = rules[i];
+		mdg = pack?( (pack==1) ? m->packdg : m->gpackdg ) : m->dg;
+		rqc[i] = malloc(sizeof(struct qc*) * (m->ndaughters+1));
+		rqc[i][0] = extract_qc(mdg);
+		for(j=0;j<m->ndaughters;j++)
+			rqc[i][j+1] = extract_qc_arg(mdg, j);
+	}
+
+	// copies of each rule's dag used to test whether subsumption is possible
+	// subsumption between (specializations of) two rules is judged as possible when
+	// the two rules dags unify.
+	struct dg	**trim_copies = malloc(sizeof(struct dg*)*nrules);
+	for(i=0;i<nrules;i++)
+	{
+		struct rule	*m = rules[i];
+		struct dg	*dg = pack?( (pack==1) ? m->packdg : m->gpackdg ) : m->dg;
+		trim_copies[i] = trim_copy(dg);
+		trim_copies[i]->xtype = trim_copies[i]->type = top;
+	}
+
 	for(i=0;i<nrules;i++)
 	{
 		struct slab_state	st;
@@ -382,6 +445,9 @@ char	*setup_rule_filter1(int pack)
 			byte = 0;
 			for(k=0;k<m->ndaughters;k++)
 			{
+				struct qc	*mqc = rqc[i][k+1];
+				struct qc	*dqc = rqc[j][0];
+				if(quickcheck(mqc, dqc))continue;
 				res = unify_dg_tmp(ddg, mdg, k);
 				forget_tmp();
 				if(res==0)
@@ -393,21 +459,34 @@ char	*setup_rule_filter1(int pack)
 			count += m->ndaughters;
 			rule_filter[i*nrules + j] = byte;
 
-			struct dg	*left = trim_copy(ddg), *right = trim_copy(mdg);
-			left->xtype = left->type = top;
-			right->xtype = right->type = top;
-			res = unify_dg_tmp(left, right, -1);
-			if(res)
+			if(i < j)
 			{
-				//printf("ssfilter[%d] `%s' + `%s': ", pack, rules[i]->name, rules[j]->name);
-				//unify_backtrace();
-				ssbl++;
+				//struct dg	*left = trim_copy(ddg), *right = trim_copy(mdg);
+				//left->xtype = left->type = top;
+				//right->xtype = right->type = top;
+				struct qc	*left_qc = rqc[i][0], *right_qc = rqc[j][0];
+				if(quickcheck(left_qc, right_qc))res = -1;
+				//else res = unify_dg_tmp(left, right, -1);
+				else
+				{
+					res = unify_dg_tmp(trim_copies[i], trim_copies[j], -1);
+					forget_tmp();
+				}
+				if(res)
+				{
+					//printf("ssfilter[%d] `%s' + `%s': ", pack, rules[i]->name, rules[j]->name);
+					//unify_backtrace();
+					ssbl++;
+				}
+				forget_tmp();
 			}
-			forget_tmp();
+			else if(i == j)res = 0;
+			else res = !rule_sfilter[j*nrules+i];
 			rule_sfilter[i*nrules+j] = res?0:1;
 		}
 		set_slabstate(&st);
 	}
+	set_slabstate(&ost);
 	printf("%.1f%% blocked (%.1f%% ss)\n", 100*(float)(count-yes)/count, 100*(float)ssbl/nrules/nrules);
 	return rule_filter;
 }
@@ -441,7 +520,7 @@ void setup_rule_filter()
 
 char	**freeze_rxtc(char	**ptr, int dim)
 {
-	if(!ptr)return 0;
+	if(!ptr)return NULL;
 	char	**ref = slab_alloc(nrules * sizeof(char*));
 	int	len;
 	char	*data;
@@ -525,6 +604,8 @@ char	*compute_rxtc(int	rnum, int right)
 	return table;
 }
 
+// figure out what types are compatible with 'r'[arg] and what types aren't.
+
 char	*type_filter_rule(struct rule	*r, int arg, struct qc **typeqc)
 {
 	struct qc *rqc = extract_qc_arg(r->dg, arg);
@@ -605,7 +686,8 @@ void	lex_filter_rules()
 		}
 		return 0;
 	}
-	run_task("type-rule filter...", build_type_rule_filter);
+	//printf("there are %d rules and %d types\n", nrules, ntypes);
+	//run_task("type-rule filter...", build_type_rule_filter);
 
 	int compose_type_rule_closured_filter()
 	{
@@ -642,8 +724,34 @@ void	lex_filter_rules()
 		}
 		return 0;
 	}
-	run_task("type-rule-closed filter...", compose_type_rule_closured_filter);
+	//run_task("type-rule-closed filter...", compose_type_rule_closured_filter);
 }
+
+configure_rules_key_driven()
+{
+	int	i;
+	for(i=0;i<nrules;i++)
+		rules[i]->rtl = rule_is_rtl_key(rules[i]);
+}
+
+/*
+configure_rules_head_driven()
+{
+	FILE	*f = fopen("../erg/erg.hds", "r");
+	assert(f != NULL);
+	char	rname[1024];
+	int		arity, head;
+	while(fscanf(f, "%[^ ] %d %d\n", rname, &arity, &head) == 3)
+	{
+		struct rule	*r = lookup_rule(rname);
+		if(!r) { fprintf(stderr, "erg.hds: unable to find rule '%s'\n", rname); continue; }
+		r->rtl = (head!=0)?1:0;
+	}
+//	int	i;
+//	for(i=0;i<nrules;i++)
+//		rules[i]->rtl = rule_is_rtl_head(rules[i]);
+	
+}*/
 
 // output rule filter left daughter graph as a .dot file
 void	dot_rf(char	*fname)

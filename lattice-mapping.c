@@ -128,7 +128,12 @@ static int	count_list(struct dg	*list, char	*rname, char	*fname)
 		if(!strcmp(list->xtype->name, g_null_type))break;
 		if(!strcmp(list->xtype->name, g_list_type))
 		{
-			fprintf(stderr, "WARNING: lattice mapping rule '%s' had %s *list* (not *null* or *cons*)\n", rname, fname);
+			static int did_warn = 0;
+			if(!did_warn)
+				fprintf(stderr, "WARNING: lattice mapping rule '%s' had %s *list* (not *null* or *cons*)\n", rname, fname);
+			else if(did_warn==1)
+				fprintf(stderr, "WARNING: suppressing more lattice mapping warnings\n");
+			did_warn++;
 			break;
 		}
 		struct dg	*item = dg_hop(list, 1);	// FIRST
