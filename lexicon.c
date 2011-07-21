@@ -23,9 +23,9 @@ extern unsigned int	generation;
 
 extern int trace, gen_qc;
 
-#define		SIMPLE_LEXICON
-
 struct dg	*constrain_lex_rels(struct dg *dg, struct dg *rels);
+
+int	enable_simple_form_lexicon = 0;
 
 // TODO: make this accept the dg of the first TOKEN that will be unified in
 // ... that will allow rejection of most generic LEs without forming a full lexical edge
@@ -34,11 +34,9 @@ struct dg	*constrain_lex_rels(struct dg *dg, struct dg *rels);
 struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 {
 	struct dg	*ldg, *dg;
-#ifdef	SIMPLE_LEXICON
-	ldg = expand_lexeme(lex);
-#else
-	ldg = lex->dg;
-#endif
+	if(enable_simple_form_lexicon)
+		ldg = expand_lexeme(lex);
+	else ldg = lex->dg;
 
 	if(rels)ldg = constrain_lex_rels(lex->dg?copy_dg(ldg):ldg, rels);
 
@@ -335,10 +333,11 @@ int	nsimpleform = 0;
 
 void	init_fnums()
 {
-#ifdef	ERG
-	orthfeat = lookup_fname("ORTH");
-	__tlfeat = lookup_fname("--TL");
-#endif
+	if(enable_simple_form_lexicon)
+	{
+		orthfeat = lookup_fname("ORTH");
+		__tlfeat = lookup_fname("--TL");
+	}
 	synsemfeat = lookup_fname("SYNSEM");
 	lkeysfeat = lookup_fname("LKEYS");
 	keyrelfeat = lookup_fname("KEYREL");
@@ -368,7 +367,6 @@ struct type *predict_onset(char *form)
 
 void	simplify_lexeme(struct lexeme	*l)
 {
-#ifdef	ERG
 	struct dg	*dg = l->dg, *ss, *lk, *kr, *pr, *ph, *on, *__tl;
 
 	// check for most common structures and just store parameters for them
@@ -424,9 +422,6 @@ void	simplify_lexeme(struct lexeme	*l)
 	//printf("`%s' has simple form; ph = %p, onset = %d\n", l->word, ph, (int)l->onset);
 	nsimpleform++;
 	l->dg = 0;
-#else
-	return;
-#endif
 }
 
 struct dg	*expand_lexeme(struct lexeme	*l)
@@ -434,7 +429,8 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 	struct dg	*dg, *ss, *lk, *kr, *pr, *st, *f, *ph, *on, *__tl;
 
 	if(l->dg)return l->dg;
-#ifdef	ERG
+	if(!enable_simple_form_lexicon)
+		assert(!"Found a simple-form lexeme, but that feature is not enabled!");
 	if(orthfeat==-1)init_fnums();
 
 	pr = atomic_dg("*top*");
@@ -465,9 +461,6 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 
 	return wellform_dg(dg);
 	//return dg;
-#else
-	assert(!"Not reached (simple lexeme for non-ERG)");
-#endif
 }
 
 struct lexeme	*get_lex_by_name(char *name)
@@ -589,9 +582,8 @@ void	add_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 	}
 	lexemes[nlexemes-1] = l;
 
-#ifdef	SIMPLE_LEXICON
-	simplify_lexeme(l);
-#endif
+	if(enable_simple_form_lexicon)
+		simplify_lexeme(l);
 
 	if(!temporary_expedient(l->word))
 		add_semantic_index(l, fulldg, 0);

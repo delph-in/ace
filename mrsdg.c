@@ -209,13 +209,17 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 	struct dg		*pred;
 	static int		lblf = -1, predf, cfromf, ctof;
 	int				i, j;
+	extern int enable_token_avms;
 
 	if(lblf==-1)
 	{
 		lblf = lookup_fname("LBL");
 		predf = lookup_fname("PRED");
-		cfromf = lookup_fname("CFROM");
-		ctof = lookup_fname("CTO");
+		if(enable_token_avms)
+		{
+			cfromf = lookup_fname("CFROM");
+			ctof = lookup_fname("CTO");
+		}
 	}
 	pred = dg_hop(dg, predf);
 	if(!pred)
@@ -246,14 +250,17 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 		ep->args[ep->nargs-1].value = dg_to_mrs_var(arcs[i], vlist);
 	}
 	ep->cfrom = ep->cto = -1;
-	struct dg	*cfrom_dg = dg_hop(dg, cfromf);
-	struct dg	*cto_dg = dg_hop(dg, ctof);
-	if(cfrom_dg!=NULL && cto_dg!=NULL)
+	if(enable_token_avms)
 	{
-		if(cfrom_dg->type->name[0]=='"' && cto_dg->type->name[0]=='"')
+		struct dg	*cfrom_dg = dg_hop(dg, cfromf);
+		struct dg	*cto_dg = dg_hop(dg, ctof);
+		if(cfrom_dg!=NULL && cto_dg!=NULL)
 		{
-			ep->cfrom = atoi(cfrom_dg->type->name+1);
-			ep->cto = atoi(cto_dg->type->name+1);
+			if(cfrom_dg->type->name[0]=='"' && cto_dg->type->name[0]=='"')
+			{
+				ep->cfrom = atoi(cfrom_dg->type->name+1);
+				ep->cto = atoi(cto_dg->type->name+1);
+			}
 		}
 	}
 }
@@ -341,7 +348,7 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	{
 		// XXX hack see chat w/ oe 2010-08-30
 		//mrs->ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
-		mrs->ltop = invent_mrs_var("h", &mrs->vlist);
+		mrs->ltop = invent_mrs_var(handle_type, &mrs->vlist);
 		mrs->index = dg_to_mrs_var(dg_hop(hook, indexf), &mrs->vlist);
 		mrs->xarg = dg_to_mrs_var(dg_hop(hook, xargf), &mrs->vlist);
 	}

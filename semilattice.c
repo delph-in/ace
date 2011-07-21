@@ -271,7 +271,7 @@ int make_glbs()
 			}
 		}
 	}
-	//rebuild_heirarchy();// XXX just to test if it works
+	rebuild_heirarchy();// to make sure daughters[] and parents[] lists are OK
 	//printf("%d cst hash collisions / %d R  ", ncsthash_collisions, ncsthash_requests);
 	return 0;
 }

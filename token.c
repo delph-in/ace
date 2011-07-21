@@ -20,6 +20,8 @@
 
 extern int trace;
 
+int	enable_token_avms = 0;
+
 char	*get_token_carg(struct token	*t)
 {
 	struct dg	*c = dg_hop(t->dg, lookup_fname("+CARG"));
@@ -74,15 +76,19 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 
 	tags = malloc(sizeof(char*) * nwords);
 	unk = malloc(sizeof(int) * nwords);
+	if(enable_post)
+	{
 #ifdef	POST
-	post_tag_sequence(nwords, words, tags, unk);
+		post_tag_sequence(nwords, words, tags, unk);
 #else
-	for(i=0;i<nwords;i++)
+		assert(!"grammar built for POS tagging, but ACE built without tagger.");
+#endif
+	}
+	else for(i=0;i<nwords;i++)
 	{
 		tags[i] = "NNP";
 		unk[i] = 1;
 	}
-#endif
 	if(trace)
 	{
 		for(i=0;i<nwords;i++)fprintf(stderr, "%s/%s%s ", words[i], tags[i], unk[i]?"?":"");
@@ -107,7 +113,8 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 		e->token->string = words[i];
 		e->token->cfrom = cfrom[i];
 		e->token->cto = cto[i];
-		build_token_dag(e->token);
+		if(enable_token_avms)
+			build_token_dag(e->token);
 		e->token->oc = NULL;
 	}
 	tc->lattice_vertex_id_gen = 10000;
@@ -186,13 +193,15 @@ void	print_token_chart(struct lattice	*tc)
 		struct token	*t = e->token;
 		printf("token le %p vtx [%d-%d] char [%d-%d] string '%s' dag ",
 			e, e->from->id, e->to->id, t->cfrom, t->cto, t->string);
-		print_dg(t->dg);
+		if(enable_token_avms)
+			print_dg(t->dg);
 		printf("\n");
 	}
 }
 
 int	test_first_token_in_lex_dg(struct dg	*le_dg, struct token	*tok)
 {
+	if(!enable_token_avms)return 0;
 	struct dg	*toklist = dg_path(le_dg, lex_tokens_list_path);
 	//printf(" .. token %s\n", tokens[i]->string);
 	assert(toklist);
@@ -272,6 +281,8 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 		return -1;
 	}
 */
+
+	if(!enable_token_avms)return 0;
 
 	struct dg	*le_toklist = dg_path(le->dg, lex_tokens_list_path);
 	struct dg	*le_toklast = dg_path(le->dg, lex_tokens_last_path);

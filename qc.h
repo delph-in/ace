@@ -15,4 +15,13 @@ void	gqc_result();
 
 extern int __qc_use_heap;
 
+// qc extractor compiler
+typedef	void	(*qc_extractor_function)(struct type**, struct dg*);
+qc_extractor_function	dynamically_link_qc_extractor();
+int	compile_qc(char	*qccode_path);
+
+// internal properties to be used only by the freezer
+void	*freeze_qc();
+void	recover_qc(void	*qcf);
+
 #endif

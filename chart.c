@@ -13,7 +13,8 @@
 #include	"lexicon.h"
 #include	"freeze.h"
 
-#define GENERALIZE_TYPES
+//#define GENERALIZE_TYPES
+
 #define	ENABLE_HYPERACTIVE	1
 //#define	RULE_STATS
 
@@ -782,7 +783,18 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 
 	if(!res)
 	{
-		if(build_edge(a, b, arg, rdg, Eout, force_noha) == -2)return -1;
+		int build_edge_result = build_edge(a, b, arg, rdg, Eout, force_noha);
+		if(build_edge_result == -2)
+		{
+			// found a root analysis in first-only mode
+			//printf("build_edge failed\n");
+			return -1;
+		}
+		if(build_edge_result == -1)
+		{
+			//printf("build_edge found a cycle\n");
+			return 0;
+		}
 		if(noldslabs >= MAX_CHUNKS)
 		{
 			fprintf(stderr, "NOTE: terminating search, too much RAM\n");

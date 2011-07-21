@@ -45,6 +45,8 @@ struct tdl_line
 	char	*odef;
 	char	*status, *filename;
 	int		lnum;
+
+	char	operation;
 };
 
 long			ntdllines;
@@ -94,7 +96,18 @@ char	*get_conf_file_path(char	*dir, char	*lhs)
 	return p;
 }
 
-void	add_tdlline(char	*lhs, char	*rhs, char	*odef, int	lnum, char	*path)
+void	augment_definition(struct tdl_line	*tdl, char	*rhs, int	lnum, char	*path)
+{
+	char	*old = tdl->rhs;
+	char	*new = malloc(strlen(old) + strlen(rhs) + 5);
+	sprintf(new, "%s & %s", old, rhs);
+	free(tdl->rhs);
+	tdl->rhs = new;
+	//fprintf(stderr, "%s:%d augments type `%s' from %s:%d\n", path, lnum, tdl->lhs, tdl->filename, tdl->lnum);
+	//fprintf(stderr, "  new definition: %s\n", new);
+}
+
+void	add_tdlline(char	*lhs, char	operation, char	*rhs, char	*odef, int	lnum, char	*path)
 {
 	/*if(!tdlstatus)
 	{
@@ -112,10 +125,23 @@ void	add_tdlline(char	*lhs, char	*rhs, char	*odef, int	lnum, char	*path)
 	if(had != 0)
 	{
 		tdl = tdllines + had-1;
-		fprintf(stderr, "warning: %s:%d redefines type `%s' from %s:%d\n", path, lnum, lhs, tdl->filename, tdl->lnum);
+		if(operation == '+')
+		{
+			augment_definition(tdl, rhs, lnum, path);
+			return;
+		}
+		else
+		{
+			fprintf(stderr, "warning: %s:%d redefines type `%s' from %s:%d\n", path, lnum, lhs, tdl->filename, tdl->lnum);
+		}
 	}
 	else
 	{
+		if(operation == '+')
+		{
+			fprintf(stderr, "error: %s:%d augments nonexistant type `%s'\n", path, lnum, lhs);
+			exit(-1);
+		}
 		ntdllines++;
 		tdllines = realloc(tdllines, sizeof(struct tdl_line)*ntdllines);
 		tdl = tdllines + ntdllines-1;
@@ -128,6 +154,7 @@ void	add_tdlline(char	*lhs, char	*rhs, char	*odef, int	lnum, char	*path)
 	tdl->status = tdlstatus?:"instance";
 	tdl->odef = (*odef)?strdup(odef):0;
 	tdl->lnum = lnum;
+	tdl->operation = operation;
 }
 
 char	*g_orth_def;
@@ -265,6 +292,8 @@ int	process_colon_command(char	*parent, char	*cmd)
 
 int	load_tdl(char	*path)
 {
+	if(!path)
+		return -1;
 	FILE	*f = fopen(path, "r");
 	char	buffer[10240], *lhs, *rhs, *end;
 	char	line[10240], *lp;
@@ -309,15 +338,16 @@ int	load_tdl(char	*path)
 		if(line[strlen(line)-1]=='\n')	// make sure we don't kill noeol files' last char
 			line[strlen(line)-1] = 0;
 		if(line[0]!='%')in_comment = process_comments(line, in_comment);
-		if(line[0]==0)continue;
-		if(line[0]=='%')
-		{
-			if(line[1]=='(')setup_morpho(line+1);
-			else strcpy(odef, line+1);
-			continue;
-		}
 
 		lp = trim_string(line);
+
+		if(*lp == 0)continue;
+		if(lp[0] == '%')
+		{
+			if(lp[1]=='(')setup_morpho(lp+1);
+			else strcpy(odef, lp+1);
+			continue;
+		}
 
 		if(buffer[0])strcat(buffer, " ");
 		strcat(buffer, lp);
@@ -345,26 +375,28 @@ int	load_tdl(char	*path)
 		}
 		end = strstr(lhs, ":=");
 		if(!end)end = strstr(lhs, ":<");
+		if(!end)end = strstr(lhs, ":+");
 		if(!end)
 		{
-			fprintf(stderr, "tdl: `%s' malformed input string, does not contain ':=' or ':<'\n", buffer);
+			fprintf(stderr, "tdl: `%s' malformed input string, does not contain ':=' or ':<' or ':+'.\n", buffer);
 			*buffer = *odef = 0;
 			continue;
 		}
 		*end = 0;
+		char operation = end[1];
 		// for our purposes, there doesn't seem to be any distinction between := and :< ...
 		rhs = end+2;
 		lhs = trim_string(lhs);
 		rhs = trim_string(rhs);
 		if(*lhs==0 || *rhs==0)
 		{
-			fprintf(stderr, "tdl: `%s := %s' malformed input string, degenerate statement\n", lhs, rhs);
+			fprintf(stderr, "tdl: `%s :%c %s' malformed input string, degenerate statement\n", lhs, operation, rhs);
 			*buffer = *odef = 0;
 			continue;
 		}
 
 		//printf("tdl input: `%s'  -->  `%s'\n", lhs, rhs);
-		add_tdlline(lhs, rhs, odef, lnum, path);
+		add_tdlline(lhs, operation, rhs, odef, lnum, path);
 		*buffer = 0;
 		*odef = 0;
 	}
@@ -760,6 +792,12 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 	}
 	if(*str != '[')
 	{
+		if(*str == '"' && R->current_pathlen == 0)
+		{
+			// this was a type comment.  terrible syntax.
+			return atomic_dg("*top*");
+			//printf("calling type_dg(%s)\n", str);
+		}
 		dg = type_dg(str);
 		if(!dg)fprintf(stderr, "hint: type_dg(%s) failed\n", str);
 		return dg;
@@ -1007,8 +1045,25 @@ int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 
 	//printf("constrain `%s' by `%s'\n", lhs, rhs);
 
+	//char	*type_of_interest = "pres-tense-lex-rule";
+	//char	*type_of_interest = "verb-tense-lex-rule";
+	//char	*type_of_interest = "add-only-no-ccont-rule";
+
+	/*if(!strcmp(lhs, type_of_interest))
+	{
+		printf("authored constraints on '%s'\n", lhs);
+		printf("string: %s\n", rhs);
+	}*/
+
 	dg = dagify(rhs, bt);
 	if(!dg) { fprintf(stderr, "hint: dagify failed\n"); return -1; }
+
+	/*if(!strcmp(lhs, type_of_interest))
+	{
+		printf("built constraints on '%s'\n", lhs);
+		print_dg(dg);
+		printf("\n");
+	}*/
 
 	return callback(lhs, dg);
 }
@@ -1036,13 +1091,22 @@ int	typify_tdl_line(char	*lhs, char	*rhs_save, void	*ref)
 			if(!(*chunk=='<' || *chunk=='#' || *chunk=='['))
 			{
 				char	*name = trim_string(chunk);
-				nparents++;
-				parents = realloc(parents, sizeof(struct type*)*nparents);
-				parents[nparents-1] = find_type(name, 0);
-				if(!parents[nparents-1])
+				if(*name=='"')
 				{
-					free(parents);
-					return -1;
+					// string 'name' is a comment on type 'lhs'
+					// do nothing with it.
+				}
+				else
+				{
+					nparents++;
+					parents = realloc(parents, sizeof(struct type*)*nparents);
+					parents[nparents-1] = find_type(name, 0);
+					if(!parents[nparents-1])
+					{
+						printf("couldn't find type '%s'\n", name);
+						free(parents);
+						return -1;
+					}
 				}
 			}
 			if(!done)chunk = trim_string(p+1);
@@ -1207,8 +1271,11 @@ int load_grammar(char	*path)
 	tdl_pop_status();
 
 	load_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
+
 	int do_load_mem() { load_mem(get_conf_file_path(confdir, "maxent-model")); return 0; }
 	run_task("loading maxent model", do_load_mem);
+
+	compile_qc(get_conf_file_path(confdir, "quickcheck-code"));
 
 	setup_rule_filter();
 

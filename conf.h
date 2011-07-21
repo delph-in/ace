@@ -16,8 +16,16 @@ extern char			*g_list_type;
 extern char			*g_null_type;
 extern char			*g_diff_list_type;
 
+extern char			*handle_type;
+
 extern struct path	*chart_dependencies_from, *chart_dependencies_to;
 extern int			nchart_dependencies;
+
+extern int			enable_token_avms;
+extern int			enable_simple_form_lexicon;
+extern int			enable_index_accessibility_filtering;
+extern int			extra_erg_dag_stash;
+extern int			enable_post;
 
 extern char			*token_type;
 extern struct path	token_form_path, token_from_path, token_to_path, token_id_path, token_postags_path, token_posprobs_path;

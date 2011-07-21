@@ -304,14 +304,14 @@ char	*vpm_map(char	*vartype, char	**input, struct vpm_context	*ctx, int	output_s
 		struct vpm_rule	*r = ctx->rules+i;
 		if(! (r->direction & VPM_INPUT_TO_OUTPUT))
 			continue;	// only consider rules working forward
-		//if(dbg)printf(" ... check rule '%s' => '%s'\n", r->input[0], r->output[0]);
+		//printf(" ... check rule '%s' => '%s'\n", r->input[0], r->output[0]);
 		for(j=0;j<ctx->ninput;j++)
 			if(vpm_test(vartype, input[j], r->input[j]) != 0)
 				break;
 		if(j<ctx->ninput)continue;
 		// else the rule applies.
 		char	*rout = r->output[output_slot];
-		//if(dbg)printf(" ... rule '%s' fires\n", rout);
+		//printf(" ... rule '%s' fires\n", rout);
 		if(!strcmp(rout, "*"))
 		{
 			assert(output_slot < ctx->ninput);
@@ -321,9 +321,9 @@ char	*vpm_map(char	*vartype, char	**input, struct vpm_context	*ctx, int	output_s
 		else if(rout[0] == '[' && prop_subsumes(rout+1, vartype))return NULL;
 		else return rout;
 	}
-	// for equal-sized mappings, default to identity map
-	if(ctx->ninput == ctx->noutput)return input[output_slot];
-	else return NULL;
+	// for equal-sized mappings, default to identity map -- NO, don't.
+	/*if(ctx->ninput == ctx->noutput)return input[output_slot];
+	else */return NULL;
 }
 
 struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
@@ -348,6 +348,12 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 		{
 			// context matches root level, i.e. variable types
 			vout->type = vpm_map(vin->type, &vin->type, ctx, 0);
+			if(!vout->type)
+			{
+				//fprintf(stderr, "WARNING: vpm did not define mapping for variable type '%s'\n", vin->type);
+				// silently accept this...
+				vout->type = vin->type;
+			}
 			assert(vout->type != NULL);
 		}
 		else
@@ -374,7 +380,7 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 			for(j=0;j<ctx->noutput;j++)
 			{
 				char	*nval = vpm_map(vin->type, values, ctx, j);
-				//printf("mapping values: %s...; result = %s\n", values[0], nval);
+				//printf("mapping values for '%s': %s...; result = %s\n", ctx->output[j], values[0], nval);
 				if(!nval)continue; // don't include NULL outputs (the VPM rule drops this property in this case)
 				vout->nprops++;
 				assert(vout->nprops < 1024);

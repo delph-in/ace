@@ -188,12 +188,15 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	{
 #ifdef	HAVE_CHECK_CYCLES
 		// ignore mark left by check_cycles()
-		if((unsigned long)dg->copy<=2)dg->copy = 0;
+		if((unsigned long long)dg->copy<=2)dg->copy = 0;
 #endif
 
-		if((unsigned long)dg->copy == 3)	// cycle marker
-			return 0;
-		if((unsigned long)dg->copy == 5)	// sharable marker
+		if((unsigned long long)dg->copy == 3)	// cycle marker
+		{
+			//print_copy_path("CYCLE ending at");
+			return NULL;
+		}
+		if((unsigned long long)dg->copy == 5)	// sharable marker
 			goto share;
 
 		if(dg->copy && dg->copy->gen == generation)
@@ -333,7 +336,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 #ifdef	COPY_COUNTS
 		copycount++;
 #ifdef	COPY_PATHS
-		print_copy_path("COPY");
+		//print_copy_path("COPY");
 #endif
 #endif
 		return newcopy;
@@ -348,7 +351,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 		if(forwarded)*chret = 1;	// since node was forwarded, parent must consider it changed, even though we're sharing it
 		else *chret = 0;
 #ifdef	COPY_PATHS
-		print_copy_path("SHARE");
+		//print_copy_path("SHARE");
 #endif
 		return dg;
 	}
@@ -650,17 +653,20 @@ void	setup_carcs_stack()
 	carcstack = malloc(sizeof(struct darc)*CSDEPTH);
 }
 
+int extra_erg_dag_stash = 0;
+
 void	setup_extra_type_dgs()
 {
 	clear_slab();
-#ifdef	ERG
-	ocons = lookup_type("*ocons*");
-	extra_ocons = copy_dg(ocons->dg);
-	substcons = lookup_type("*substcons*");
-	extra_substcons = copy_dg(substcons->dg);
-	anti_synsem = lookup_type("anti_synsem");
-	extra_anti_synsem = copy_dg(anti_synsem->dg);
-#endif
+	if(extra_erg_dag_stash)
+	{
+		ocons = lookup_type("*ocons*");
+		extra_ocons = copy_dg(ocons->dg);
+		substcons = lookup_type("*substcons*");
+		extra_substcons = copy_dg(substcons->dg);
+		anti_synsem = lookup_type("anti_synsem");
+		extra_anti_synsem = copy_dg(anti_synsem->dg);
+	}
 	commit_slab();
 }
 
@@ -668,15 +674,18 @@ struct dg	*get_extra_type_dg(struct type	*t)
 {
 	struct dg	*extra = 0;
 
-	if(t==ocons)
-		if(extra_ocons->gen != generation)
-			extra = extra_ocons;
-	if(t==substcons)
-		if(extra_substcons->gen != generation)
-			extra = extra_substcons;
-	if(t==anti_synsem)
-		if(extra_anti_synsem->gen != generation)
-			extra = extra_anti_synsem;
+	if(extra_erg_dag_stash)
+	{
+		if(t==ocons)
+			if(extra_ocons->gen != generation)
+				extra = extra_ocons;
+		if(t==substcons)
+			if(extra_substcons->gen != generation)
+				extra = extra_substcons;
+		if(t==anti_synsem)
+			if(extra_anti_synsem->gen != generation)
+				extra = extra_anti_synsem;
+	}
 
 	if(extra)
 	{

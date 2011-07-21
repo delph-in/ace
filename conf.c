@@ -10,6 +10,7 @@
 
 struct path	lex_stem_path, lex_rels_path, rule_rels_path, extract_mrs_path, lex_carg_path, lex_pred_path;
 char		*semarg_type;
+char		*handle_type;
 char		*g_cons_type;
 char		*g_list_type;
 char		*g_null_type;
@@ -17,6 +18,8 @@ char		*g_diff_list_type;
 
 struct path	*chart_dependencies_from, *chart_dependencies_to;
 int			nchart_dependencies;
+
+int enable_post = 0;
 
 struct path	token_form_path, token_from_path, token_to_path, token_id_path, token_postags_path, token_posprobs_path;
 struct path	lex_tokens_list_path, lex_tokens_last_path;
@@ -128,6 +131,7 @@ static struct path get_conf_path(char	*lhs)
 struct conf
 {
 	char		*semarg_type;
+	char		*handle_type;
 	char		*cons_type;
 	char		*list_type;
 	char		*null_type;
@@ -153,6 +157,12 @@ struct conf
 	char	*generating_packing;
 	char	*ep_drop;
 	int		restrictor_size;
+
+	int		enable_token_avms;
+	int		enable_simple_form_lexicon;
+	int		enable_index_accessibility_filtering;
+	int		enable_post;
+	int		extra_erg_dag_stash;
 };
 
 struct path	freeze_path(struct path	p)
@@ -168,6 +178,7 @@ void	*freeze_conf()
 {
 	struct conf	*c = slab_alloc(sizeof(*c));
 	c->semarg_type = freeze_string(semarg_type);
+	c->handle_type = freeze_string(handle_type);
 	c->cons_type = freeze_string(g_cons_type);
 	c->list_type = freeze_string(g_list_type);
 	c->null_type = freeze_string(g_null_type);
@@ -209,6 +220,12 @@ void	*freeze_conf()
 	c->restrictor_size = restrictor_size;
 	c->ep_drop = freeze_block(ep_drop, restrictor_size);
 
+	c->enable_token_avms = enable_token_avms;
+	c->enable_simple_form_lexicon = enable_simple_form_lexicon;
+	c->enable_index_accessibility_filtering = enable_index_accessibility_filtering;
+	c->enable_post = enable_post;
+	c->extra_erg_dag_stash = extra_erg_dag_stash;
+
 	return c;
 }
 
@@ -216,6 +233,7 @@ void	recover_conf(void	*vc)
 {
 	struct conf	*c = vc;
 	semarg_type = c->semarg_type;
+	handle_type = c->handle_type;
 	g_cons_type = c->cons_type;
 	g_list_type = c->list_type;
 	g_null_type = c->null_type;
@@ -253,12 +271,31 @@ void	recover_conf(void	*vc)
 	ep_drop = c->ep_drop;
 	reload_restrictors = (restrictor_size != nfnames);
 
+	enable_token_avms = c->enable_token_avms;
+	enable_simple_form_lexicon = c->enable_simple_form_lexicon;
+	enable_index_accessibility_filtering = c->enable_index_accessibility_filtering;
+	enable_post = c->enable_post;
+	extra_erg_dag_stash = c->extra_erg_dag_stash;
+
 	//printf("types cons `%s' list `%s' null `%s' dlist `%s'\n", g_cons_type, g_list_type, g_null_type, g_diff_list_type);
+}
+
+int	get_conf_bool(char	*name)
+{
+	char	*str = get_conf("simplify-lexicon");
+	if(!str)return 0;
+	if(!strcasecmp(str, "enabled"))return 1;
+	if(!strcasecmp(str, "on"))return 1;
+	if(!strcasecmp(str, "yes"))return 1;
+	if(!strcasecmp(str, "true"))return 1;
+	if(!strcasecmp(str, "t"))return 1;
+	return 0;
 }
 
 int	load_conf()
 {
 	semarg_type = get_conf("semarg-type")?:"semarg";
+	handle_type = get_conf("handle-type")?:"h";
 	g_cons_type = get_conf("cons-type")?:"cons";
 	g_list_type = get_conf("list-type")?:"list";
 	g_null_type = get_conf("null-type")?:"null";
@@ -271,23 +308,32 @@ int	load_conf()
 	rule_rels_path = get_conf_path("rule-rels-path");
 	extract_mrs_path = get_conf_path("semantics-path");
 
-	lex_tokens_list_path = get_conf_path("lexicon-tokens-path");
-	lex_tokens_last_path = get_conf_path("lexicon-last-token-path");
-	token_form_path = get_conf_path("token-form-path");
-	token_from_path = get_conf_path("token-from-path");
-	token_to_path = get_conf_path("token-to-path");
-	token_id_path = get_conf_path("token-id-path");
-	token_postags_path = get_conf_path("token-postags-path");
-	token_posprobs_path = get_conf_path("token-posprobs-path");
-
-	lattice_mapping_input_path = get_conf_path("lattice-mapping-input-path");
-	lattice_mapping_output_path = get_conf_path("lattice-mapping-output-path");
-	lattice_mapping_context_path = get_conf_path("lattice-mapping-context-path");
-	lattice_mapping_position_path = get_conf_path("lattice-mapping-position-path");
-
-	token_type = get_conf("token-type")?:"token";
-
 	load_chart_dependencies(get_conf("chart-dependencies"));
+
+	enable_token_avms = get_conf_bool("token-mapping");
+	if(enable_token_avms)
+	{
+		lex_tokens_list_path = get_conf_path("lexicon-tokens-path");
+		lex_tokens_last_path = get_conf_path("lexicon-last-token-path");
+		token_form_path = get_conf_path("token-form-path");
+		token_from_path = get_conf_path("token-from-path");
+		token_to_path = get_conf_path("token-to-path");
+		token_id_path = get_conf_path("token-id-path");
+		token_postags_path = get_conf_path("token-postags-path");
+		token_posprobs_path = get_conf_path("token-posprobs-path");
+
+		lattice_mapping_input_path = get_conf_path("lattice-mapping-input-path");
+		lattice_mapping_output_path = get_conf_path("lattice-mapping-output-path");
+		lattice_mapping_context_path = get_conf_path("lattice-mapping-context-path");
+		lattice_mapping_position_path = get_conf_path("lattice-mapping-position-path");
+
+		token_type = get_conf("token-type")?:"token";
+	}
+
+	enable_simple_form_lexicon = get_conf_bool("simplify-lexicon");
+	enable_index_accessibility_filtering = get_conf_bool("index-accessibility-filtering");
+	enable_post = get_conf_bool("english-pos-tagger");
+	extra_erg_dag_stash = get_conf_bool("extra-erg-dag-stash");
 
 	recover_conf(freeze_conf());
 }
@@ -330,6 +376,8 @@ void	load_chart_dependencies(char	*depstring)
 {
 	char	*strings[1024];
 	int		nstrings = 0;
+
+	if(!depstring)return;
 
 	depstring = trim_string(depstring);
 	while(depstring && *depstring)

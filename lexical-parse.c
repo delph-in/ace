@@ -62,13 +62,14 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 	struct edge	*e = le->edge;
 	int	i;
 
-//	printf("lexparsing edge #%d\n", le->edge->id);
-//	for(i=0;i<le->edge->north_routes;i++)
-//		printf("oroute %d: next rule %s\n", i, (le->edge->orth_routes[i].len>0)?(rules[le->edge->orth_routes[i].rules[0]]->name):"none");
+	//printf("lexparsing edge #%d\n", le->edge->id);
+	//for(i=0;i<le->edge->north_routes;i++)
+	//	printf("oroute %d: next rule %s\n", i, (le->edge->orth_routes[i].len>0)?(rules[le->edge->orth_routes[i].rules[0]]->name):"none");
 	for(i=0;i<nrules;i++)
 	{
 		if(!rules[i]->lexical)continue;
 		if(check_lexical_rule_constraints(rules[i], le->edge))continue;
+		//printf("should I try lexrule '%s'?\n", rules[i]->name);
 		epsila[i]->from = epsila[i]->to = le->edge->from;
 		if(filter(epsila[i], le->edge))
 		{
@@ -85,6 +86,7 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 				//printf(" -- built new edge #%d ('%s')\n", e->id, show_orth_leaves(e));
 				add_new_lexical_edge(lc, e);
 			}
+			//else unify_backtrace();
 		}
 	}
 	return 0;
@@ -133,5 +135,17 @@ int	lexical_parse_lattice(struct lattice	*lc)
 			remove_lattice_edge(lc, lc->edges[i]);
 			i--;
 		}
+	}
+}
+
+void	print_lexical_chart(struct lattice	*tc)
+{
+	int	i;
+	for(i=0;i<tc->nedges;i++)
+	{
+		struct lattice_edge	*e = tc->edges[i];
+		struct edge	*t = e->edge;
+		printf("lexical le %p vtx [%d-%d] lexeme '%s'\n",
+			e, e->from->id, e->to->id, t->lex->word);
 	}
 }

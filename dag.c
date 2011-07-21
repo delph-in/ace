@@ -597,3 +597,8 @@ void enable_packing(int how)
 	else if(how==1)unify_restrictor = parsing_packing;
 	else if(how==2)unify_restrictor = generating_packing;
 }
+
+struct dg	*noninline_dg_hop(struct dg	*d, int	f)
+{
+	return dg_hop(d, f);
+}

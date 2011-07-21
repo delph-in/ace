@@ -75,6 +75,8 @@ void score_hypothesis(struct hypothesis *h)
 		// 'h' is a leaf node
 		// construct the cannonical surface form
 		if(g_mode == GENERATING)return;	// FIXME: realization ranking doesn't have access to surface forms because we have no tokens...
+		extern int enable_token_avms;
+		if(!enable_token_avms)return;
 		extern char	*current_sentence;
 		char	surface[1024], *sp = surface;
 		int	i;
@@ -778,25 +780,33 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 		{
 			if(g_mode == PARSING)
 			{
+				extern int enable_token_avms;
 				int	ntokens = e->lex->stemlen;
 				for(i=0;i<ntokens;i++)
 				{
-					struct token	*tok = (struct token*)e->daughters[i];
-					int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
-					char	*form = tok->string;
-					char	*tokstr = dstr_lookup((void*)tok, from);
-					if(!tokstr)
+					if(enable_token_avms)
 					{
-						char	token_str[10240];
-						extern int dag_print_style;
-						dag_print_style = 1;
-						snprint_dg(token_str, 10239, tok->dg);
-						//*token_str = 0;
-						dag_print_style = 0;
-						tokstr = slab_escape(token_str);
-						dstr_save((void*)tok, from, tokstr);
+						struct token	*tok = (struct token*)e->daughters[i];
+						int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
+						char	*form = tok->string;
+						char	*tokstr = dstr_lookup((void*)tok, from);
+						if(!tokstr)
+						{
+							char	token_str[10240];
+							extern int dag_print_style;
+							dag_print_style = 1;
+							snprint_dg(token_str, 10239, tok->dg);
+							//*token_str = 0;
+							dag_print_style = 0;
+							tokstr = slab_escape(token_str);
+							dstr_save((void*)tok, from, tokstr);
+						}
+						print(" (\"%s\" %d \"%s\")", slab_escape(form), id, tokstr);
 					}
-					print(" (\"%s\" %d \"%s\")", slab_escape(form), id, tokstr);
+					else
+					{
+						print(" (\"?\")");
+					}
 				}
 			}
 			else if(g_mode == GENERATING)

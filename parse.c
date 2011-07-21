@@ -306,6 +306,8 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	// do lexical parsing
 	lexical_parse_lattice(lexical_chart);
 
+	if(trace)print_lexical_chart(lexical_chart);
+
 	// do lexical filtering
 	apply_lexical_filtering(lexical_chart);
 

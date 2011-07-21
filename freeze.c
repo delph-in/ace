@@ -78,6 +78,7 @@ struct grammar
 	void	*token_mapping_rules;
 	void	*lexical_filtering_rules;
 	void	*transfer;
+	void	*qc;
 };
 
 extern void	*slab_alloc(int	len);
@@ -114,6 +115,8 @@ struct type	*freeze_type(struct type	*tin)
 	tout->dg = tin->dg?copy_dg(tin->dg):0;
 	tout->name = freeze_string(tin->name);
 	tout->descendents = freeze_block(tin->descendents, tin->ndescendents * sizeof(short));
+	tout->parents = freeze_block(tin->parents, sizeof(struct type*)*tout->nparents);
+	tout->daughters = freeze_block(tin->daughters, sizeof(struct type*)*tout->ndaughters);
 
 	return tout;
 }
@@ -193,6 +196,15 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 	lin->dg = (struct dg*)lout;	// NOTE: keep pointer to new copy of lexeme, so semantic index can be updated
 
 	return lout;
+}
+
+void	patch_type(struct type	*tout)
+{
+	int i;
+	for(i=0;i<tout->nparents;i++)
+		tout->parents[i] = FT(tout->parents[i]);
+	for(i=0;i<tout->ndaughters;i++)
+		tout->daughters[i] = FT(tout->daughters[i]);
 }
 
 void	patch_dg(struct dg	*dg)
@@ -280,7 +292,9 @@ int	freeze_grammar()
 	strtype = lookup_type("string");
 	freezer_note("strings");
 
+	for(i=0;i<ntypes;i++)patch_type(types[i]);
 	for(i=0;i<ntypes;i++)patch_dg(types[i]->dg);
+
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->dg);
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->packdg);
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->gpackdg);
@@ -365,6 +379,7 @@ int	freeze_grammar()
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
 	G->strtype = strtype;
+	G->qc = freeze_qc();
 	freezer_note("miscellaneous");
 	G->semindex = freeze_semantic_index();
 	G->transfer = freeze_transfer();
@@ -376,9 +391,13 @@ int	freeze_grammar()
 	strcat(G->message, grammar_version); strcat(G->message, "\n");
 
 #ifdef	POST
-	G->post = slab_alloc(post_image_size());
-	post_freeze(G->post);
-	freezer_note("pos-tagger");
+	if(enable_post)
+	{
+		G->post = slab_alloc(post_image_size());
+		post_freeze(G->post);
+		freezer_note("pos-tagger");
+	}
+	else G->post = NULL;
 #endif
 
 extern void	*token_mapping_rules, *lexical_filtering_rules;
@@ -435,13 +454,15 @@ static int	load_freeze()
 	recover_conf(G->conf);
 	recover_instances(G->instances);
 	recover_labels(G->labels);
+	recover_qc(G->qc);
 	recover_vpm(G->vpm);
 	recover_semantic_index(G->semindex);
 	recover_transfer(G->transfer);
 	recover_stochastic_model(G->stochmodel);
 
 #ifdef	POST
-	post_recover(G->post);
+	if(enable_post)
+		post_recover(G->post);
 #endif
 
 extern void	*token_mapping_rules;

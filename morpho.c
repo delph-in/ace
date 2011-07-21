@@ -8,6 +8,8 @@
 
 #define	USE_GENERICS
 
+//#define	SHOW_ORTH_ROUTES
+
 static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, char	*stem, int type);
 struct lexeme	*proper_noun_lex(char	*name);
 
@@ -23,7 +25,7 @@ struct lexeme	*proper_noun_lex(char	*name);
 
 #include	"token.h"
 
-#define	MAX_ORTH_RULES	5
+#define	MAX_ORTH_RULES	7
 
 int				norules;
 struct orule	**orules;
@@ -177,7 +179,8 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		// enumerate all possible ways of reaching each possible stem
 		for(j=0;j<t->oc->nedges;j++)
 			unfold_oroutes(t->oc->edges[j], t->oc->edges[j], 0, 0);
-		/*for(j=0;j<t->oc->nedges;j++)
+#ifdef	SHOW_ORTH_ROUTES
+		for(j=0;j<t->oc->nedges;j++)
 		{
 			printf("%s -> %s\n", t->string, t->oc->edges[j]->form);
 			for(k=0;k<t->oc->edges[j]->north_routes;k++)
@@ -188,7 +191,8 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 				for(l=0;l<r->len;l++)printf(" %s", rules[r->rules[l]]->name);
 				printf("\n");
 			}
-		}*/
+		}
+#endif
 	}
 
 	// do lexical lookup on each variation of each token
@@ -444,7 +448,13 @@ void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int n
 	int i;
 
 	// don't go down garden paths
-	if(nrules >= MAX_ORTH_RULES)return;
+	if(nrules >= MAX_ORTH_RULES)
+	{
+		fprintf(stderr, "WARNING: ran up against MAX_ORTH_RULES limit during orthographemic analysis\n");
+		return;
+	}
+
+	//printf("unfold '%s' [%d parents]\n", visit->form, visit->nparents);
 
 	for(i=0;i<visit->nparents;i++)
 	{

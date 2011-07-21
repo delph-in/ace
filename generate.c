@@ -17,6 +17,8 @@ extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inh
 
 unsigned long long	require_ep_span = 0;
 
+int			enable_index_accessibility_filtering = 0;
+
 unsigned long long collect_vars(struct dg	*dg)
 {
 	int	i;
@@ -87,8 +89,6 @@ int	index_accessibility_filter(struct edge	*e)
 
 // chart
 
-#define	INDEX_ACCESSIBILITY_FILTERING
-
 int	gen_process_edge(struct edge	*e)
 {
 	struct chart_cell	*c = cells;
@@ -98,13 +98,16 @@ int	gen_process_edge(struct edge	*e)
 	e->inaccessible_vars = 0;
 	for(i=0;i<e->have;i++)
 	{
-		if(e->daughters[i]->frozen==1)return 0;
+		if(e->daughters[i]->frozen==1)
+		{
+			//printf("not processing edge #%d ; daughter #%d is frozen\n", e->id, e->daughters[i]->id);
+			return 0;
+		}
 		e->accessible_vars |= e->daughters[i]->accessible_vars;
 		e->inaccessible_vars |= e->daughters[i]->inaccessible_vars;
 	}
 
-#ifdef	INDEX_ACCESSIBILITY_FILTERING
-	if(e->have == e->need)
+	if(e->have == e->need && enable_index_accessibility_filtering)
 	{
 		unsigned long long	really_accessible = accessible_vars(e);
 		e->inaccessible_vars |= e->accessible_vars & ~really_accessible;
@@ -117,7 +120,6 @@ int	gen_process_edge(struct edge	*e)
 		//if(e->accessible_vars)printf("#%d has accessibility: %16.16llX\n", e->id, e->accessible_vars);
 		//if(e->inaccessible_vars)printf("#%d has inaccessibility: %16.16llX\n", e->id, e->inaccessible_vars);
 	}
-#endif
 
 	if(!inhibit_pack && e->have == e->need)
 	{

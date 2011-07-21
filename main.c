@@ -9,6 +9,7 @@
 #include	"chart.h"
 #include	"net.h"
 #include	"freeze.h"
+#include	"conf.h"
 #include	"rule.h"
 #include	"lexicon.h"
 #include	"mrs.h"
@@ -124,6 +125,33 @@ struct job_stats
 	float		time;
 };
 
+show_heirarchy(char	*type)
+{
+	struct type	*t = lookup_type(type);
+	if(!t) { printf("no such type '%s'\n", type); return -1; }
+
+	int i;
+	printf("parents:");
+	for(i=0;i<t->nparents;i++)printf(" %s", t->parents[i]->name);
+	printf("\n");
+	printf("daughters:");
+	for(i=0;i<t->ndaughters;i++)printf(" %s", t->daughters[i]->name);
+	printf("\n");
+}
+
+show_glb(char	*input)
+{
+	struct type	*t = get_top();
+	char	*p;
+	for(p=strtok(input, " ");p && t;p=strtok(NULL, " "))
+	{
+		struct type	*t2 = lookup_type(p);
+		if(!t2) { printf("no such type '%s'\n", p); return -1; }
+		t = glb(t, t2);
+	}
+	printf("glb = %s\n", t?t->name:"BOTTOM");
+}
+
 struct job_stats	main_input_loop(FILE	*fin)
 {
 	struct job_stats	st = {.success = 0, .fail = 0, .count = 0, .time = 0};
@@ -152,6 +180,10 @@ struct job_stats	main_input_loop(FILE	*fin)
 				if(l>3)line[l-1] = 0;
 				if(line[1]=='r' && line[2]==' ')
 					lui_rule(line+3);
+				if(line[1]=='h' && line[2]==' ')
+					show_heirarchy(line+3);
+				if(line[1]=='g' && line[2]==' ')
+					show_glb(line+3);
 				num_results = -2;
 			}
 			else num_results = parse_line(line);
@@ -202,7 +234,8 @@ void	initialize_engine()
 		gettimeofday(&tv1, 0);
 		load_grammar(load_grammar_path);
 #ifdef	POST
-		post_train_from("../post/brown.train.txt");
+		if(enable_post)
+			post_train_from("../post/brown.train.txt");
 #endif
 		gettimeofday(&tv2, 0);
 		tv2.tv_sec -= tv1.tv_sec;
@@ -262,11 +295,14 @@ int	main(int	argc, char	*argv[])
 	setup_signal_handlers();
 
 	//generalization_experiments();
-	/*printf("%d types\n", ntypes);
+	/*extern int nstrings;
+	extern struct type	**strings;
+	printf("%d strings\n", nstrings);
 	int i;
-	for(i=0;i<ntypes;i++)printf("%d	= %s\n", i, types[i]->name);*/
+	for(i=0;i<nstrings;i++)printf("%d	= %s\n", i, strings[i]->name);*/
 
-//treebank_control(); return 0;
+	//treebank_control(); return 0;
+
 	stats = main_input_loop(open_sentence_source());
 
 	shutdown_net();

@@ -8,25 +8,14 @@
 #include	"dag.h"
 #include	"tdl.h"
 
-#ifdef ERG
 //#define	HIDEOUS_HACK
 #undef	HIDEOUS_HACK
-#endif
 
 /* essentially, QC extracts a skeleton type tree from a dag
  * and performs *tree*-unification on that skeleton before
  * the full dag-unifier is allowed to run */
 
-#define	QC_SIZE(x) unsigned int	qc_size = x;
-#define PUSH(fname)
-#define POP
-#define REC(x)
-#include	"qccode.c"
-#undef PUSH
-#undef POP
-#undef REC
-#undef QC_SIZE
-#define	QC_SIZE(x)
+int	qc_size;
 
 struct qc
 {
@@ -38,34 +27,28 @@ int	__qc_use_heap = 0;
 static struct type	*olist, *minus, *_0dlist;
 extern int gen_qc;
 
-IFCLOCK(unsigned long long extract_clock;)
-IFCLOCK(unsigned long long extract_count;)
+qc_extractor_function	qc_extractor = NULL;
+
+struct type	*dg_type(struct dg	*d)
+{
+	extern unsigned int	generation;
+	if(d->gen == generation)return d->type;
+	return d->xtype;
+}
 
 struct qc	*extract_qc(struct dg	*d)
 {
-	static int	init = 0;
 	struct qc	*q;
 	long		i, iter, sp = 0, dst, fn, onf;
-	extern int	nfnames;
 	int			*lp;
-	extern unsigned int	generation;
-	struct dg	*stack[64];
-	static int	labels[1024];
 
 	if(gen_qc)return NULL;
 
+	static int init = 0;
 	if(!init)
 	{
 		init = 1;
-		lp = labels;
-#define	REC(dst)
-#define	POP
-#define	PUSH(fstr)			onf = nfnames ; *lp++ = fn = lookup_fname(#fstr); if(fn>=onf)fprintf(stderr, "QC: feature %s does not exist\n", #fstr);
-#include	"qccode.c"
-#undef	PUSH
-#undef	POP
-#undef	REC
-
+		qc_extractor = dynamically_link_qc_extractor();
 #ifdef	HIDEOUS_HACK
 		olist = lookup_type("*olist*");
 		assert(olist);
@@ -85,29 +68,8 @@ struct qc	*extract_qc(struct dg	*d)
 //start_timer(hop_timer);
 
 IFCLOCK(	clock_t	T = clock();for(iter=0;iter<100;iter++)	)
-//for(iter=0;iter<10;iter++)
-	{
-	sp = 0;
-	lp = labels;
-	stack[sp] = d;
-
-#define	REC(dst)	if(stack[sp]) \
-						q->entries[dst] = (stack[sp]->gen==generation)?stack[sp]->type:stack[sp]->xtype; \
-					else q->entries[dst] = 0;
-
-#define	POP			--sp;
-
-#ifdef	CLOCKCOUNT
-#define	EC		extract_count++
-#else
-#define	EC
-#endif
-#define	PUSH(fname)	if(stack[sp])stack[sp+1] = dg_hop(stack[sp], *lp);	\
-					else stack[sp+1] = 0;	\
-					sp++; lp++; EC;
-
-#include	"qccode.c"
-	}
+	assert(qc_extractor != NULL);
+	qc_extractor(q->entries, d);
 IFCLOCK(	extract_clock += clock() - T; )
 
 //stop_timer(hop_timer, qc_size * iter);

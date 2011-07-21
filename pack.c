@@ -72,7 +72,7 @@ extern long long copycount, copytraverse;
 
 extern int gen_qc;
 
-int	upward_kill(struct edge	*edge)
+int	upward_kill(struct edge	*edge, struct edge	*save)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	int					i, j, k, killed = 1, pass;
@@ -83,6 +83,8 @@ int	upward_kill(struct edge	*edge)
 	//	which means remove it from the chart.
 	//   since we are parsing each string length exhaustively before moving to longer constituents,
 	//		only need to search in the same cell
+	// BUT, 'save' was the new host, so DON'T freeze it;
+	//	this is non-NULL when we retroactively pack an edge into its parent
 	edge->frozen = 1;
 	PACKBUG("frost #%d\n", edge->id);
 	// algorithm: anything with a frozen daughter gets frozen, repeat till convergence
@@ -93,6 +95,7 @@ int	upward_kill(struct edge	*edge)
 		for(k=-1;k<E->npack;k++)
 		{
 			struct edge *e = (k==-1)?E:E->pack[k];
+			if(e == save)continue;
 			// for each edge, packed or not
 			for(j=0;j<e->have;j++)
 				if(e->daughters[j]->frozen == 1)
@@ -329,7 +332,7 @@ int	pack_edge(struct edge	*edge)
 				if(h->built_on)
 				{
 					//printf("upkilling #%d to pack it in #%d\n", h->id, edge->id);
-					upward_kill(h);
+					upward_kill(h, edge);
 				}
 				h->built_on = 0;
 				if(!already_packed)
