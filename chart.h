@@ -101,6 +101,8 @@ extern struct chart_cell	*cells;
 extern int					chart_size;
 extern unsigned long long	require_ep_span;
 
+extern int enable_generalize_edge_top_types;
+
 #define PARSING 1
 #define GENERATING 2
 extern int g_mode;

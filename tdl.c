@@ -30,10 +30,10 @@ char	*trim_string(char	*str)
 {
 	int	len;
 
-	while(*str==' ' || *str=='\t' || *str=='\n')str++;
+	while(*str==' ' || *str=='\t' || *str=='\n' || *str=='\r')str++;
 	len = strlen(str);
 	if(len==0)return str;
-	while(len>0 && (str[len-1]==' ' || str[len-1]=='\t' || str[len-1]=='\n'))len--;
+	while(len>0 && (str[len-1]==' ' || str[len-1]=='\t' || str[len-1]=='\n' || str[len-1]=='\r'))len--;
 	str[len] = 0;
 	return str;
 }
@@ -334,9 +334,9 @@ int	load_tdl(char	*path)
 	{
 		if(line[0]==0)break;
 		lnum++;
-		if(line[0]=='\n')continue;
-		if(line[strlen(line)-1]=='\n')	// make sure we don't kill noeol files' last char
-			line[strlen(line)-1] = 0;
+//		if(line[0]=='\n')continue;
+//		if(line[strlen(line)-1]=='\n')	// make sure we don't kill noeol files' last char
+//			line[strlen(line)-1] = 0;
 		if(line[0]!='%')in_comment = process_comments(line, in_comment);
 
 		lp = trim_string(line);

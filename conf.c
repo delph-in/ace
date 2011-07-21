@@ -6,6 +6,7 @@
 #include	"dag.h"
 #include	"conf.h"
 #include	"rule.h"
+#include	"chart.h"
 #include	"freeze.h"
 
 struct path	lex_stem_path, lex_rels_path, rule_rels_path, extract_mrs_path, lex_carg_path, lex_pred_path;
@@ -162,6 +163,7 @@ struct conf
 	int		enable_simple_form_lexicon;
 	int		enable_index_accessibility_filtering;
 	int		enable_post;
+	int		enable_generalize_edge_top_types;
 	int		extra_erg_dag_stash;
 };
 
@@ -223,6 +225,7 @@ void	*freeze_conf()
 	c->enable_token_avms = enable_token_avms;
 	c->enable_simple_form_lexicon = enable_simple_form_lexicon;
 	c->enable_index_accessibility_filtering = enable_index_accessibility_filtering;
+	c->enable_generalize_edge_top_types = enable_generalize_edge_top_types;
 	c->enable_post = enable_post;
 	c->extra_erg_dag_stash = extra_erg_dag_stash;
 
@@ -274,6 +277,7 @@ void	recover_conf(void	*vc)
 	enable_token_avms = c->enable_token_avms;
 	enable_simple_form_lexicon = c->enable_simple_form_lexicon;
 	enable_index_accessibility_filtering = c->enable_index_accessibility_filtering;
+	enable_generalize_edge_top_types = c->enable_generalize_edge_top_types;
 	enable_post = c->enable_post;
 	extra_erg_dag_stash = c->extra_erg_dag_stash;
 
@@ -282,7 +286,7 @@ void	recover_conf(void	*vc)
 
 int	get_conf_bool(char	*name)
 {
-	char	*str = get_conf("simplify-lexicon");
+	char	*str = get_conf(name);
 	if(!str)return 0;
 	if(!strcasecmp(str, "enabled"))return 1;
 	if(!strcasecmp(str, "on"))return 1;
@@ -332,6 +336,7 @@ int	load_conf()
 
 	enable_simple_form_lexicon = get_conf_bool("simplify-lexicon");
 	enable_index_accessibility_filtering = get_conf_bool("index-accessibility-filtering");
+	enable_generalize_edge_top_types = get_conf_bool("generalize-edge-top-types");
 	enable_post = get_conf_bool("english-pos-tagger");
 	extra_erg_dag_stash = get_conf_bool("extra-erg-dag-stash");
 

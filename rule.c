@@ -404,11 +404,17 @@ char	*setup_rule_filter1(int pack)
 	struct slab_state	ost;
 	get_slabstate(&ost);
 
+	struct type	*save_types[nrules];
 	struct qc	***rqc = malloc(sizeof(struct qc**) * nrules);
+	static struct type *signtype = 0;
+	if(!signtype)signtype = lookup_type("sign");
 	for(i=0;i<nrules;i++)
 	{
 		struct rule	*m = rules[i];
 		mdg = pack?( (pack==1) ? m->packdg : m->gpackdg ) : m->dg;
+		save_types[i] = mdg->xtype;
+		if(enable_generalize_edge_top_types)
+			mdg->xtype = signtype;
 		rqc[i] = malloc(sizeof(struct qc*) * (m->ndaughters+1));
 		rqc[i][0] = extract_qc(mdg);
 		for(j=0;j<m->ndaughters;j++)
@@ -487,6 +493,17 @@ char	*setup_rule_filter1(int pack)
 		set_slabstate(&st);
 	}
 	set_slabstate(&ost);
+
+	if(enable_generalize_edge_top_types)
+	{
+		for(i=0;i<nrules;i++)
+		{
+			struct rule	*m = rules[i];
+			mdg = pack?( (pack==1) ? m->packdg : m->gpackdg ) : m->dg;
+			mdg->xtype = save_types[i];
+		}
+	}
+
 	printf("%.1f%% blocked (%.1f%% ss)\n", 100*(float)(count-yes)/count, 100*(float)ssbl/nrules/nrules);
 	return rule_filter;
 }

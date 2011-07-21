@@ -422,7 +422,7 @@ int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
 			extern char	**rf_tc;
 			if(!rf_tc[rnums[j]][rnums[i]])
 			{
-				//printf("killing rule chain containing pair `%s %s'\n", rules[rnums[i]]->name, rules[rnums[j]]->name);
+				printf("killing rule chain containing pair `%s %s'\n", rules[rnums[i]]->name, rules[rnums[j]]->name);
 				return 0;
 			}
 		}
@@ -451,6 +451,10 @@ void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int n
 	if(nrules >= MAX_ORTH_RULES)
 	{
 		fprintf(stderr, "WARNING: ran up against MAX_ORTH_RULES limit during orthographemic analysis\n");
+		fprintf(stderr, "WARNING: rule chain from '%s' to '%s':\n", visit->form, target->form);
+		for(i=0;i<nrules;i++)
+			fprintf(stderr, "  %s", rules[rnums[i]]->name);
+		fprintf(stderr, "\n");
 		return;
 	}
 
@@ -462,6 +466,35 @@ void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int n
 		if(d->edge)
 		{
 			// we got here by applying d->rule backwards to d->edge
+			// see if d->rule is incompatible with any rules already on this o-route
+			int j;
+			for(j=0;j<nrules;j++)
+			{
+				extern char	**rf_tc;
+				if(!rf_tc[d->rule->rule->rnum][rnums[j]])
+				{
+					// transitively closed rule filter says we can't
+					// apply rnums[j] once d->rule has been applied.
+					//fprintf(stderr, "RFTC blocked exploration of route containing pair '%s(%s)'.\n",
+						//rules[rnums[j]]->name, d->rule->rule->name);
+					break;
+				}
+				if(rnums[j] == d->rule->rule->rnum)
+				{
+					// this rule is already on the agenda.
+					// that is legal for certain cases,
+					// like multiple punctuation marks: "I won!!!!!"
+					// but it is an infinite loop for certain other cases,
+					// such as a rule that happens to have no orthographemic effect
+					// for certain inputs, like the past tense of "let".
+					if(!strcmp(visit->form, d->edge->form))
+					{
+						//fprintf(stderr, "blocking duplicate rule application with no spelling change.\n");
+						break;
+					}
+				}
+			}
+			if(j<nrules) continue;
 			// recurse and see about ways to get to d->edge from the starting form.
 			assert(d->rule != NULL);
 			int		*mnums = longer_rule_list_rev(nrules, rnums, d->rule);

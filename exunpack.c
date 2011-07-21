@@ -1,0 +1,133 @@
+#include	<stdio.h>
+#include	<stdlib.h>
+#include	<string.h>
+#include	<assert.h>
+#include	<stdarg.h>
+
+#include "dag.h"
+#include "chart.h"
+#include "lexicon.h"
+#include "maxent.h"
+#include "unpack.h"
+#include "mrs.h"
+#include	"token.h"
+
+struct hyp_eu
+{
+	int	ndtrs;
+	struct hyp_eu	**dtrs;
+	struct dg	*dg;
+};
+
+struct tree_list
+{
+	int	n;
+	struct hyp_eu	**list;
+};
+
+struct tree_list	singleton_eue(struct edge	*e)
+{
+	struct tree_list	tl;
+	tl.n = 1;
+	tl.list = slab_alloc(sizeof(struct hyp_eu*));
+	tl.list[0] = slab_alloc(sizeof(struct hyp_eu));
+	tl.list[0]->ndtrs = 0;
+	tl.list[0]->dtrs = NULL;
+	if(e->rule)tl.list[0]->dg = e->rule->dg;
+	else 
+	{
+		if(g_mode == GENERATING)
+		{
+			// generator lexeme.  don't put the specialized RELS list in.
+			tl.list[0]->dg = lexical_dg(e->lex, 0);
+		}
+		else tl.list[0]->dg = e->dg;
+	}
+	return tl;
+}
+
+struct tree_list	instantiate_eue(struct edge	*e, struct tree_list	*dtl, int	d)
+{
+	if(d == e->have)return singleton_eue(e);
+	struct tree_list	sub = instantiate_eue(e, dtl, d+1);
+	struct tree_list	dtr = dtl[d];
+	int	i, j;
+	struct tree_list	res;
+	res.list = slab_alloc(sizeof(struct hyp_eu*) * dtr.n * sub.n);
+	res.n = 0;
+	for(i=0;i<dtr.n;i++)
+	{
+		for(j=0;j<sub.n;j++)
+		{
+			struct hyp_eu	*sh = sub.list[j];
+			//printf("sh->dg >%d =:\n", d);print_dg(sh->dg);printf("\n");
+			if(unify_dg_tmp(dtr.list[i]->dg, sh->dg, d))
+			{
+				forget_tmp();
+				continue;
+			}
+			else
+			{
+				struct dg	*dg = finalize_tmp(sh->dg, (d==0)?1:0);
+				if(!dg)continue;	// cycle failure
+				struct hyp_eu	*h = slab_alloc(sizeof(*h));
+				h->dg = dg;
+				h->ndtrs = sh->ndtrs+1;
+				h->dtrs = slab_alloc(sizeof(struct hyp_eu*)*h->ndtrs);
+				h->dtrs[0] = dtr.list[j];
+				memcpy(h->dtrs+1, sh->dtrs, sizeof(struct hyp_eu*)*sh->ndtrs);
+				res.list[res.n++] = h;
+			}
+		}
+	}
+	return res;
+}
+
+extend_tree_list(struct tree_list	*L, struct tree_list	ex)
+{
+	L->list = slab_realloc(L->list, sizeof(void*)*L->n, sizeof(void*)*(L->n+ex.n));
+	memcpy(L->list+L->n, ex.list, sizeof(void*)*ex.n);
+	L->n += ex.n;
+}
+
+struct tree_list	exhaustive_unpack_edge(struct edge	*e)
+{
+	if(e->unpack)return *(struct tree_list*)e->unpack;
+	struct tree_list	dtl[e->have];
+	int	i, j;
+	for(i=0;i<e->have;i++)
+	{
+		dtl[i] = exhaustive_unpack_edge(e->daughters[i]);
+		for(j=0;j<e->daughters[i]->npack;j++)
+			extend_tree_list(&dtl[i], exhaustive_unpack_edge(e->daughters[i]->pack[j]));
+	}
+	struct tree_list	tl = instantiate_eue(e, dtl, 0);
+	e->unpack = slab_alloc(sizeof(tl));
+	*(struct tree_list*)(e->unpack) = tl;
+	return tl;
+}
+
+int	exhaustive_unpack(struct chart_cell	*cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs))
+{
+	int	i, total = 0;
+	for(i=0;i<cell->p_nedges;i++)
+	{
+		struct edge	*edge = cell->p_edges[i];
+		if( (g_mode!=GENERATING || edge->ep_span == require_ep_span) && is_root(edge->dg) && !edge->frozen )
+		{
+			//DEBUG("edge #%d can be root...\n", edge->id);
+			int	j;
+			for(j=-1;j<edge->npack;j++)
+			{
+				// for each potentially root packed edge...
+				struct edge *e = (j==-1)?edge:edge->pack[j];
+				if(e->frozen)continue;
+				if(!is_root(e->dg))continue;
+				struct tree_list	tl = exhaustive_unpack_edge(e);
+				fprintf(stderr, "I don't know how to call process() on these hypotheses yet.\n");
+				total += tl.n;
+			}
+		}
+	}
+	return total;
+}

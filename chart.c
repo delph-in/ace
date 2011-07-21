@@ -13,13 +13,13 @@
 #include	"lexicon.h"
 #include	"freeze.h"
 
-//#define GENERALIZE_TYPES
-
 #define	ENABLE_HYPERACTIVE	1
 //#define	RULE_STATS
 
 //int	nofragments = 1;
 int	nofragments = 0;
+
+int	enable_generalize_edge_top_types = 0;
 
 int	inhibit_results = 0;
 extern int inhibit_pack;
@@ -224,9 +224,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 			// hyperpassive
 			hyperactive = 1;
 			__qc_use_heap = 1;
-#ifdef	GENERALIZE_TYPES
-			dg->type = signtype;
-#endif
+			if(enable_generalize_edge_top_types)
+				dg->type = signtype;
 			hqc = extract_qc_arg(dg, -1);
 			__qc_use_heap = 0;
 			forget_tmp();
@@ -252,9 +251,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 			nbase_finalize++;
 #endif
 			if(!u)return -1;	// cycles might happen, check for them.
-#ifdef	GENERALIZE_TYPES
-			u->type = u->xtype = signtype;
-#endif
+			if(enable_generalize_edge_top_types)
+				u->type = u->xtype = signtype;
 			qc = extract_qc_arg(u, -1);
 		}
 		e = slab_alloc(sizeof(struct edge));

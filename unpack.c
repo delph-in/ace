@@ -863,7 +863,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 	struct hypothesis		*hyp;
 	struct edge			*edge;
 
-	if(!nbest)return exhaustive_unpack(cell);
+	//if(!nbest)return exhaustive_unpack(cell, process);
 
 	static struct scoring_ancestry	root_ancestry = {.nparent_types=0,.parent_types=NULL, .rooted = 1};
 
