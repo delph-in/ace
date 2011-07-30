@@ -3,6 +3,8 @@
 #include	<string.h>
 #include	<time.h>
 
+#include	<liba.h>
+
 #include	"conf.h"
 #include	"chart.h"
 #include	"dag.h"
@@ -26,6 +28,8 @@ int	__qc_use_heap = 0;
 
 static struct type	*olist, *minus, *_0dlist;
 extern int gen_qc;
+
+int	eqc_timer = -1;
 
 qc_extractor_function	qc_extractor = NULL;
 
@@ -57,6 +61,7 @@ struct qc	*extract_qc(struct dg	*d)
 		_0dlist = lookup_type("0-dlist");
 		assert(_0dlist);
 #endif
+		eqc_timer = new_timer("extract QC");
 	}
 
 	if(!__qc_use_heap)
@@ -67,10 +72,12 @@ struct qc	*extract_qc(struct dg	*d)
 //if(hop_timer==-1)hop_timer = new_timer("qc hop");
 //start_timer(hop_timer);
 
-IFCLOCK(	clock_t	T = clock();for(iter=0;iter<100;iter++)	)
+IFCLOCK( start_timer(eqc_timer);)
+//IFCLOCK(	clock_t	T = clock();for(iter=0;iter<100;iter++)	)
 	assert(qc_extractor != NULL);
 	qc_extractor(q->entries, d);
-IFCLOCK(	extract_clock += clock() - T; )
+//IFCLOCK(	extract_clock += clock() - T; )
+IFCLOCK(	stop_timer(eqc_timer, 1); )
 
 //stop_timer(hop_timer, qc_size * iter);
 
@@ -129,8 +136,8 @@ int	quickcheck(struct qc	*a, struct qc	*b)
 	if(i<qcs)return -1;
 
 #ifdef	HIDEOUS_HACK
-	struct dlist_hack { int dlist, list, last; }	hacks[1] = { {30,21,15} };
-	struct olist_hack { int list, opt; }			ohacks[1] = { {28,17} };
+	struct dlist_hack { int dlist, list, last; }	hacks[1] = { {28,24,19} };
+	struct olist_hack { int list, opt; }			ohacks[1] = { {26,12} };
 	int					nhacks=1, nohacks=1;
 //	if(a->entries[20] == olist && b->entries[9]==minus)return -1;
 //	if(b->entries[20] == olist && a->entries[9]==minus)return -1;
@@ -231,7 +238,10 @@ extern unsigned long long unify_attempts_total, unify_attempts_pass_rf, unify_at
 /* measured feb-24 erg-1004 on 'sh.titan' */
 //const double	k_glb = 1.02e-8 /*25.745 / 2533382030*/, k_unify = 6.54394e-6 /*0.00000654394*/, k_hop = 8.66e-9 /*7.078 / 817753160*/;
 
-const double	k_glb = 1.02e-7 /*25.745 / 2533382030*/, k_unify = 6.54394e-6 /*0.00000654394*/, k_hop = 8.66e-8 /*7.078 / 817753160*/;
+//const double	k_glb = 1.02e-7 /*25.745 / 2533382030*/, k_unify = 6.54394e-6 /*0.00000654394*/, k_hop = 8.66e-8 /*7.078 / 817753160*/;
+
+/* measured jul-25-2011 erg-trunk on 'octopus' */
+const double	k_glb = 0 /* not measured this time */, k_unify = 0.000005, k_hop = 0.0000016 / 45;
 
 void	gqc_treeify(int	count, int *hops)
 {

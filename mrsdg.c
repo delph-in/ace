@@ -94,9 +94,9 @@ void	clear_mrs()
 {
 	int i;
 
-static int clear_mrs_timer = -1;
-if(clear_mrs_timer==-1)clear_mrs_timer = new_timer("mrs clear hash");
-start_timer(clear_mrs_timer);
+//static int clear_mrs_timer = -1;
+//if(clear_mrs_timer==-1)clear_mrs_timer = new_timer("mrs clear hash");
+//start_timer(clear_mrs_timer);
 bzero(varhash, sizeof(struct mrs_var*) * VHSIZE);
 	/*for(i=0;i<VHSIZE;i++)
 	{
@@ -109,7 +109,7 @@ bzero(varhash, sizeof(struct mrs_var*) * VHSIZE);
 	}*/
 	varhash_used = 0;
 	varhash_collis = 0;
-stop_timer(clear_mrs_timer, 1);
+//stop_timer(clear_mrs_timer, 1);
 }
 
 struct mrs_var	*invent_mrs_var(char	*type, struct mrs_vlist	*vlist)
@@ -156,9 +156,9 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		}
 		else
 		{
-			static int var_extract_timer = -1;
-			if(var_extract_timer == -1)var_extract_timer = new_timer("mrs var extr");
-			start_timer(var_extract_timer);
+			//static int var_extract_timer = -1;
+			//if(var_extract_timer == -1)var_extract_timer = new_timer("mrs var extr");
+			//start_timer(var_extract_timer);
 			var = slab_calloc(sizeof(struct mrs_var), 1);
 			if(!descendent_of(dg->type->tnum, semarg)) var->is_const = 1;
 			var->dg = dg;
@@ -188,7 +188,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 			else varhash_used++;
 			varhash[hc] = var; var->refs++;
 			nvars_extracted++;
-			stop_timer(var_extract_timer, 1);
+			//stop_timer(var_extract_timer, 1);
 		}
 
 		vlist->nvars++;
@@ -332,11 +332,11 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	}
 	//printf("extract from cont: "); print_dg(cont); printf("\n");
 
-	static int other_timer = -1;
-	if(other_timer==-1)other_timer = new_timer("reset CONT");
-	start_timer(other_timer);
+//	static int other_timer = -1;
+//	if(other_timer==-1)other_timer = new_timer("reset CONT");
+//	start_timer(other_timer);
 	dgreset_r(cont);
-	stop_timer(other_timer, 1);
+//	stop_timer(other_timer, 1);
 
 	nvars_extracted = 0;
 
@@ -352,9 +352,9 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		mrs->index = dg_to_mrs_var(dg_hop(hook, indexf), &mrs->vlist);
 		mrs->xarg = dg_to_mrs_var(dg_hop(hook, xargf), &mrs->vlist);
 	}
-	static int	rel_timer = -1;
-	if(rel_timer == -1)rel_timer = new_timer("extract EPs");
-	start_timer(rel_timer);
+//	static int	rel_timer = -1;
+//	if(rel_timer == -1)rel_timer = new_timer("extract EPs");
+//	start_timer(rel_timer);
 	int	nrels = 0;
 	DO_DIFFLIST(rels, struct dg *rel, nrels++; );
 	mrs->rels = slab_alloc(sizeof(struct mrs_ep) * nrels);
@@ -363,10 +363,10 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		dg_to_mrs_ep(rel, &mrs->vlist, mrs->rels+mrs->nrels-1);
 		mrs->rels[mrs->nrels-1].epnum = mrs->nrels-1;
 	);
-	stop_timer(rel_timer, nrels);
-	static int	hc_timer = -1;
-	if(hc_timer == -1)hc_timer = new_timer("extract HCs");
-	start_timer(hc_timer);
+//	stop_timer(rel_timer, nrels);
+//	static int	hc_timer = -1;
+//	if(hc_timer == -1)hc_timer = new_timer("extract HCs");
+//	start_timer(hc_timer);
 	int	nhc = 0;
 	DO_DIFFLIST(hcons, struct dg *hc, nhc++; );
 	mrs->hcons = slab_alloc(sizeof(struct mrs_hcons) * nhc);
@@ -374,7 +374,7 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		mrs->nhcons++;
 		dg_to_mrs_hc(hc, &mrs->vlist, mrs->hcons+mrs->nhcons-1);
 	);
-	stop_timer(hc_timer, nhc);
+//	stop_timer(hc_timer, nhc);
 	// give ``mrs'' its own slab allocated vlist
 	mrs->vlist.vars = slab_alloc(sizeof(struct mrs_var*) * mrs->vlist.nvars);
 	memcpy(mrs->vlist.vars, tmp_vlist, sizeof(struct mrs_var*) * mrs->vlist.nvars);

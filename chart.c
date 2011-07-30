@@ -7,6 +7,8 @@
 #include	<time.h>
 #include	<assert.h>
 
+#include	<liba.h>
+
 #include	"conf.h"
 #include	"chart.h"
 #include	"rule.h"
@@ -633,7 +635,12 @@ int	filter(struct edge	*a, struct edge	*b)
 		{
 			// spanning edge
 			extern char	*rule_root_utc;
-			if(!rule_root_utc[a->rule->rnum]) return 0;
+			if(!rule_root_utc[a->rule->rnum])
+			{
+				// yes, this fires a lot!
+				//printf("not using rule '%s' in spanning cell\n", a->rule->name);
+				return 0;
+			}
 		}
 		else
 		{
@@ -749,7 +756,13 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 //static int ut = -1;
 //if(ut==-1)ut = new_timer("core unification");
 //start_timer(ut);
+	//if(!a->have)printf("EPS %s\n", a->rule->name);
+	static int main_unify_timer = -1;
+	if(main_unify_timer == -1)
+		main_unify_timer = new_timer("main unify");
+	IFCLOCK( start_timer(main_unify_timer); )
 	res = unify_dg_tmp(pdg, rdg, arg);
+	IFCLOCK( stop_timer(main_unify_timer, 1); )
 //stop_timer(ut, 1);
 #ifdef	CLOCKCOUNT
 	unify_clock += clock()-T;
@@ -781,7 +794,12 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 
 	if(!res)
 	{
+		static int	build_edge_timer = -1;
+		if(build_edge_timer == -1)
+			build_edge_timer = new_timer("build edge");
+		IFCLOCK( start_timer(build_edge_timer); )
 		int build_edge_result = build_edge(a, b, arg, rdg, Eout, force_noha);
+		IFCLOCK( stop_timer(build_edge_timer, 1); )
 		if(build_edge_result == -2)
 		{
 			// found a root analysis in first-only mode

@@ -781,14 +781,23 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 			if(g_mode == PARSING)
 			{
 				extern int enable_token_avms;
-				int	ntokens = e->lex->stemlen;
-				for(i=0;i<ntokens;i++)
+				if(enable_token_avms)
 				{
-					if(enable_token_avms)
+					int	ntokens = e->lex->stemlen;
+					print(" (\"");
+					for(i=0;i<ntokens;i++)
+					{
+						struct token	*tok = (struct token*)e->daughters[i];
+						char	*form = tok->string;
+						if(i>0)print(" ");
+						print("%s", slab_escape(form));
+					}
+					print("\"");
+
+					for(i=0;i<ntokens;i++)
 					{
 						struct token	*tok = (struct token*)e->daughters[i];
 						int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
-						char	*form = tok->string;
 						char	*tokstr = dstr_lookup((void*)tok, from);
 						if(!tokstr)
 						{
@@ -796,17 +805,18 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 							extern int dag_print_style;
 							dag_print_style = 1;
 							snprint_dg(token_str, 10239, tok->dg);
-							//*token_str = 0;
+							// *token_str = 0;
 							dag_print_style = 0;
 							tokstr = slab_escape(token_str);
 							dstr_save((void*)tok, from, tokstr);
 						}
-						print(" (\"%s\" %d \"%s\")", slab_escape(form), id, tokstr);
+						print(" %d \"%s\"", id, tokstr);
 					}
-					else
-					{
-						print(" (\"?\")");
-					}
+					print(")");
+				}
+				else
+				{
+					print(" (\"?\")");
 				}
 			}
 			else if(g_mode == GENERATING)

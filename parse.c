@@ -51,10 +51,10 @@ static int	parse_process_edge(struct edge	*e)
 	if(!inhibit_pack && e->have == e->need)
 	{
 		static int packtimer = -1;
-		//if(packtimer==-1)packtimer = new_timer("packing");
-		//start_timer(packtimer);
+		if(packtimer==-1)packtimer = new_timer("packing");
+		IFCLOCK( start_timer(packtimer); );
 		pack = pack_edge(e);
-		//stop_timer(packtimer, 1);
+		IFCLOCK( stop_timer(packtimer, 1); );
 		if(pack==1)
 			return 0;	// big savings! woohoo!
 	}
@@ -275,9 +275,44 @@ int	prepare_parse_chart(struct lattice	*lexical_chart)
 	return nwords;
 }
 
+//int		wcap[1024];
+char	*current_sentence = "(not initialized)";
+int didsent;
+
+// show analyses
+int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs)
+{
+	struct dg	*root = hyp->dg, *sem;
+	extern char	*mrs_end;
+	extern int print_trees;
+	if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->dec->edge->id);
+	if(trace>1){print_dg(hyp->dg); printf("\n");}
+	if(!inhibit_results)
+	{
+		char	*sentence = current_sentence;
+		if(sentence && !question && !didsent){printf("SENT: %s\n", sentence);didsent=1;}
+		if(print_trees)
+		{
+			mrs_end = " ; ";
+			print_mrs(mrs);
+			char	*dstr = hypothesis_to_dstring(hyp);
+			puts(dstr);
+			free(dstr);
+			mrs_end = "\n";
+			//print_hypothesis(hyp, printf);
+			//printf((mrs_end = "\n"));
+		}
+		else print_mrs(mrs);
+	}
+	free_mrs(mrs);
+	//printf("\n");
+	//printf("dstring = `%s'\n", slab_escape(hypothesis_to_dstring(hyp)));
+	return 1;
+}
+
 int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 {
-	int		i, count, didsent = 0, cforest;
+	int		i, count, cforest;
 	int		num_parses = 0, num_entries;
 	float	t_setup, t_forest, t_unpack;
 	struct dg	*root;
@@ -285,12 +320,17 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	struct edge	*edge;
 	clock_t	start = clock();
 
+	static int chart_setup_timer = -1;
+	if(chart_setup_timer == -1)chart_setup_timer = new_timer("chart setup");
+	start_timer(chart_setup_timer);
+
 	// a starting place for main-chart edge IDs
 	reset_edges();
 
 	// setup a token lattice and do token mapping
 	struct lattice	*token_chart = build_token_chart(nwords, words, cfrom, cto);
-	if(!token_chart)return -1;
+	if(!token_chart) { stop_timer(chart_setup_timer, 1); return -1; }
+
 	apply_token_mapping(token_chart);
 
 	if(trace)print_token_chart(token_chart);
@@ -300,6 +340,7 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	if(!lexical_chart)
 	{
 		fprintf(stderr, "NOTE: failed to build lexical chart\n");
+		stop_timer(chart_setup_timer, 1);
 		return -1;
 	}
 
@@ -316,22 +357,34 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	if(nwords < 0)
 	{
 		fprintf(stderr, "NOTE: negative lexical chart length\n");
+		stop_timer(chart_setup_timer, 1);
 		return -1;
 	}
 	assert(nwords >= 0);
 	if(!nwords)
 	{
 		fprintf(stderr, "NOTE: nothing to parse\n");
+		stop_timer(chart_setup_timer, 1);
 		return -1;
 	}
 
 	//if(lexical_lookup_into_chart(token_chart)) { fprintf(stderr, "NOTE: lexical coverage gap\n");  return -1; }
-	if(reduce_chart(nwords)) { fprintf(stderr, "NOTE: post reduction gap\n"); return -1; }
+	if(reduce_chart(nwords))
+	{
+		fprintf(stderr, "NOTE: post reduction gap\n");
+		stop_timer(chart_setup_timer, 1);
+		return -1;
+	}
 
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
 
 	//alarm(10);	// XXX make this commandline configurable, and apply it to unpacking too
+
+	stop_timer(chart_setup_timer, 1);
+	static int chart_parsing_timer = -1;
+	if(chart_parsing_timer == -1)chart_parsing_timer = new_timer("chart parsing");
+	start_timer(chart_parsing_timer);
 
 	t_setup = timer();
 
@@ -349,40 +402,13 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		if(parse_process_edge(edge))break;
 	}
 
+	stop_timer(chart_parsing_timer, 1);
+
 	t_forest = t_half + timer();
 	cforest = clock() - start;
 
 	alarm(0);
 
-	// show analyses
-	int show_result(struct hypothesis	*hyp, struct mrs	*mrs)
-	{
-		struct dg	*root = hyp->dg, *sem;
-		extern char	*mrs_end;
-		extern int print_trees;
-		if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->dec->edge->id);
-		if(trace>1){print_dg(hyp->dg); printf("\n");}
-		if(!inhibit_results)
-		{
-			if(sentence && !question && !didsent){printf("SENT: %s\n", sentence);didsent=1;}
-			if(print_trees)
-			{
-				mrs_end = " ; ";
-				print_mrs(mrs);
-				char	*dstr = hypothesis_to_dstring(hyp);
-				puts(dstr);
-				free(dstr);
-				mrs_end = "\n";
-				//print_hypothesis(hyp, printf);
-				//printf((mrs_end = "\n"));
-			}
-			else print_mrs(mrs);
-		}
-		free_mrs(mrs);
-		//printf("\n");
-		//printf("dstring = `%s'\n", slab_escape(hypothesis_to_dstring(hyp)));
-		return 1;
-	}
 	if(do_forest)
 	{
 		output_forest(&cells[chart_size-1]);
@@ -390,8 +416,9 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	}
 	else if(!do_itsdb)
 	{
+		didsent = 0;
 		if(chart_size>0)
-			num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], show_result, best_only);
+			num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], parse_show_result, best_only);
 		else num_parses = 0;
 		if(num_parses && !inhibit_results)printf("\n\n");
 		fflush(stdout);
@@ -434,9 +461,6 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 
 	return num_parses;
 }
-
-//int		wcap[1024];
-char	*current_sentence = "(not initialized)";
 
 void	preprocess_line(char	*string, int	*Nwords, char	***Words, int	**CFrom, int	**CTo);
 

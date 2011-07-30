@@ -322,6 +322,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 			}
 		}
 #endif*/
+//#undef USE_GENERICS
 #ifdef	USE_GENERICS
 		int k;
 		for(k=0;k<oc->nedges;k++)

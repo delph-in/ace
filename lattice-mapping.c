@@ -766,6 +766,47 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 	return did_add + did_remove;
 }
 
+// for the currently active rule:
+int					nfailed_unify_inputs;
+int					*failed_haves;
+struct lattice_edge	***failed_unify_inputs;
+
+static int	same_unify_inputs(struct lattice_edge	**ins, int	have, struct lattice_edge	**ins2, int	have2)
+{
+	if(have != have2)return 0;
+	int i;
+	for(i=0;i<have;i++)
+		if(ins[i] != ins2[i])return 0;
+	return 1;
+}
+
+static int	check_already_failed(struct lattice_edge	**inputs, int	have)
+{
+	int	i;
+	for(i=0;i<nfailed_unify_inputs;i++)
+		if(same_unify_inputs(inputs, have, failed_unify_inputs[i], failed_haves[i]))
+			return 1;
+	return 0;
+}
+
+static void	record_failed(struct lattice_edge	**inputs, int	have)
+{
+	nfailed_unify_inputs++;
+	failed_haves = realloc(failed_haves, sizeof(int)*nfailed_unify_inputs);
+	failed_haves[nfailed_unify_inputs-1] = have;
+	failed_unify_inputs = realloc(failed_unify_inputs, sizeof(void**)*nfailed_unify_inputs);
+	failed_unify_inputs[nfailed_unify_inputs-1] = malloc(sizeof(void*)*have);
+	memcpy(failed_unify_inputs[nfailed_unify_inputs-1], inputs, sizeof(void*)*have);
+}
+
+static void clear_failed()
+{
+	int i;
+	for(i=0;i<nfailed_unify_inputs;i++)
+		free(failed_unify_inputs[i]);
+	nfailed_unify_inputs = 0;
+}
+
 // TODO find a more efficient algorithm for finding application sites
 // TODO keep a cache of what rule already failed to unify with what edge... a *lot* of wasted unification attempts
 // TODO   -- or use quickcheck?
@@ -864,11 +905,17 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 				else return 0;
 			}
 		}
+		if(check_already_failed(inputs, have))return 0;
 		// verify inputs unify into the rule
 		for(i=0;i<have;i++)
 		{
 			if(unify_dg_tmp(lattice_dg(inputs[i]), lattice_rule_spot(r, i), -1) != 0)
-				{ forget_tmp(); DEBUG_VERBOSE(" ... didn't unify\n"); /*unify_backtrace(); print_dg(lattice_rule_spot(r,i));printf("\n");*/return 0; }
+			{
+				forget_tmp();
+				DEBUG_VERBOSE(" ... didn't unify\n"); /*unify_backtrace(); print_dg(lattice_rule_spot(r,i));printf("\n");*/
+				record_failed(inputs, have);
+				return 0;
+			}
 		}
 	}
 	if(have == r->ninput + r->ncontext)
@@ -932,7 +979,11 @@ void	apply_lattice_mapping(struct lattice	*lat, struct lattice_rule_set	*rs)
 	int	i, redo = 0;
 
 	for(i=0;i<rs->nrules;i++)
+	{
+		clear_failed();
 		while(apply_lattice_rule(lat, rs->rules[i])){}
+	}
+
 /*again:
 	redo = 0;
 	for(i=0;i<rs->nrules;i++)
