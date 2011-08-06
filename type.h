@@ -46,4 +46,6 @@ void *freeze_typehash();
 struct type	*glb(struct type	*a, struct type	*b);
 struct type	*lub(struct type	*a, struct type	*b);
 
+struct dg	*find_instance(char	*name);
+
 #endif

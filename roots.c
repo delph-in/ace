@@ -196,6 +196,15 @@ int	load_instances()
 	return 0;
 }
 
+struct dg	*find_instance(char	*name)
+{
+	int	i;
+	for(i=0;i<ninstances;i++)
+		if(!strcmp(name, instances[i].name))
+			return instances[i].dg;
+	return NULL;
+}
+
 struct label
 {
 	char 		*name;
@@ -213,7 +222,7 @@ void	*freeze_labels()
 	struct label_set	*ls = slab_alloc(sizeof(*ls));
 	int					i;
 
-	if(!lset)return 0;
+	if(!lset)return NULL;
 	ls->nlabels = lset->nlabels;
 	ls->labels = slab_alloc(sizeof(struct label)*ls->nlabels);
 	for(i=0;i<ls->nlabels;i++)
@@ -225,21 +234,34 @@ void	*freeze_labels()
 }
 
 void	recover_labels(void	*ls)
-	{ lset = ls; }
+{
+	lset = ls;
+	//printf("recover labelset %p\n", ls);
+}
 
 char	*label_dag(struct dg	*dg, char *fallback)
 {
 	int i;
 
-	if(!lset)return fallback;
+	if(!lset)
+	{
+		//printf("no labelset\n");
+		return fallback;
+	}
+
 	for(i=0;i<lset->nlabels;i++)
 	{
 		lset->labels[i].dg->xtype = lset->labels[i].dg->type = lookup_type("*top*");
 		int res = unify_dg_tmp(dg, lset->labels[i].dg, -1);
 		forget_tmp();
-		if(!res)return lset->labels[i].name;
+		if(!res)
+		{
+			//printf("label %s\n", lset->labels[i].name);
+			return lset->labels[i].name;
+		}
 	}
 
+	//printf("fallback %s\n", fallback);
 	return fallback;
 }
 
@@ -259,14 +281,16 @@ int	study_label(char	*lhs, struct dg	*dg)
 	lset->labels = realloc(lset->labels, sizeof(struct label) * lset->nlabels);
 	lset->labels[lset->nlabels-1].name = name;
 	lset->labels[lset->nlabels-1].dg = dg;
+	//printf("study label %s\n", name);
 	return 0;
 }
 
 int	load_labels()
 {
-	if(process_tdl_dgs_status("parse-node", study_label))
+	printf("loading tree-node-labels\n");
+	if(process_tdl_dgs_status("tree-node-label", study_label))
 	{
-		fprintf(stderr, "parse-nodes: unable to load, bailing out.\n");
+		fprintf(stderr, "tree-node-labels: unable to load, bailing out.\n");
 		exit(-1);
 	}
 	return 0;
