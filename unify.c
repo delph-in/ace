@@ -1127,13 +1127,13 @@ static int	snrprint_dg(char	*str, int	maxlen, struct dg	*d)
 	if(dag_print_style == 0)
 	{
 		if(d->copy)
-			return snprintf(str, maxlen, "<%d>", (int)d->copy);
+			return snprintf(str, maxlen, "<%lld>", (long long)d->copy);
 
 		// multi-visited, give it a tag.
 		if(d->ncarcs>1)
 		{
 			d->copy = (struct dg*)(marker++);
-			tmp = snprintf(str, maxlen, "<%ld>= ", (int)d->copy);
+			tmp = snprintf(str, maxlen, "<%lld>= ", (long long)d->copy);
 			if(str)str += tmp; maxlen -= tmp; len += tmp;
 			if(maxlen<0)maxlen=0;
 		}
@@ -1173,7 +1173,7 @@ static int	snrprint_dg(char	*str, int	maxlen, struct dg	*d)
 			if(str)str += tmp; maxlen -= tmp; len += tmp;
 			if(maxlen<0)maxlen=0;
 		}
-		tmp = snprintf(str, maxlen, "]");
+		tmp = snprintf(str, maxlen, " ]");
 		if(str)str += tmp; maxlen -= tmp; len += tmp;
 		if(maxlen<0)maxlen=0;
 	}
