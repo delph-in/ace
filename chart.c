@@ -265,6 +265,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 		e->ha_dg = b->dg;
 		e->ha_arg = arg;
 		e->ha_use = 0;
+		e->frosted = 0;
+		e->frozen = 0;
 	}
 	else
 	{
@@ -320,6 +322,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 		e->ha_arg = arg;
 		e->ha_use = 0;
 		e->qc = qc;
+		e->frosted = 0;
+		e->frozen = 0;
 		//printf("active qc %p (copy of %p)\n", e->qc, qc);
 	}
 	//e->prio = a->prio+1;

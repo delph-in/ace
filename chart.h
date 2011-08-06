@@ -15,8 +15,8 @@ struct edge
 	struct rule	*rule;
 	signed char		have, need, from, to;
 	struct edge	**daughters;
-	int			id:30;
-	unsigned	built_on:1, frozen:1;
+	int			id:29;
+	unsigned	built_on:1, frozen:1, frosted:1;
 
 	struct lexeme	*lex;		// non-null if this is a lexical edge
 
@@ -78,7 +78,7 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence);
 void	output_lui_chart(char	*words[]);
 void	output_lui_dg(struct dg	*dg, char *wtitle);
 struct mrs;
-void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs);
+int		output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs);
 char	*label_dag(struct dg	*dg, char *fallback);
 void	final_chart_stats();
 char	*show_orth_leaves(struct edge	*e);

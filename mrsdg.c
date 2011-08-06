@@ -136,7 +136,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 	if(!semarg)
 		assert(semarg = lookup_type(semarg_type));
 
-	if(!dg)return 0;
+	if(!dg)return NULL;
 
 	if(dg->gen != 1 || !dg->copy || ((struct mrs_var*)dg->copy)->dg!=dg)
 	{

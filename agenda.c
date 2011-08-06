@@ -90,6 +90,34 @@ void	add_agenda(struct edge	*e)
 	}
 }
 
+// kill everything on the agenda that is built (directly) on 'e'.
+kill_agenda(struct edge	*p)
+{
+	int	i;
+	//printf("poisoning #%d\n", p->id);
+	for(i=0;i<=highest;i++)
+	{
+		struct task	*t = agenda[i].start, *prev = NULL, **pp = &agenda[i].start;
+		while(t)
+		{
+			struct edge	*e = t->edge;
+			int j;
+			prev = t;
+			for(j=0;j<e->have;j++)
+				if(e->daughters[j] == p)
+				{
+					//printf("killing #%d from the agenda\n", e->id);
+					*pp = t->next;
+					if(t->next)t->next->prev = t->prev;
+					prev = t->prev;
+				}
+			pp = &t->next;
+			t = t->next;
+		}
+		agenda[i].end = prev;
+	}
+}
+
 struct edge	*next_agenda(int	from_start)
 {
 	struct task	*best;
