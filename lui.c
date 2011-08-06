@@ -69,7 +69,7 @@ int lui_initialize()
 		close(0); close(1);
 		close(wfd[1]); close(rfd[0]);
 		dup2(wfd[0], 0); dup2(rfd[1], 1);
-		execlp("yzlui", "yzlui", "-p", 0);
+		execlp("yzlui", "yzlui", "-p", NULL);
 		fprintf(stderr, "unable to launch yzlui!\n");
 		exit(-1);
 	}
@@ -157,15 +157,30 @@ void	browse_lui(int eid, char *what)
 			}
 }
 
-void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs)
+int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs)
 {
-	int	count;
+	struct hypothesis	**hyps = NULL;
+	struct mrs			**mrss = NULL;
+	int	count = 0;
+
 	lui_initialize();
-	int counter(struct hypothesis	*hyp, struct mrs	*mrs) { if(!require_mrs || mrs_subsumes(require_mrs, mrs))return 1; else return 0; }
-	count = iterate_cell_root_hypotheses(c, counter, best_only);
+	int iter(struct hypothesis	*hyp, struct mrs	*mrs)
+	{
+		if(!require_mrs || mrs_subsumes(require_mrs, mrs))
+		{
+			count++;
+			hyps = realloc(hyps, sizeof(struct hypothesis*) * count);
+			mrss = realloc(mrss, sizeof(struct mrs*) * count);
+			hyps[count-1] = hyp;
+			mrss[count-1] = mrs;
+			return 1;
+		}
+		else return 0;
+	}
+	count = iterate_cell_root_hypotheses(c, iter, best_only);
+	//printf("got %d results\n", count);
 	fprintf(lui_write, "group %d \"%s\"\n", count, sent);
 
-	count = 0;
 	int show_tree(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
 		void rtree(struct hypothesis *h, char *surf)
@@ -201,9 +216,16 @@ void	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mr
 		fprintf(lui_write, "tree %d", chart_id);
 		rtree(hyp, 0);
 		fprintf(lui_write, " \"%s\"\n", sent);
+		printf("lui wrote a tree\n");
 		return 1;
 	}
+
 	chart_id++;
-	iterate_cell_root_hypotheses(c, show_tree, best_only);
+	int i;
+	for(i=0;i<count;i++)
+		show_tree(hyps[i], mrss[i]);
+
 	fflush(lui_write);
+
+	return count;
 }

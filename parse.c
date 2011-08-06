@@ -279,6 +279,8 @@ int	prepare_parse_chart(struct lattice	*lexical_chart)
 char	*current_sentence = "(not initialized)";
 int didsent;
 
+void	(*parse_callback)(struct hypothesis	*hyp, struct mrs	*mrs) = NULL;
+
 // show analyses
 int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs)
 {
@@ -304,6 +306,8 @@ int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs)
 		}
 		else print_mrs(mrs);
 	}
+	if(parse_callback)
+		parse_callback(hyp, mrs);
 	free_mrs(mrs);
 	//printf("\n");
 	//printf("dstring = `%s'\n", slab_escape(hypothesis_to_dstring(hyp)));
@@ -414,7 +418,7 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		output_forest(&cells[chart_size-1]);
 		num_parses = 1;
 	}
-	else if(!do_itsdb)
+	else if(!do_itsdb && !lui_mode)
 	{
 		didsent = 0;
 		if(chart_size>0)
@@ -427,9 +431,14 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 			num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
 		print_slab_stats();
 	}
-	else
+	else if(do_itsdb)
 	{
 		num_parses = itsdb_report(nwords, words, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
+	}
+	else if(lui_mode)
+	{
+		num_parses = output_lui_trees(cells+chart_size-1, sentence, best_only, 0);
+		if(!num_parses){}//output_lui_chart(words);
 	}
 
 //	extern int	output_edge_vectors;
@@ -437,13 +446,6 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 //		do_output_edge_vectors();
 
 	t_unpack = timer();
-
-	if(lui_mode)
-	{
-		if(num_parses)
-			output_lui_trees(cells+chart_size-1, sentence, best_only, 0);
-		else {}//output_lui_chart(words);
-	}
 
 	used_total += used_edges;
 	pused_total += pused_edges;
