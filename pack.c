@@ -83,6 +83,8 @@ int	upward_kill(struct edge	*edge, struct edge	*save)
 	//	which means remove it from the chart.
 	//   since we are parsing each string length exhaustively before moving to longer constituents,
 	//		only need to search in the same cell
+	//   *ALSO*, when we freeze a parent, we must see if there are any X packed *in* that edge,
+	//      and if there are, we must return those X to the agenda 
 	// BUT, 'save' was the new host, so DON'T freeze it;
 	//	this is non-NULL when we retroactively pack an edge into its parent
 	edge->frozen = 1;
@@ -111,6 +113,26 @@ int	upward_kill(struct edge	*edge, struct edge	*save)
 			{
 				c->p_nedges--;
 				memmove(c->p_edges+i, c->p_edges+i+1, sizeof(struct edge*) * (c->p_nedges - i));
+				// new code august-2-2011;
+				// when we kill an edge e because its descendent has been packed,
+				// we are guaranteed that that edge will be regenerated (in more general form) off of the edge that the descendent packed into.
+				// however, other edges packed on e will not be regenerated, so we have to be careful not to lose them.
+				int l;
+				for(l=0;l<e->npack;l++)
+				{
+					struct edge	*p = e->pack[l];
+					// make sure everything built on `p' from the first time it entered the chart dies
+					// since p is packed, there is nothing *in* the chart built on p,
+					// but there may be stuff on the agenda built on p.
+					// since we are putting p back on the agenda,
+					// we can't leave a marker for all future edges built on p to be killed.
+					// we have to do it now.
+					kill_agenda(p);
+					//printf("returning packed edge #%d to agenda on upward_kill\n", e->pack[l]->id);
+					p->frozen = 0;
+					p->frosted = 0;
+					add_agenda(p);
+				}
 				goto more;
 			}
 			else
@@ -355,7 +377,7 @@ int	pack_edge(struct edge	*edge)
 				}
 				h->npack = 0;
 				h->pack = 0;
-				h->qc = 0;
+				h->frosted = 1;
 				if(!was_frozen)
 				{
 					//printf(" ... packing it though\n");

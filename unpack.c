@@ -11,6 +11,7 @@
 #include "unpack.h"
 #include "mrs.h"
 #include	"token.h"
+#include	"transfer.h"
 
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
@@ -107,11 +108,8 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	struct decomposition *dec, *d;
 
 	ndecomposed++;
-	if(edge->frozen && edge->qc)
+	if(edge->frozen && !edge->frosted)
 	{
-		// ->frozen means either frozen or frosted
-		// ->qc is NULLed when we frost an edge
-		// so, this edge is frozen
 		// shouldn't get here because we delete frozen edges from the chart
 		// and don't build on top of them
 		fprintf(stderr, "ERROR: edge #%d frozen but not removed from chart\n", edge->id);
@@ -164,6 +162,8 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 				if(r2->rule && !check_rf(edge->rule, r2->rule, 1))continue;
 				d->rhs[0] = r1;
 				d->rhs[1] = r2;
+				DEBUG("decomp #%d  %d = #%d = #%d		%p\n",
+					edge->id, n, r1->id, r2->id, d);
 				d++; n++;
 			}
 		}
@@ -438,6 +438,9 @@ struct hypothesis *process_hypagenda(struct hypagenda_item **A)
 	struct hypagenda_item	**W, *l, *r;
 	int					arity, i, j;
 
+	//printf("agenda:\n");
+	//print_heap(*A, 1);
+
 again:
 	if(!*A)return NULL;
 
@@ -617,6 +620,8 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 		indent--;
 	}
 
+	if(customAgenda)return NULL;
+
 	indent++;
 	hyp = process_hypagenda(&cui->agenda);
 	indent--;
@@ -643,11 +648,12 @@ int instantiate_hypothesis(struct hypothesis *h)
 		else return 0;
 	}
 
-	//DEBUG("inst edge #%d rule %s\n", h->dec->edge->id, h->dec->edge->rule?h->dec->edge->rule->name:NULL);
+	DEBUG("inst edge #%d rule %s     = dec %p\n", h->dec->edge->id, h->dec->edge->rule?h->dec->edge->rule->name:NULL, h->dec);
 	for(i=0;i<arity;i++)
 		if(0 != instantiate_hypothesis(h->rhs[i]))
 		{
 			h->dg = (void*)1;
+			DEBUG("edge #%d fail on daughter %d\n", h->dec->edge->id, i);
 			return -1;
 		}
 	if(!h->string)
@@ -693,6 +699,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 			if(!h->dg)	// cycle failure can occur
 			{
 				h->dg = (void*)1;
+				//printf("cycle\n");
 				return -1;
 			}
 		}
@@ -889,17 +896,9 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 			{
 				// for each potentially root packed edge...
 				struct edge *e = (j==-1)?edge:edge->pack[j];
-				if(e->frozen)continue;
+				if(e->frozen && !e->frosted)continue;
 				if(!is_root(e->dg))continue;
-				struct hypothesis *h = hypothesize_edge(e, 0, root_ancestry, &agenda);
-				/*if(h)
-				{
-					struct hypagenda_item *ha = slab_alloc(sizeof(*ha));
-					ha->h = h;
-					ha->left = ha->right = NULL;
-					printf("iterate_root_hypos inserting hyp = %p on edge #%d into top level agenda\n", h, e->id);
-					add_uagenda(&agenda, ha);
-				}*/
+				hypothesize_edge(e, 0, root_ancestry, &agenda);
 			}
 		}
 	}
@@ -921,8 +920,13 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 		start_timer(inst_timer);
 		int	ires = instantiate_hypothesis(hyp);
 		stop_timer(inst_timer, 1);
+		DEBUG("instantiation result = %d\n", ires);
+		//if(hyp->dec->edge->id == 11329)
+		//	DEBUG("instantiation of hypothesis from edge 11329: res = %d\n", ires);
 		if(0 == ires)
 		{
+		//	if(hyp->dec->edge->id == 11329)
+		//		DEBUG("... testing an instantiated hypothesis from edge 11329\n");
 			if(is_root(hyp->dg))
 			{
 				struct mrs	*m = NULL;
@@ -932,9 +936,12 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 					m = extract_mrs(hyp->dg);
 					stop_timer(mrs_timer, 1);
 				}
-				//printf("hyp = %p\n", hyp);
-				//printf("\n"); print_hypothesis(h, printf); printf("\n");
-				count += process(hyp, m);
+				if(check_idioms(hyp->dg, m))
+				{
+					//printf("hyp = %p\n", hyp);
+					//printf("\n"); print_hypothesis(h, printf); printf("\n");
+					count += process(hyp, m);
+				}
 			}
 			else DEBUG("... wasn't root after unpacking\n");
 		}
