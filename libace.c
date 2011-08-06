@@ -2,6 +2,9 @@
 #include	<locale.h>
 #include	<assert.h>
 
+#include	"chart.h"
+#include	"unpack.h"
+#include	"mrs.h"
 #include	"dag.h"
 #include	"rule.h"
 #include	"freeze.h"
@@ -29,4 +32,20 @@ void	ace_load_grammar(char	*path)
 	load_frozen_grammar(path);
 	setup_extra_type_dgs();
 	g_loaded = 1;
+}
+
+struct mrs	*ace_surface_to_mrs(char	*line)
+{
+	struct mrs	*first_mrs = NULL;
+	extern void	(*parse_callback)(struct hypothesis	*hyp, struct mrs	*mrs);
+	void my_callback(struct hypothesis	*h, struct mrs	*m)
+	{
+		if(!first_mrs)
+			first_mrs = copy_mrs(m);
+	}
+	parse_callback = my_callback;
+	inhibit_results = 1;
+	parse_line(line);
+	parse_callback = NULL;
+	return first_mrs;
 }

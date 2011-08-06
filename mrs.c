@@ -761,3 +761,68 @@ int mrs_subsumes1(struct mrs *in, struct mrs *out, int hci, int *vmap, char *use
 	return 0;
 }
 #endif
+
+// produce a copy of 'min' entirely on the heap, for posterity
+struct mrs	*copy_mrs(struct mrs	*min)
+{
+	struct mrs	*mout = calloc(sizeof(*mout),1);
+	int	i, j;
+
+	mout->vlist.nvars = min->vlist.nvars;
+	mout->vlist.vars = malloc(sizeof(struct mrs_var*) * mout->vlist.nvars);
+	for(i=0;i<mout->vlist.nvars;i++)
+	{
+		mout->vlist.vars[i] = calloc(sizeof(struct mrs_var),1);
+		struct mrs_var	*vin = min->vlist.vars[i];
+		struct mrs_var	*vout = mout->vlist.vars[i];
+		vout->name = strdup(vin->name);
+		vout->type = strdup(vin->type);
+		vout->is_const = vin->is_const;
+		vout->refs = vin->refs;
+		vout->vnum = vin->vnum;
+		vout->nprops = vin->nprops;
+		vout->props = malloc(sizeof(struct mrs_var_property) * vout->nprops);
+		for(j=0;j<vout->nprops;j++)
+		{
+			vout->props[j].name = strdup(vin->props[j].name);
+			vout->props[j].value = strdup(vin->props[j].value);
+		}
+	}
+
+	mout->nhcons = min->nhcons;
+	mout->hcons = malloc(sizeof(struct mrs_hcons) * mout->nhcons);
+	for(i=0;i<mout->nhcons;i++)
+	{
+		struct mrs_hcons	*hin = min->hcons+i;
+		struct mrs_hcons	*hout = mout->hcons+i;
+		hout->type = hin->type;
+		hout->hi = mout->vlist.vars[hin->hi->vnum];
+		hout->lo = mout->vlist.vars[hin->lo->vnum];
+	}
+
+	if(min->ltop)mout->ltop = mout->vlist.vars[min->ltop->vnum];
+	if(min->index)mout->index = mout->vlist.vars[min->index->vnum];
+	if(min->xarg)mout->xarg = mout->vlist.vars[min->xarg->vnum];
+
+	mout->nrels = min->nrels;
+	mout->rels = calloc(sizeof(struct mrs_ep), mout->nrels);
+	for(i=0;i<mout->nrels;i++)
+	{
+		struct mrs_ep	*ein = min->rels+i;
+		struct mrs_ep	*eout = mout->rels+i;
+		eout->pred = strdup(ein->pred);
+		eout->lbl = mout->vlist.vars[ein->lbl->vnum];
+		eout->epnum = ein->epnum;
+		eout->cfrom = ein->cfrom;
+		eout->cto = ein->cto;
+		eout->nargs = ein->nargs;
+		eout->args = malloc(sizeof(struct mrs_ep_role) * eout->nargs);
+		for(j=0;j<eout->nargs;j++)
+		{
+			eout->args[j].name = strdup(ein->args[j].name);
+			eout->args[j].value = mout->vlist.vars[ein->args[j].value->vnum];
+		}
+	}
+
+	return mout;
+}

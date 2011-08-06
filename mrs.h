@@ -87,6 +87,9 @@ void		recover_vpm(void *vpm);
 struct mrs_var	*internal_to_external_mrs_var(struct mrs_var	*vin);
 struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin);
 
+struct mrs	*copy_mrs(struct mrs	*m);
+struct mrs	*ace_surface_to_mrs(char	*line);
+
 void	mrs_crange_for_x(struct mrs	*m, struct mrs_var	*x, int	quantified, int	*From, int	*To);
 
 int pred_subsumes(char *in, char *out);
