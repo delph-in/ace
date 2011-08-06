@@ -28,5 +28,12 @@ struct transfer_rule
 	struct dg	**eq, **ss;
 };
 
+void	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, void	(*callback)());
+struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg);
+
 int	study_trigger_rule(char	*name, struct dg	*dg);
 void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid));
+
+extern char	*non_idiom_root;
+int	study_idiom_rule(char	*name, struct dg	*dg);
+int	check_idioms(struct dg	*dg, struct mrs	*m);

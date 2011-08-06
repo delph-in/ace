@@ -1199,6 +1199,17 @@ void	load_triggers(char	*path)
 	process_tdl_dgs_status("trigger-rule", study_trigger_rule);
 }
 
+void	load_idioms(char	*path)
+{
+	non_idiom_root = strdup(get_conf("non-idiom-root"));
+	//printf("CONF: non_idiom_root = '%s'\n", non_idiom_root);
+	if(!path)return;
+	tdl_push_status("idiom-rule");
+	load_tdl(path);
+	tdl_pop_status();
+	process_tdl_dgs_status("idiom-rule", study_idiom_rule);
+}
+
 char	*grammar_dir;
 
 int	load_grammar_top(char *toptdl)
@@ -1226,7 +1237,6 @@ int	load_grammar_top(char *toptdl)
 	run_task("processing lex-rules", load_lrules);
 	if(load_lexicon())exit(-1);
 	if(load_instances())exit(-1);
-	if(load_labels())exit(-1);
 	if(load_token_mapping_rules())exit(-1);
 	if(load_lexical_filtering_rules())exit(-1);
 
@@ -1264,11 +1274,13 @@ int load_grammar(char	*path)
 	load_grammar_top(get_conf_file_path(confdir, "grammar-top"));
 
 	load_triggers(get_conf_file_path(confdir, "generation-trigger-rules"));
+	load_idioms(get_conf_file_path(confdir, "idiom-rules"));
 
 	// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...
 	tdl_push_status("tree-node-label");
 	load_tdl(get_conf_file_path(confdir, "parse-node-labels"));
 	tdl_pop_status();
+	if(load_labels())exit(-1);
 
 	load_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
 

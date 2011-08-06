@@ -96,7 +96,13 @@ struct transfer_freezer
 {
 	struct transfer_rule	**trigger_rules;
 	int						ntrigger_rules;
+	struct transfer_rule	**idiom_rules;
+	int						nidiom_rules;
+	char					*non_idiom_root;
 };
+
+extern struct transfer_rule	**idiom_rules;
+extern int						nidiom_rules;
 
 struct transfer_rule	*freeze_transfer_rule(struct transfer_rule	*tr)
 {
@@ -111,10 +117,20 @@ void	*freeze_transfer()
 {
 	int	i;
 	struct transfer_freezer	*fz = slab_alloc(sizeof(*fz));
+
 	fz->trigger_rules = slab_alloc(sizeof(struct transfer_rule*)*ntrigger_rules);
 	for(i=0;i<ntrigger_rules;i++)
 		fz->trigger_rules[i] = freeze_transfer_rule(trigger_rules[i]);
 	fz->ntrigger_rules = ntrigger_rules;
+
+	fz->idiom_rules = slab_alloc(sizeof(struct transfer_rule*)*nidiom_rules);
+	for(i=0;i<nidiom_rules;i++)
+		fz->idiom_rules[i] = freeze_transfer_rule(idiom_rules[i]);
+	fz->nidiom_rules = nidiom_rules;
+	if(non_idiom_root)fz->non_idiom_root = freeze_string(non_idiom_root);
+	else fz->non_idiom_root = NULL;
+	//printf("freezer: %s\n", fz->non_idiom_root);
+
 	return fz;
 }
 
@@ -167,6 +183,12 @@ void	recover_transfer(void	*transfer)
 			thaw_transfer_rule(trigger_rules[i]);
 		//fprintf(stderr, "NOTE: thawed %d trigger rules.\n", ntrigger_rules);
 	}
+	idiom_rules = fz->idiom_rules;
+	nidiom_rules = fz->nidiom_rules;
+	for(i=0;i<nidiom_rules;i++)
+		thaw_transfer_rule(idiom_rules[i]);
+	non_idiom_root = fz->non_idiom_root;
+	//printf("recover: %s\n", non_idiom_root);
 }
 
 struct mrs_ep_desc	place_in_transfer_rule(struct transfer_rule	*tr, int	pl)
