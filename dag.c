@@ -233,6 +233,7 @@ int	subsume_same_dg(struct dg	*a)
 	struct dg	**arcs;
 
 	//return 0;
+	//printf("sssd %p?\n", a);
 	a = p_dereference_dg(a);
 
 	if(a->gen!=generation)
@@ -271,9 +272,15 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	a = p_dereference_dg(a);
 	b = p_dereference_dg(b);
 
-	if(a==b)return subsume_same_dg(a);
+	if(a==b)
+	{
+		int	sssd = subsume_same_dg(a);
+		//printf("sssd = %d\n", sssd);
+		return sssd;
+	}
 	if(a->gen!=generation)
 	{
+		//printf("reset lhs\n");
 		a->forward = a->copy = 0;
 		a->carcs = 0; a->ncarcs = 0;
 		a->type = a->xtype;
@@ -281,6 +288,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	}
 	if(b->gen!=generation)
 	{
+		//printf("reset rhs\n");
 		b->forward = b->copy = 0;
 		b->carcs = 0; b->ncarcs = 0;
 		b->type = b->xtype;
@@ -296,8 +304,8 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	}
 
 	if(a->copy == b && b->forward == a)return 1;
-	if(a->copy)subsume_forward = 0;
-	if(b->forward)subsume_backward = 0;
+	if(a->copy) { subsume_forward = 0; }//printf("not forward...\n"); }
+	if(b->forward) { subsume_backward = 0; }//printf("not backward...\n"); }
 	if(!subsume_forward && !subsume_backward)return 0;
 	//if(a->copy || b->forward)return 0;
 
@@ -341,9 +349,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	}
 	else
 	{
-		/*printf(" `%s'#%d vs `%s'#%d flags %d %d\n", a->xtype->name, a->narcs, b->xtype->name, b->narcs, subsume_forward, subsume_backward);
-		for(i=0;i<a->narcs;i++)printf(" %s", fnames[aarcs[i].label]); printf("\n");
-		for(i=0;i<b->narcs;i++)printf(" %s", fnames[barcs[i].label]); printf("\n");*/
+		//printf(" `%s'#%d vs `%s'#%d flags %d %d\n", a->xtype->name, a->narcs, b->xtype->name, b->narcs, subsume_forward, subsume_backward);
+		//for(i=0;i<a->narcs;i++)printf(" %s", fnames[a->label[i]]); printf("\n");
+		//for(i=0;i<b->narcs;i++)printf(" %s", fnames[b->label[i]]); printf("\n");
 		return 0;
 	}
 	return 1;
