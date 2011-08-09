@@ -3,6 +3,10 @@
 #include	<string.h>
 #include	<stdlib.h>
 #include	<sys/time.h>
+#include	<assert.h>
+
+//#define	DEBUG	printf
+#define	DEBUG(...)	do { } while(0)
 
 #include	"unicode.h"
 #include	"transfer.h"
@@ -12,6 +16,10 @@
 #include	"type.h"
 #include	"hash.h"
 #include	"conf.h"
+#include	"mrs.h"
+
+int	is_semarg_type(struct type	*x);
+int equal_semarg_types(struct type	*x, struct type	*y);
 
 void	check_pred_re(struct mrs_ep_desc	*ep)
 {
@@ -78,6 +86,22 @@ struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg)
 	return tr;
 }
 
+void warn_about_equals(struct transfer_rule	*tr)
+{
+	static int	eqpath[5]={-1};
+	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", 0);
+	while(eql && dg_hop(eql, 1))
+	{
+		struct dg	*eq = dg_hop(eql, 1);
+		eql = dg_hop(eql, 2);
+		if(!is_semarg_type(eq->xtype))
+		{
+			fprintf(stderr, "WARNING: ACE only fully supports EQUAL constraints on `semarg' subtypes.\n");
+			fprintf(stderr, "%s: EQUAL constraint on `%s' type\n", tr->name, eq->xtype->name);
+		}
+	}
+}
+
 struct transfer_rule	**trigger_rules;
 int						ntrigger_rules;
 
@@ -85,8 +109,10 @@ int	study_trigger_rule(char	*name, struct dg	*dg)
 {
 	//printf("loading trigger rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
+	wellform(dg, "transfer rule");
 	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
 	if(!tr)return -1;
+	warn_about_equals(tr);
 	trigger_rules = realloc(trigger_rules, sizeof(struct trigger_rule*)*(ntrigger_rules+1));
 	trigger_rules[ntrigger_rules++] = tr;
 	return 0;
@@ -201,6 +227,23 @@ struct mrs_ep_desc	place_in_transfer_rule(struct transfer_rule	*tr, int	pl)
 	fprintf(stderr, "asked for nonexistant place in transfer rule '%s'\n", tr->name);
 }
 
+int	is_semarg_type(struct type	*x)
+{
+	static struct type *semarg = NULL;
+	if(!semarg)assert(semarg = lookup_type(semarg_type));
+	if(x->name[0]=='"')return 0;
+	return descendent_of(x->tnum, semarg);
+}
+
+int equal_semarg_types(struct type	*x, struct type	*y)
+{
+	if(x==y)return 1;
+	char	*semi_x = internal_to_external_var_type(x->name);
+	char	*semi_y = internal_to_external_var_type(y->name);
+	DEBUG("compare %s [%s] to %s [%s]\n", semi_x, x->name, semi_y, y->name);
+	return strcmp(semi_x, semi_y)?0:1;
+}
+
 int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total)
 {
 	int	i;
@@ -242,9 +285,12 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 			}
 			struct dg	*now = dereference_dg(tr->eq[i]);
 			struct type	*tnow = (now->gen == generation)?now->type:now->xtype;
-			if(tr->eq[i]->xtype != tnow)
+			struct type	*tshould = tr->eq[i]->xtype;
+			if(equal_semarg_types(tnow, tshould) == 0)
 			{
-				//printf("failed EQ test: should have been type '%s'; actually '%s'\n", tr->eq[i]->xtype->name, tnow->name);
+			//if(tr->eq[i]->xtype != tnow)
+			//{
+				DEBUG("failed EQ test: should have been type '%s'; actually '%s'\n", tr->eq[i]->xtype->name, tnow->name);
 				forget_tmp();
 				return -1;
 			}
@@ -311,9 +357,10 @@ void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, 
 	{
 		if(mrs->rels[i].active)continue;
 		alignment[place] = i;
-		//printf("how about rule %s spot %d for '%s'?\n", tr->name, place, mrs->rels[i].pred);
+		DEBUG("how about rule %s spot %d for '%s'?\n", tr->name, place, mrs->rels[i].pred);
 		if(0 != test_transfer_alignment(tr, mrs, place+1, alignment, tr->input.neps + tr->context.neps))
 			continue;
+		DEBUG("passed test.\n");
 		mrs->rels[i].active = 1;
 		align_transfer_rule0(tr, mrs, place+1, total, alignment, callback);
 		mrs->rels[i].active = 0;
@@ -326,6 +373,7 @@ void	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, void	(*callb
 	for(i=0;i<mrs->nrels;i++)
 		mrs->rels[i].active = 0;
 
+	DEBUG("trying to align %s\n", tr->name);
 	int	nplaces = tr->input.neps + tr->context.neps + tr->filter.neps;
 	int	alignment[nplaces];
 	align_transfer_rule0(tr, mrs, 0, tr->input.neps + tr->context.neps, alignment, callback);

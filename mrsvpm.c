@@ -326,6 +326,23 @@ char	*vpm_map(char	*vartype, char	**input, struct vpm_context	*ctx, int	output_s
 	else */return NULL;
 }
 
+char	*convert_mrs_var_type(struct vpm	*v, char	*type)
+{
+	int	i;
+	for(i=0;i<v->ncontexts;i++)
+	{
+		struct vpm_context	*ctx = v->contexts+i;
+		if(ctx->ninput == 1 && !*ctx->input[0] && ctx->noutput == 1 && !*ctx->output[0])
+		{
+			// context matches root level, i.e. variable types
+			char	*tout = vpm_map(type, &type, ctx, 0);
+			if(!tout)tout = type;
+			return tout;
+		}
+	}
+	return type;
+}
+
 struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 {
 	struct mrs_var	*vout = slab_malloc(sizeof(*vout));
@@ -340,12 +357,15 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 	static struct mrs_var_property	*tmp_props = NULL;
 	if(!tmp_props)tmp_props = malloc(sizeof(struct mrs_var_property) * 1024);
 	vout->props = tmp_props;
+	vout->type = convert_mrs_var_type(v, vin->type);
+	assert(vout->type != NULL);
 
 	for(i=0;i<v->ncontexts;i++)
 	{
 		struct vpm_context *ctx = v->contexts+i;
 		if(ctx->ninput==1 && !*ctx->input[0] && ctx->noutput==1 && !*ctx->output[0])
 		{
+		/*
 			// context matches root level, i.e. variable types
 			vout->type = vpm_map(vin->type, &vin->type, ctx, 0);
 			if(!vout->type)
@@ -354,7 +374,7 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 				// silently accept this...
 				vout->type = vin->type;
 			}
-			assert(vout->type != NULL);
+		*/
 		}
 		else
 		{
@@ -410,4 +430,10 @@ struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin)
 	if(!v) { vin->refs++; return vin; }
 	if(!vinv)vinv = invert_vpm(v);
 	return convert_mrs_var(vinv, vin);
+}
+
+char		*internal_to_external_var_type(char	*in)
+{
+	if(!v)return in;
+	return convert_mrs_var_type(v, in);
 }

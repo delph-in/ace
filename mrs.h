@@ -86,6 +86,7 @@ void		*freeze_vpm();
 void		recover_vpm(void *vpm);
 struct mrs_var	*internal_to_external_mrs_var(struct mrs_var	*vin);
 struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin);
+char		*internal_to_external_var_type(char	*in);
 
 struct mrs	*copy_mrs(struct mrs	*m);
 struct mrs	*ace_surface_to_mrs(char	*line);
