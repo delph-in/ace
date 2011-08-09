@@ -245,7 +245,10 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 //static int	pft = -1;
 //if(pft==-1)pft = new_timer("passive copy");
 //start_timer(pft);
-			u = finalize_tmp(dg, 1);
+			if(g_mode == GENERATING)
+				u = finalize_tmp_noss(dg, 1);
+			else u = finalize_tmp(dg, 1);
+			//u = copy_dg(u);
 //stop_timer(pft, 1);
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
@@ -535,7 +538,9 @@ int	recall_hyper(struct edge	*b)
 	//printf("hyper reconstruct #%d from %p[%d] <- %p\n", b->id, b->ha_dg, b->ha_arg, b->ha_par);
 	if(unify_dg_tmp(b->ha_dg, b->ha_par, b->ha_arg))
 		hyperfailure(b);
-	b->dg = finalize_tmp(b->ha_par, (b->have==b->need)?1:0);
+	if(g_mode == GENERATING && b->have==b->need)
+		b->dg = finalize_tmp_noss(b->ha_par, 1);
+	else b->dg = finalize_tmp(b->ha_par, (b->have==b->need)?1:0);
 #ifdef	TIM
 	gettimeofday(&tv2, 0);
 	base_unify_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);

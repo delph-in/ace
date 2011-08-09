@@ -357,6 +357,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	}
 }
 
+int	cdwca_should_trim = 0;
 struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
@@ -393,11 +394,12 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 		return dg->copy;
 	}
 
+#define	CDWCA_RESTRICTOR(x)	(PACKING_RESTRICTOR(x) || (cdwca_should_trim && SHOULD_TRIM(x)))
 	int	na = dg->narcs + dg->ncarcs;
 	for(i=0;i<dg->narcs;i++)
-		if(PACKING_RESTRICTOR(dg->label[i]))na--;
+		if(CDWCA_RESTRICTOR(dg->label[i]))na--;
 	for(i=0;i<dg->ncarcs;i++)
-		if(PACKING_RESTRICTOR(dg->carcs[i].label))na--;
+		if(CDWCA_RESTRICTOR(dg->carcs[i].label))na--;
 	int	ab = (na-2 + 3)/4 * 4;
 
 	newcopy = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*na);
@@ -444,7 +446,7 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 			copylabel = dg->carcs[(int)j].label;
 			copyme = dg->carcs[(int)j++].dest;
 		}
-		if(PACKING_RESTRICTOR(copylabel))
+		if(CDWCA_RESTRICTOR(copylabel))
 			continue;
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
 		//		fnames[aptr->label], newcopy->type->name, xarc.dest);
@@ -984,11 +986,14 @@ struct dg	*finalize_tmp(struct dg	*d, int trim)
 	return res;
 }
 
-struct dg	*finalize_tmp_noss(struct dg	*d)
+struct dg	*finalize_tmp_noss(struct dg	*d, int trim)
 {
 	struct dg	*res;
 
+	enable_trim(trim);
+	cdwca_should_trim = 1;
 	res = copy_dg_with_comp_arcs(d);
+	cdwca_should_trim = 0;
 	if(!res)set_slabstate(&tmpstate);
 	generation++;
 	if(generation==MAX_GEN)
@@ -1027,7 +1032,7 @@ struct dg	*unify_dg(struct dg	*dg1, struct dg	*dg2, int	arg)
 struct dg	*unify_dg_noss(struct dg	*dg1, struct dg	*dg2, int	arg)
 {
 	if(!unify_dg_tmp(dg1, dg2, arg))
-		return finalize_tmp_noss(dg2);
+		return finalize_tmp_noss(dg2, 0);
 	else
 	{
 		forget_tmp();
