@@ -112,11 +112,25 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	{
 		// shouldn't get here because we delete frozen edges from the chart
 		// and don't build on top of them
-		fprintf(stderr, "ERROR: edge #%d frozen but not removed from chart\n", edge->id);
+		fprintf(stderr, "ERROR: tried to decompose frozen edge #%d\n", edge->id);
 		exit(-1);
 	}
 
-	for(i=0;i<edge->have;i++)n *= edge->daughters[i]->npack + 1;
+	for(i=0;i<edge->have;i++)
+	{
+		int	ngood = 1;
+		struct edge	*d = edge->daughters[i];
+		if(d->frozen && !d->frosted)
+		{
+			fprintf(stderr, "ERROR: tried to decompose edge with frozen daughter #%d\n", d->id);
+			exit(-1);
+		}
+		// count non-frozen alternatives for this daughter
+		for(j=0;j<d->npack;j++)
+			if(!(d->pack[j]->frozen && !d->pack[j]->frosted))
+				ngood++;
+		n *= ngood + 1;
+	}
 	// this has been known to exceed the slab segment size:
 	int	len = sizeof(struct decomposition) * n;
 	extern int currslabsize;
@@ -141,6 +155,7 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 		for(i=-1;i<edge->daughters[0]->npack;i++)
 		{
 			struct edge *r1 = (i!=-1)?edge->daughters[0]->pack[i]:edge->daughters[0];
+			if(r1->frozen && !r1->frosted)continue;
 			// check rule filter to see if this particular local unpacking can be ruled out
 			if(r1->rule && !check_rf(edge->rule, r1->rule, 0))continue;
 			d->rhs[0] = r1;
@@ -154,11 +169,13 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 		for(i=-1;i<edge->daughters[0]->npack;i++)
 		{
 			struct edge *r1 = (i!=-1)?edge->daughters[0]->pack[i]:edge->daughters[0];
+			if(r1->frozen && !r1->frosted)continue;
 			// check rule filter to see if this particular local unpacking can be ruled out
 			if(r1->rule && !check_rf(edge->rule, r1->rule, 0))continue;
 			for(j=-1;j<edge->daughters[1]->npack;j++)
 			{
 				struct edge *r2 = (j!=-1)?edge->daughters[1]->pack[j]:edge->daughters[1];
+				if(r2->frozen && !r2->frosted)continue;
 				if(r2->rule && !check_rf(edge->rule, r2->rule, 1))continue;
 				d->rhs[0] = r1;
 				d->rhs[1] = r2;
@@ -404,15 +421,19 @@ void	put_more_on_agenda(struct hypagenda_item	**A, struct decomposition	*dec, in
 			{
 				rhs[j] = hypothesize_edge(dec->rhs[j], idx[j], sub_ancestry, NULL);
 				if(!rhs[j]) { status = -1; break; }
-				if(rhs[j]->dg==(void*)0x1)
+				/*if(rhs[j]->dg==(void*)0x1)	// TODO find a way to make this actually work.
 				{
+					// XXX this solution doesn't really work.
+					// we miss readings on CSLI item 629 if the "if" is there
+					// we crash on the very next item if it isn't there.
 					// simple solution: pretend this hypothesis succeeded,
 					// and pretend we've already popped it; get yet more indices!
 					if(i==j)
 						put_more_on_agenda(A, dec, idx, ancestry);
+					//put_more_on_agenda(A, dec, idx, ancestry);
 					status = -2;
 					break;
-				}
+				}*/
 			}
 			if(status == 0)new_hypothesis(dec, A, rhs, idx, ancestry);
 			else
@@ -642,6 +663,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 	{
 		if(h->dg == (void*)1)
 		{
+		return -1;
 			assert(!"Not reached");
 			return -1;
 		}
@@ -871,6 +893,16 @@ char	*hypothesis_to_dstring(struct hypothesis	*h)
 	return derivation;
 }
 
+void	fixup_generator_string(struct hypothesis	*h)
+{
+	char	*p = h->string;
+	while(p && *p && !isalpha(*p))p++;
+	if(p && *p)
+	{
+		*p = toupper(*p);
+	}
+}
+
 int want_mrs = 1;
 
 int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest)
@@ -889,7 +921,12 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		edge = cell->p_edges[i];
-		if( (g_mode!=GENERATING || edge->ep_span == require_ep_span) && is_root(edge->dg) && !edge->frozen )
+		if(edge->frozen)
+		{
+			fprintf(stderr, "ERROR: found a frozen edge #%d (not packed) in the root cell!\n", edge->id);
+			exit(-1);
+		}
+		if( (g_mode!=GENERATING || edge->ep_span == require_ep_span) && is_root(edge->dg) )// && !edge->frozen )
 		{
 			DEBUG("edge #%d can be root...\n", edge->id);
 			for(j=-1;j<edge->npack;j++)
@@ -904,6 +941,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 	}
 
 	static int	hyp_timer = -1, inst_timer = -1, mrs_timer = -1;
+	int	ninsthyps = 0;
 	if(hyp_timer==-1)hyp_timer = new_timer("hypothesize");
 	if(inst_timer==-1)inst_timer = new_timer("instantiate");
 	if(mrs_timer==-1)mrs_timer = new_timer("mrs");
@@ -925,6 +963,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 		//	DEBUG("instantiation of hypothesis from edge 11329: res = %d\n", ires);
 		if(0 == ires)
 		{
+			ninsthyps++;
 		//	if(hyp->dec->edge->id == 11329)
 		//		DEBUG("... testing an instantiated hypothesis from edge 11329\n");
 			if(is_root(hyp->dg))
@@ -940,6 +979,8 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 				{
 					//printf("hyp = %p\n", hyp);
 					//printf("\n"); print_hypothesis(h, printf); printf("\n");
+					if(g_mode == GENERATING)
+						fixup_generator_string(hyp);
 					count += process(hyp, m);
 				}
 			}
@@ -954,8 +995,40 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 	}
 	if(debug_level)
 	{
-		printf("%d hyps / %d readings\n", nhyp, count);
+		printf("%d hyps / %d reconstructed / %d readings\n", nhyp, ninsthyps, count);
 	}
+	/*for(i=0;i<chart_size;i++)
+	{
+		for(j=i+2;j<chart_size;j++)
+		{
+			struct chart_cell	*c = cells + i*chart_size + j;
+			int k;
+			for(k=0;k<c->p_nedges;k++)
+			{
+				struct edge	*E = c->p_edges[k];
+				int l;
+				for(l=-1;l<E->npack;l++)
+				{
+					struct edge	*e = (l==-1)?E:E->pack[l];
+					struct unpack_info	*u = e->unpack;
+					if(u)
+					{
+						int m;
+						for(m=0;m<u->ncuis;m++)
+						{
+							int o, ns = 0;
+							for(o=0;o<u->cuis[m]->nhypotheses;o++)
+							{
+								int	ires = instantiate_hypothesis(u->cuis[m]->hypotheses[o]);
+								if(ires == 0)ns++;
+							}
+							printf("edge #%d cui %d had %d hypotheses ; %d instantiate\n", e->id, m, u->cuis[m]->nhypotheses, ns);
+						}
+					}
+				}
+			}
+		}
+	}*/
 	return count;
 }
 

@@ -11,6 +11,7 @@
 #include "unpack.h"
 #include "mrs.h"
 #include	"token.h"
+#include	"transfer.h"
 
 struct hyp_eu
 {
@@ -74,7 +75,7 @@ struct tree_list	instantiate_eue(struct edge	*e, struct tree_list	*dtl, int	d)
 				h->dg = dg;
 				h->ndtrs = sh->ndtrs+1;
 				h->dtrs = slab_alloc(sizeof(struct hyp_eu*)*h->ndtrs);
-				h->dtrs[0] = dtr.list[j];
+				h->dtrs[0] = dtr.list[i];
 				memcpy(h->dtrs+1, sh->dtrs, sizeof(struct hyp_eu*)*sh->ndtrs);
 				res.list[res.n++] = h;
 			}
@@ -93,6 +94,14 @@ extend_tree_list(struct tree_list	*L, struct tree_list	ex)
 struct tree_list	exhaustive_unpack_edge(struct edge	*e)
 {
 	if(e->unpack)return *(struct tree_list*)e->unpack;
+	if(e->frozen && !e->frosted)
+	{
+		struct tree_list	tl = {.n = 0, .list = NULL};
+		e->unpack = slab_alloc(sizeof(tl));
+		*(struct tree_list*)(e->unpack) = tl;
+		//printf("EUE edge #%d was frozen\n", e->id);
+		return tl;
+	}
 	struct tree_list	dtl[e->have];
 	int	i, j;
 	for(i=0;i<e->have;i++)
@@ -104,30 +113,46 @@ struct tree_list	exhaustive_unpack_edge(struct edge	*e)
 	struct tree_list	tl = instantiate_eue(e, dtl, 0);
 	e->unpack = slab_alloc(sizeof(tl));
 	*(struct tree_list*)(e->unpack) = tl;
+	//printf("EUE edge #%d has %d instantiated trees\n", e->id, tl.n);
 	return tl;
 }
 
 int	exhaustive_unpack(struct chart_cell	*cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs))
 {
 	int	i, total = 0;
+	int ninsthyps = 0;
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		struct edge	*edge = cell->p_edges[i];
 		if( (g_mode!=GENERATING || edge->ep_span == require_ep_span) && is_root(edge->dg) && !edge->frozen )
 		{
-			//DEBUG("edge #%d can be root...\n", edge->id);
+			//printf("edge #%d can be root...\n", edge->id);
 			int	j;
 			for(j=-1;j<edge->npack;j++)
 			{
 				// for each potentially root packed edge...
 				struct edge *e = (j==-1)?edge:edge->pack[j];
-				if(e->frozen)continue;
+				if(e->frozen && !e->frosted)continue;
 				if(!is_root(e->dg))continue;
 				struct tree_list	tl = exhaustive_unpack_edge(e);
-				fprintf(stderr, "I don't know how to call process() on these hypotheses yet.\n");
-				total += tl.n;
+				int k;
+				for(k=0;k<tl.n;k++)
+				{
+					struct dg	*dg = tl.list[k]->dg;
+					ninsthyps++;
+					if(is_root(dg))
+					{
+						struct mrs	*m = extract_mrs(dg);
+						if(check_idioms(dg, m))
+						{
+							total += 1;
+							fprintf(stderr, "I don't know how to call process() on these hypotheses yet.\n");
+						}
+					}
+				}
 			}
 		}
 	}
+	fprintf(stderr, "NOTE: %d trees reconstructed\n", ninsthyps);
 	return total;
 }

@@ -72,6 +72,7 @@ extern long long copycount, copytraverse;
 
 extern int gen_qc;
 
+/*
 int	upward_kill(struct edge	*edge, struct edge	*save)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
@@ -121,17 +122,21 @@ int	upward_kill(struct edge	*edge, struct edge	*save)
 				for(l=0;l<e->npack;l++)
 				{
 					struct edge	*p = e->pack[l];
-					// make sure everything built on `p' from the first time it entered the chart dies
-					// since p is packed, there is nothing *in* the chart built on p,
-					// but there may be stuff on the agenda built on p.
-					// since we are putting p back on the agenda,
-					// we can't leave a marker for all future edges built on p to be killed.
-					// we have to do it now.
-					kill_agenda(p);
-					//printf("returning packed edge #%d to agenda on upward_kill\n", e->pack[l]->id);
-					p->frozen = 0;
-					p->frosted = 0;
-					add_agenda(p);
+					if(!edge_descendent(edge, p))
+					{
+						// make sure everything built on `p' from the first time it entered the chart dies
+						// since p is packed, there is nothing *in* the chart built on p,
+						// but there may be stuff on the agenda built on p.
+						// since we are putting p back on the agenda,
+						// we can't leave a marker for all future edges built on p to be killed.
+						// we have to do it now.
+						kill_agenda(p);
+						//printf("returning packed edge #%d to agenda on upward_kill\n", e->pack[l]->id);
+						p->frozen = 0;
+						p->frosted = 0;
+						add_agenda(p);
+					}
+					else {} // 'p' would have been killed by a different pass of this function
 				}
 				goto more;
 			}
@@ -142,40 +147,12 @@ int	upward_kill(struct edge	*edge, struct edge	*save)
 				k--;
 				continue;
 			}
-
-/* old implementation that might be broken:
-			if(e->frozen==1)
-			{
-				if(e->qc)continue;
-				continue;// just added this (feb-24-2011), seems to make no difference and I can't at the moment see why it's here.  breaks things when we are doing gen_qc.
-			}
-			for(j=0;j<e->have;j++)
-				if(e->daughters[j]->frozen == 1)
-				{
-					if(k==-1)
-					{
-						// leave E in the chart, "frozen".
-					}
-					else
-					{
-						//printf("UKP #%d since daughter[%d] = #%d\n", e->id, j, e->daughters[j]->id);
-						E->npack--;
-						memmove(E->pack+k, E->pack+k+1, sizeof(struct edge*)*(E->npack-k));
-						k--;
-					}
-					e->frozen = 1;
-					PACKBUG("freeze #%d\n", e->id);
-					killed++;
-					if(k==-1)pass = 1;	// we require that packed edges are not built on
-					break;
-				}
-*/
 		}
 	}
 	if(pass)goto more;
 	//printf("upward_kill'd %d edges built on #%d\n", killed, edge->id);
 	return killed;
-}
+}*/
 
 int	generalize_pack_edge(struct edge	*edge)
 {
@@ -230,6 +207,35 @@ int	generalize_pack_edge(struct edge	*edge)
 	return 1;
 }
 
+block(struct edge	*e, int	freeze)
+{
+	if(!e->frozen || freeze)
+	{
+		if(freeze && !(e->frozen && !e->frosted))
+			PACKBUG("FREEZING edge #%d; expect to pick it up later.\n", e->id);
+
+		if(freeze) { e->frozen = 1; e->frosted = 0; }
+		else { e->frozen = 1; e->frosted = 1; }
+	}
+	// for each of `e's parents:
+	struct chart_cell	*c = cells + e->from*chart_size + e->to;
+	int i, j, l;
+	for(i=0;i<c->p_nedges;i++)
+	{
+		struct edge	*P = c->p_edges[i];
+		for(l=-1;l<P->npack;l++)
+		{
+			struct edge	*p = (l==-1)?P:P->pack[l];
+			for(j=0;j<p->have;j++)
+				if(p->daughters[j] == e)
+				{
+					block(p, 1);
+					break;
+				}
+		}
+	}
+}
+
 int	pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
@@ -268,9 +274,17 @@ int	pack_edge(struct edge	*edge)
 			if(!identical_orth_routes(h, edge))continue;
 
 			if(!edge->dg)
-				if(recall_hyper(edge))return 0;
+				if(recall_hyper(edge))
+				{
+					PACKBUG("whoops! edge was hyperpassive and vanished\n");
+					return 0;
+				}
 			if(!h->dg)
-				if(recall_hyper(h))continue;
+				if(recall_hyper(h))
+				{
+					PACKBUG("whoops! host was hyperpassive and vanished\n");
+					continue;
+				}
 
 #ifdef	RULE_STATS
 			if(edge->ntries==0)
@@ -290,8 +304,11 @@ int	pack_edge(struct edge	*edge)
 			ssd = equivalent_dg(h->dg, edge->dg, fw, bk);
 			if(ssd)packss++;
 			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
-			if(ssd == 1 || (ssd == 2 && !h->frozen))
+			PACKBUG("ssd = %d ; h->frozen = %d\n", ssd, h->frozen);
+			//if(ssd == 1 || (ssd == 2 && !h->frozen))
+			if((ssd == 1 || ssd == 2) && !h->frozen)
 			{
+				// forward packing
 				// h subsumes edge
 				if(same_cell_daughter(edge, h))
 				{
@@ -316,7 +333,7 @@ int	pack_edge(struct edge	*edge)
 						// pretend we packed it, but actually just discard it.
 						return 1;
 					}
-					//printf("blocked same-cell-daughter packing\n");
+					PACKBUG("blocked same-cell-daughter packing\n");
 					continue;
 				}
 				PACKBUG("packed #%d `%s' in #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
@@ -329,6 +346,7 @@ int	pack_edge(struct edge	*edge)
 			else if((ssd == -1 || ssd == 2) && 1)
 			{
 				int was_frozen = h->frozen;
+				// retroactive packing
 				// edge subsumes h
 				if(same_cell_daughter(h, edge))
 				{
@@ -342,7 +360,16 @@ int	pack_edge(struct edge	*edge)
 					continue;
 				}
 				if(!already_packed)
-					c->p_edges[i] = edge;	// replace 'h' by 'edge' in the chart before upward_kill() changes the chart around
+				{
+					// replace 'h' by 'edge' in the chart before upward_kill() changes the chart around
+					c->p_edges[i] = edge;
+					PACKBUG("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
+					//printf("host: "); print_dg(edge->dg); printf("\n");
+					//printf("pack: "); print_dg(h->dg); printf("\n");
+					// promote what's packed on 'h' to be packed on 'edge'
+					edge->npack = h->npack;
+					edge->pack = h->pack;
+				}
 				else
 				{
 					// delete 'h' from the chart
@@ -350,26 +377,10 @@ int	pack_edge(struct edge	*edge)
 					ncandidates--;
 					memmove(c->p_edges+i, c->p_edges+i+1, sizeof(struct edge*)*(c->p_nedges-i));
 					i--;
-				}
-				if(h->built_on)
-				{
-					//printf("upkilling #%d to pack it in #%d\n", h->id, edge->id);
-					upward_kill(h, edge);
-				}
-				h->built_on = 0;
-				if(!already_packed)
-				{
-					PACKBUG("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
-					//printf("host: "); print_dg(edge->dg); printf("\n");
-					//printf("pack: "); print_dg(h->dg); printf("\n");
-					edge->npack = h->npack;
-					edge->pack = h->pack;
-				}
-				else
-				{
 					PACKBUG("claimed #%d also\n", h->id);
 					if(h->npack)
 					{
+						// promote what's packed on 'h' to be packed on 'edge'
 						edge->pack = memcpy(slab_alloc(sizeof(struct edge*)*(edge->npack+h->npack)), edge->pack, sizeof(struct edge*)*edge->npack);
 						memcpy(edge->pack+edge->npack, h->pack, sizeof(struct edge*)*h->npack);
 						edge->npack += h->npack;
@@ -377,27 +388,21 @@ int	pack_edge(struct edge	*edge)
 				}
 				h->npack = 0;
 				h->pack = 0;
-				h->frosted = 1;
-				if(!was_frozen)
+				if(!h->frozen)
 				{
-					//printf(" ... packing it though\n");
+					//printf(" ... packing it too\n");
+					//h->frosted = 1;
 					record_packing(edge, h);
 				}
 				already_packed = 1;
+				if(h->built_on)
+				{
+					//printf("upkilling #%d to pack it in #%d\n", h->id, edge->id);
+					block(h, 0);
+				}
+				h->built_on = 0;
 				// keep going!
-				// NOTE: this goto is here
-				// to force the loop to restart
-				// because we have no way to know how severely
-				// upward_kill() reorganized the list of candidates in the cell
-				goto try_more;
-				//return 2;	// tell caller the edge is in the chart but requires further processing
 			}
-			/*else
-			{
-				printf(" ... no subsumption relation\n");
-				printf("host: "); print_dg(h->dg); printf("\n");
-				printf("edge: "); print_dg(edge->dg); printf("\n");
-			}*/
 		}
 	if(already_packed)return 2;
 	return 0;
