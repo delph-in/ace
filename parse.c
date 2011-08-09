@@ -261,7 +261,7 @@ int	prepare_parse_chart(struct lattice	*lexical_chart)
 	{
 		struct lattice_edge	*le = lexical_chart->edges[i];
 		assert(le->edge != NULL);
-		if(! edge_is_ready_for_syntax(le->edge))continue;
+		if(! edge_is_ready_for_syntax(le->edge)) continue;
 		le->edge->from = le->from->id;
 		le->edge->to = le->to->id;
 		add_agenda(le->edge);

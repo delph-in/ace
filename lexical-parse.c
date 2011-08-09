@@ -15,6 +15,8 @@
 #include	"lexical-parse.h"
 #include	"lattice-mapping.h"
 
+extern int inhibit_pack;
+
 void	add_new_lexical_edge(struct lattice	*lc, struct edge	*e)
 {
 	struct lattice_edge	*lat_e = slab_alloc(sizeof(*lat_e));
@@ -106,6 +108,8 @@ int	lexical_parse_lattice(struct lattice	*lc)
 			used[i] = 1;
 			epsila_starts[i] = NULL;
 		}
+	int	_save_inhibit_pack = inhibit_pack;
+	inhibit_pack = 1;
 	for(i=0;i<lc->nedges;i++)
 	{
 		struct lattice_edge	*e = lc->edges[i];
@@ -117,11 +121,16 @@ int	lexical_parse_lattice(struct lattice	*lc)
 				epsila_starts[j] = NULL;
 				epsila[j] = epsilon_edge(rules[j], 0, 0, NULL);
 			}
-		if(lexical_parse(lc, lc->edges[i], epsila, used) != 0)return -1;
+		if(lexical_parse(lc, lc->edges[i], epsila, used) != 0)
+		{
+			inhibit_pack = _save_inhibit_pack;
+			return -1;
+		}
 		for(j=0;j<nrules;j++)
 			if(rules[j]->lexical && used[j])
 				epsila_starts[j] = e->from;
 	}
+	inhibit_pack = _save_inhibit_pack;
 
 	// delete edges which have not satisfied their orth_routes
 	for(i=0;i<lc->nedges;i++)

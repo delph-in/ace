@@ -45,6 +45,8 @@ extern long top_unifies, top_unifies_wellform, top_copies;
 
 extern int best_only;
 
+int	tsdb_i_id = -1;
+
 static int process_item(int i_id, char *i_input, int parse_id, 
 		int edges, int nanalyses, int nderivations, int interactive)
 {
@@ -56,6 +58,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 
 	inhibit_results = 1;
 	best_only = nderivations;
+	tsdb_i_id = i_id;
 
 	top_copies = top_unifies_wellform = top_unifies = 0;
 
