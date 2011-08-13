@@ -386,6 +386,7 @@ int	instantiate_alignment(struct ep_alignment	*a)
 		int i;
 		for(i=0;i<=e->nextra_preds;i++)
 			edge->ep_span |= ((unsigned long long)1)<<align[i]->epnum;
+		edge->neps = 1+e->nextra_preds;
 		add_agenda(edge);
 	}
 	return edge?1:0;
@@ -517,6 +518,40 @@ int evacuate(int nvaclex, char **vaclex)
 	return count;
 }
 
+void	check_triggers(int	nx, char	**x, int	ny, char	**y)
+{
+	int	i, j;
+	char	goty[ny];
+	static FILE	*logf = NULL;
+	if(!logf)
+	{
+		logf = fopen("/tmp/triglog.txt", "a");
+		if(!logf) { perror("/tmp/triglog.txt"); exit(-1); }
+		fprintf(logf, "STARTUP\n");
+	}
+	extern int tsdb_i_id;
+	fprintf(logf, "next item (i_id = %d) ; ACE %d trigs, LKB %d trigs\n", tsdb_i_id, nx, ny);
+	bzero(goty, sizeof(goty));
+	for(i=0;i<nx;i++)
+	{
+		for(j=0;j<ny;j++)
+		{
+			if(goty[j])continue;
+			if(!strcmp(x[i], y[j]))
+			{
+				goty[j] = 1;
+				break;
+			}
+		}
+		if(j==ny)
+			fprintf(logf, "extra ACE trigger: %s\n", x[i]);
+	}
+	for(j=0;j<ny;j++)
+		if(!goty[j])
+			fprintf(logf, "extra LKB trigger: %s\n", y[j]);
+	fflush(logf);
+}
+
 // driver
 
 void semantic_lookup(struct mrs	*mrs)
@@ -557,6 +592,7 @@ void semantic_lookup(struct mrs	*mrs)
 	}
 	activate_trigger_rules(mrs, add_vac);
 	//printf("triggered %d vacuous lexemes\n", ntriggers);
+	//check_triggers(ntriggers, triggers, mrs->ntriggers, mrs->triggers);
 	count += evacuate(ntriggers, triggers);
 	//count += evacuate(mrs->ntriggers, mrs->triggers);
 	if(0)

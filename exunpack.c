@@ -146,7 +146,7 @@ int	exhaustive_unpack(struct chart_cell	*cell, int (*process)(struct hypothesis 
 						if(check_idioms(dg, m))
 						{
 							total += 1;
-							fprintf(stderr, "I don't know how to call process() on these hypotheses yet.\n");
+							//fprintf(stderr, "I don't know how to call process() on these hypotheses yet.\n");
 						}
 					}
 				}

@@ -725,10 +725,13 @@ char	*inflect(struct orule	*or, char	*str)
 	char	*res=0;
 	int		i, strl = wcslen(wstr);
 
+	//printf("inflect '%S' using '%s'\n", wstr, or->rule->name);
+
 	for(i=0;i<or->nirregs;i++)
 		if(!wcscmp(wstr, or->irregs_s[i].stem))
 		{
 			res = freeze_tombs(or->irregs_s[i].form);
+			//printf("irregular form: %s\n", res);
 			break;
 		}
 	if(!res)

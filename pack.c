@@ -305,6 +305,7 @@ int	pack_edge(struct edge	*edge)
 			if(ssd)packss++;
 			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
 			PACKBUG("ssd = %d ; h->frozen = %d\n", ssd, h->frozen);
+			//if(!ssd)subsume_backtrace();
 			//if(ssd == 1 || (ssd == 2 && !h->frozen))
 			if((ssd == 1 || ssd == 2) && !h->frozen)
 			{

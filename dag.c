@@ -255,7 +255,11 @@ int	subsume_same_dg(struct dg	*a)
 
 	arcs = DARCS(a);
 	for(i=0;i<a->narcs;i++)
+	{
+		upath[upathl++] = a->label[i];
 		if(!subsume_same_dg(arcs[i]))return 0;
+		upathl--;
+	}
 	return 1;
 }
 
@@ -304,13 +308,26 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	}
 
 	if(a->copy == b && b->forward == a)return 1;
-	if(a->copy) { subsume_forward = 0; }//printf("not forward...\n"); }
-	if(b->forward) { subsume_backward = 0; }//printf("not backward...\n"); }
-	if(!subsume_forward && !subsume_backward)return 0;
+
+	if(!a->copy)a->copy = b;
+	else if(a->copy != b)
+	{
+		subsume_forward = 0;
+		//printf("not forward... (lhs = %p)\n", a->copy);
+	}
+
+	if(!b->forward)b->forward = a;
+	else if(b->forward != a)
+	{
+		subsume_backward = 0;
+		//printf("not backward... (rhs = %p)\n", b->forward);
+	}
+
+	if(!subsume_forward && !subsume_backward) { ut1 = a->xtype; ut2 = b->xtype; return 0; }
 	//if(a->copy || b->forward)return 0;
 
-	a->copy = b;
-	b->forward = a;
+	//a->copy = b;
+	//b->forward = a;
 
 	//printf("maybe %p [%s] <=> %p [%s]\n", a, a->xtype->name, b, b->xtype->name);
 
@@ -321,7 +338,12 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		// well-formedness and sortedness conditions guarantee that since
 		// types match exactly, arc labels match exactly...
 		for(i=0;i<a->narcs;i++)
+		{
+			assert(a->label[i] == b->label[i]);
+			upath[upathl++] = a->label[i];
 			if(!subsume_dg1(aarcs[i], barcs[i]))return 0;
+			upathl--;
+		}
 	}
 	else if(subsume_forward && a->narcs<=b->narcs) // b is subtype of a, so has strict superset of features
 	{
@@ -330,7 +352,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			if(j>=a->narcs)break;
 			if(a->label[j] == b->label[i])
 			{
+				upath[upathl++] = a->label[j];
 				if(!subsume_dg1(aarcs[j], barcs[i]))return 0;
+				upathl--;
 				j++;
 			}
 		}
@@ -342,7 +366,9 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			if(j>=b->narcs)break;
 			if(a->label[i] == b->label[j])
 			{
+				upath[upathl++] = a->label[i];
 				if(!subsume_dg1(aarcs[i], barcs[j]))return 0;
+				upathl--;
 				j++;
 			}
 		}
@@ -369,6 +395,8 @@ int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk)
 		exit(-1);
 	}
 
+	upathl = 0;
+	ut1 = ut2 = NULL;
 	subsume_forward = Fw;
 	subsume_backward = Bk;
 	res = subsume_dg1(a, b);
@@ -513,9 +541,22 @@ void	unify_backtrace()
 	for(i=0;i<upathl;i++)fprintf(stdout, "%s ", fnames[upath[i]]);
 	fprintf(stdout, "\n");
 	fflush(stdout);
-	if(uglb) fprintf(stderr, "    inside glb constraint for `%s' depth %d\n", uglb->name, upathgl);
+	if(uglb) fprintf(stdout, "    inside glb constraint for `%s' depth %d\n", uglb->name, upathgl);
 	if(ut1 && ut2)
-		fprintf(stderr, "  might have been trying to unify types %s + %s\n", ut1->name, ut2->name);
+		fprintf(stdout, "  might have been trying to unify types %s + %s\n", ut1->name, ut2->name);
+}
+
+void	subsume_backtrace()
+{
+	int	i;
+
+	fflush(stdout);
+	fprintf(stdout, "subsumption failed at path: ");
+	for(i=0;i<upathl;i++)fprintf(stdout, "%s ", fnames[upath[i]]);
+	fprintf(stdout, "\n");
+	fflush(stdout);
+	if(ut1 && ut2)
+		fprintf(stdout, "  types %s + %s\n", ut1->name, ut2->name);
 }
 
 struct path	unify_backtrace_path()
