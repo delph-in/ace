@@ -307,7 +307,9 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 //static int	aft = -1;
 //if(aft==-1)aft = new_timer("active copy");
 //start_timer(aft);
-			u = finalize_tmp(dg, 0);
+			if(g_mode == GENERATING)
+				u = finalize_tmp_noss(dg, 0);
+			else u = finalize_tmp(dg, 0);
 //stop_timer(aft, 1);
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
@@ -372,6 +374,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 		memcpy(e->daughters, a->daughters, sizeof(struct edge*) * a->have);
 		e->daughters[arg] = b;
 	}
+	if(g_mode == GENERATING)
+		e->neps = a->neps + b->neps;
 
 	if(e->rule->lexical)
 		setup_lexrule_edge(e);
@@ -538,8 +542,8 @@ int	recall_hyper(struct edge	*b)
 	//printf("hyper reconstruct #%d from %p[%d] <- %p\n", b->id, b->ha_dg, b->ha_arg, b->ha_par);
 	if(unify_dg_tmp(b->ha_dg, b->ha_par, b->ha_arg))
 		hyperfailure(b);
-	if(g_mode == GENERATING && b->have==b->need)
-		b->dg = finalize_tmp_noss(b->ha_par, 1);
+	if(g_mode == GENERATING)// && b->have==b->need)
+		b->dg = finalize_tmp_noss(b->ha_par, (b->have==b->need)?1:0);
 	else b->dg = finalize_tmp(b->ha_par, (b->have==b->need)?1:0);
 #ifdef	TIM
 	gettimeofday(&tv2, 0);

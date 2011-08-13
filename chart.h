@@ -43,6 +43,7 @@ struct edge
 
 	unsigned long long	ep_span;
 	unsigned long long	accessible_vars, inaccessible_vars;
+	int	neps;
 
 	int			ntries;
 	int			npack;

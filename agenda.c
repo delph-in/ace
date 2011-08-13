@@ -22,6 +22,7 @@ struct task
 
 #define	EPSILON_PRIORITY(rule)	(NPRIO-1)
 #define	EDGE_PRIORITY(edge)		(NPRIO-1 - (edge->to-edge->from))
+#define	GEN_EDGE_PRIORITY(edge)		(NPRIO-1 - (edge->neps))
 #define	LEX_PRIO				(NPRIO-2)
 
 static struct queue
@@ -62,7 +63,12 @@ void	add_agenda(struct edge	*e)
 	e->pack = 0;
 	e->unpack = 0;
 
-	if(e->from==e->to)e->prio = EPSILON_PRIORITY(e->rule);
+	if(g_mode == GENERATING)
+	{
+		e->prio = GEN_EDGE_PRIORITY(e);
+		//printf("gen edge with %d eps; prio = %d\n", e->neps, e->prio);
+	}
+	else if(e->from==e->to)e->prio = EPSILON_PRIORITY(e->rule);
 	else if(e->lex)e->prio = LEX_PRIO;
 	else e->prio = EDGE_PRIORITY(e);
 

@@ -218,10 +218,12 @@ int	generate(struct mrs	*mrs)
 	semantic_lookup(mrs);
 	if(debug_level)printf("semlook %.4f\n", timer());
 
+	int	npassive_edges = 0;
 	sentential = 0;
 	while( (edge = next_agenda(0)) )
 	{
-		//printf("... process %p = #%d\n", edge, edge->id);
+		if(edge->have == edge->need)npassive_edges++;
+		//printf("... process %p = #%d  ; %d EPs\n", edge, edge->id, edge->neps);
 		if(gen_process_edge(edge)){/*printf("terminated!\n");break;*/}
 	}
 	if(debug_level)printf("packed %.4f\n", timer());
@@ -250,8 +252,8 @@ int	generate(struct mrs	*mrs)
 	if(do_itsdb)itsdb_report_gen(count);
 	if(debug_level)printf("unpacked %.4f\n", timer());
 
-	fprintf(stderr, "NOTE: %d passive, %d active edges in final generation chart [%d results]\n",
-		cells->p_nedges, cells->al_nedges + cells->ar_nedges, count);
+	fprintf(stderr, "NOTE: %d passive, %d active edges in final generation chart; built %d passives total. [%d results]\n",
+		cells->p_nedges, cells->al_nedges + cells->ar_nedges, npassive_edges, count);
 
 	/*if(lui_chart)
 	{
