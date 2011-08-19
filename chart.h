@@ -45,7 +45,7 @@ struct edge
 
 	unsigned long long	*ep_span_bv;
 	//unsigned long long	ep_span;
-	unsigned long long	accessible_vars, inaccessible_vars;
+	unsigned long long	*accessible_vars_bv, *inaccessible_vars_bv;
 	int	neps;
 
 	int			ntries;
@@ -103,7 +103,7 @@ void	setup_lexrule_edge(struct edge	*e);
 
 extern struct chart_cell	*cells;
 extern int					chart_size;
-extern int					require_neps, n_epsbv;
+extern int					require_neps, n_epsbv, n_avsbv;
 
 extern int enable_generalize_edge_top_types;
 

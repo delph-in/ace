@@ -15,11 +15,11 @@ extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inh
 		extern int nstrings;
 		extern struct type	**strings;
 
-int	require_neps = 0, n_epsbv = 0;
+int	require_neps = 0, n_epsbv = 0, n_avsbv = 0;
 
 int			enable_index_accessibility_filtering = 0;
 
-unsigned long long collect_vars(struct dg	*dg)
+void collect_vars(struct dg	*dg, unsigned long long	*bv)
 {
 	int	i;
 	dg = p_dereference_dg(dg);
@@ -27,30 +27,28 @@ unsigned long long collect_vars(struct dg	*dg)
 	static int instloc = -1;
 	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
 
-	unsigned long long v = 0;
 	for(i=0;i<dg->narcs;i++)
 	{
 		if(dg->label[i] == instloc)
 		{
 			struct type	*t = arcs[i]->xtype;
-			if(t->name[0]!='"')return 0;;
-			int	tnum = t->tnum;
-			//int k;
-			//for(k=0;k<100;k++)
-			//	if(strings[k]==t)tnum = k;
-			//printf("instloc has tnum = %d = %s\n", tnum, t->name);
-			return ((unsigned long long)1)<<tnum;
+			if(t->name[0]=='"')
+			{
+				int	tnum = t->tnum;
+				assert(tnum < n_avsbv*64);
+				bitvec_set(bv, tnum);
+			}
+			return;
 		}
-		else v |= collect_vars(arcs[i]);
+		else collect_vars(arcs[i], bv);
 	}
-	return v;
 }
 
-unsigned long long accessible_vars(struct edge	*e)
+void accessible_vars(struct edge	*e, unsigned long long	*bv)
 {
 	// look at SYNSEM.LKEYS
-	static int	save[3] = {-1,-1,-1};
-	struct dg	*lkeys = walk_dg(e->dg, save, "SYNSEM", "LKEYS", NULL);
+//	static int	save[3] = {-1,-1,-1};
+//	struct dg	*lkeys = walk_dg(e->dg, save, "SYNSEM", "LKEYS", NULL);
 
 //	printf("lkeys:\n");
 //	print_dg(lkeys);
@@ -58,14 +56,15 @@ unsigned long long accessible_vars(struct edge	*e)
 
 	//assert(lkeys != NULL);
 	//return collect_vars(lkeys);
-	return collect_vars(e->dg);
+	collect_vars(e->dg, bv);
 }
 
 struct mrs	*current_input_mrs;
 
 int	index_accessibility_filter_one_var(struct edge	*e, struct mrs_var	*v)
 {
-	return e->inaccessible_vars & (((unsigned long long)1)<<v->vnum);
+	return bitvec_test(e->inaccessible_vars_bv, v->vnum);
+	//return e->inaccessible_vars & (((unsigned long long)1)<<v->vnum);
 }
 
 int index_accessibility_filter_one_ep(struct edge	*e, struct mrs_ep	*ep)
@@ -94,8 +93,16 @@ int	gen_process_edge(struct edge	*e)
 	struct chart_cell	*c = cells;
 	int	i, pack = 0;
 
-	e->accessible_vars = 0;
-	e->inaccessible_vars = 0;
+	e->accessible_vars_bv = bitvec_slab_alloc(n_avsbv);
+	bitvec_clear_all(e->accessible_vars_bv, n_avsbv);
+	e->inaccessible_vars_bv = bitvec_slab_alloc(n_avsbv);
+	bitvec_clear_all(e->inaccessible_vars_bv, n_avsbv);
+	unsigned long long	*temp_bv = bitvec_slab_alloc(n_avsbv);
+	bitvec_clear_all(temp_bv, n_avsbv);
+
+	unsigned long long	*previously_accessible = temp_bv;					// use as scratch space
+	unsigned long long	*previously_inaccessible = e->inaccessible_vars_bv;	// use as scratch space
+
 	for(i=0;i<e->have;i++)
 	{
 		if(e->daughters[i]->frozen==1)
@@ -103,22 +110,26 @@ int	gen_process_edge(struct edge	*e)
 			//printf("not processing edge #%d ; daughter #%d is frozen\n", e->id, e->daughters[i]->id);
 			return 0;
 		}
-		e->accessible_vars |= e->daughters[i]->accessible_vars;
-		e->inaccessible_vars |= e->daughters[i]->inaccessible_vars;
+		bitvec_or(e->daughters[i]->accessible_vars_bv, previously_accessible, previously_accessible, n_avsbv);
+		bitvec_or(e->daughters[i]->inaccessible_vars_bv, previously_inaccessible, previously_inaccessible, n_avsbv);
 	}
 
 	if(e->have == e->need && enable_index_accessibility_filtering)
 	{
-		unsigned long long	really_accessible = accessible_vars(e);
-		e->inaccessible_vars |= e->accessible_vars & ~really_accessible;
-		e->accessible_vars = really_accessible;
+		// compute the set of variables actually accessible on 'e'
+		accessible_vars(e, e->accessible_vars_bv);
+		// inaccessible variables are ones that were once accessible but no longer are
+		// newly inaccessible variables are ones that were accessible on a daughter but are not accessible on 'e'
+		// variables that were inaccessible on a daughter are still inaccessible on 'e'
+		// inaccessible = previously_inaccessible | (previously accessible & ~currently accessible)
+		unsigned long long	*newly_inaccessible = temp_bv;
+		bitvec_andnot(previously_accessible, e->accessible_vars_bv, newly_inaccessible, n_avsbv);
+		bitvec_or(previously_inaccessible, newly_inaccessible, e->inaccessible_vars_bv, n_avsbv);
 		if(index_accessibility_filter(e))
 		{
 			//printf("filtered.\n");
 			return 0;
 		}
-		//if(e->accessible_vars)printf("#%d has accessibility: %16.16llX\n", e->id, e->accessible_vars);
-		//if(e->inaccessible_vars)printf("#%d has inaccessibility: %16.16llX\n", e->id, e->inaccessible_vars);
 	}
 
 	if(!inhibit_pack && e->have == e->need)
@@ -184,13 +195,9 @@ int	generate(struct mrs	*mrs)
 
 	fprintf(stderr, "NOTE: input semantics had %d EPs and %d variables\n", mrs->nrels, mrs->vlist.nvars);
 
-	if(mrs->vlist.nvars > 64)
-	{
-		fprintf(stderr, "ERROR: generator cannot currently function with more than 64 vars\n");
-		return 0;
-	}
 	require_neps = mrs->nrels;
 	n_epsbv = bitvec_n(mrs->nrels);
+	n_avsbv = bitvec_n(mrs->vlist.nvars);
 
 	// set up the skolemization and specialization dags we'll need.
 	struct dg	*skar[mrs->vlist.nvars];
