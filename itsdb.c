@@ -21,8 +21,8 @@
 
 extern int inhibit_results;
 
-static int create_test_run(char *data, int run_id, char *comment,
-		int interactive, int protocol_version, char *custom)
+static int create_test_run(const char *data, int run_id, const char *comment,
+		int interactive, int protocol_version, const char *custom)
 {
 	char platform [1024];
 
@@ -47,8 +47,8 @@ extern int best_only;
 
 int	tsdb_i_id = -1;
 
-static int process_item(int i_id, char *i_input, int parse_id, 
-		int edges, int nanalyses, int nderivations, int interactive)
+static int process_item(int i_id, const char *i_input, int parse_id, 
+		int edges, int nanalyses, int nderivations, int interactive, const char	*who_knows_what_this_argument_is)
 {
 	extern int total_edges, real_edges, passive_edges;
 	int readings, msec;
@@ -69,8 +69,9 @@ static int process_item(int i_id, char *i_input, int parse_id,
 		readings = parse_line(i_input);
 	else
 	{
-		printf("mrs input: `%s'\n", i_input);
-		struct mrs *m = parse_mrs(i_input);
+		//printf("mrs input: `%s'\n", i_input);
+		char	*mutable_input = strdup(i_input);
+		struct mrs *m = parse_mrs(mutable_input);
 		if(!m)
 		{
 			readings = -1;
@@ -82,6 +83,7 @@ static int process_item(int i_id, char *i_input, int parse_id,
 			readings = generate(m);
 			free_mrs(m);
 		}
+		free(mutable_input);
 	}
 	gettimeofday(&tv2, 0);
 	c1 = clock();
@@ -196,12 +198,12 @@ int	capi_print_derivations(int nwords, char **words)
 	return n;
 }
 
-static int complete_test_run(int run_id, char *custom)
+static int complete_test_run(int run_id, const char *custom)
 {
 	return 0;
 }
 
-static int reconstruct_item(char *derivation)
+static int reconstruct_item(const char *derivation)
 {
 	return 0;
 }
