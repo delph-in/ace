@@ -34,8 +34,8 @@ int	is_idiom_ep(char	*ep)
 {
 	if(strlen(ep) < 6)return 0;
 	char	*tail = ep + strlen(ep) - 6;
-	if(!strcmp(ep, "_i_rel"))return 1;
-	if(!strcmp(ep, "-i_rel"))return 1;
+	if(!strcmp(tail, "_i_rel"))return 1;
+	if(!strcmp(tail, "-i_rel"))return 1;
 	return 0;
 }
 
@@ -70,10 +70,17 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 
 	struct mrs	**results;
 	int	n = transfer_mrs(nidiom_rules, idiom_rules, m, &results);
+	//printf("%d idiom rule transfer result[s]\n", n);
 
 	int	i;
 	for(i=0;i<n;i++)
+	{
+		//print_mrs(results[i]);
 		if(is_idiom_free(results[i]))
+		{
+			//printf("idiom free.\n");
 			return 1;
+		}
+	}
 	return 0;
 }

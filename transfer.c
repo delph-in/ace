@@ -445,7 +445,7 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 			struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
 			char	lexid[256];
 			sprintf(lexid, "%.*s", (int)strlen(trig->xtype->name)-2, trig->xtype->name+1);
-			//printf("triggering '%s' via '%s'\n", lexid, trigger_rules[i]->name);
+			//printf("triggering '%s' via '%s', aligned on %s\n", lexid, trigger_rules[i]->name, mrsin->rels[alignment[0]].pred);
 			trigger(lexid);
 		}
 		align_transfer_rule(trigger_rules[i], mrsin, found_alignment);
