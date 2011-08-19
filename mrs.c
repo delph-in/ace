@@ -589,6 +589,9 @@ int	mrs_no_extra = 0;
 
 int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv);
 
+//#define	DEBUG	printf
+#define	DEBUG(x...)	do {} while(0)
+
 int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 {
 	int	i;
@@ -610,6 +613,7 @@ int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 	if(in->ltop && !var_subsume(in->ltop, out->ltop, vmap, in->vlist.nvars))return 0;
 	if(in->index && !var_subsume(in->index, out->index, vmap, in->vlist.nvars))return 0;
 	if(in->xarg && !var_subsume(in->xarg, out->xarg, vmap, in->vlist.nvars))return 0;
+	DEBUG("mrs subsumption passed top-level checks\n");
 	return mrs_subsumes0(in, out, 0, vmap, used);
 }
 
@@ -696,6 +700,7 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 		char	hused[in->nhcons];
 		bzero(hused, in->nhcons);
 		//printf("checking HCONS subsumption\n");
+		DEBUG("mrs subsumption passed RELS checks\n");
 		return mrs_subsumes1(in, out, 0, vmap, hused);
 	}
 
@@ -717,7 +722,7 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 		}
 		if(j<ep->nargs)continue;
 
-		//printf("in %d <=> out %d\n", epi, i);
+		DEBUG("mrs subsumption: in %d <=> out %d\n", epi, i);
 
 		// we found an alignment for epi; recurse.
 		used[i] = 1;
@@ -728,6 +733,7 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 		}
 		used[i] = 0;
 	}
+	DEBUG("mrs subsumption: no match for %s\n", ep->pred);
 	return 0;
 }
 
