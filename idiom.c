@@ -30,57 +30,21 @@ int	study_idiom_rule(char	*name, struct dg	*dg)
 	return 0;
 }
 
-void	skolemize_for_idioms(struct mrs	*m)
+int	is_idiom_ep(char	*ep)
 {
-	int	i;
-	static int instloc = -1;
-	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
-
-	// tweak the INSTLOC fields of the mrs variables
-	// so that they won't unify with each other.
-
-	for(i=0;i<m->vlist.nvars;i++)
-	{
-		struct dg	*dg = m->vlist.vars[i]->dg;
-		if(!dg)continue;	// invented LTOP, INDEX, XARG
-		if(m->vlist.vars[i]->is_const)continue;
-
-		/*printf("dag to skolemize for %s%d = \n", m->vlist.vars[i]->type, i);
-		print_dg(dg);
-		printf("\n");*/
-
-		struct dg	*iloc = dg_hop(dg, instloc);
-		assert(iloc != NULL);
-		extern int nstrings;
-		extern struct type	**strings;
-		assert(i<nstrings);
-		iloc->type = iloc->xtype = strings[i];
-	}
+	if(strlen(ep) < 6)return 0;
+	char	*tail = ep + strlen(ep) - 6;
+	if(!strcmp(ep, "_i_rel"))return 1;
+	if(!strcmp(ep, "-i_rel"))return 1;
+	return 0;
 }
 
-void	unskolemize_for_idioms(struct mrs	*m)
+int	is_idiom_free(struct mrs	*m)
 {
 	int	i;
-	static int instloc = -1;
-	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
-
-	// tweak the INSTLOC fields of the mrs variables
-	// so that they won't unify with each other.
-
-	for(i=0;i<m->vlist.nvars;i++)
-	{
-		struct dg	*dg = m->vlist.vars[i]->dg;
-		if(!dg)continue;	// invented LTOP, INDEX, XARG
-		if(m->vlist.vars[i]->is_const)continue;
-
-		/*printf("dag to skolemize for %s%d = \n", m->vlist.vars[i]->type, i);
-		print_dg(dg);
-		printf("\n");*/
-
-		struct dg	*iloc = dg_hop(dg, instloc);
-		assert(iloc != NULL);
-		iloc->type = iloc->xtype = get_top();
-	}
+	for(i=0;i<m->nrels;i++)
+		if(is_idiom_ep(m->rels[i].pred))return 0;
+	return 1;
 }
 
 int	check_idioms(struct dg	*dg, struct mrs	*m)
@@ -104,24 +68,12 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 
 	if(!m)m = extract_mrs(dg);
 
-	skolemize_for_idioms(m);
+	struct mrs	**results;
+	int	n = transfer_mrs(nidiom_rules, idiom_rules, m, &results);
 
 	int	i;
-	for(i=0;i<nidiom_rules;i++)
-	{
-		int found = 0;
-		void	found_alignment() { found = 1; }
-		align_transfer_rule(idiom_rules[i], m, found_alignment);
-		if(found)
-		{
-			//printf("licensed by idiom rule `%s'\n", idiom_rules[i]->name);
-			break;
-		}
-	}
-
-	unskolemize_for_idioms(m);
-
-	if(i<nidiom_rules)return 1;
-	//printf("found a reading that doesn't pass the idiom test\n");
+	for(i=0;i<n;i++)
+		if(is_idiom_free(results[i]))
+			return 1;
 	return 0;
 }

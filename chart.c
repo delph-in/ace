@@ -15,7 +15,6 @@
 #include	"lexicon.h"
 #include	"freeze.h"
 
-#define	ENABLE_HYPERACTIVE	1
 //#define	RULE_STATS
 
 //int	nofragments = 1;

@@ -82,6 +82,9 @@ struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg)
 {
 	struct transfer_rule	*tr = calloc(sizeof(struct transfer_rule), 1);
 	tr->name = strdup(name);
+	static int flagspath[5] = {-1,-1};
+	struct dg	*optdg = walk_dg(dg, flagspath, "FLAGS", "OPTIONAL", 0);
+	tr->optional = optdg?(!strcmp(optdg->xtype->name, "+")):0;
 	tr->dg = dg;
 	return tr;
 }
@@ -244,32 +247,75 @@ int equal_semarg_types(struct type	*x, struct type	*y)
 	return strcmp(semi_x, semi_y)?0:1;
 }
 
+int	nfailed_transfer_unifies, nsuccessful_transfer_unifies;
+
+void	show_transfer_counts() __attribute__ ((destructor));
+void	show_transfer_counts()
+{
+	if(g_mode == GENERATING)
+		printf("NOTE: transfer did %d successful unifies and %d failed ones\n", nsuccessful_transfer_unifies, nfailed_transfer_unifies);
+}
+
 int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total)
 {
 	int	i;
+	for(i=0;i<count;i++)
+	{
+		static int	pred_fnum = -1, arg0_fnum=-1;
+		if(pred_fnum == -1)pred_fnum = lookup_fname("PRED");
+		if(arg0_fnum == -1)arg0_fnum = lookup_fname("ARG0");
+		struct mrs_ep	*ep = &mrs->rels[align[i]];
+		struct dg	*ep_p = dg_hop(ep->dg, pred_fnum);
+		struct dg	*ep_a0 = dg_hop(ep->dg, arg0_fnum);
+		struct mrs_ep_desc	de = place_in_transfer_rule(tr, i);
+		struct dg	*de_p = dg_hop(de.dg, pred_fnum);
+		struct dg	*de_a0 = dg_hop(de.dg, arg0_fnum);
+		if(de_p && ep_p)
+		{
+			struct type	*de_pred = de_p->xtype;
+			struct type	*ep_pred = ep_p->xtype;
+			if(!glb(ep_pred, de_pred))
+			{
+				// most common failure path
+				return -1;
+			}
+			if(de.pred_re)
+			{
+				wchar_t	*wide = towide(ep_pred->name);
+				//printf("need to see if '%S' and '%S' are RE-compatible\n", wide, de.pred_re);
+				regmatch_t	mat;
+				int	res = regexec(&de.re, wide, 1, &mat, 0);
+				free(wide);
+				if(res != 0)
+				{
+					//printf("nope.\n");
+					return -1;
+				}
+				//else printf("yup!\n");
+			}
+		}
+		if(de_a0 && ep_a0)
+		{
+			if(!glb(de_a0->xtype, ep_a0->xtype))
+			{
+				return -1;
+			}
+		}
+	}
 	setup_tmp();
 	for(i=0;i<count;i++)
 	{
 		struct mrs_ep	*ep = &mrs->rels[align[i]];
 		struct mrs_ep_desc	de = place_in_transfer_rule(tr, i);
 		if(0 != unify_dg_tmp(ep->dg, de.dg, -1))
-			{ forget_tmp(); return -1; }
-		if(de.pred_re)
 		{
-			struct dg	*p = dg_hop(ep->dg, lookup_fname("PRED"));
-			wchar_t	*wide = towide(p->type->name);
-			//printf("need to see if '%S' and '%S' are RE-compatible\n", wide, de.pred_re);
-			regmatch_t	mat;
-			int	res = regexec(&de.re, wide, 1, &mat, 0);
-			free(wide);
-			if(res != 0)
-			{
-				//printf("nope.\n");
-				forget_tmp();
-				return -1;
-			}
-			//else printf("yup!\n");
+			//printf("TRANSFER: ");
+			//unify_backtrace();
+			forget_tmp();
+			nfailed_transfer_unifies++;
+			return -1;
 		}
+		nsuccessful_transfer_unifies++;
 	}
 	if(count == total)
 	{
@@ -287,9 +333,8 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 			struct type	*tnow = (now->gen == generation)?now->type:now->xtype;
 			struct type	*tshould = tr->eq[i]->xtype;
 			if(equal_semarg_types(tnow, tshould) == 0)
-			{
 			//if(tr->eq[i]->xtype != tnow)
-			//{
+			{
 				DEBUG("failed EQ test: should have been type '%s'; actually '%s'\n", tr->eq[i]->xtype->name, tnow->name);
 				forget_tmp();
 				return -1;
@@ -321,7 +366,7 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	return 0;
 }
 
-void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, int	total, int	*alignment, void	(*callback)())
+void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, int	total, int	*alignment, void	(*callback)(int	*alignment))
 {
 	int	i;
 	if(place == tr->input.neps + tr->context.neps && place == total)
@@ -335,7 +380,7 @@ void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, 
 		{
 			// see if we can match the filter portion... uh oh!
 			int	did_filter = 0;
-			void	filtercb() { did_filter = 1; }
+			void	filtercb(int	*filtalign) { did_filter = 1; }
 			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, filtercb);
 			if(did_filter)
 			{
@@ -343,12 +388,13 @@ void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, 
 				return;
 			}
 		}
-		callback();
+		callback(alignment);
 		return;
 	}
 	else if(place == total)
 	{
-		callback();
+		// FILTER callback
+		callback(alignment);
 		return;
 	}
 
@@ -367,7 +413,7 @@ void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, 
 	}
 }
 
-void	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, void	(*callback)())
+void	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, void	(*callback)(int	*alignment))
 {
 	int	i;
 	for(i=0;i<mrs->nrels;i++)
@@ -393,7 +439,7 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 	// note: generate() has already built the ep->dg's for each input relation
 	for(i=0;i<ntrigger_rules;i++)
 	{
-		void	found_alignment()
+		void	found_alignment(int	*alignment)
 		{
 			struct dg	*flags = dg_hop(trigger_rules[i]->dg, lookup_fname("FLAGS"));
 			struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
@@ -404,4 +450,150 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 		}
 		align_transfer_rule(trigger_rules[i], mrsin, found_alignment);
 	}
+}
+
+
+
+
+void	skolemize_for_transfer(struct mrs	*m)
+{
+	int	i;
+	static int instloc = -1;
+	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
+
+	// tweak the INSTLOC fields of the mrs variables
+	// so that they won't unify with each other.
+
+	for(i=0;i<m->vlist.nvars;i++)
+	{
+		struct dg	*dg = m->vlist.vars[i]->dg;
+		if(!dg)continue;	// invented LTOP, INDEX, XARG
+		if(m->vlist.vars[i]->is_const)continue;
+
+		/*printf("dag to skolemize for %s%d = \n", m->vlist.vars[i]->type, i);
+		print_dg(dg);
+		printf("\n");*/
+
+		struct dg	*iloc = dg_hop(dg, instloc);
+		assert(iloc != NULL);
+		extern int nstrings;
+		extern struct type	**strings;
+		assert(i<nstrings);
+		iloc->type = iloc->xtype = strings[i];
+	}
+}
+
+void	unskolemize_for_transfer(struct mrs	*m)
+{
+	int	i;
+	static int instloc = -1;
+	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
+
+	// untweak the INSTLOC fields of the mrs variables
+
+	for(i=0;i<m->vlist.nvars;i++)
+	{
+		struct dg	*dg = m->vlist.vars[i]->dg;
+		if(!dg)continue;	// invented LTOP, INDEX, XARG
+		if(m->vlist.vars[i]->is_const)continue;
+
+		struct dg	*iloc = dg_hop(dg, instloc);
+		assert(iloc != NULL);
+		iloc->type = iloc->xtype = get_top();
+	}
+}
+
+
+struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct mrs	*min)
+{
+	// for now, we only support deleting EPs.
+	// XXX when we support creating new EPs (and hence new variables),
+	// we won't be able to just copy straight over the hcons and vlist anymore
+	assert(tr->output.neps == 0);
+	assert(tr->output.nhcons == 0);
+	assert(tr->input.nhcons == 0);
+
+	//printf("activated rule '%s' to ditch %d EPs\n", tr->name, tr->input.neps);
+
+	struct mrs	*mout = slab_alloc(sizeof(*mout));
+	bzero(mout, sizeof(*mout));
+	mout->nhcons = min->nhcons;
+	mout->hcons = min->hcons;
+	mout->vlist = min->vlist;
+	mout->ltop = min->ltop;
+	mout->index = min->index;
+	mout->xarg = min->xarg;
+	mout->nrels = min->nrels - tr->input.neps;
+	mout->rels = slab_alloc(sizeof(struct mrs_ep) * mout->nrels);
+	int i, j;
+	char	ep_ditch[min->nrels];
+	bzero(ep_ditch, sizeof(ep_ditch));
+	for(i=0;i<tr->input.neps;i++)
+		ep_ditch[alignment[i]] = 1;
+	for(i=j=0;i<min->nrels;i++)
+		if(!ep_ditch[i])
+			mout->rels[j++] = min->rels[i];
+	return mout;
+}
+
+struct transfer_mrs_set
+{
+	int	n;
+	struct mrs	**mrs;
+};
+
+int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts)
+{
+	int	i, nresult = 0;
+	struct mrs	**result = NULL;
+	for(i=0;i<ts->n;i++)
+	{
+		struct mrs	*min = ts->mrs[i];
+		int	nalignments = 0;
+		void	found_alignment(int	*alignment)
+		{
+			struct mrs	*mout = transfer_mrs_result(tr, alignment, min);
+			// XXX TODO: figure out how to pack results
+			// the tricky question is whether to put a packed MRS on the final result list or not
+
+			// new result.
+			ts->mrs = slab_realloc(ts->mrs, sizeof(struct mrs*)*ts->n, sizeof(struct mrs*)*(ts->n+1));
+			ts->mrs[ts->n++] = mout;
+			//print_mrs(mout);printf("\n");
+			nalignments++;
+		}
+		align_transfer_rule(tr, min, found_alignment);
+		if(nalignments == 0 || tr->optional)
+		{
+			// keep this mrs
+			result = slab_realloc(result, sizeof(struct mrs*)*nresult, sizeof(struct mrs*)*(nresult+1));
+			result[nresult++] = min;
+		}
+		else
+		{
+			// ditch this mrs
+		}
+	}
+	ts->n = nresult;
+	ts->mrs = result;
+}
+
+int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct mrs	***Results)
+{
+	int	i;
+
+	skolemize_for_transfer(m);
+
+	struct transfer_mrs_set	ts;
+	ts.n = 1;
+	ts.mrs = slab_alloc(sizeof(*m));
+	ts.mrs[0] = m;
+
+	for(i=0;i<nrules;i++)
+		transfer_mrs1(rules[i], &ts);
+
+	unskolemize_for_transfer(m);
+
+	if(Results)*Results = ts.mrs;
+	return ts.n;
 }

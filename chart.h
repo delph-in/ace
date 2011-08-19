@@ -5,6 +5,7 @@
 #include	"morpho.h"
 
 //#define	RULE_STATS
+#define	ENABLE_HYPERACTIVE	1
 
 #undef	CLOCKCOUNT
 #define	IFCLOCK(code)

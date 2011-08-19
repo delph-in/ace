@@ -13,6 +13,16 @@ extern unsigned int	generation;
 
 extern int *nptries;
 
+// to determine whether the active edge component of a task is built out of frozen goods
+int	contains_frozen(struct edge	*e)
+{
+	int	i;
+	if(e->frozen)return 1;
+	for(i=0;i<e->have;i++)
+		if(e->daughters[i]->frozen)return 1;
+	return 0;
+}
+
 static int	same_cell_daughter(struct edge *par, struct edge *dtr)
 {
 	int i;
@@ -154,7 +164,7 @@ int	upward_kill(struct edge	*edge, struct edge	*save)
 	return killed;
 }*/
 
-int	generalize_pack_edge(struct edge	*edge)
+/*int	generalize_pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	printf("thinking about how to pack #%d [%d passives in cell]\n", edge->id, c->p_nedges);
@@ -205,7 +215,7 @@ int	generalize_pack_edge(struct edge	*edge)
 	c->p_nedges = 0;
 	add_agenda(invent);
 	return 1;
-}
+}*/
 
 block(struct edge	*e, int	freeze)
 {

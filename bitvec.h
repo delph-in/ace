@@ -12,11 +12,26 @@ static inline int	bitvec_and(unsigned long long	*a, unsigned long long	*b, unsig
 	return nz;
 }
 
+static inline void	bitvec_or(unsigned long long	*a, unsigned long long	*b, unsigned long long	*r, int	n)
+{
+	int	i;
+	for(i=0;i<n;i++)
+		r[i] = a[i] | b[i];
+}
+
 static inline int bitvec_subsume(unsigned long long	*x, unsigned long long	*y, int	n)
 {
 	int	i;
 	for(i=0;i<n;i++)
 		if((x[i] & y[i]) != y[i])return 0;
+	return 1;
+}
+
+static inline int bitvec_equal(unsigned long long	*x, unsigned long long	*y, int	n)
+{
+	int	i;
+	for(i=0;i<n;i++)
+		if(x[i] != y[i])return 0;
 	return 1;
 }
 
