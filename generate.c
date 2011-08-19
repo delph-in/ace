@@ -245,7 +245,7 @@ int	generate(struct mrs	*mrs)
 			free_mrs(mrs_res);
 			return 0;
 		}
-		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->dec->edge->id);
+		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
 		if(!inhibit_results)printf("%s\n", hyp->string);
 		if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, count);

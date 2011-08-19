@@ -29,7 +29,8 @@ figure out why unpacking is so much slower than PET (sometimes 10x slower!)
 
 learn something from head-corner strategy
 
-freeze qc settings into grammar file
+[x] freeze qc settings into grammar file
+	- cool: we compile it as a dynamic library at grammar load time, and then dlopen() it at parse time.
 
 ignore punctuation-chars for jacy
 
@@ -49,7 +50,8 @@ maybe support lexdb
 
 make STEM actually be updated by ortho rules; apparently some grammars depend on it.
 
-make unpacking support 2+-ary
+[x] make unpacking support 2+-ary
+	- the latest ERG versions have several 4-ary rules and one 5-ary!
 
 loading: use an instance to define configuration paths?
 

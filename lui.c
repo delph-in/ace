@@ -187,7 +187,7 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 	{
 		void rtree(struct hypothesis *h, char *surf)
 		{
-			struct edge *e = h->dec->edge;
+			struct edge *e = h->edge;
 			char	*sign;
 			if(e->rule)
 				sign = e->rule->name;
@@ -210,7 +210,7 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 				fprintf(lui_write, " #T[%d %s %s %d %s",
 					e->id, label, "nil", e->id, sign);
 				for(i=0;i<arity;i++)
-					rtree(h->rhs[i], surf);
+					rtree(h->rhslist[i], surf);
 			}
 			fprintf(lui_write, "]");
 		}
