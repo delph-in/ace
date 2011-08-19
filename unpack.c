@@ -44,36 +44,24 @@ void score_hypothesis(struct hypothesis *h)
 {
 	int i;
 	h->score = 0;
-	if(h->dec->edge->have)
+	if(h->arity)
 	{
-		char	*lhs_sign = edge_sign(h->dec->edge);
-		char	*rhs0_sign = edge_sign(h->rhs[0]->dec->edge);
-		char	*rhs1_sign = h->rhs[1]?edge_sign(h->rhs[1]->dec->edge):NULL;
-		int		key_arg = h->dec->edge->rule->rtl;
+		// 'h' is a rule node
+		// XXX TODO make this support higher arity rules
+		char	*lhs_sign = edge_sign(h->edge);
+		char	*rhs0_sign = edge_sign(h->rhslist[0]->edge);
+		char	*rhs1_sign = (h->arity>1)?edge_sign(h->rhslist[1]->edge):NULL;
+		int		key_arg = h->edge->rule->rtl;
 
 		float	score = maxent_score(lhs_sign, rhs0_sign, rhs1_sign, key_arg, &h->ancestry);
 		h->score += score;
 
-		for(i=0;i<h->dec->edge->have;i++)
-		{
-			h->score += h->rhs[i]->score;
-			/*if(!h->dec->edge->lex &&  h->rhs[i]->dec->edge->lex)
-			{
-				// syntax edge with lexical daughter.
-				// this is the first place in the hypothesis tree where we
-				// know for sure what the surface form under us is, so add the maxent score
-				char surf[512];
-				assert(h->rhs[i]->string);
-				sprintf(surf, "\"%s\"", h->rhs[i]->string);
-				//printf("should score surface `%s'\n", surf);
-				// TODO think carefully about how to score this... what LHS, what ancestry?
-				//h->score += maxent_score(h->rhs[i]->dec->edge->lex->lextype->name, surf, NULL, 0, &h->anc);
-			}*/
-		}
+		for(i=0;i<h->arity;i++)
+			h->score += h->rhslist[i]->score;
 	}
 	else
 	{
-		// 'h' is a leaf node
+		// 'h' is a leaf/lexeme node
 		// construct the cannonical surface form
 		if(g_mode == GENERATING)return;	// FIXME: realization ranking doesn't have access to surface forms because we have no tokens...
 		extern int enable_token_avms;
@@ -81,7 +69,7 @@ void score_hypothesis(struct hypothesis *h)
 		extern char	*current_sentence;
 		char	surface[1024], *sp = surface;
 		int	i;
-		struct edge	*e = h->dec->edge;
+		struct edge	*e = h->edge;
 		struct lexeme	*lex = e->lex;
 		assert(lex);
 		sp += sprintf(sp, "\"");
@@ -101,6 +89,8 @@ void score_hypothesis(struct hypothesis *h)
 		h->score = maxent_score(lhs_sign, surface, NULL, 0, &h->ancestry);
 	}
 }
+
+/*  high arity safe after this mark */
 
 struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 {
@@ -144,85 +134,116 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	for(i=0;i<n;i++)
 	{
 		dec[i].edge = edge;
-		dec[i].seeni1 = 0;
-		dec[i].ni2 = 0;
-		dec[i].ai2 = 0;
+		dec[i].seen_indices = NULL;
+		dec[i].nsi = 0;
+		dec[i].asi = 0;
 	}
 
-	orign = n; n = 0;
-	if(edge->have == 1)
+	n = 0;
+
+	int	arity = edge->have;
+	int	indices[arity];
+	bzero(indices, sizeof(indices));
+	while(1)
 	{
-		for(i=-1;i<edge->daughters[0]->npack;i++)
+		int	x;
+		// make a decomposition with these indices
+		struct edge	*rhs[arity];
+		for(x=0;x<arity;x++)
 		{
-			struct edge *r1 = (i!=-1)?edge->daughters[0]->pack[i]:edge->daughters[0];
-			if(r1->frozen && !r1->frosted)continue;
-			// check rule filter to see if this particular local unpacking can be ruled out
-			if(r1->rule && !check_rf(edge->rule, r1->rule, 0))continue;
-			d->rhs[0] = r1;
-			d->rhs[1] = 0;
-			d++; n++;
+			int			ix = indices[x];
+			struct edge	*rx = (ix==0)?edge->daughters[x]:edge->daughters[x]->pack[ix-1];
+			if(rx->frozen && !rx->frosted)break;
+			if(rx->rule && !check_rf(edge->rule, rx->rule, x))break;
+			rhs[x] = rx;
 		}
-	}
-	else
-	{
-		d = dec;
-		for(i=-1;i<edge->daughters[0]->npack;i++)
+		if(x==arity)
 		{
-			struct edge *r1 = (i!=-1)?edge->daughters[0]->pack[i]:edge->daughters[0];
-			if(r1->frozen && !r1->frosted)continue;
-			// check rule filter to see if this particular local unpacking can be ruled out
-			if(r1->rule && !check_rf(edge->rule, r1->rule, 0))continue;
-			for(j=-1;j<edge->daughters[1]->npack;j++)
-			{
-				struct edge *r2 = (j!=-1)?edge->daughters[1]->pack[j]:edge->daughters[1];
-				if(r2->frozen && !r2->frosted)continue;
-				if(r2->rule && !check_rf(edge->rule, r2->rule, 1))continue;
-				d->rhs[0] = r1;
-				d->rhs[1] = r2;
-				DEBUG("decomp #%d  %d = #%d = #%d		%p\n",
-					edge->id, n, r1->id, r2->id, d);
-				d++; n++;
-			}
+			// no checks failed; record it.
+			d->rhs = slab_alloc(sizeof(struct edge*)*arity);
+			memcpy(d->rhs, rhs, sizeof(struct edge*)*arity);
+			d++;
+			n++;
 		}
+		// increment the indices
+		for(x=0;x<arity;x++)
+		{
+			indices[x]++;
+			if(indices[x] > edge->daughters[x]->npack)
+				indices[x] = 0;
+			else break;
+		}
+		if(x==arity)break;
 	}
 
-	//if(orign!=n)printf("decompose #%d: xprod %d, rf %d\n", edge->id, orign, n);
 	*Ndecompositions = n;
 	return dec;
 }
 
-static inline int dec_check_indices(struct decomposition	*dec, int indices[2])
+// is 'subsumer' >= 'subsumed' in all dimensions?
+static inline int subsume_indices(int	*subsumed, int	*subsumer, int	arity)
 {
-	int ret;
-
-#define DEC_SEEN(x, y)	(x<0 || y<0 || (y<dec->ni2 && x<=dec->seeni1[y]))
-	ret = !(DEC_SEEN(indices[0]-1, indices[1]) && DEC_SEEN(indices[0], indices[1]-1));
-	//printf("dec_check on %p [%d %d] = %d;   ni2 = %d\n", dec, indices[0], indices[1], ret, dec->ni2);
-	return ret;
+	int	i;
+	for(i=0;i<arity;i++)
+		if(subsumed[i] > subsumer[i])return 0;
+	return 1;
 }
 
-int dec_add_indices(struct decomposition	*dec, int indices[2])
+// have we used a hypothesis with these indices yet?
+static inline int dec_seen_indices(struct decomposition	*dec, int	*indexlist)
 {
-	assert(indices[1] <= dec->ni2);
-	if(indices[1] == dec->ni2)
-	{
-		assert(indices[0] == 0);
-		dec->ni2++;
-		if(dec->ni2 >= dec->ai2)
+	int	i, arity = dec->edge->have;
+	// we've seen indexlist if it is subsumed by one we have recorded
+	for(i=0;i<dec->nsi;i++)
+		if(subsume_indices(indexlist, dec->seen_indices+arity*i, arity))return 1;
+	return 0;
+}
+
+// record that we have used a hypothesis with these indices.
+// pack our recorded list of indices under subsumption.
+// we've seen everything subsumed by anything on our list.
+void dec_add_indices(struct decomposition	*dec, int *indices)
+{
+	int	i, j;
+	int	arity = dec->edge->have;
+	// remove all indices subsumed by 'indices'
+	for(i=j=0;i<dec->nsi;i++)
+		if(!subsume_indices(dec->seen_indices+arity*i, indices, arity))
 		{
-			int	oa = dec->ai2;
-			dec->ai2 = (dec->ai2 + 1) * 1.5;
-			dec->seeni1 = slab_realloc(dec->seeni1,
-				sizeof(int) * oa, sizeof(int) * dec->ai2);
+			// not subsumed; keep it.
+			if(j != i)
+				memcpy(dec->seen_indices+arity*j, dec->seen_indices+arity*i, sizeof(int)*arity);
+			j++;
 		}
-		dec->seeni1[indices[1]] = 0;
-	}
-	else
+	dec->nsi = j;
+	if(dec->nsi >= dec->asi)
 	{
-		assert(indices[0] <= 1+dec->seeni1[indices[1]]);
-		if(dec->seeni1[indices[1]] < indices[0])
-			dec->seeni1[indices[1]] = indices[0];
+		dec->asi = (dec->nsi+1)*2;
+		dec->seen_indices = slab_realloc(dec->seen_indices, sizeof(int)*arity*dec->nsi, sizeof(int)*arity*dec->asi);
 	}
+	memcpy(dec->seen_indices + dec->nsi*arity, indices, sizeof(int)*arity);
+	dec->nsi++;
+}
+
+// should a hypothesis with these indices be built?
+// if we've seen hypotheses with one less on each dimension, yes.
+// otherwise, a hypothesis with one less on a dimension is guaranteed to be better, so don't allow this to be explored yet.
+// return 0 to allow exploration, 1 to disallow
+static inline int dec_check_indices(struct decomposition	*dec, int *indexlist)
+{
+	int ret = 0;
+
+	int	i;
+	for(i=0;i<dec->edge->have;i++)
+	{
+		indexlist[i]--;
+		if(indexlist[i]>=0 && !dec_seen_indices(dec, indexlist))
+			ret = 1;
+		indexlist[i]++;
+	}
+	//ret = !(DEC_SEEN(indices[0]-1, indices[1]) && DEC_SEEN(indices[0], indices[1]-1));
+	//printf("dec_check on %p [%d %d] = %d;   ni2 = %d\n", dec, indices[0], indices[1], ret, dec->ni2);
+	return ret;
 }
 
 print_heap(struct hypagenda_item *h, int indent)
@@ -230,7 +251,7 @@ print_heap(struct hypagenda_item *h, int indent)
 	int i;
 	if(!h){printf("(null)\n");return 0;}
 	for(i=0;i<indent;i++)printf("  ");
-	printf("hyp %p [edge #%d] score %f\n", h->h, h->h->dec->edge->id, h->h->score);
+	printf("hyp %p [edge #%d] score %f\n", h->h, h->h->edge->id, h->h->score);
 	if(h->left)print_heap(h->left, indent+1);
 	if(h->right)print_heap(h->right, indent+1);
 }
@@ -268,7 +289,55 @@ void	add_hypothesis_to_agenda(struct hypagenda_item	**agenda, struct hypothesis	
 	add_uagenda(agenda, ha);
 }
 
-struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypagenda_item **agenda, struct hypothesis *rhs[2], int indices[2], struct scoring_ancestry	ancestry)
+void	build_hypothesis_surface(struct hypothesis	*h)
+{
+	if(h->edge->lex)
+	{
+		if(h->arity == 0)
+		{
+			// lexeme
+			struct edge	*e = h->edge;
+			int	i, slen = 0;
+			for(i=0;i<e->lex->stemlen;i++)slen += strlen(e->lex->stem[i]->name) + 3;//1 - 2;
+			if(slen%4)slen = (slen&~3)+4;
+			h->string = slab_alloc(slen); h->string[0]=0;
+			for(i=0;i<e->lex->stemlen;i++)
+			{
+				char	single[256];
+				if(i)strcat(h->string, " ");
+				strcpy(single, e->lex->stem[i]->name+1);
+				if(*single)single[strlen(single)-1] = 0;
+				strcat(h->string, single);
+			}
+		}
+		else
+		{
+			// lexical rule
+			assert(h->arity==1);	// lexical rules are unary
+			if(h->edge->rule->orth)
+			{
+				h->string = inflect(h->edge->rule->orth, h->rhslist[0]->string);
+				if(!h->string)h->string = "(failed to inflect)";	// packing might make us try something silly here
+			}
+			else h->string = h->rhslist[0]->string;
+		}
+	}
+	else
+	{
+		// combine the strings of daughters
+		int slen = 0, i, arity = h->arity;
+		for(i=0;i<arity;i++)slen += strlen(h->rhslist[i]->string) + 1;
+		if(slen%4)slen = (slen&~3)+4;
+		h->string = slab_alloc(slen); h->string[0] = 0;
+		for(i=0;i<arity;i++)
+		{
+			if(i)strcat(h->string, " ");
+			strcat(h->string, h->rhslist[i]->string);
+		}
+	}
+}
+
+struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypagenda_item **agenda, struct hypothesis **rhslist, int *indexlist, struct scoring_ancestry	ancestry)
 {
 	struct hypothesis	*h = slab_alloc(sizeof(struct hypothesis));
 	int					i;
@@ -279,26 +348,20 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypagenda_it
 //	DEBUG("\n");
 
 	h->dec = dec;
-	h->rhs[0] = rhs[0];
-	h->rhs[1] = rhs[1];
+	h->edge = dec->edge;
+	h->arity = dec->edge->have;
+	h->rhslist = slab_alloc(sizeof(struct hypothesis*)*h->arity);
+	memcpy(h->rhslist, rhslist, sizeof(struct hypothesis*)*h->arity);
 	h->dg = NULL; h->string = NULL;
 	h->checkup = 0;
-	h->toklen = rhs[0]->toklen;
-	if(rhs[1])h->toklen += rhs[1]->toklen;
+	h->toklen = 0;
+	for(i=0;i<h->arity;i++)
+		h->toklen += h->rhslist[i]->toklen;
 
-	if(dec->edge->lex)
-	{
-		assert(dec->edge->have==1);	// lexical rules are unary
-		if(dec->edge->rule->orth)
-		{
-			h->string = inflect(dec->edge->rule->orth, h->rhs[0]->string);
-			if(!h->string)h->string = "(failed to inflect)";	// packing might make us try something silly here
-		}
-		else h->string = h->rhs[0]->string;
-	}
+	build_hypothesis_surface(h);
 
-	h->indices[0] = indices[0];
-	h->indices[1] = indices[1];
+	h->indexlist = slab_alloc(sizeof(int) * h->arity);
+	memcpy(h->indexlist, indexlist, sizeof(int) * h->arity);
 	h->ancestry = ancestry;
 
 	score_hypothesis(h);
@@ -310,33 +373,22 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypagenda_it
 
 struct hypothesis *leaf_hypothesis(struct edge *e, struct scoring_ancestry	ancestry)
 {
-	struct decomposition *dec = slab_alloc(sizeof(struct decomposition));
 	struct hypothesis *hyp = slab_alloc(sizeof(struct hypothesis));
 	int	i, slen = 0;
 	assert(!e->have);
-	dec->edge = e;
-	dec->rhs[0] = dec->rhs[1] = NULL;
-	dec->ni2 = dec->ai2 = 0;
-	dec->seeni1 = NULL;
-	hyp->dec = dec;
-	hyp->toklen = e->lex->stemlen;
 
-	for(i=0;i<e->lex->stemlen;i++)slen += strlen(e->lex->stem[i]->name) + 1 - 2;
-	if(slen%4)slen = (slen&~3)+4;
-	hyp->string = slab_alloc(slen); hyp->string[0]=0;
-	for(i=0;i<e->lex->stemlen;i++)
-	{
-		char	single[256];
-		if(i)strcat(hyp->string, " ");
-		strcpy(single, e->lex->stem[i]->name+1);
-		if(*single)single[strlen(single)-1] = 0;
-		strcat(hyp->string, single);
-	}
+	hyp->dec = NULL;
+	hyp->edge = e;
+	hyp->toklen = e->lex->stemlen;
+	hyp->arity = 0;
+	hyp->rhslist = NULL;
+	hyp->indexlist = NULL;
+
+	assert(e->lex);
+	build_hypothesis_surface(hyp);
 	hyp->dg = NULL;
 	hyp->checkup = -1;
-	hyp->rhs[0] = hyp->rhs[1] = NULL;
 	hyp->ancestry = ancestry;
-	hyp->indices[0] = hyp->indices[1] = 0;
 
 	score_hypothesis(hyp);
 	return hyp;
@@ -350,11 +402,11 @@ static inline void checkup(struct hypothesis *h)
 	if(h->dg)return; // if we already know failure/success status, don't recurse
 	if(h->checkup>=0 && h->checkup != g_checkup)
 	{
-		int i, arity = h->dec->edge->have;
-		for(i=0;i<arity;i++)
+		int i;
+		for(i=0;i<h->arity;i++)
 		{
-			checkup(h->rhs[i]);
-			if(h->rhs[i]->dg == (void*)1)
+			checkup(h->rhslist[i]);
+			if(h->rhslist[i]->dg == (void*)1)
 			{
 				h->dg = (void*)1;
 				return;
@@ -394,7 +446,7 @@ struct scoring_ancestry	compute_sub_ancestry(struct scoring_ancestry	panc, struc
 	return anc;
 }
 
-void	put_more_on_agenda(struct hypagenda_item	**A, struct decomposition	*dec, int	from_indices[], struct scoring_ancestry	ancestry)
+void	put_more_on_agenda(struct hypagenda_item	**A, struct decomposition	*dec, int	*from_indices, struct scoring_ancestry	ancestry)
 {
 	int i, j;
 	int	arity = dec->edge->have;
@@ -407,11 +459,13 @@ void	put_more_on_agenda(struct hypagenda_item	**A, struct decomposition	*dec, in
 	dec_add_indices(dec, from_indices);
 	for(i=0;i<arity;i++)
 	{
-		int idx[2] = {from_indices[0], from_indices[1]};
+		int	idx[arity];
+		memcpy(idx, from_indices, sizeof(int)*arity);
 		idx[i]++;
 		if(!dec_check_indices(dec, idx))
 		{
-			struct hypothesis *rhs[2] = {NULL,NULL};
+			struct hypothesis *rhs[arity];
+			bzero(rhs, sizeof(struct hypothesis*)*arity);
 			// try to add a new agenda hypothesis for {dec,idx}
 			for(j=1;j<indent;j++)DEBUG("  ");
 			DEBUG("trying further hypothesize [%d %d] on dec %p of #%d\n", idx[0], idx[1], dec, dec->edge->id);
@@ -496,13 +550,13 @@ again:
 	else *W = r;
 
 	// do the expansion around the popped hyp
-	put_more_on_agenda(A, hyp->dec, hyp->indices, hyp->ancestry);
+	put_more_on_agenda(A, hyp->dec, hyp->indexlist, hyp->ancestry);
 
 	checkup(hyp);
 	if(hyp->dg == (void*)1)goto again;
 
 	// 'hyp' is the next ranking item in the relevant edge's cache for this ancestry; record it.
-	struct context_unpack_info	*cui = get_edge_cui(hyp->dec->edge, hyp->ancestry);
+	struct context_unpack_info	*cui = get_edge_cui(hyp->edge, hyp->ancestry);
 	if(!cui_has_hypothesis(cui, hyp))
 		set_cui_hypothesis(cui, cui->nhypotheses, hyp);
 
@@ -615,7 +669,11 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 	if(!cui->nhypotheses)
 	{
 		// nothing in the cache means we haven't decomposed this edge and put the initial hypotheses on the agenda yet
-		int i, j, idx[2] = {0,0}, ndecs;
+		int i, j, ndecs;
+		int	arity = e->have;
+		int	idx[arity];
+		bzero(idx, sizeof(int)*arity);
+
 		struct decomposition *decs;
 		// initialize agenda with (0,...,0) index vector for each decomposition
 		decs = decompose_edge(e, &ndecs);
@@ -628,13 +686,14 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 		for(i=0;i<ndecs;i++)
 		{
 			struct decomposition *dec = decs+i;
-			struct hypothesis *rhs[2] = {NULL,NULL};
-			for(j=0;j<e->have;j++)
+			struct hypothesis *rhs[arity];
+			bzero(rhs, sizeof(struct hypothesis*)*arity);
+			for(j=0;j<arity;j++)
 			{
 				rhs[j] = hypothesize_edge(dec->rhs[j], 0, sub_ancestry, NULL);
 				if(!rhs[j])break;
 			}
-			if(j<e->have)continue;	// failed to hypothesize even the 0'th unpacking of this decomposition
+			if(j<arity)continue;	// failed to hypothesize even the 0'th unpacking of this decomposition
 			struct hypothesis	*h = new_hypothesis(dec, &cui->agenda, rhs, idx, ancestry);
 			if(customAgenda)add_hypothesis_to_agenda(customAgenda, h);
 		}
@@ -656,7 +715,7 @@ unsigned long long total_reconstructed_nodes;
 
 int instantiate_hypothesis(struct hypothesis *h)
 {
-	int arity = h->dec->edge->have, i;
+	int arity = h->arity, i;
 
 	// don't try to re-instantiate when we've already been here!
 	if(h->dg)
@@ -670,27 +729,16 @@ int instantiate_hypothesis(struct hypothesis *h)
 		else return 0;
 	}
 
-	DEBUG("inst edge #%d rule %s     = dec %p\n", h->dec->edge->id, h->dec->edge->rule?h->dec->edge->rule->name:NULL, h->dec);
+	DEBUG("inst edge #%d rule %s     = dec %p\n", h->edge->id, h->edge->rule?h->edge->rule->name:NULL, h->dec);
 	for(i=0;i<arity;i++)
-		if(0 != instantiate_hypothesis(h->rhs[i]))
+		if(0 != instantiate_hypothesis(h->rhslist[i]))
 		{
 			h->dg = (void*)1;
-			DEBUG("edge #%d fail on daughter %d\n", h->dec->edge->id, i);
+			DEBUG("edge #%d fail on daughter %d\n", h->edge->id, i);
 			return -1;
 		}
 	if(!h->string)
-	{
-		// combine the strings of daughters
-		int slen = 0, i;
-		for(i=0;i<arity;i++)slen += strlen(h->rhs[i]->string) + 1;
-		if(slen%4)slen = (slen&~3)+4;
-		h->string = slab_alloc(slen); h->string[0] = 0;
-		for(i=0;i<arity;i++)
-		{
-			if(i)strcat(h->string, " ");
-			strcat(h->string, h->rhs[i]->string);
-		}
-	}
+		build_hypothesis_surface(h);
 
 	if(g_mode == GENERATING || !inhibit_pack)
 	{
@@ -699,19 +747,19 @@ int instantiate_hypothesis(struct hypothesis *h)
 			if(g_mode == GENERATING)
 			{
 				// generator lexeme.  don't put the specialized RELS list in.
-				h->dg = lexical_dg(h->dec->edge->lex, 0);
+				h->dg = lexical_dg(h->edge->lex, 0);
 			}
-			else h->dg = h->dec->edge->dg;
+			else h->dg = h->edge->dg;
 		}
 		else
 		{
 			total_reconstructed_nodes++;
-			struct dg *rdg = h->dec->edge->rule->dg;
+			struct dg *rdg = h->edge->rule->dg;
 			for(i=0;i<arity;i++)
-				if(unify_dg_tmp(h->rhs[i]->dg, rdg, i))
+				if(unify_dg_tmp(h->rhslist[i]->dg, rdg, i))
 				{
 					//printf("when combining edges #%d and #%d under rule %s\n",
-					//	h->dec->edge->id, h->rhs[i]->dec->edge->id, h->dec->edge->rule->name);
+					//	h->edge->id, h->rhslist[i]->edge->id, h->edge->rule->name);
 					//unify_backtrace();
 					forget_tmp();
 					h->dg = (void*)1;
@@ -729,7 +777,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 	else
 	{
 		// no need to unspecialize or reconstruct; we already have a full dag.
-		h->dg = h->dec->edge->dg;
+		h->dg = h->edge->dg;
 	}
 
 	return 0;
@@ -786,7 +834,7 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 	void	print_tree0(struct hypothesis *hyp, int from)
 	{
 		int i;
-		struct edge *e = hyp->dec->edge;
+		struct edge *e = hyp->edge;
 
 		// print out the edge, with span information
 		char	*sign = "no-sign";
@@ -801,8 +849,8 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 		{
 			for(i=0;i<e->have;i++)
 			{
-				print_tree0(hyp->rhs[i], from);
-				from += hyp->rhs[i]->toklen;
+				print_tree0(hyp->rhslist[i], from);
+				from += hyp->rhslist[i]->toklen;
 			}
 		}
 		else if(e->lex)
@@ -912,7 +960,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 	struct hypothesis		*hyp;
 	struct edge			*edge;
 
-	//if(!nbest)return exhaustive_unpack(cell, process);
+	if(!nbest)return exhaustive_unpack(cell, process);
 
 	static struct scoring_ancestry	root_ancestry = {.nparent_types=0,.parent_types=NULL, .rooted = 1};
 
@@ -952,20 +1000,18 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 		stop_timer(hyp_timer, 1);
 		if(!hyp)break;
 		nhyp++;
-		if(hyp->dec->edge->have == 2)
-			DEBUG("try a hyp %p score %f ind %d %d on decomp %p [#%d,#%d] of edge #%d\n", hyp, hyp->score, hyp->indices[0], hyp->indices[1], hyp->dec, hyp->dec->rhs[0]->id, hyp->dec->rhs[1]->id, hyp->dec->edge->id);
-		else DEBUG("try a hyp %p score %f ind %d on decomp %p [#%d] of edge #%d\n", hyp, hyp->score, hyp->indices[0], hyp->dec, hyp->dec->rhs[0]->id, hyp->dec->edge->id);
+		DEBUG("try a hyp %p score %f ind %d on decomp %p [", hyp, hyp->score, hyp->indexlist[0], hyp->dec);
+		int k;
+		for(k=0;k<hyp->arity;k++)
+			DEBUG("%s#%d", k?" ":"", hyp->dec->rhs[k]->id);
+		DEBUG("] of edge #%d\n", hyp->edge->id);
 		start_timer(inst_timer);
 		int	ires = instantiate_hypothesis(hyp);
 		stop_timer(inst_timer, 1);
 		DEBUG("instantiation result = %d\n", ires);
-		//if(hyp->dec->edge->id == 11329)
-		//	DEBUG("instantiation of hypothesis from edge 11329: res = %d\n", ires);
 		if(0 == ires)
 		{
 			ninsthyps++;
-		//	if(hyp->dec->edge->id == 11329)
-		//		DEBUG("... testing an instantiated hypothesis from edge 11329\n");
 			if(is_root(hyp->dg))
 			{
 				struct mrs	*m = NULL;

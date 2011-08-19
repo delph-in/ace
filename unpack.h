@@ -3,10 +3,10 @@
 struct decomposition
 {
 	struct edge *edge;
-	struct edge *rhs[2];
+	struct edge **rhs;
 
-	int	*seeni1;
-	int	ni2, ai2;
+	int	*seen_indices;
+	int	nsi, asi;
 };
 
 struct hypothesis
@@ -15,7 +15,9 @@ struct hypothesis
 	// even if there are several ways of scoring a tree (different grandparents),
 	// this portion remains constant and can be a shared structure in theory...
 	struct decomposition *dec;
-	struct hypothesis	*rhs[2];
+	struct edge			*edge;	// redundant, but allows struct hypothesis to be used when we aren't doing decompositions.
+	int					arity;
+	struct hypothesis	**rhslist;
 	struct dg			*dg;		// reconstructed
 	char				*string;	// surface yield
 	int					checkup;
@@ -24,7 +26,7 @@ struct hypothesis
 
 	// internal to a hypothesis as a scored tree
 	// this part will be different for different ancestry contexts
-	int					indices[2];
+	int					*indexlist;
 	float				score;
 	struct scoring_ancestry	ancestry;
 };

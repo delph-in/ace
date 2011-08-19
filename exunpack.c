@@ -13,27 +13,22 @@
 #include	"token.h"
 #include	"transfer.h"
 
-struct hyp_eu
-{
-	int	ndtrs;
-	struct hyp_eu	**dtrs;
-	struct dg	*dg;
-};
-
 struct tree_list
 {
 	int	n;
-	struct hyp_eu	**list;
+	struct hypothesis	**list;
 };
 
 struct tree_list	singleton_eue(struct edge	*e)
 {
 	struct tree_list	tl;
 	tl.n = 1;
-	tl.list = slab_alloc(sizeof(struct hyp_eu*));
-	tl.list[0] = slab_alloc(sizeof(struct hyp_eu));
-	tl.list[0]->ndtrs = 0;
-	tl.list[0]->dtrs = NULL;
+	tl.list = slab_alloc(sizeof(struct hypothesis*));
+	tl.list[0] = slab_alloc(sizeof(struct hypothesis));
+	bzero(tl.list[0], sizeof(struct hypothesis));
+	tl.list[0]->edge = e;
+	tl.list[0]->arity = 0;
+	tl.list[0]->rhslist = NULL;
 	if(e->rule)tl.list[0]->dg = e->rule->dg;
 	else 
 	{
@@ -44,6 +39,7 @@ struct tree_list	singleton_eue(struct edge	*e)
 		}
 		else tl.list[0]->dg = e->dg;
 	}
+	if(!e->have)build_hypothesis_surface(tl.list[0]);
 	return tl;
 }
 
@@ -54,13 +50,13 @@ struct tree_list	instantiate_eue(struct edge	*e, struct tree_list	*dtl, int	d)
 	struct tree_list	dtr = dtl[d];
 	int	i, j;
 	struct tree_list	res;
-	res.list = slab_alloc(sizeof(struct hyp_eu*) * dtr.n * sub.n);
+	res.list = slab_alloc(sizeof(struct hypothesis*) * dtr.n * sub.n);
 	res.n = 0;
 	for(i=0;i<dtr.n;i++)
 	{
 		for(j=0;j<sub.n;j++)
 		{
-			struct hyp_eu	*sh = sub.list[j];
+			struct hypothesis	*sh = sub.list[j];
 			//printf("sh->dg >%d =:\n", d);print_dg(sh->dg);printf("\n");
 			if(unify_dg_tmp(dtr.list[i]->dg, sh->dg, d))
 			{
@@ -71,16 +67,21 @@ struct tree_list	instantiate_eue(struct edge	*e, struct tree_list	*dtl, int	d)
 			{
 				struct dg	*dg = finalize_tmp(sh->dg, (d==0)?1:0);
 				if(!dg)continue;	// cycle failure
-				struct hyp_eu	*h = slab_alloc(sizeof(*h));
+				struct hypothesis	*h = slab_alloc(sizeof(*h));
+				bzero(h, sizeof(*h));
 				h->dg = dg;
-				h->ndtrs = sh->ndtrs+1;
-				h->dtrs = slab_alloc(sizeof(struct hyp_eu*)*h->ndtrs);
-				h->dtrs[0] = dtr.list[i];
-				memcpy(h->dtrs+1, sh->dtrs, sizeof(struct hyp_eu*)*sh->ndtrs);
+				h->edge = e;
+				h->arity = sh->arity+1;
+				h->rhslist = slab_alloc(sizeof(struct hypothesis*)*h->arity);
+				h->rhslist[0] = dtr.list[i];
+				memcpy(h->rhslist+1, sh->rhslist, sizeof(struct hypothesis*)*sh->arity);
 				res.list[res.n++] = h;
 			}
 		}
 	}
+	if(d==0)
+		for(i=0;i<res.n;i++)
+			build_hypothesis_surface(res.list[i]);
 	return res;
 }
 
@@ -138,7 +139,8 @@ int	exhaustive_unpack(struct chart_cell	*cell, int (*process)(struct hypothesis 
 				int k;
 				for(k=0;k<tl.n;k++)
 				{
-					struct dg	*dg = tl.list[k]->dg;
+					struct hypothesis	*h = tl.list[k];
+					struct dg	*dg = h->dg;
 					ninsthyps++;
 					if(is_root(dg))
 					{
@@ -146,6 +148,9 @@ int	exhaustive_unpack(struct chart_cell	*cell, int (*process)(struct hypothesis 
 						if(check_idioms(dg, m))
 						{
 							total += 1;
+							if(g_mode == GENERATING)
+								fixup_generator_string(h);
+							process(h, m);
 							//fprintf(stderr, "I don't know how to call process() on these hypotheses yet.\n");
 						}
 					}
