@@ -162,26 +162,6 @@ struct edge	*next_agenda(int	from_start)
 	return 0;
 }
 
-void add_agenda_lrule(int x, struct rule *rule)
-{
-	struct task	*t;
-	int			prio = EPSILON_PRIORITY(rule);
-
-	for(t=agenda[prio].start;t;t=t->next)
-	{
-		//if(t->edge->rule)printf(" -- already %s [%d-%d]\n", t->edge->rule->name, t->edge->from, t->edge->to);
-		if(t->edge->rule==rule &&
-			((g_mode==GENERATING && t->edge->ep_span == 1<<x) ||
-			(g_mode==PARSING && t->edge->from==x && t->edge->to==x)))
-		{
-			//printf("save work - `%s' was already in the chart for %d\n", rule->name, x);
-			return;
-		}
-	}
-	//printf("sadly, have to add `%s' at prio? %d\n", rule->name, prio);
-	add_agenda(epsilon_edge(rule, x, 0, 0));
-}
-
 void	allow_edge_orth_route(struct edge	*e, int nrules, int *rules)
 {
 	e->north_routes++;

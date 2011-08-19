@@ -19,9 +19,11 @@ void	print_current_sentence(int	sig)
 {
 	extern	char	*current_sentence;
 
-	write(saved_termerr, "DEADLY SIGNAL! sent = `", strlen("DEADLY SIGNAL! sent = `"));
-	write(saved_termerr, current_sentence, strlen(current_sentence));
-	write(saved_termerr, "'\n", 2);
+	int	r;
+	
+	r = write(saved_termerr, "DEADLY SIGNAL! sent = `", strlen("DEADLY SIGNAL! sent = `"));
+	r = write(saved_termerr, current_sentence, strlen(current_sentence));
+	r = write(saved_termerr, "'\n", 2);
 	shutdown_net();
 	exit(-1);
 }

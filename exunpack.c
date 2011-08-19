@@ -124,7 +124,7 @@ int	exhaustive_unpack(struct chart_cell	*cell, int (*process)(struct hypothesis 
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		struct edge	*edge = cell->p_edges[i];
-		if( (g_mode!=GENERATING || edge->ep_span == require_ep_span) && is_root(edge->dg) && !edge->frozen )
+		if( (g_mode!=GENERATING || edge->neps == require_neps) && is_root(edge->dg) && !edge->frozen )
 		{
 			//printf("edge #%d can be root...\n", edge->id);
 			int	j;

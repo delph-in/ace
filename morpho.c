@@ -50,18 +50,6 @@ struct ochart
 void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule);
 void	unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int nrules, int *rnums);
 
-void add_orules_to_chart_agenda(struct edge *le)
-{
-	int i, j;
-
-	for(i=0;i<le->north_routes;i++)
-	{
-		struct orth_route *r = le->orth_routes+i;
-		for(j=0;j<r->len;j++)
-			add_agenda_lrule(le->from, rules[r->rules[j]]);
-	}
-}
-
 int	check_mbs(char	*mbs);
 /*int	check_mbs(char	*mbs)
 {

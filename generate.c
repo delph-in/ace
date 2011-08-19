@@ -15,7 +15,7 @@ extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inh
 		extern int nstrings;
 		extern struct type	**strings;
 
-unsigned long long	require_ep_span = 0;
+int	require_neps = 0, n_epsbv = 0;
 
 int			enable_index_accessibility_filtering = 0;
 
@@ -81,7 +81,7 @@ int	index_accessibility_filter(struct edge	*e)
 {
 	int	i;
 	for(i=0;i<current_input_mrs->nrels;i++)
-		if(!(e->ep_span & (((unsigned long long)1)<<i)))
+		if(!bitvec_test(e->ep_span_bv, i))
 			if(index_accessibility_filter_one_ep(e, current_input_mrs->rels+i))
 				return 1;
 	return 0;
@@ -134,17 +134,17 @@ int	gen_process_edge(struct edge	*e)
 	{
 		// passive edge
 		for(i=0;i<c->al_nedges;i++)
-			if(! (e->ep_span & c->al_edges[i]->ep_span))
+			if(!bitvec_and(e->ep_span_bv, c->al_edges[i]->ep_span_bv, NULL, n_epsbv))
 				if(combine(c->al_edges[i], e) == -1)return -1;
 		for(i=0;i<c->ar_nedges;i++)
-			if(! (e->ep_span & c->ar_edges[i]->ep_span))
+			if(!bitvec_and(e->ep_span_bv, c->ar_edges[i]->ep_span_bv, NULL, n_epsbv))
 				if(combine(c->ar_edges[i], e) == -1)return -1;
 	}
 	else
 	{
 		// active edge
 		for(i=0;i<c->p_nedges;i++)
-			if(! (e->ep_span & c->p_edges[i]->ep_span))
+			if(!bitvec_and(e->ep_span_bv, c->p_edges[i]->ep_span_bv, NULL, n_epsbv))
 				if(combine(e, c->p_edges[i]) == -1)return -1;
 	}
 	return 0;
@@ -184,12 +184,13 @@ int	generate(struct mrs	*mrs)
 
 	fprintf(stderr, "NOTE: input semantics had %d EPs and %d variables\n", mrs->nrels, mrs->vlist.nvars);
 
-	if(mrs->nrels > 64 || mrs->vlist.nvars > 64)
+	if(mrs->vlist.nvars > 64)
 	{
-		fprintf(stderr, "ERROR: generator cannot currently function with more than 64 EPs and 64 vars\n");
+		fprintf(stderr, "ERROR: generator cannot currently function with more than 64 vars\n");
 		return 0;
 	}
-	require_ep_span = (((unsigned long long)1)<<mrs->nrels)-1;
+	require_neps = mrs->nrels;
+	n_epsbv = bitvec_n(mrs->nrels);
 
 	// set up the skolemization and specialization dags we'll need.
 	struct dg	*skar[mrs->vlist.nvars];

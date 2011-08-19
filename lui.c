@@ -53,7 +53,9 @@ int lui_initialize()
 	int rfd[2], wfd[2];
 	if(lui_rfd != -1)return 0;
 
-	pipe(rfd); pipe(wfd);
+	int	pr1 = pipe(rfd);
+	int	pr2 = pipe(wfd);
+	assert((pr1 == 0 && pr2 == 0) || !"failed to create a pipe to talk to LUI");
 	if(fork())
 	{
 		static pthread_t	pth;

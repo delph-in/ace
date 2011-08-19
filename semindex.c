@@ -13,6 +13,7 @@
 #include	"mrs.h"
 #include	"freeze.h"
 #include	"transfer.h"
+#include	"bitvec.h"
 
 #define	VACUOUS	"vacuous"
 
@@ -360,7 +361,7 @@ int	instantiate_alignment(struct ep_alignment	*a)
 	// we have produced a complete alignment of 'e' against the input semantics.
 	struct grammar_entity	*e = a->e;
 	struct mrs_ep			**align = a->align;
-	struct edge	*edge = 0;
+	struct edge	*edge = NULL;
 	struct dg	*rels = dagify_rels_from_eps(1+e->nextra_preds, align);
 	int			result, i;
 	struct slab_state slab;
@@ -385,7 +386,8 @@ int	instantiate_alignment(struct ep_alignment	*a)
 	{
 		int i;
 		for(i=0;i<=e->nextra_preds;i++)
-			edge->ep_span |= ((unsigned long long)1)<<align[i]->epnum;
+			bitvec_set(edge->ep_span_bv, align[i]->epnum);
+			//edge->ep_span |= ((unsigned long long)1)<<align[i]->epnum;
 		edge->neps = 1+e->nextra_preds;
 		add_agenda(edge);
 	}

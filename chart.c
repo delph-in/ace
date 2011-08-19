@@ -373,8 +373,6 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 		memcpy(e->daughters, a->daughters, sizeof(struct edge*) * a->have);
 		e->daughters[arg] = b;
 	}
-	if(g_mode == GENERATING)
-		e->neps = a->neps + b->neps;
 
 	if(e->rule->lexical)
 		setup_lexrule_edge(e);
@@ -385,7 +383,12 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 		e->orth_routes = 0;
 	}
 
-	e->ep_span = a->ep_span | b->ep_span;
+	if(g_mode == GENERATING)
+	{
+		e->neps = a->neps + b->neps;
+		e->ep_span_bv = bitvec_slab_alloc(n_epsbv);
+		bitvec_or(a->ep_span_bv, b->ep_span_bv, e->ep_span_bv, n_epsbv);
+	}
 	e->npack=0;
 	e->pack=0;
 
@@ -393,8 +396,8 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 	{
 		if(g_mode == GENERATING)
 		{
-			printf("generated #%d %d/%d from #%d, #%d for [%16.16llX] with rule %s: ",
-				e->id, e->have, e->need, a->id, b->id, e->ep_span, e->rule->name);
+			printf("generated #%d %d/%d from #%d, #%d for %d EPs with rule %s: ",
+				e->id, e->have, e->need, a->id, b->id, e->neps, e->rule->name);
 			printf("%s\n", show_orth_leaves(e));
 		}
 		else // (g_mode == PARSING)
@@ -415,7 +418,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 #endif
 
 		if(!exhaustive &&
-			((g_mode == GENERATING && e->ep_span == require_ep_span) ||
+			((g_mode == GENERATING && e->neps == require_neps) ||
 			(g_mode == PARSING && e->from==0 && e->to==chart_size-1)) &&
 			is_root(e->dg))
 		{
@@ -627,8 +630,8 @@ int	filter(struct edge	*a, struct edge	*b)
 	//printf("    <%d/%d> + <%d/%d>\n", a->have, a->need, b->have, b->need);
 	//printf("    %s   + %s\n", a->dg->xtype->name, b->dg->xtype->name);
 
-	if(trace>1)printf("[%8.8X #%d [lex %d orth %p] + %8.8X #%d [lex %p]] rule %s?\n",
-		0/*a->ep_span*/, a->id, a->rule->lexical, a->rule->orth, 0/*b->ep_span*/, b->id, b->lex, a->rule->name);
+	if(trace>1)printf("[#%d [lex %d orth %p] + #%d [lex %p]] rule %s?\n",
+		a->id, a->rule->lexical, a->rule->orth, b->id, b->lex, a->rule->name);
 
 	// see if a or b is lexical and incompatible
 	if(check_lexical_rule_constraints(a->rule, b))return 0;

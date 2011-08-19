@@ -28,7 +28,7 @@ static int	same_cell_daughter(struct edge *par, struct edge *dtr)
 	int i;
 
 	if(par==dtr)return 1;
-	if(g_mode==GENERATING && (par->ep_span != dtr->ep_span))return 0;
+	if(g_mode==GENERATING && !bitvec_equal(par->ep_span_bv, dtr->ep_span_bv, n_epsbv))return 0;
 	if(g_mode==PARSING && (par->from != dtr->from || par->to != dtr->to))return 0;
 	for(i=0;i<par->have;i++)
 		if(same_cell_daughter(par->daughters[i], dtr))return 1;
@@ -266,7 +266,7 @@ int	pack_edge(struct edge	*edge)
 	ncandidates = (edge->have==edge->need)?c->p_nedges:(edge->rule->rtl?c->ar_nedges:c->al_nedges);
 	for(i=0;i<ncandidates && (h=candidates[i]);i++)
 		if( h->have == edge->have && h->need == edge->need
-		&& (g_mode != GENERATING || h->ep_span == edge->ep_span)
+		&& (g_mode != GENERATING || bitvec_equal(h->ep_span_bv, edge->ep_span_bv, n_epsbv))
 			)
 		{
 			int	fw = 1, bk = 1;

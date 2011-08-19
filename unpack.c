@@ -926,7 +926,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 			fprintf(stderr, "ERROR: found a frozen edge #%d (not packed) in the root cell!\n", edge->id);
 			exit(-1);
 		}
-		if( (g_mode!=GENERATING || edge->ep_span == require_ep_span) && is_root(edge->dg) )// && !edge->frozen )
+		if( (g_mode!=GENERATING || edge->neps == require_neps) && is_root(edge->dg) )// && !edge->frozen )
 		{
 			DEBUG("edge #%d can be root...\n", edge->id);
 			for(j=-1;j<edge->npack;j++)

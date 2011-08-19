@@ -85,6 +85,11 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 	edge->to = i+len;
 	edge->lex = lex;
 	edge->qc = gen_qc?NULL:extract_qc(edge->dg);
+	if(g_mode == GENERATING)
+	{
+		edge->ep_span_bv = bitvec_slab_alloc(n_epsbv);
+		bitvec_clear_all(edge->ep_span_bv, n_epsbv);
+	}
 
 	return edge;
 }

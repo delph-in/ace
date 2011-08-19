@@ -3,6 +3,7 @@
 
 #include	"dag.h"
 #include	"morpho.h"
+#include	"bitvec.h"
 
 //#define	RULE_STATS
 #define	ENABLE_HYPERACTIVE	1
@@ -42,7 +43,8 @@ struct edge
 
 	struct unpack_info *unpack;
 
-	unsigned long long	ep_span;
+	unsigned long long	*ep_span_bv;
+	//unsigned long long	ep_span;
 	unsigned long long	accessible_vars, inaccessible_vars;
 	int	neps;
 
@@ -101,7 +103,7 @@ void	setup_lexrule_edge(struct edge	*e);
 
 extern struct chart_cell	*cells;
 extern int					chart_size;
-extern unsigned long long	require_ep_span;
+extern int					require_neps, n_epsbv;
 
 extern int enable_generalize_edge_top_types;
 

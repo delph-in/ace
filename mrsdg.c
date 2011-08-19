@@ -88,7 +88,7 @@ int add_var_feats(struct mrs_var *v, int label, struct dg *value)
 struct mrs_var	*varhash[VHSIZE];
 int				varind;
 int	varhash_used = 0, varhash_collis = 0;
-static inline unsigned hashcode(struct dg	*dg) { return ((unsigned)dg>>5) % (VHSIZE-1); }
+static inline unsigned hashcode(struct dg	*dg) { return ((unsigned long long)dg>>5) % (VHSIZE-1); }
 
 void	clear_mrs()
 {

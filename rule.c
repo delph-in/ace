@@ -161,6 +161,11 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 		__qc_use_heap = 0;
 	}
 	e->qc = ruleqc[r->rnum];
+	if(g_mode == GENERATING)
+	{
+		e->ep_span_bv = bitvec_slab_alloc(n_epsbv);
+		bitvec_clear_all(e->ep_span_bv, n_epsbv);
+	}
 
 	if(trace>1)
 	{
