@@ -118,6 +118,8 @@ struct tree_list	exhaustive_unpack_edge(struct edge	*e)
 	return tl;
 }
 
+extern int debug_level;
+
 int	exhaustive_unpack(struct chart_cell	*cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs))
 {
 	int	i, total = 0;
@@ -125,9 +127,10 @@ int	exhaustive_unpack(struct chart_cell	*cell, int (*process)(struct hypothesis 
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		struct edge	*edge = cell->p_edges[i];
+		if(debug_level > 2)printf("checking whether %d can be root\n", edge->id);
 		if( (g_mode!=GENERATING || ep_span_is_root(edge->ep_span_bv, edge->neps)) && is_root(edge->dg) && !edge->frozen )
 		{
-			//printf("edge #%d can be root...\n", edge->id);
+			if(debug_level > 1)printf("edge #%d can be root...\n", edge->id);
 			int	j;
 			for(j=-1;j<edge->npack;j++)
 			{

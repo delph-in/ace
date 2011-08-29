@@ -666,12 +666,13 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 	for(i=0;i<nv;i++) if(vmap[i] == out->vnum)return 0;
 
 	// make sure variable type is subsumed
-	switch(in->type[0])
+	if(!pred_subsumes(in->type, out->type))return 0;
+	/*switch(in->type[0])
 	{
 		case	'u':	break;
 		case	'i':	if(out->type[0]=='h' || out->type[0]=='u')return 0;	break;
 		default:		if(out->type[0]!=in->type[0])return 0;	break;
-	}
+	}*/
 
 	// make sure variable properties are subsumed
 	for(i=0;i<in->nprops;i++)

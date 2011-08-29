@@ -89,6 +89,7 @@ struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin);
 char		*internal_to_external_var_type(char	*in);
 
 struct mrs	*copy_mrs(struct mrs	*m);
+struct mrs	*external_to_internal_mrs(struct mrs	*min);
 struct mrs	*ace_surface_to_mrs(char	*line);
 
 void	mrs_crange_for_x(struct mrs	*m, struct mrs_var	*x, int	quantified, int	*From, int	*To);

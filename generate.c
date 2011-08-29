@@ -317,12 +317,26 @@ int	generate(struct mrs	*mrs)
 	}
 	if(debug_level)printf("packed %.4f\n", timer());
 
+	struct mrs	*hax_ref = external_to_internal_mrs(mrs);
+	if(trace)
+	{
+		printf("internal version of MRS:\n");
+		print_mrs(hax_ref);
+		printf("\n");
+	}
+
 	int show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
 	{
-		if(!mrs_subsumes(mrs, mrs_res))
+		// ugly hack: LKB compares *internal* MRSes,
+		// by going through the VPM *twice* "to get defaults".
+		// see comment in lkb/mrs/generate.lisp near line 765.
+		struct mrs	*hax_res = external_to_internal_mrs(mrs_res);
+		//if(!mrs_subsumes(mrs, mrs_res))
+		if(!mrs_subsumes(hax_ref, hax_res))
 		{
 			if(trace){ printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
-			print_mrs(mrs_res); printf("\n"); }
+			print_mrs(hax_res); printf("\n"); }
+			//print_mrs(mrs_res); printf("\n"); }
 			free_mrs(mrs_res);
 			return 0;
 		}
@@ -331,7 +345,8 @@ int	generate(struct mrs	*mrs)
 		if(!inhibit_results)printf("%s\n", hyp->string);
 		if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, count);
 		count++;
-		if(trace>0){ print_mrs(mrs_res); printf("\n"); }
+		//if(trace>0){ print_mrs(mrs_res); printf("\n"); }
+		if(trace>0){ print_mrs(hax_res); printf("\n"); }
 		free_mrs(mrs_res);
 		return 1;
 	}
