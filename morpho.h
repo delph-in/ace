@@ -16,11 +16,14 @@ struct orule
 		int			repl;
 	}		*sub;
 
-	int		nirregs;
+	struct hash	*irregs_stem_to_form;
+	struct hash	*irregs_form_to_stem;
+
+	/*int		nirregs;
 	struct irreg
 	{
 		wchar_t	*form, *stem;
-	}	*irregs_f, *irregs_s;
+	}	*irregs_f, *irregs_s;*/
 };
 
 extern int		norules;
@@ -34,5 +37,7 @@ char	*inflect(struct orule	*or, char	*str);
 void	setup_morpho(char	*line);
 int		load_lrules();
 void	add_orule(struct rule	*rule, char	*def);
+
+struct orule	*freeze_orule(struct orule	*orin);
 
 #endif

@@ -17,6 +17,7 @@
 #include	"post.h"
 #endif
 #include	"lattice-mapping.h"
+#include	"hash.h"
 
 extern void		**oldslabs;
 extern int		noldslabs, aoldslabs, currslabsize;
@@ -135,36 +136,6 @@ struct rule	*freeze_rule(struct rule	*rin)
 	// make sure the semantic index pointers can find the frozen rules
 	rin->dg = (struct dg*)rout;
 	return rout;
-}
-
-struct orule	*freeze_orule(struct orule	*orin)
-{
-	struct orule	*orout = slab_alloc(sizeof(struct orule));
-	int		i;
-
-	*orout = *orin;
-	orout->rule->orth = orout;
-	orout->sub = slab_alloc(sizeof(struct orule_sub) * orout->nsub);
-	for(i=0;i<orout->nsub;i++)
-	{
-		struct orule_sub *subi = orin->sub+i, *subo = orout->sub+i;
-		subo->pat = freeze_wcs(subi->pat);
-		subo->rep = freeze_wcs(subi->rep);
-		subo->patl = subi->patl;
-		subo->repl = subi->repl;
-	}
-
-	orout->irregs_f = slab_alloc(sizeof(struct irreg) * orout->nirregs);
-	orout->irregs_s = slab_alloc(sizeof(struct irreg) * orout->nirregs);
-	for(i=0;i<orout->nirregs;i++)
-	{
-		orout->irregs_f[i].stem = orout->irregs_s[i].stem = freeze_wcs(orin->irregs_f[i].stem);
-		orout->irregs_f[i].form = orout->irregs_s[i].form = freeze_wcs(orin->irregs_f[i].form);
-	}
-	int scmp(const void	*ia, const void *ib) { return wcscmp( ((const struct irreg*)ia)->stem, ((const struct irreg*)ib)->stem ); }
-	qsort(orout->irregs_s, orout->nirregs, sizeof(struct irreg), scmp);
-
-	return orout;
 }
 
 static struct type	*FT(struct type	*t)

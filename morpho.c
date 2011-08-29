@@ -3,6 +3,7 @@
 #include	<string.h>
 #include	<limits.h>
 #include	<wchar.h>
+#include	<wctype.h>
 #include	<ctype.h>
 #include	"unicode.h"
 
@@ -22,6 +23,7 @@ struct lexeme	*proper_noun_lex(char	*name);
 #include	"tdl.h"
 #include	"lexicon.h"
 #include	"freeze.h"
+#include	"hash.h"
 
 #include	"token.h"
 
@@ -147,6 +149,20 @@ show_form_to_relation(struct edge	*le, struct token	**toklist)
 	else printf("FORM-TO-RELATION	%s	%s\n", toklist[0]->string, preddg->xtype->name);
 }
 
+char	*mbsdowncase(char	*mbsin)
+{
+	int	len = strlen(mbsin);
+	wchar_t	wcs[len+5];
+	int	n = mbstowcs(wcs, mbsin, len+3);
+	int	i;
+	for(i=0;i<n;i++)
+		wcs[i] = towlower(wcs[i]);
+	int	olen = wcstombs(NULL, wcs, 0) + 1;
+	char	*mbsout = malloc(n + 2);
+	wcstombs(mbsout, wcs, olen+1);
+	return mbsout;
+}
+
 int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, struct token	**tokens))
 {
 	int				i, j, k;
@@ -162,8 +178,11 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		struct token	*t = lat_e->token;
 		t->oc = slab_alloc(sizeof(struct ochart));
 		bzero(t->oc, sizeof(struct ochart));
+		// compute a lowercase version of t->string
+		char	*low = mbsdowncase(t->string);
 		// compute all possible stems, with dynamic programming
-		add_ochart_edge(0, t->oc, t->string, 0);
+		add_ochart_edge(0, t->oc, low, 0);
+		free(low);
 		// enumerate all possible ways of reaching each possible stem
 		for(j=0;j<t->oc->nedges;j++)
 			unfold_oroutes(t->oc->edges[j], t->oc->edges[j], 0, 0);
@@ -559,23 +578,12 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 		int				j, k, l, r;//, *mrules = 0;
 		char			stem[1024];
 		struct orule	*or = orules[i];
-		struct irreg	*irr;
-
-		for(j=0,l=or->nirregs-1;j<=l;)
+		char	*irreg_stem = hash_find(or->irregs_form_to_stem, form);
+		if(irreg_stem)
 		{
-			k = (j+l)/2;
-			irr = or->irregs_f + k;
-			//r = wcscmp(wform, irr->form);
-			r = wcscasecmp(wform, irr->form);
-			if(r==0)
-			{
-				add_ochart_edge(edge, chart, freeze_tombs(irr->stem), or);
-				break;	// TODO support irregs.tab defining whether to cut the search here or continue it
-			}
-			else if(r<0)l = k-1;
-			else j = k+1;
+			add_ochart_edge(edge, chart, irreg_stem, or);
+			continue;
 		}
-		if(j<=l)continue;	// if we got it with an irreg, don't try patterns
 
 		for(j=or->nsub-1;j>=0;j--)
 		{
@@ -716,14 +724,7 @@ char	*inflect(struct orule	*or, char	*str)
 
 	//printf("inflect '%S' using '%s'\n", wstr, or->rule->name);
 
-	for(i=0;i<or->nirregs;i++)
-		//if(!wcscmp(wstr, or->irregs_s[i].stem))
-		if(!wcscasecmp(wstr, or->irregs_s[i].stem))
-		{
-			res = freeze_tombs(or->irregs_s[i].form);
-			//printf("irregular form: %s\n", res);
-			break;
-		}
+	res = hash_find(or->irregs_stem_to_form, str);
 	if(!res)
 	{
 		int slen = strlen(str)+10;
@@ -948,9 +949,8 @@ void	add_orule(struct rule	*rule, char	*def)
 	orules[norules-1] = or;
 
 	or->rule = rule;
-	or->nirregs = 0;
-	or->irregs_f = 0;
-	or->irregs_s = 0;
+	or->irregs_stem_to_form = hash_new("stem_to_form");
+	or->irregs_form_to_stem = hash_new("form_to_stem");
 	rule->orth = or;
 	setup_orule(or, def);
 	//printf("rule `%s' has %d orthographemic patterns\n", rule->name, or->nsub);
@@ -966,14 +966,11 @@ struct orule	*lookup_orule(char	*rule)
 	return 0;
 }
 
-static int fcmp(const void	*ia, const void *ib) { return wcscmp( ((const struct irreg*)ia)->form, ((const struct irreg*)ib)->form ); }
-static int scmp(const void	*ia, const void *ib) { return wcscmp( ((const struct irreg*)ia)->stem, ((const struct irreg*)ib)->stem ); }
-
 int	load_irregulars(char	*path)
 {
 	FILE	*f = fopen(path, "r");
 	char	line[1024], copy[1024];
-	char	*form =0 , *rule =0 , *stem =0 ;
+	char	*form = NULL, *rule = NULL, *stem = NULL;
 	struct orule	*or;
 
 	if(!f) { perror(path); return 0; }
@@ -1000,22 +997,15 @@ int	load_irregulars(char	*path)
 			continue;
 		}
 		//printf("add form `%s', stem `%s' TO rule: %s\n", form, stem, or->rule->name);
-		wchar_t	*wstem = towide(stem), *wform = towide(form);
-		or->nirregs++;
-		or->irregs_f = realloc(or->irregs_f, sizeof(struct irreg)*or->nirregs);
-		or->irregs_f[or->nirregs-1].stem = wstem;
-		or->irregs_f[or->nirregs-1].form = wform;
-		or->irregs_s = realloc(or->irregs_s, sizeof(struct irreg)*or->nirregs);
-		or->irregs_s[or->nirregs-1].stem = wstem;
-		or->irregs_s[or->nirregs-1].form = wform;
+		stem = strdup(stem);
+		form = strdup(form);
+		// only record the first match in each direction for each (rule,string) pair.
+		if(!hash_find(or->irregs_stem_to_form, stem))
+			hash_add(or->irregs_stem_to_form, stem, form);
+		if(!hash_find(or->irregs_form_to_stem, form))
+			hash_add(or->irregs_form_to_stem, form, stem);
 	}
 	fclose(f);
-	int i;
-	for(i=0;i<norules;i++)
-	{
-		qsort(orules[i]->irregs_f, orules[i]->nirregs, sizeof(struct irreg), fcmp);
-		qsort(orules[i]->irregs_s, orules[i]->nirregs, sizeof(struct irreg), scmp);
-	}
 	return 0;
 }
 
@@ -1038,4 +1028,37 @@ int	load_lrules()
 		exit(-1);
 	}
 	return 0;
+}
+
+struct hash	*freeze_string_hash(struct hash	*h)
+{
+	struct hash_bucket *walk;
+	int	i;
+	for(i=0;i<h->size;i++)
+		for(walk=h->buckets[i];walk;walk=walk->next)
+			walk->value = freeze_string(walk->value);
+	return freeze_hash(h);
+}
+
+struct orule	*freeze_orule(struct orule	*orin)
+{
+	struct orule	*orout = slab_alloc(sizeof(struct orule));
+	int		i;
+
+	*orout = *orin;
+	orout->rule->orth = orout;
+	orout->sub = slab_alloc(sizeof(struct orule_sub) * orout->nsub);
+	for(i=0;i<orout->nsub;i++)
+	{
+		struct orule_sub *subi = orin->sub+i, *subo = orout->sub+i;
+		subo->pat = freeze_wcs(subi->pat);
+		subo->rep = freeze_wcs(subi->rep);
+		subo->patl = subi->patl;
+		subo->repl = subi->repl;
+	}
+
+	orout->irregs_stem_to_form = freeze_string_hash(orin->irregs_stem_to_form);
+	orout->irregs_form_to_stem = freeze_string_hash(orin->irregs_form_to_stem);
+
+	return orout;
 }
