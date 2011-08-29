@@ -3,6 +3,8 @@
 #include	<string.h>
 #include	<assert.h>
 #include	<stdarg.h>
+#include	<wchar.h>
+#include	<wctype.h>
 
 #include "dag.h"
 #include "chart.h"
@@ -12,6 +14,7 @@
 #include "mrs.h"
 #include	"token.h"
 #include	"transfer.h"
+#include	"unicode.h"
 
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
@@ -942,14 +945,84 @@ char	*hypothesis_to_dstring(struct hypothesis	*h)
 	return derivation;
 }
 
+/* ERG's Lisp code to do this roughly translates as:
+bool gen-extract-surface(edge, initialp, cliticp)
+{
+	if(edge->daughters)
+	{
+		for each daughter d
+			cliticp = gen-extract-surface(d, initialp, cliticp)
+		return cliticp
+	}
+	else
+	{
+		entry = lexical-entry for e
+		orth = orthography of 'entry', with a space after it?
+		do some ugly hack for "Englishmen"
+		tdfs = lex-entry-full-fs(entry);
+		type = tdfs->type
+		string = downcase(first leaf of edge)?
+		prefix = how many initial characters of string are in {(, ", '}
+		suffix = min(length of string, prefix + length of orth)
+		if(orth != the substring of 'string' between prefix and suffix)
+			suffix = 0
+		rawp = suffix != 0 and there is at least 1 uppercase letter in orth
+		capitalizep = 1 if type is a subtype of one of:
+			{basic_n_proper_lexent, n_-_c-month_le, n_-_c-dow_le, n_-_pr-i_le}
+		if(!cliticp)
+			cliticp = string length > 0 and string[0]=='\''
+		if(rawp)
+			string = string[0..prefix] + orth + string[suffix..end]
+		else if(capitalizep)
+			replace underscores with spaces
+			set the first alphanumeric character after each space to be uppercase
+		if(string[0]=='_' && length(string) > 1 && string[1] is uppercase)
+			string = string[1..end]
+		if(initialp && string[0] is alphanumeric)
+			string[0] = towupper(string[0]);
+		if(!initialp && !cliticp)
+			output a space
+		output string, skipping spaces following hyphens
+		return (last character we output == '-')
+	}
+}
+*/
+
 void	fixup_generator_string(struct hypothesis	*h)
 {
-	char	*p = h->string;
-	while(p && *p && !isalpha(*p))p++;
-	if(p && *p)
+	wchar_t	*w = towide(h->string);
+	wchar_t	*p = w, *q = w;
+	int		initialp = 1;
+
+	while(*p)
 	{
-		*p = toupper(*p);
+		if(initialp && iswalnum(*p))
+		{
+			// capitalize the first alphanumeric
+			*q++ = towupper(*p++);
+			initialp = 0;
+		}
+		else if(*p == ' ' && p>w && p[-1]=='-')
+		{
+			// gobble up space after hyphens
+			p++;
+		}
+		else if(*p == ' ' && p[1] == '\'' && p[2] && p[2]!=' ')
+		{
+			// gobble up space before clitics
+			p++;
+		}
+		else if(*p == '_')
+		{
+			// convert to a space
+			*q++ = ' ';
+			p++;
+		}
+		else *q++ = *p++;
 	}
+	*q = 0;
+	h->string = freeze_tombs(w);
+	free(w);
 }
 
 int want_mrs = 1;
