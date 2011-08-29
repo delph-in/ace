@@ -565,7 +565,8 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 		{
 			k = (j+l)/2;
 			irr = or->irregs_f + k;
-			r = wcscmp(wform, irr->form);
+			//r = wcscmp(wform, irr->form);
+			r = wcscasecmp(wform, irr->form);
 			if(r==0)
 			{
 				add_ochart_edge(edge, chart, freeze_tombs(irr->stem), or);
@@ -716,7 +717,8 @@ char	*inflect(struct orule	*or, char	*str)
 	//printf("inflect '%S' using '%s'\n", wstr, or->rule->name);
 
 	for(i=0;i<or->nirregs;i++)
-		if(!wcscmp(wstr, or->irregs_s[i].stem))
+		//if(!wcscmp(wstr, or->irregs_s[i].stem))
+		if(!wcscasecmp(wstr, or->irregs_s[i].stem))
 		{
 			res = freeze_tombs(or->irregs_s[i].form);
 			//printf("irregular form: %s\n", res);
