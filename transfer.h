@@ -30,6 +30,11 @@ struct transfer_rule
 	int	optional;
 };
 
+extern int g_transfer;
+extern int	ntransfer_rules;
+extern struct transfer_rule	**transfer_rules;
+int	load_transfer_rules();
+
 void	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, void	(*callback)(int	*alignment));
 struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg);
 

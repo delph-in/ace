@@ -287,7 +287,7 @@ int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs)
 	struct dg	*root = hyp->dg, *sem;
 	extern char	*mrs_end;
 	extern int print_trees;
-	if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->dec->edge->id);
+	if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->edge->id);
 	if(trace>1){print_dg(hyp->dg); printf("\n");}
 	if(!inhibit_results)
 	{

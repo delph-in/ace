@@ -40,7 +40,7 @@ struct dg	*build_pos_tags_list(char	*tag)
 	sprintf(tag_str, "\"%s\"", tag);
 	struct dg	*list = atomic_dg("*cons*");
 	struct type	*tagtype = add_string(freeze_string(tag_str));
-	struct dg	*tagdg = tagtype->dg?:atomic_dg("*top*");
+	struct dg	*tagdg = tagtype->dg?:atomic_dg(top_type);
 	tagdg->xtype=tagdg->type=tagtype;
 	list = add_dg_hop(list, 1, tagdg);	// FIRST
 	list = add_dg_hop(list, 2, type_dg("*null*"));	// REST

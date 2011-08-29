@@ -9,6 +9,8 @@
 #include	"chart.h"
 #include	"freeze.h"
 
+int	g_transfer = 0;
+
 struct path	lex_stem_path, lex_rels_path, rule_rels_path, extract_mrs_path, lex_carg_path, lex_pred_path;
 char		*semarg_type;
 char		*handle_type;
@@ -16,6 +18,8 @@ char		*g_cons_type;
 char		*g_list_type;
 char		*g_null_type;
 char		*g_diff_list_type;
+
+char	*top_type;
 
 struct path	*chart_dependencies_from, *chart_dependencies_to;
 int			nchart_dependencies;
@@ -131,6 +135,9 @@ static struct path get_conf_path(char	*lhs)
 
 struct conf
 {
+	int	transfer;
+
+	char		*top_type;
 	char		*semarg_type;
 	char		*handle_type;
 	char		*cons_type;
@@ -179,55 +186,65 @@ extern char	*deleted_daughters, *parsing_packing, *generating_packing, *ep_drop;
 void	*freeze_conf()
 {
 	struct conf	*c = slab_alloc(sizeof(*c));
+	c->transfer = g_transfer;
+	c->top_type = freeze_string(top_type);
 	c->semarg_type = freeze_string(semarg_type);
 	c->handle_type = freeze_string(handle_type);
 	c->cons_type = freeze_string(g_cons_type);
 	c->list_type = freeze_string(g_list_type);
 	c->null_type = freeze_string(g_null_type);
 	c->diff_list_type = freeze_string(g_diff_list_type);
-	c->lex_stem_path = freeze_path(lex_stem_path);
-	c->lex_rels_path = freeze_path(lex_rels_path);
-	c->lex_carg_path = freeze_path(lex_carg_path);
-	c->lex_pred_path = freeze_path(lex_pred_path);
-	c->rule_rels_path = freeze_path(rule_rels_path);
-	c->extract_mrs_path = freeze_path(extract_mrs_path);
-	c->lex_tokens_list_path = freeze_path(lex_tokens_list_path);
-	c->lex_tokens_last_path = freeze_path(lex_tokens_last_path);
-	c->token_form_path = freeze_path(token_form_path);
-	c->token_from_path = freeze_path(token_from_path);
-	c->token_to_path = freeze_path(token_to_path);
-	c->token_id_path = freeze_path(token_id_path);
-	c->token_postags_path = freeze_path(token_postags_path);
-	c->token_posprobs_path = freeze_path(token_posprobs_path);
-	c->token_type = freeze_string(token_type);
 
-	c->lattice_mapping_input_path = freeze_path(lattice_mapping_input_path);
-	c->lattice_mapping_output_path = freeze_path(lattice_mapping_output_path);
-	c->lattice_mapping_context_path = freeze_path(lattice_mapping_context_path);
-	c->lattice_mapping_position_path = freeze_path(lattice_mapping_position_path);
-
-	int i;
-	for(i=0;i<nchart_dependencies;i++)
+	if(!g_transfer)
 	{
-		chart_dependencies_from[i] = freeze_path(chart_dependencies_from[i]);
-		chart_dependencies_to[i] = freeze_path(chart_dependencies_to[i]);
+		c->lex_stem_path = freeze_path(lex_stem_path);
+		c->lex_rels_path = freeze_path(lex_rels_path);
+		c->lex_carg_path = freeze_path(lex_carg_path);
+		c->lex_pred_path = freeze_path(lex_pred_path);
+		c->rule_rels_path = freeze_path(rule_rels_path);
+		c->extract_mrs_path = freeze_path(extract_mrs_path);
+		c->lex_tokens_list_path = freeze_path(lex_tokens_list_path);
+		c->lex_tokens_last_path = freeze_path(lex_tokens_last_path);
+		c->token_form_path = freeze_path(token_form_path);
+		c->token_from_path = freeze_path(token_from_path);
+		c->token_to_path = freeze_path(token_to_path);
+		c->token_id_path = freeze_path(token_id_path);
+		c->token_postags_path = freeze_path(token_postags_path);
+		c->token_posprobs_path = freeze_path(token_posprobs_path);
+		c->token_type = freeze_string(token_type);
+
+		c->lattice_mapping_input_path = freeze_path(lattice_mapping_input_path);
+		c->lattice_mapping_output_path = freeze_path(lattice_mapping_output_path);
+		c->lattice_mapping_context_path = freeze_path(lattice_mapping_context_path);
+		c->lattice_mapping_position_path = freeze_path(lattice_mapping_position_path);
+
+		int i;
+		for(i=0;i<nchart_dependencies;i++)
+		{
+			chart_dependencies_from[i] = freeze_path(chart_dependencies_from[i]);
+			chart_dependencies_to[i] = freeze_path(chart_dependencies_to[i]);
+		}
+		c->chart_dependencies_from = freeze_block(chart_dependencies_from, sizeof(struct path)*nchart_dependencies);
+		c->chart_dependencies_to = freeze_block(chart_dependencies_to, sizeof(struct path)*nchart_dependencies);
+		c->nchart_dependencies = nchart_dependencies;
+
+		c->deleted_daughters = freeze_block(deleted_daughters, restrictor_size);
+		c->parsing_packing = freeze_block(parsing_packing, restrictor_size);
+		c->generating_packing = freeze_block(generating_packing, restrictor_size);
+		c->restrictor_size = restrictor_size;
+		c->ep_drop = freeze_block(ep_drop, restrictor_size);
+
+		c->enable_token_avms = enable_token_avms;
+		c->enable_simple_form_lexicon = enable_simple_form_lexicon;
+		c->enable_index_accessibility_filtering = enable_index_accessibility_filtering;
+		c->enable_generalize_edge_top_types = enable_generalize_edge_top_types;
+		c->enable_post = enable_post;
+		c->extra_erg_dag_stash = extra_erg_dag_stash;
 	}
-	c->chart_dependencies_from = freeze_block(chart_dependencies_from, sizeof(struct path)*nchart_dependencies);
-	c->chart_dependencies_to = freeze_block(chart_dependencies_to, sizeof(struct path)*nchart_dependencies);
-	c->nchart_dependencies = nchart_dependencies;
-
-	c->deleted_daughters = freeze_block(deleted_daughters, restrictor_size);
-	c->parsing_packing = freeze_block(parsing_packing, restrictor_size);
-	c->generating_packing = freeze_block(generating_packing, restrictor_size);
-	c->restrictor_size = restrictor_size;
-	c->ep_drop = freeze_block(ep_drop, restrictor_size);
-
-	c->enable_token_avms = enable_token_avms;
-	c->enable_simple_form_lexicon = enable_simple_form_lexicon;
-	c->enable_index_accessibility_filtering = enable_index_accessibility_filtering;
-	c->enable_generalize_edge_top_types = enable_generalize_edge_top_types;
-	c->enable_post = enable_post;
-	c->extra_erg_dag_stash = extra_erg_dag_stash;
+	else
+	{
+		
+	}
 
 	return c;
 }
@@ -235,53 +252,60 @@ void	*freeze_conf()
 void	recover_conf(void	*vc)
 {
 	struct conf	*c = vc;
+	g_transfer = c->transfer;
+	top_type = c->top_type;
 	semarg_type = c->semarg_type;
 	handle_type = c->handle_type;
 	g_cons_type = c->cons_type;
 	g_list_type = c->list_type;
 	g_null_type = c->null_type;
 	g_diff_list_type = c->diff_list_type;
-	lex_stem_path = c->lex_stem_path;
-	lex_rels_path = c->lex_rels_path;
-	lex_carg_path = c->lex_carg_path;
-	lex_pred_path = c->lex_pred_path;
-	rule_rels_path = c->rule_rels_path;
-	extract_mrs_path = c->extract_mrs_path;
 
-	nchart_dependencies = c->nchart_dependencies;
-	chart_dependencies_from = c->chart_dependencies_from;
-	chart_dependencies_to = c->chart_dependencies_to;
+	if(!g_transfer)
+	{
+		lex_stem_path = c->lex_stem_path;
+		lex_rels_path = c->lex_rels_path;
+		lex_carg_path = c->lex_carg_path;
+		lex_pred_path = c->lex_pred_path;
+		rule_rels_path = c->rule_rels_path;
+		extract_mrs_path = c->extract_mrs_path;
 
-	lex_tokens_list_path = c->lex_tokens_list_path;
-	lex_tokens_last_path = c->lex_tokens_last_path;
-	token_form_path = c->token_form_path;
-	token_from_path = c->token_from_path;
-	token_to_path = c->token_to_path;
-	token_id_path = c->token_id_path;
-	token_postags_path = c->token_postags_path;
-	token_posprobs_path = c->token_posprobs_path;
-	token_type = c->token_type;
+		nchart_dependencies = c->nchart_dependencies;
+		chart_dependencies_from = c->chart_dependencies_from;
+		chart_dependencies_to = c->chart_dependencies_to;
 
-	lattice_mapping_position_path = c->lattice_mapping_position_path;
-	lattice_mapping_input_path = c->lattice_mapping_input_path;
-	lattice_mapping_output_path = c->lattice_mapping_output_path;
-	lattice_mapping_context_path = c->lattice_mapping_context_path;
+		lex_tokens_list_path = c->lex_tokens_list_path;
+		lex_tokens_last_path = c->lex_tokens_last_path;
+		token_form_path = c->token_form_path;
+		token_from_path = c->token_from_path;
+		token_to_path = c->token_to_path;
+		token_id_path = c->token_id_path;
+		token_postags_path = c->token_postags_path;
+		token_posprobs_path = c->token_posprobs_path;
+		token_type = c->token_type;
 
-	deleted_daughters = c->deleted_daughters;
-	parsing_packing = c->parsing_packing;
-	generating_packing = c->generating_packing;
-	restrictor_size = c->restrictor_size;
-	ep_drop = c->ep_drop;
-	reload_restrictors = (restrictor_size != nfnames);
+		lattice_mapping_position_path = c->lattice_mapping_position_path;
+		lattice_mapping_input_path = c->lattice_mapping_input_path;
+		lattice_mapping_output_path = c->lattice_mapping_output_path;
+		lattice_mapping_context_path = c->lattice_mapping_context_path;
 
-	enable_token_avms = c->enable_token_avms;
-	enable_simple_form_lexicon = c->enable_simple_form_lexicon;
-	enable_index_accessibility_filtering = c->enable_index_accessibility_filtering;
-	enable_generalize_edge_top_types = c->enable_generalize_edge_top_types;
-	enable_post = c->enable_post;
-	extra_erg_dag_stash = c->extra_erg_dag_stash;
+		deleted_daughters = c->deleted_daughters;
+		parsing_packing = c->parsing_packing;
+		generating_packing = c->generating_packing;
+		restrictor_size = c->restrictor_size;
+		ep_drop = c->ep_drop;
+		reload_restrictors = (restrictor_size != nfnames);
 
-	//printf("types cons `%s' list `%s' null `%s' dlist `%s'\n", g_cons_type, g_list_type, g_null_type, g_diff_list_type);
+		enable_token_avms = c->enable_token_avms;
+		enable_simple_form_lexicon = c->enable_simple_form_lexicon;
+		enable_index_accessibility_filtering = c->enable_index_accessibility_filtering;
+		enable_generalize_edge_top_types = c->enable_generalize_edge_top_types;
+		enable_post = c->enable_post;
+		extra_erg_dag_stash = c->extra_erg_dag_stash;
+	}
+	else
+	{
+	}
 }
 
 int	get_conf_bool(char	*name)
@@ -296,15 +320,12 @@ int	get_conf_bool(char	*name)
 	return 0;
 }
 
-int	load_conf()
+load_transfer_conf()
 {
-	semarg_type = get_conf("semarg-type")?:"semarg";
-	handle_type = get_conf("handle-type")?:"h";
-	g_cons_type = get_conf("cons-type")?:"cons";
-	g_list_type = get_conf("list-type")?:"list";
-	g_null_type = get_conf("null-type")?:"null";
-	g_diff_list_type = get_conf("diff-list-type")?:"diff-list";
+}
 
+load_syntax_conf()
+{
 	lex_stem_path = get_conf_path("orth-path");
 	lex_rels_path = get_conf_path("lex-rels-path");
 	lex_carg_path = get_conf_path("lex-carg-path");
@@ -339,6 +360,21 @@ int	load_conf()
 	enable_generalize_edge_top_types = get_conf_bool("generalize-edge-top-types");
 	enable_post = get_conf_bool("english-pos-tagger");
 	extra_erg_dag_stash = get_conf_bool("extra-erg-dag-stash");
+}
+
+int	load_conf()
+{
+	g_transfer = get_conf_bool("transfer");
+	if(g_transfer)load_transfer_conf();
+	else load_syntax_conf();
+
+	top_type = get_conf("top-type")?:"*top*";
+	semarg_type = get_conf("semarg-type")?:"semarg";
+	handle_type = get_conf("handle-type")?:"h";
+	g_cons_type = get_conf("cons-type")?:"cons";
+	g_list_type = get_conf("list-type")?:"list";
+	g_null_type = get_conf("null-type")?:"null";
+	g_diff_list_type = get_conf("diff-list-type")?:"diff-list";
 
 	recover_conf(freeze_conf());
 }

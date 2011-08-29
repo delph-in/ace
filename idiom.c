@@ -65,6 +65,7 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 		int res = unify_dg_tmp(dg, non_idiom_root_dg, -1);
 		if(res == 0)return 1;	// no further checking necessary.
 	}
+	else return 1;	// hack to make idiom analyses succeed if non_idiom_root is not declared
 
 	if(!m)m = extract_mrs(dg);
 

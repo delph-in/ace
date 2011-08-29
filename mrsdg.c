@@ -452,13 +452,13 @@ void dagify_mrs_ep(struct mrs_ep *ep)
 
 struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[])
 {
-	struct dg	*last = atomic_dg("*top*"), *list = last;
-	struct dg	*rels = add_dg_feature(atomic_dg("*top*"), "LAST", last);
+	struct dg	*last = atomic_dg(top_type), *list = last;
+	struct dg	*rels = add_dg_feature(atomic_dg(top_type), "LAST", last);
 	int			i;
 
 	for(i=neps-1;i>=0;i--)
 	{
-		struct dg *cons = atomic_dg("*top*");
+		struct dg *cons = atomic_dg(top_type);
 		cons = add_dg_hop(cons, 2, list);
 		list = cons = add_dg_hop(cons, 1, eps[i]->dg);
 	}

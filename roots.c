@@ -251,7 +251,7 @@ char	*label_dag(struct dg	*dg, char *fallback)
 
 	for(i=0;i<lset->nlabels;i++)
 	{
-		lset->labels[i].dg->xtype = lset->labels[i].dg->type = lookup_type("*top*");
+		lset->labels[i].dg->xtype = lset->labels[i].dg->type = get_top();
 		int res = unify_dg_tmp(dg, lset->labels[i].dg, -1);
 		forget_tmp();
 		if(!res)

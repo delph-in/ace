@@ -3,6 +3,7 @@
 #include	<string.h>
 #include	<stdlib.h>
 #include	<sys/time.h>
+#include	<assert.h>
 
 #include	"tdl.h"
 #include	"preprocessor.h"
@@ -271,7 +272,11 @@ int	process_colon_command(char	*parent, char	*cmd)
 			while(p>dirpath && *p!='/')p--;
 			*p = 0;
 			sprintf(iname, "%s%s%s", dirpath, dirpath[0]?"/":"", what);
-			if(!strstr(what, ".tdl"))strcat(iname, ".tdl");
+			extern int g_transfer;
+			if(!g_transfer)
+			{
+				if(!strstr(what, ".tdl"))strcat(iname, ".tdl");
+			}
 			/*if(!tdlstatus && strstr(what, "parse-nodes"))
 			{
 				fprintf(stderr, "WARNING: implicitly setting tdl status to `parse-node'\n");
@@ -550,6 +555,26 @@ static void coreference(struct dagify_record	*R, char	*name)
 	R->corefs[R->ncorefs-1].name = strdup(name);
 }
 
+static void record_transfer_copy(struct dagify_record	*R)
+{
+	// as near as I can tell, +copy+ means the (say, I'th) output should be
+	// identical to the I'th input, with some additional constraints thrown in.
+	// rather than letting the additional constraints fail when we try to build the new EP,
+	// it makes much more sense to just add a coreference between the relevant input and output;
+	// that way, the constraints are present on the rule's input and we get the copying for free.
+	static int	input = -1, output = -1;
+	if(input==-1) { input = lookup_fname("INPUT"); output = lookup_fname("OUTPUT"); }
+	static int tcidx = 1;
+	static char	tccorefname[256];
+	sprintf(tccorefname, "_+copy+_%d", tcidx++);
+	assert((R->current_pathlen > 0 && R->current_path[0] == output)
+			|| !"+copy+ can only appear in the OUTPUT of a transfer rule.");
+	R->current_path[0] = input;
+	coreference(R, tccorefname);
+	R->current_path[0] = output;
+	coreference(R, tccorefname);
+}
+
 struct dg *add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
 {
 	int	i;
@@ -560,7 +585,7 @@ struct dg *add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
 		step = dg_hop(d, path[i]);
 		if(!step)
 		{
-			step = atomic_dg("*top*");
+			step = atomic_dg(top_type);
 			d = add_dg_hop(d, path[i], step);
 			if(i==0)ret = d;
 		}
@@ -591,7 +616,7 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 			if(!strcmp(rnames[j], R->corefs[i].name))break;
 		if(j==nr)
 		{
-			reentrancies[j] = atomic_dg("*top*");
+			reentrancies[j] = atomic_dg(top_type);
 			rnames[j] = R->corefs[i].name;
 			nr++;
 		}
@@ -601,7 +626,7 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 	}
 	for(j=0;j<nr;j++)
 	{
-		coref_template = atomic_dg("*top*");
+		coref_template = atomic_dg(top_type);
 		for(i=0;i<R->ncorefs;i++) if(!strcmp(rnames[j], R->corefs[i].name))
 			coref_template = add_dg_path(coref_template, R->corefs[i].path, R->corefs[i].pathlen, reentrancies[j]);
 		//printf("coref template:\n"); print_dg(coref_template); printf("\n");
@@ -781,7 +806,7 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 			return 0;
 		}
 		coreference(R, str+1);
-		return atomic_dg("*top*");
+		return atomic_dg(top_type);
 	}
 
 	if(*str == '<')
@@ -795,15 +820,20 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 		if(*str == '"' && R->current_pathlen == 0)
 		{
 			// this was a type comment.  terrible syntax.
-			return atomic_dg("*top*");
+			return atomic_dg(top_type);
 			//printf("calling type_dg(%s)\n", str);
 		}
-		dg = type_dg(str);
+		if(g_transfer!=0 && !strcmp(str, "+copy+"))
+		{
+			record_transfer_copy(R);
+			dg = type_dg(top_type);
+		}
+		else dg = type_dg(str);
 		if(!dg)fprintf(stderr, "hint: type_dg(%s) failed\n", str);
 		return dg;
 	}
 
-	dg = atomic_dg("*top*");
+	dg = atomic_dg(top_type);
 
 	ptr = trim_string(str+1);
 	len = strlen(ptr);
@@ -972,9 +1002,7 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 	int	i;
 	struct dagify_record	R;
 
-	R.ncorefs=0;
-	R.corefs = NULL;
-	R.current_pathlen = 0;
+	bzero(&R, sizeof(R));
 
 	dg = rdagify(&R, str, building_type);
 	if(!dg)
@@ -989,7 +1017,7 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 #ifdef	UNIFY_PATHS
 		unify_backtrace();
 #endif
-		dg = 0;
+		dg = NULL;
 	}
 
 	for(i=0;i<R.ncorefs;i++)
@@ -1201,7 +1229,9 @@ void	load_triggers(char	*path)
 
 void	load_idioms(char	*path)
 {
-	non_idiom_root = strdup(get_conf("non-idiom-root"));
+	char	*nir = get_conf("non-idiom-root");
+	if(!nir)non_idiom_root = NULL;
+	else non_idiom_root = strdup(nir);
 	//printf("CONF: non_idiom_root = '%s'\n", non_idiom_root);
 	if(!path)return;
 	tdl_push_status("idiom-rule");
@@ -1233,18 +1263,27 @@ int	load_grammar_top(char *toptdl)
 #endif
 
 	if(load_types())exit(-1);
-	run_task("processing rules", load_rules);
-	run_task("processing lex-rules", load_lrules);
-	if(load_lexicon())exit(-1);
-	if(load_instances())exit(-1);
-	if(load_token_mapping_rules())exit(-1);
-	if(load_lexical_filtering_rules())exit(-1);
+	if(g_transfer == 0)
+	{
+		run_task("processing rules", load_rules);
+		run_task("processing lex-rules", load_lrules);
+		if(load_lexicon())exit(-1);
+		if(load_instances())exit(-1);
+		if(load_token_mapping_rules())exit(-1);
+		if(load_lexical_filtering_rules())exit(-1);
+	}
+	else
+	{
+		run_task("processing transfer rules", load_transfer_rules);
+	}
 
 	number_strings();
 
-	//if(debug_level)
+	if(g_transfer == 0)
 		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d orules, %d instances, %d strings, %d features\n",
 				ntypes, glb_type_count, nlexemes, nrules, norules, ninstances, nstrings, nfnames);
+	else fprintf(stderr, "%d types (%d glb) %d transfer rules, %d strings, %d features\n",
+				ntypes, glb_type_count, ntransfer_rules, nstrings, nfnames);
 	return 0;
 }
 

@@ -122,9 +122,9 @@ struct lexeme	*proper_noun_lex(char	*name)
 	stem = add_dg_feature(stem, "FIRST", ty->dg);
 	stem = add_dg_feature(stem, "REST", atomic_dg(g_null_type));
 
-	kr = add_dg_feature(atomic_dg("*top*"), "CARG", ty->dg);
-	lk = add_dg_feature(atomic_dg("*top*"), "KEYREL", kr);
-	ss = add_dg_feature(atomic_dg("*top*"), "LKEYS", lk);
+	kr = add_dg_feature(atomic_dg(top_type), "CARG", ty->dg);
+	lk = add_dg_feature(atomic_dg(top_type), "KEYREL", kr);
+	ss = add_dg_feature(atomic_dg(top_type), "LKEYS", lk);
 
 	extra = atomic_dg("n_proper_le");
 	assert(extra);
@@ -438,26 +438,26 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 		assert(!"Found a simple-form lexeme, but that feature is not enabled!");
 	if(orthfeat==-1)init_fnums();
 
-	pr = atomic_dg("*top*");
+	pr = atomic_dg(top_type);
 	pr->xtype = pr->type = l->pred;
-	kr = add_dg_hop(atomic_dg("*top*"), predfeat, pr);
-	lk = add_dg_hop(atomic_dg("*top*"), keyrelfeat, kr);
-	ss = add_dg_hop(atomic_dg("*top*"), lkeysfeat, lk);
+	kr = add_dg_hop(atomic_dg(top_type), predfeat, pr);
+	lk = add_dg_hop(atomic_dg(top_type), keyrelfeat, kr);
+	ss = add_dg_hop(atomic_dg(top_type), lkeysfeat, lk);
 
 	if(l->onset)
 	{
 		__tl = atomic_dg("native_token_list");
-		on = atomic_dg("*top*");
+		on = atomic_dg(top_type);
 		on->xtype = on->type = predict_onset(l->stem[0]->name);
 		on = add_dg_hop(on, __tlfeat, __tl);
-		ph = add_dg_hop(atomic_dg("*top*"), onsetfeat, on);
+		ph = add_dg_hop(atomic_dg(top_type), onsetfeat, on);
 		ss = add_dg_hop(ss, phonfeat, ph);
 	}
 
-	f = atomic_dg("*top*");
+	f = atomic_dg(top_type);
 	f->xtype = f->type = l->stem[0];
-	st = add_dg_hop(atomic_dg("*top*"), ffeat, f);
-	dg = atomic_dg("*top*");
+	st = add_dg_hop(atomic_dg(top_type), ffeat, f);
+	dg = atomic_dg(top_type);
 	dg = add_dg_hop(dg, orthfeat, st);
 	dg = add_dg_hop(dg, synsemfeat, ss);
 

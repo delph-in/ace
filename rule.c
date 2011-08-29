@@ -400,7 +400,7 @@ char	*setup_rule_filter1(int pack)
 	struct dg	*mdg;
 	int	yes = 0, count = 0, res, ssbl = 0;
 	char	byte, *rule_filter;
-	struct type *top = lookup_type("*top*");
+	struct type *top = get_top();
 
 	show_task_name("rule filter...");
 	rule_filter = calloc(sizeof(char), nrules*nrules);
@@ -801,7 +801,7 @@ check_unary_chains()
 	int			nchains = 0, *len = 0, i, j;
 	nchains = 1; len = calloc(sizeof(int), 1);
 	chains = calloc(sizeof(int*), 1); chains[0] = calloc(sizeof(int), 1); chains[0][0] = -1;
-	dags = calloc(sizeof(struct dg*), 1); dags[0] = atomic_dg("*top*");
+	dags = calloc(sizeof(struct dg*), 1); dags[0] = atomic_dg(top_type);
 	for(i=0;i<nchains;i++)
 	{
 		for(j=0;j<nrules;j++) if(rules[j]->ndaughters==1 && !strstr(rules[j]->name, "punct_"))
@@ -873,7 +873,7 @@ decompose_dg(struct rule	*r, int	rarg, struct dg	*dg, int feat)
 	int			i;
 
 	if(feat != -1)at = most_general_type_for_feat(feat);
-	else at = lookup_type("*top*");
+	else at = get_top();
 	if(dg->xtype != at && !always_compatible(at, dg->xtype))
 	{
 		struct constraint	*c = 0;

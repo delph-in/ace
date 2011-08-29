@@ -7,6 +7,7 @@
 #include	"tdl.h"
 #include	"type.h"
 #include	"freeze.h"
+#include	"conf.h"
 
 int		ntypes;
 struct type	**types;
@@ -190,7 +191,7 @@ struct type	*temporary_string_type(char *string)
 	// make a type representing 'name'
 	bzero(ty, sizeof(*ty));
 	ty->name = string;
-	ty->dg = atomic_dg("*top*");
+	ty->dg = atomic_dg(top_type);
 	ty->dg->type = ty->dg->xtype = ty;
 	ty->tnum = -1;	// it doesn't matter that this is reused; it's a string type, anyway
 
@@ -420,8 +421,8 @@ int	init_top_type()
 {
 	types = calloc(sizeof(struct type*), 1);
 
-	if(add_type_only("*top*", 0, 0)) return -1;
-	types[0]->dg = atomic_dg("*top*");
+	if(add_type_only(top_type, 0, 0)) return -1;
+	types[0]->dg = atomic_dg(top_type);
 	return 0;
 }
 

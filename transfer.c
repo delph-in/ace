@@ -105,6 +105,9 @@ void warn_about_equals(struct transfer_rule	*tr)
 	}
 }
 
+struct transfer_rule	**transfer_rules;
+int						ntransfer_rules;
+
 struct transfer_rule	**trigger_rules;
 int						ntrigger_rules;
 
@@ -116,8 +119,32 @@ int	study_trigger_rule(char	*name, struct dg	*dg)
 	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
 	if(!tr)return -1;
 	warn_about_equals(tr);
-	trigger_rules = realloc(trigger_rules, sizeof(struct trigger_rule*)*(ntrigger_rules+1));
+	trigger_rules = realloc(trigger_rules, sizeof(struct transfer_rule*)*(ntrigger_rules+1));
 	trigger_rules[ntrigger_rules++] = tr;
+	return 0;
+}
+
+int	study_transfer_rule(char	*name, struct dg	*dg)
+{
+	//printf("loading transfer rule '%s'\n", name);
+	//printf("	dg type '%s'\n", dg->xtype->name);
+	wellform(dg, "transfer rule");
+	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
+	if(!tr)return -1;
+	warn_about_equals(tr);
+	transfer_rules = realloc(transfer_rules, sizeof(struct transfer_rule*)*(ntransfer_rules+1));
+	transfer_rules[ntransfer_rules++] = tr;
+	return 0;
+}
+
+int	load_transfer_rules()
+{
+	assert(g_transfer != 0);
+	if(process_tdl_dgs_status("rule", study_transfer_rule))
+	{
+		fprintf(stderr, "transfer rules: unable to load rules, bailing out.\n");
+		exit(-1);
+	}
 	return 0;
 }
 
@@ -128,6 +155,8 @@ struct transfer_freezer
 	struct transfer_rule	**idiom_rules;
 	int						nidiom_rules;
 	char					*non_idiom_root;
+	struct transfer_rule	**transfer_rules;
+	int						ntransfer_rules;
 };
 
 extern struct transfer_rule	**idiom_rules;
@@ -159,6 +188,11 @@ void	*freeze_transfer()
 	if(non_idiom_root)fz->non_idiom_root = freeze_string(non_idiom_root);
 	else fz->non_idiom_root = NULL;
 	//printf("freezer: %s\n", fz->non_idiom_root);
+
+	fz->transfer_rules = slab_alloc(sizeof(struct transfer_rule*)*ntransfer_rules);
+	for(i=0;i<ntransfer_rules;i++)
+		fz->transfer_rules[i] = freeze_transfer_rule(transfer_rules[i]);
+	fz->ntransfer_rules = ntransfer_rules;
 
 	return fz;
 }
@@ -217,6 +251,8 @@ void	recover_transfer(void	*transfer)
 	for(i=0;i<nidiom_rules;i++)
 		thaw_transfer_rule(idiom_rules[i]);
 	non_idiom_root = fz->non_idiom_root;
+	transfer_rules = fz->transfer_rules;
+	ntransfer_rules = fz->ntransfer_rules;
 	//printf("recover: %s\n", non_idiom_root);
 }
 

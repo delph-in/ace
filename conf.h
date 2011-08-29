@@ -15,6 +15,7 @@ extern char			*g_cons_type;
 extern char			*g_list_type;
 extern char			*g_null_type;
 extern char			*g_diff_list_type;
+extern char			*top_type;
 
 extern char			*handle_type;
 

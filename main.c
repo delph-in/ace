@@ -301,6 +301,11 @@ int	main(int	argc, char	*argv[])
 	int i;
 	for(i=0;i<nstrings;i++)printf("%d	= %s\n", i, strings[i]->name);*/
 
+	/*int i;
+	extern int nfnames;
+	extern char **fnames;
+	for(i=0;i<nfnames;i++)printf("%s\n", fnames[i]);*/
+
 	//treebank_control(); return 0;
 
 	stats = main_input_loop(open_sentence_source());

@@ -12,7 +12,7 @@
 #include	"unpack.h"
 
 static int lui_rfd = -1, lui_wfd;
-static FILE		*lui_write, *lui_read;
+FILE		*lui_write, *lui_read;
 static int chart_id = 0;
 
 void	browse_lui(int eid, char *what);

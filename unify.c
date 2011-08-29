@@ -48,6 +48,11 @@ static inline void	p_forward_dg(struct dg	*from, struct dg	*to)
 	from->carcs = 0;
 }
 
+void	permanent_forward_dg(struct dg	*from, struct dg	*to)
+{
+	p_forward_dg(from, to);
+}
+
 static inline void	forward_dg(struct dg	*from, struct dg	*to)
 {
 	from->forward = to;
