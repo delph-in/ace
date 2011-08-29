@@ -17,7 +17,8 @@
 #define	DEBUG(fmt, ...)	do {} while(0)
 
 //#define	MAX_UNPACK_CHUNKS	70000
-#define	MAX_UNPACK_CHUNKS	7000
+//#define	MAX_UNPACK_CHUNKS	7000
+#define	MAX_UNPACK_CHUNKS	1500
 extern int noldslabs;
 
 extern int debug_level, inhibit_pack;
@@ -974,7 +975,7 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 			fprintf(stderr, "ERROR: found a frozen edge #%d (not packed) in the root cell!\n", edge->id);
 			exit(-1);
 		}
-		if( (g_mode!=GENERATING || edge->neps == require_neps) && is_root(edge->dg) )// && !edge->frozen )
+		if( (g_mode!=GENERATING || ep_span_is_root(edge->ep_span_bv, edge->neps)) && is_root(edge->dg) )// && !edge->frozen )
 		{
 			DEBUG("edge #%d can be root...\n", edge->id);
 			for(j=-1;j<edge->npack;j++)

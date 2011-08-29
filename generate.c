@@ -4,11 +4,14 @@
 #include	<assert.h>
 #include	<sys/time.h>
 
+#define	DISJUNCTIVE_GENERATION	0
+
 #include	"dag.h"
 #include "mrs.h"
 #include "lexicon.h"
 #include "chart.h"
 #include "unpack.h"
+#include	"conf.h"
 
 extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
 
@@ -86,7 +89,81 @@ int	index_accessibility_filter(struct edge	*e)
 	return 0;
 }
 
+#if DISJUNCTIVE_GENERATION
+// disjunctive generation test
+
+int	nroot_epspans = 0;
+unsigned long long	**root_epspans;
+
+setup_disjunctive_generation_test()
+{
+	unsigned long long	*r1 = bitvec_slab_alloc(1);
+	bitvec_clear_all(r1, 1);
+	bitvec_set(r1, 0);	// the
+	bitvec_set(r1, 1);	// dog
+	bitvec_set(r1, 3);	// sleep
+	unsigned long long	*r2 = bitvec_slab_alloc(1);
+	bitvec_clear_all(r2, 1);
+	bitvec_set(r2, 0);	// the
+	bitvec_set(r2, 2);	// cat
+	bitvec_set(r2, 3);	// sleep
+	unsigned long long	*r3 = bitvec_slab_alloc(1);
+	bitvec_clear_all(r3, 1);
+	bitvec_set(r3, 0);	// the
+	bitvec_set(r3, 1);	// dog
+	bitvec_set(r3, 4);	// bark
+	unsigned long long	*r4 = bitvec_slab_alloc(1);
+	bitvec_clear_all(r4, 1);
+	bitvec_set(r4, 0);	// the
+	bitvec_set(r4, 2);	// cat
+	bitvec_set(r4, 5);	// arrive
+
+	nroot_epspans = 4;
+	root_epspans = malloc(sizeof(void*)*nroot_epspans);
+	root_epspans[0] = r1;
+	root_epspans[1] = r2;
+	root_epspans[2] = r3;
+	root_epspans[3] = r4;
+	enable_index_accessibility_filtering = 0;
+}
+
+int	ep_span_is_root(unsigned long long	*eps, int	neps)
+{
+	int	i;
+	for(i=0;i<nroot_epspans;i++)
+		if(bitvec_equal(root_epspans[i], eps, n_epsbv))
+			return 1;
+	return 0;
+}
+
+int	ep_span_subsumed_by_root(unsigned long long	*eps)
+{
+	int	i;
+	for(i=0;i<nroot_epspans;i++)
+		if(bitvec_subsume(root_epspans[i], eps, n_epsbv))
+			return 1;
+	return 0;
+}
+#else
+int	ep_span_is_root(unsigned long long	*eps, int	neps)
+{
+	return (neps == require_neps)?1:0;
+}
+#endif
+
 // chart
+
+int	ep_spans_are_adjacent(unsigned long long	*e1, unsigned long long	*e2)
+{
+	if(bitvec_and(e1, e2, NULL, n_epsbv))
+		return 0;
+#if DISJUNCTIVE_GENERATION
+	unsigned long long	tmp[n_epsbv];
+	bitvec_or(e1, e2, tmp, n_epsbv);
+	if(!ep_span_subsumed_by_root(tmp))return 0;
+#endif
+	return 1;
+}
 
 int	gen_process_edge(struct edge	*e)
 {
@@ -145,17 +222,17 @@ int	gen_process_edge(struct edge	*e)
 	{
 		// passive edge
 		for(i=0;i<c->al_nedges;i++)
-			if(!bitvec_and(e->ep_span_bv, c->al_edges[i]->ep_span_bv, NULL, n_epsbv))
+			if(ep_spans_are_adjacent(e->ep_span_bv, c->al_edges[i]->ep_span_bv))
 				if(combine(c->al_edges[i], e) == -1)return -1;
 		for(i=0;i<c->ar_nedges;i++)
-			if(!bitvec_and(e->ep_span_bv, c->ar_edges[i]->ep_span_bv, NULL, n_epsbv))
+			if(ep_spans_are_adjacent(e->ep_span_bv, c->ar_edges[i]->ep_span_bv))
 				if(combine(c->ar_edges[i], e) == -1)return -1;
 	}
 	else
 	{
 		// active edge
 		for(i=0;i<c->p_nedges;i++)
-			if(!bitvec_and(e->ep_span_bv, c->p_edges[i]->ep_span_bv, NULL, n_epsbv))
+			if(ep_spans_are_adjacent(e->ep_span_bv, c->p_edges[i]->ep_span_bv))
 				if(combine(e, c->p_edges[i]) == -1)return -1;
 	}
 	return 0;
@@ -181,6 +258,10 @@ int	generate(struct mrs	*mrs)
 	char		*str;
 	int			i, count = 0;
 
+#if DISJUNCTIVE_GENERATION
+	setup_disjunctive_generation_test();
+#endif
+
 	current_input_mrs = mrs;
 
 	timer();
@@ -204,7 +285,7 @@ int	generate(struct mrs	*mrs)
 	for(i=0;i<mrs->vlist.nvars;i++)
 	{
 		struct dg			*skolem;
-		skolem = atomic_dg("*top*");
+		skolem = atomic_dg(top_type);
 		assert(i<nstrings);
 		skolem->type = skolem->xtype = strings[i];
 		skar[i] = skolem;
