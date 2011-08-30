@@ -227,6 +227,16 @@ struct semindex_pred_node	*freeze_spn(struct semindex_pred_node	*old)
 	return node;
 }
 
+struct semantic_index
+{
+	struct hash	*sindex;
+	int	nexpedients;
+	char	**expedients;
+};
+
+extern int nexpedients;
+extern char	**expedients;
+
 void	*freeze_semantic_index()
 {
 	int	i;
@@ -247,13 +257,22 @@ void	*freeze_semantic_index()
 		for(walk=sindex->buckets[i];walk;walk=walk->next)
 			walk->value = freeze_spn(walk->value);
 	// finally, freeze the hash structure
-	return freeze_hash(sindex);
+	struct semantic_index	*freeze = slab_alloc(sizeof(*freeze));
+	freeze->sindex = freeze_hash(sindex);
+	freeze->nexpedients = nexpedients;
+	freeze->expedients = slab_alloc(sizeof(char*) * nexpedients);
+	for(i=0;i<nexpedients;i++)
+		freeze->expedients[i] = freeze_string(expedients[i]);
+	return freeze;
 }
 
 void	recover_semantic_index(void *frozen)
 {
 	extern int debug_level;
-	sindex = frozen;
+	struct semantic_index	*freeze = frozen;
+	sindex = freeze->sindex;
+	nexpedients = freeze->nexpedients;
+	expedients = freeze->expedients;
 	if(debug_level)
 		printf("NOTE: semantic index hash contains %d entries in %d slots\n",
 					sindex->entries, sindex->size);
