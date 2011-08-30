@@ -438,6 +438,13 @@ char		*internal_to_external_var_type(char	*in)
 	return convert_mrs_var_type(v, in);
 }
 
+char		*external_to_internal_var_type(char	*ex)
+{
+	if(!v)return ex;
+	if(!vinv)vinv = invert_vpm(v);
+	return convert_mrs_var_type(vinv, ex);
+}
+
 // produce a copy of 'min' on the slab, with internal MRS variables
 struct mrs	*external_to_internal_mrs(struct mrs	*min)
 {

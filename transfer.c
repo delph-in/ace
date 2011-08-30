@@ -276,11 +276,28 @@ int	is_semarg_type(struct type	*x)
 
 int equal_semarg_types(struct type	*x, struct type	*y)
 {
+	DEBUG("eq-semarg-types: %s =? %s\n", x->name, y->name);
 	if(x==y)return 1;
 	char	*semi_x = internal_to_external_var_type(x->name);
 	char	*semi_y = internal_to_external_var_type(y->name);
 	DEBUG("compare %s [%s] to %s [%s]\n", semi_x, x->name, semi_y, y->name);
 	return strcmp(semi_x, semi_y)?0:1;
+}
+
+int subsume_semarg_types(struct type	*x, struct type	*y)
+{
+	DEBUG("ss-semarg-types: %s >? %s\n", x->name, y->name);
+	if(x==y)return 1;
+	char	*semi_x = internal_to_external_var_type(x->name);
+	char	*semi_y = internal_to_external_var_type(y->name);
+	char	*local_x = external_to_internal_var_type(semi_x);
+	char	*local_y = external_to_internal_var_type(semi_y);
+	// scared yet?
+	DEBUG("compare %s [%s [%s]] to %s [%s [%s]]\n", local_x, semi_x, x->name, local_y, semi_y, y->name);
+	struct type	*tx = lookup_type(local_x);
+	struct type	*ty = lookup_type(local_y);
+	assert(tx && ty);
+	return descendent_of(ty->tnum, tx)?1:0;
 }
 
 int	nfailed_transfer_unifies, nsuccessful_transfer_unifies;
@@ -339,20 +356,40 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 		}
 	}
 	setup_tmp();
+
+	// guarantee that the rule nodes get forwarded to the EP nodes,
+	// rather than forwarding EP nodes to rule nodes.
+	extern int allow_unify_swapping;
+	allow_unify_swapping = 0;
+	// note: if the rule has multiple re-entrancies for an EQUAL or SUBSUME node,
+	// we need to do something slightly cleverer than what happens below.
+	// right now, we see whether tr->eq[i]->xtype is compatible with
+	// dereference_dg(tr->eq[i])->xtype.
+	// i *think* in the case where there are multiple EP nodes that get
+	// unified to the same EQ node (or SS node), we just have to walk
+	// down the forwarding chain from tr->eq[i] one at a time and check
+	// that each one's xtype is compatible with the original xtype.
+	// if that turns out not to work... as a last resort, we could
+	// recurse on the input EP's dag and find all nodes that are forwarded
+	// to the same place as tr->eq[i]... but that sounds slow.
 	for(i=0;i<count;i++)
 	{
 		struct mrs_ep	*ep = &mrs->rels[align[i]];
 		struct mrs_ep_desc	de = place_in_transfer_rule(tr, i);
-		if(0 != unify_dg_tmp(ep->dg, de.dg, -1))
+		//if(0 != unify_dg_tmp(ep->dg, de.dg, -1))
+		if(0 != unify_dg_tmp(de.dg, ep->dg, -1))
 		{
 			//printf("TRANSFER: ");
 			//unify_backtrace();
 			forget_tmp();
 			nfailed_transfer_unifies++;
+			allow_unify_swapping = 1;
 			return -1;
 		}
 		nsuccessful_transfer_unifies++;
 	}
+	allow_unify_swapping = 1;
+
 	if(count == total)
 	{
 		// unification is complete; test the EQUAL and SUBSUME conditions
@@ -365,20 +402,22 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 				forget_tmp();
 				return -1;
 			}
-			struct dg	*now = dereference_dg(tr->eq[i]);
-			struct type	*tnow = (now->gen == generation)?now->type:now->xtype;
-			struct type	*tshould = tr->eq[i]->xtype;
-			if(equal_semarg_types(tnow, tshould) == 0)
-			//if(tr->eq[i]->xtype != tnow)
+			// we require that the *original* type of the node that matched tr->eq[i]
+			// is equal to the *original* type of tr->eq[i] itself
+			//struct dg	*now = dereference_dg(tr->eq[i]);
+			//struct type	*tnow = (now->gen == generation)?now->type:now->xtype;
+			//struct type	*tshould = tr->eq[i]->xtype;
+			//if(equal_semarg_types(tnow, tshould) == 0)
+			struct dg	*ep_original = dereference_dg(tr->eq[i]);
+			struct type	*t_ep_original = ep_original->xtype;
+			struct type	*t_eq_original = tr->eq[i]->xtype;
+			if(equal_semarg_types(t_ep_original, t_eq_original) == 0)
 			{
-				DEBUG("failed EQ test: should have been type '%s'; actually '%s'\n", tr->eq[i]->xtype->name, tnow->name);
+				DEBUG("failed EQ test: should have been type '%s'; actually '%s'\n", tr->eq[i]->xtype->name, t_ep_original->name);
 				forget_tmp();
 				return -1;
 			}
-			/*printf("passed EQ test %d for rule '%s'\n", i, tr->name);
-			printf("tr->eq[i]->xtype = %s\n", tr->eq[i]->xtype->name);
-			printf("now = %p ; eq[i] = %p\n", now, tr->eq[i]);
-			printf("now is %s\n", (now->gen==generation)?"current":"stale");*/
+			DEBUG("passed EQ test %d for rule '%s'\n", i, tr->name);
 		}
 		for(i=0;i<tr->nss;i++)
 		{
@@ -388,11 +427,17 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 				forget_tmp();
 				return -1;
 			}
-			struct dg	*now = dereference_dg(tr->ss[i]);
-			struct type	*tnow = (now->gen == generation)?now->type:now->xtype;
-			if(!descendent_of(tnow->tnum, tr->ss[i]->xtype))
+			//struct dg	*now = dereference_dg(tr->ss[i]);
+			//struct type	*tnow = (now->gen == generation)?now->type:now->xtype;
+			//if(!descendent_of(tnow->tnum, tr->ss[i]->xtype))
+			struct dg	*ep_original = dereference_dg(tr->ss[i]);
+			struct type	*t_ep_original = ep_original->xtype;
+			struct type	*t_ss_original = tr->ss[i]->xtype;
+			DEBUG("SS test: %s >? %s\n", t_ss_original->name, t_ep_original->name);
+			if(subsume_semarg_types(t_ss_original, t_ep_original) == 0)
+			//if(!descendent_of(t_ep_original->tnum, t_ss_original))
 			{
-				//printf("failed SS test\n");
+				DEBUG("failed SS test\n");
 				forget_tmp();
 				return -1;
 			}
@@ -481,6 +526,11 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 			struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
 			char	lexid[256];
 			sprintf(lexid, "%.*s", (int)strlen(trig->xtype->name)-2, trig->xtype->name+1);
+			if(temporary_expedient(lexid))
+			{
+				//printf("not triggering '%s' via '%s' because it is disabled for generation\n", lexid, trigger_rules[i]->name);
+				return;
+			}
 			//printf("triggering '%s' via '%s', aligned on %s\n", lexid, trigger_rules[i]->name, mrsin->rels[alignment[0]].pred);
 			trigger(lexid);
 		}

@@ -713,6 +713,8 @@ struct dg	*get_extra_type_dg(struct type	*t)
 	return extra;
 }
 
+int	allow_unify_swapping = 1;
+
 int	unify1(struct dg	*dg1, struct dg	*dg2)
 {
 	int	i, j, k;
@@ -734,7 +736,7 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	__builtin_prefetch(dg1->label);
 	__builtin_prefetch(dg2->label);
 
-	if(!FROZEN(dg2))
+	if(!FROZEN(dg2) && allow_unify_swapping)
 	{
 		register int balance = 0;
 		if(FROZEN(dg1))goto swap;
