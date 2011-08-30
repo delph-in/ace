@@ -346,7 +346,13 @@ int	generate(struct mrs	*mrs)
 		if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, count);
 		count++;
 		//if(trace>0){ print_mrs(mrs_res); printf("\n"); }
-		if(trace>0){ print_mrs(hax_res); printf("\n"); }
+		if(trace>0)
+		{
+			print_mrs(hax_res);
+			printf("\n");
+			char	*dstr = hypothesis_to_dstring(hyp);
+			puts(dstr);
+		}
 		free_mrs(mrs_res);
 		return 1;
 	}

@@ -710,7 +710,7 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 	{
 		op = out->rels+i;
 		if(!pred_subsumes(ep->pred, op->pred))continue;
-		//printf(" ... might match output pred '%s'\n", op->pred);
+		DEBUG(" ... might match output pred '%s'\n", op->pred);
 		memcpy(vm, vmap, sizeof(int)*in->vlist.nvars);
 		if(ep->lbl && !var_subsume(ep->lbl, op->lbl, vm, in->vlist.nvars))continue;
 		//printf(" ... label ok\n");
@@ -718,8 +718,16 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 		{
 			for(k=0;k<op->nargs;k++)
 				if(!strcasecmp(ep->args[j].name, op->args[k].name))break;
-			if(k==op->nargs)break;
-			if(!var_subsume(ep->args[j].value, op->args[k].value, vm, in->vlist.nvars))break;
+			if(k==op->nargs)
+			{
+				DEBUG("no `%s'\n", ep->args[j].name);
+				break;
+			}
+			if(!var_subsume(ep->args[j].value, op->args[k].value, vm, in->vlist.nvars))
+			{
+				DEBUG("in var %s%d incompatible with out var %s%d\n", ep->args[j].value->type, ep->args[j].value->vnum, op->args[k].value->type, op->args[k].value->vnum);
+				break;
+			}
 		}
 		if(j<ep->nargs)continue;
 
