@@ -3,6 +3,21 @@
 
 #include	<stdlib.h>
 
+struct type_hierarchy
+{
+	char	*id;
+	int			ntypes;
+	struct type	**types;
+	int			nstrings;
+	struct type	**strings;
+	struct type	*top, *strtype;
+	struct hash	*thash;
+};
+
+struct type_hierarchy	*new_type_hierarchy(char	*id, char	*topname);
+struct type_hierarchy	*default_type_hierarchy();
+void					set_default_type_hierarchy(struct type_hierarchy	*th);
+
 struct type
 {
 	char		*name;
@@ -17,9 +32,6 @@ struct type
 	int			nparents, ndaughters;
 	struct type	**parents, **daughters;
 };
-
-extern int		ntypes;
-extern struct type	**types;
 
 struct type	*get_top();
 struct type	*lookup_type(char	*name);
@@ -36,7 +48,8 @@ void	print_glb_stats();
 struct type	*temporary_string_type(char *string);
 struct dg	*type_dg(char		*name);
 
-struct type	*most_general_type_for_feat(int	feat);
+struct type	*most_general_type_for_feat(struct type_hierarchy	*th, int	feat);
+struct type	*most_general_type_for_dg(struct dg	*d);
 
 int make_glbs();
 

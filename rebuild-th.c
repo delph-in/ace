@@ -17,45 +17,30 @@ void	add_to_type_daughters(struct type	*par, struct type	*d)
 	par->daughters[par->ndaughters-1] = d;
 }
 
-void	recompute_type_daughters()
+void	recompute_type_daughters(struct type_hierarchy	*th)
 {
 	int	i, j;
-	for(i=0;i<ntypes;i++)
+	for(i=0;i<th->ntypes;i++)
 	{
-		struct type	*t = types[i];
+		struct type	*t = th->types[i];
 		if(t->daughters)free(t->daughters);
 		t->daughters = NULL;
 		t->ndaughters = 0;
 	}
-	for(i=0;i<ntypes;i++)
+	for(i=0;i<th->ntypes;i++)
 	{
-		struct type	*t = types[i];
+		struct type	*t = th->types[i];
 		for(j=0;j<t->nparents;j++)
 			add_to_type_daughters(t->parents[j], t);
 	}
-	for(i=0;i<ntypes;i++)
-	{
-		if(!strcmp(types[i]->name, "G(6653)") || !strcmp(types[i]->name, "G(6656)"))
-		{
-			printf("type %s\n", types[i]->name);
-			printf("parents");
-			for(j=0;j<types[i]->nparents;j++)
-				printf(" %s", types[i]->parents[j]->name);
-			printf("\n");
-			printf("daughters");
-			for(j=0;j<types[i]->ndaughters;j++)
-				printf(" %s", types[i]->daughters[j]->name);
-			printf("\n");
-		}
-	}
 }
 
-void	clear_descendents_and_daughters()
+void	clear_descendents_and_daughters(struct type_hierarchy	*th)
 {
 	int i;
-	for(i=0;i<ntypes;i++)
+	for(i=0;i<th->ntypes;i++)
 	{
-		struct type	*t = types[i];
+		struct type	*t = th->types[i];
 		if(t->descendents)free(t->descendents);
 		t->descendents = NULL;
 		if(t->daughters)free(t->daughters);
@@ -81,12 +66,6 @@ void	recompute_descendents(struct type	*t)
 		unsigned short	*dlist = t->daughters[i]->descendents, dn = t->daughters[i]->ndescendents;
 		for(j=0;j<dn;j++)
 			list[n++] = dlist[j];
-		/*{
-			for(k=0;k<n;k++)
-				if(list[k] == dlist[j])break;
-			if(k<n)continue;
-			list[n++] = dlist[j];
-		}*/
 	}
 	// sort descendents and remove duplicates
 	qsort(list, n, sizeof(short), shortcomp);
@@ -100,19 +79,18 @@ void	recompute_descendents(struct type	*t)
 	t->descendents = realloc(list, sizeof(unsigned short) * n);
 }
 
-void	recompute_tnums()
+void	recompute_tnums(struct type_hierarchy	*th)
 {
 	int	i,j;
 
 	struct type	**old_type_array;
-	old_type_array = malloc(sizeof(struct type*) * ntypes);
-	memcpy(old_type_array, types, sizeof(struct type*)*ntypes);
+	old_type_array = malloc(sizeof(struct type*) * th->ntypes);
+	memcpy(old_type_array, th->types, sizeof(struct type*)*th->ntypes);
 
 	// perform a topological sort of the type heirarchy,
 	// storing the result in the types[] array, back to front.
-	char	*have = calloc(1, ntypes);
-	struct type	*top = types[0];
-	int idx = ntypes-1;
+	char	*have = calloc(1, th->ntypes);
+	int idx = th->ntypes-1;
 	void tsort(struct type	*t)
 	{
 		if(have[t->tnum])return;
@@ -121,47 +99,24 @@ void	recompute_tnums()
 			tsort(t->daughters[i]);
 		have[t->tnum] = 1;
 		assert(idx >= 0);
-		types[idx--] = t;
+		th->types[idx--] = t;
 	}
-	tsort(top);
+	tsort(th->top);
 	assert(idx == -1);
-	assert(types[0] == top);
-
-/*
-	//printf("sorting\n");fflush(stdout);
-	// put all the newly built GLB types in their places
-	//for(i=ntypes - nglbs_to_add;i<ntypes;i++)
-	for(i=1;i<ntypes;i++)
-	{
-		struct type	*g = old_type_array[i];
-		int	mj = 0;
-		//printf("looking for where to put type %s\n", g->name);
-		for(j=0;j<i;j++)
-			if(descendent_of(g->tnum, types[j]))
-			{
-				//printf("must be after %s\n", types[j]->name);
-				mj = j;
-			}
-		mj++;
-		// mj is the first slot in types[] where 'g' could go
-		memmove(types+mj+1, types+mj, sizeof(struct type*) * (ntypes - (mj+1)));
-		types[mj] = g;
-		//printf("decided %d\n", mj);
-	}
-	*/
-
+	assert(th->types[0] == th->top);
 
 	// renumber all the types
 	//printf("renumbering\n");fflush(stdout);
-	for(i=0;i<ntypes;i++)
+	for(i=0;i<th->ntypes;i++)
 	{
-		struct type	*T = types[i];//old_type_array[i];
+		struct type	*T = th->types[i];
 		T->tnum = i;
 	}
+
 	// renumber all the descendent arrays
-	for(i=0;i<ntypes;i++)
+	for(i=0;i<th->ntypes;i++)
 	{
-		struct type	*T = types[i];//old_type_array[i];
+		struct type	*T = th->types[i];
 		for(j=0;j<T->ndescendents;j++)
 			T->descendents[j] = old_type_array[T->descendents[j]]->tnum;
 		qsort(T->descendents, T->ndescendents, sizeof(short), shortcomp);
@@ -182,32 +137,32 @@ void	recompute_tnums()
 // on input, the ->parents[] links must be correct.
 // on output, the ->daughters[] links and ->descendents[] links have been recomputed,
 // and the types[] array is reordered according to a topological sort.
-rebuild_heirarchy(int	report_changes)
+rebuild_heirarchy(int	report_changes, struct type_hierarchy	*th)
 {
 	unsigned short	**old_d;
 	int	i, *old_dn;
 	if(report_changes)
 	{
-		old_d = malloc(sizeof(unsigned short*) * ntypes);
-		old_dn = malloc(sizeof(int) * ntypes);
-		for(i=0;i<ntypes;i++)
+		old_d = malloc(sizeof(unsigned short*) * th->ntypes);
+		old_dn = malloc(sizeof(int) * th->ntypes);
+		for(i=0;i<th->ntypes;i++)
 		{
-			old_dn[i] = types[i]->ndescendents;
-			old_d[i] = types[i]->descendents;
-			types[i]->descendents = NULL;
-			types[i]->ndescendents = 0;
+			old_dn[i] = th->types[i]->ndescendents;
+			old_d[i] = th->types[i]->descendents;
+			th->types[i]->descendents = NULL;
+			th->types[i]->ndescendents = 0;
 		}
 	}
-	clear_descendents_and_daughters();
-	recompute_type_daughters();
-	recompute_descendents(types[0]);
+	clear_descendents_and_daughters(th);
+	recompute_type_daughters(th);
+	recompute_descendents(th->top);
 	if(report_changes)
 	{
-		for(i=0;i<ntypes;i++)
+		for(i=0;i<th->ntypes;i++)
 		{
-			if(old_dn[i] != types[i]->ndescendents)
-				printf("type '%s': had %d desc, now %d\n", types[i]->name, old_dn[i], types[i]->ndescendents);
+			if(old_dn[i] != th->types[i]->ndescendents)
+				printf("type '%s': had %d desc, now %d\n", th->types[i]->name, old_dn[i], th->types[i]->ndescendents);
 		}
 	}
-	recompute_tnums();
+	recompute_tnums(th);
 }

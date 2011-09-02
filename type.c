@@ -9,16 +9,49 @@
 #include	"freeze.h"
 #include	"conf.h"
 
-int		ntypes;
-struct type	**types;
+static struct type_hierarchy	*default_th;
+
+struct type_hierarchy	*default_type_hierarchy() { return default_th; }
+void	set_default_type_hierarchy(struct type_hierarchy	*th) { default_th = th; }
+
+static int	init_top_type(char	*top_type)
+{
+	default_th->types = calloc(sizeof(struct type*), 1);
+	if(add_type_only(top_type, 0, 0)) return -1;
+	default_th->types[0]->dg = atomic_dg(top_type);
+	return 0;
+}
+
+struct type_hierarchy	*new_type_hierarchy(char	*id, char	*topname)
+{
+	struct type_hierarchy	*th = calloc(sizeof(struct type_hierarchy), 1);
+	th->id = strdup(id);
+	th->thash = hash_new("type-name-hash");
+
+	//fprintf(stderr, "INITIALIZING hierarchy '%s' with top '%s'\n", id, topname);
+
+	struct type_hierarchy	*tmp = default_type_hierarchy();
+	set_default_type_hierarchy(th);
+	if(init_top_type(topname) != 0)
+	{
+		fprintf(stderr, "unable to initialize top type `%s' for hierarchy `%s'\n", topname, id);
+		exit(-1);
+	}
+	th->top = th->types[0];
+	set_default_type_hierarchy(tmp);
+	return th;
+}
+
+//int		ntypes;
+//struct type	**types;
 int		glb_type_count;
 
-int		nstrings;
-struct type	**strings;
+//int		nstrings;
+//struct type	**strings;
 
-struct type	*get_top() { return types[0]; }
+struct type	*get_top() { return default_th->top; }
 
-struct type	*strtype = 0;
+//struct type	*strtype = 0;
 
 #define	THSIZE	100000
 static struct type	**typehash;
@@ -40,7 +73,7 @@ void	inval_thash()
 	}
 }
 
-unsigned int	thash(char	*name)
+/*unsigned int	thash(char	*name)
 {
 	unsigned int	h = 0;
 
@@ -50,56 +83,31 @@ unsigned int	thash(char	*name)
 		h ^= tolower(*name++);
 	}
 	return h;
-}
+}*/
 
-void	th_add(char	*name, struct type	*t)
+void	th_add(struct type	*t)
 {
-	unsigned int	h = thash(name), i;
-
-	if(!typehash)th_init();
-
-	for(i=0;i<THSIZE;i++)
-		if(!typehash[(h+i)%THSIZE])
-		{
-			typehash[(h+i)%THSIZE] = t;
-			return;
-		}
-	fprintf(stderr, "typehash: table full!\n");
-}
-
-void *freeze_typehash()
-{
-	int i;
-	typehash = slab_alloc(sizeof(struct type*) * THSIZE);
-
-	bzero(typehash, sizeof(struct type*)*THSIZE);
-	for(i=0;i<ntypes;i++)th_add(types[i]->name, types[i]);
-	return typehash;
-}
-
-void recover_typehash(void *frozen)
-{
-	typehash = frozen;
+	hash_add(default_th->thash, t->name, t);
 }
 
 struct type	*th_look(char	*name)
 {
-	unsigned int	h = thash(name), i;
-
-	if(!typehash)return NULL;
-
-	for(i=0;i<THSIZE;i++)
-	{
-		if(typehash[(h+i)%THSIZE] && !strcasecmp(typehash[(h+i)%THSIZE]->name, name))
-			return typehash[(h+i)%THSIZE];
-		if(!typehash[(h+i)%THSIZE])return NULL;
-	}
-	return NULL;
+	char	*p;
+	for(p=name;*p;p++)
+		if(isalpha(*p) && isupper(*p))
+			*p = tolower(*p);
+	return hash_find(default_th->thash, name);
 }
 
 struct type	*lookup_type(char	*name)
 {
 	int	i;
+
+	if(!default_th)
+	{
+		fprintf(stderr, "lookup_type(%s) called with no default type hierarchy active\n", name);
+		exit(-1);
+	}
 
 	if(name[0]=='"' || name[0]=='\'' || name[0]=='^')
 	{
@@ -110,11 +118,7 @@ struct type	*lookup_type(char	*name)
 		return add_string(name);
 	}
 
-	if(typehash)return th_look(name);
-	else for(i=0;i<ntypes;i++)
-		if(!strcasecmp(types[i]->name, name))
-			return types[i];
-	return NULL;
+	return th_look(name);
 }
 
 void	lui_type(char	*name)
@@ -146,7 +150,7 @@ int	descendent_of(int	dec, struct type	*of)
 	int	i, j, k, x;
 
 	if(!of->ndescendents)return 0;
-	if(dec==ntypes-1)return dec==of->descendents[of->ndescendents-1];
+	if(dec==default_th->ntypes-1)return dec==of->descendents[of->ndescendents-1];
 	i = 0, j = of->ndescendents-1;
 	while(i<j)
 	{
@@ -163,7 +167,7 @@ void	add_descendent(struct type	*anc, int	dec)
 {
 	int	i;
 
-	if(dec==ntypes-1)
+	if(dec==default_th->ntypes-1)
 	{
 		i=anc->ndescendents;
 		if(i && anc->descendents[i-1] == dec)
@@ -184,6 +188,11 @@ void	add_descendent(struct type	*anc, int	dec)
 	anc->descendents[i] = dec;
 }
 
+struct dg	*atomic_top()
+{
+	return atomic_dg(default_th->top->name);
+}
+
 struct type	*temporary_string_type(char *string)
 {
 	struct type	*ty = slab_alloc(sizeof(*ty));
@@ -191,7 +200,7 @@ struct type	*temporary_string_type(char *string)
 	// make a type representing 'name'
 	bzero(ty, sizeof(*ty));
 	ty->name = string;
-	ty->dg = atomic_dg(top_type);
+	ty->dg = atomic_top();
 	ty->dg->type = ty->dg->xtype = ty;
 	ty->tnum = -1;	// it doesn't matter that this is reused; it's a string type, anyway
 
@@ -202,6 +211,9 @@ struct type	*add_string(char	*name)
 {
 	struct type	*t;
 	int		i, j, k, r;
+
+	int	nstrings = default_th->nstrings;
+	struct type	**strings = default_th->strings;
 
 	// binary search for existing string
 	for(i=0,j=nstrings-1;i<=j;)
@@ -226,6 +238,8 @@ struct type	*add_string(char	*name)
 		strings = str;
 	}
 	else strings = realloc(strings, sizeof(struct type*) * nstrings);
+	default_th->strings = strings;
+	default_th->nstrings = nstrings;
 
 	t = calloc(sizeof(struct type), 1);
 
@@ -245,7 +259,7 @@ void	number_strings()
 {
 	int	i;
 
-	for(i=0;i<nstrings;i++)strings[i]->tnum = i;
+	for(i=0;i<default_th->nstrings;i++)default_th->strings[i]->tnum = i;
 }
 
 int	add_type_only(char	*name, int	npar, struct type	**par)
@@ -253,13 +267,26 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 	struct type	*t;
 	int		i, pari, lexical = 0;
 
-	if(th_look(name))
-	/*for(i=0;i<ntypes;i++)
-		if(!strcasecmp(types[i]->name, name))*/
+	char	*c;
+	int	did_lower = 0;
+	for(c=name;*c;c++)
+	{
+		if(isalpha(*c) && isupper(*c))
 		{
-			fprintf(stderr, "type: `%s' already declared, go away!\n", name);
-			return -1;
+			/*if(!did_lower)
+			{
+				fprintf(stderr, "warning: downcasing type name '%s'\n", name);
+				did_lower = 1;
+			}*/
+			*c = tolower(*c);
 		}
+	}
+
+	if(th_look(name))
+	{
+		fprintf(stderr, "type: `%s' already declared, go away!\n", name);
+		return -1;
+	}
 
 	/*fprintf(stderr, "new type `%s' inherits from:", name);
 	for(i=0;i<npar;i++)
@@ -269,16 +296,16 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 	fprintf(stderr, "\n");*/
 
 	t = calloc(sizeof(struct type), 1);
-	ntypes++;
-	types = realloc(types, sizeof(struct type*) * ntypes);
-	types[ntypes-1] = t;
+	default_th->ntypes++;
+	default_th->types = realloc(default_th->types, sizeof(struct type*) * default_th->ntypes);
+	default_th->types[default_th->ntypes-1] = t;
 	t->name = strdup(name);
 	t->ndescendents = 0;
 	t->descendents = 0;
 	t->dg = 0;
-	if(!strcasecmp(name, "string"))strtype = t;	// XXX hardcoded type name
-	t->tnum = ntypes-1;
-	th_add(name, t);
+	if(!strcasecmp(name, "string"))default_th->strtype = t;	// XXX hardcoded type name
+	t->tnum = default_th->ntypes-1;
+	th_add(t);
 
 	if(npar>=0)setup_type_lineage(t, npar, par);
 }
@@ -309,19 +336,6 @@ setup_type_lineage(struct type	*t, int	npar, struct type	**par)
 
 	//fprintf(stderr, " - linking\n");
 	add_to_ancestors(t, t->tnum);
-	/*for(i=0;i<ntypes-1;i++)
-	{
-		int	pari;
-		for(pari=0;pari<npar;pari++)
-			if(descendent_of(par[pari]->tnum, types[i]))
-			{
-				//if(!descendent_of(ntypes-1, types[i]))
-				add_descendent(types[i], ntypes-1);
-				break;
-			}
-	}
-	add_descendent(t, ntypes-1);*/
-	//fprintf(stderr, " - done adding\n");
 
 	return 0;
 }
@@ -417,29 +431,20 @@ void	wellform(struct dg	*d, char	*typename)
 	}
 }
 
-int	init_top_type()
-{
-	types = calloc(sizeof(struct type*), 1);
-
-	if(add_type_only(top_type, 0, 0)) return -1;
-	types[0]->dg = atomic_dg(top_type);
-	return 0;
-}
-
 int	constrain_glbs_and_wellformedness()
 {
 	int	i, j, descbytes = 0;
 
 	fix_glbs();
 
-	for(i=0;i<ntypes;i++)
+	for(i=0;i<default_th->ntypes;i++)
 	{
-		types[i]->dg = dereference_dg(types[i]->dg);
+		default_th->types[i]->dg = dereference_dg(default_th->types[i]->dg);
 		// introduce top-level features for this type, it might be the most general type for them
-		//printf("pre-welformed dag for `%s':\n", types[i]->name);
-		//print_dg(types[i]->dg); printf("\n\n");
-		for(j=0;j<types[i]->dg->narcs;j++)
-			introduce_feature(types[i]->dg->label[j], i);
+		//printf("pre-welformed dag for `%s':\n", default_th->types[i]->name);
+		//print_dg(default_th->types[i]->dg); printf("\n\n");
+		for(j=0;j<default_th->types[i]->dg->narcs;j++)
+			introduce_feature(default_th->types[i]->dg->label[j], i);
 	}
 	number_strings();	// just in case
 
@@ -447,23 +452,27 @@ int	constrain_glbs_and_wellformedness()
 	generation = 11;
 	// XXX hack!
 
-	for(i=0;i<ntypes;i++)
+	for(i=0;i<default_th->ntypes;i++)
 	{
-		//printf("well-forming `%s', current dag:\n", types[i]->name);
-		//print_dg(types[i]->dg); printf("\n");
-		wellform(types[i]->dg, types[i]->name);
-		descbytes += types[i]->ndescendents * sizeof(short);
+		//printf("well-forming `%s', current dag:\n", default_th->types[i]->name);
+		//print_dg(default_th->types[i]->dg); printf("\n");
+		wellform(default_th->types[i]->dg, default_th->types[i]->name);
+		descbytes += default_th->types[i]->ndescendents * sizeof(short);
 	}
 
 	return 0;
 }
+
+struct type_hierarchy	*main_th;
 
 int	load_types()
 {
 extern int enable_out_of_order;
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 
-	if(init_top_type())return -1;
+	main_th = new_type_hierarchy("main", top_type);
+	if(!main_th)return -1;
+	set_default_type_hierarchy(main_th);
 
 	enable_out_of_order = 1;
 	process_tdl_status("type", typify_tdl_line, 0);
@@ -485,13 +494,13 @@ struct type	*lub(struct type	*a, struct type	*b)
 	int	tn = a->tnum;
 	if(b->tnum < tn)tn = b->tnum;
 
-	if(a->name[0]=='"')return lub(strtype, b);
-	if(b->name[0]=='"')return lub(a, strtype);
+	if(a->name[0]=='"')return lub(default_th->strtype, b);
+	if(b->name[0]=='"')return lub(a, default_th->strtype);
 	while(tn >= 0)
 	{
-		if(descendent_of(a->tnum, types[tn]))
-			if(descendent_of(b->tnum, types[tn]))
-				return types[tn];
+		if(descendent_of(a->tnum, default_th->types[tn]))
+			if(descendent_of(b->tnum, default_th->types[tn]))
+				return default_th->types[tn];
 		tn--;
 	}
 	assert(!"no upper bound found");

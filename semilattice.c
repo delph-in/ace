@@ -16,6 +16,8 @@ int	shortcomp(const void	*a, const void	*b) { return *(unsigned short*)a - *(uns
 #define	BITVEC_GLB		1
 #define	ORIGINAL_GLB	0
 
+#if ORIGINAL_GLB
+
 #define	CSTSIZE	(16384*8-1)
 //static char	csthashres[CSTSIZE];
 static struct type	*csthasha[CSTSIZE];
@@ -66,8 +68,6 @@ int	find_common_subtypes(struct type	*a, struct type	*b, unsigned short	*_glb_co
 	//csthashres[h] = _glb_ncommon?1:0;
 	return _glb_ncommon;
 }
-
-#if ORIGINAL_GLB
 
 static struct glb_fix
 {
@@ -142,7 +142,7 @@ int	check_for_glb(struct type	*a, struct type	*b)
 	}
 
 	// no glb existed; make one!
-	sprintf(name, "G(%s,%s)", a->name, b->name);
+	sprintf(name, "g(%s,%s)", a->name, b->name);
 	add_type_only(name, 2, ar);
 	//printf("add `%s'\n", name);
 
@@ -283,10 +283,11 @@ int make_glbs()
 // new-fangled version
 int	fix_glbs()
 {
+	struct type_hierarchy	*th = default_type_hierarchy();
 	int	i, j;
-	for(i=0;i<ntypes;i++)
+	for(i=0;i<th->ntypes;i++)
 	{
-		struct type	*t = types[i];
+		struct type	*t = th->types[i];
 		if(t->dg)continue;
 		//printf("fixing up %s\n", t->name);
 		struct dg	*d = t->parents[0]->dg;
@@ -328,7 +329,7 @@ int	nparts;
 int	npartitions = 0;
 int	biggest_partition = 0;
 
-print_subheirarchy(struct partition	*part)
+print_subheirarchy(struct type_hierarchy	*th, struct partition	*part)
 {
 	int	i, j, k;
 	for(i=0;i<part->psize;i++)
@@ -337,7 +338,7 @@ print_subheirarchy(struct partition	*part)
 		printf("type %3d = %s ... descendents are:\n", T->tnum, T->name);
 		for(j=1;j<T->ndescendents;j++)
 		{
-			struct type	*d = types[T->descendents[j]];
+			struct type	*d = th->types[T->descendents[j]];
 			for(k=0;k<part->psize;k++)
 				if(part->part[k] == d)break;
 			if(k<=part->psize)
@@ -349,7 +350,7 @@ print_subheirarchy(struct partition	*part)
 
 // partition algorithm from the LKB [AAC-1998 apparently]
 // we're trying to split the type heirarchy up into as many little chunks as possible
-void	compute_partitions(struct type	*top, char	*visitmap, char	*collectmap)
+void	compute_partitions(struct type_hierarchy	*th, struct type	*top, char	*visitmap, char	*collectmap)
 {
 	// first see if we can split off some partitions among this node's daughters
 	int	i, j;
@@ -358,7 +359,7 @@ void	compute_partitions(struct type	*top, char	*visitmap, char	*collectmap)
 	visitmap[top->tnum] = 1;
 	if(!top->ndaughters)return;
 	for(i=0;i<top->ndaughters;i++)
-		compute_partitions(top->daughters[i], visitmap, collectmap);
+		compute_partitions(th, top->daughters[i], visitmap, collectmap);
 
 	// my descendents can be a partition if every descendent satisfies at least one of these criteria:
 	// 1. it's already been put in a partition, so I don't have to worry about it
@@ -368,7 +369,7 @@ void	compute_partitions(struct type	*top, char	*visitmap, char	*collectmap)
 	int	psize = 0;
 	for(i=0;i<top->ndescendents;i++)
 	{
-		struct type	*d = types[top->descendents[i]];
+		struct type	*d = th->types[top->descendents[i]];
 		if(collectmap[d->tnum])continue;
 		psize++;
 		if(d->nparents == 1)continue;
@@ -392,7 +393,7 @@ void	compute_partitions(struct type	*top, char	*visitmap, char	*collectmap)
 	psize = 0;
 	for(i=0;i<top->ndescendents;i++)
 	{
-		struct type	*d = types[top->descendents[i]];
+		struct type	*d = th->types[top->descendents[i]];
 		if(collectmap[d->tnum])continue;
 		part[psize++] = d;
 		collectmap[d->tnum] = 1;
@@ -406,11 +407,11 @@ void	compute_partitions(struct type	*top, char	*visitmap, char	*collectmap)
 	parts[nparts-1].part = part;
 }
 
-void	count_nonleaf_nodes()
+void	count_nonleaf_nodes(struct type_hierarchy	*th)
 {
 	int	i, n=0;
-	for(i=0;i<ntypes;i++)
-		if(types[i]->ndescendents > 1)n++;
+	for(i=0;i<th->ntypes;i++)
+		if(th->types[i]->ndescendents > 1)n++;
 	printf("%d non-leaf types\n", n);
 }
 
@@ -418,40 +419,26 @@ int	make_glbs()
 {
 	int	i, j;
 
-	//rebuild_heirarchy(1);
+	struct type_hierarchy	*th = default_type_hierarchy();
 
-/*
-	printf("before doing any GLB mucking but after rebuilding the heirarchy, seeing if we can unify 'subconj_prdp_init_phr' and 'basic_partitive_num_phrase'.\n");
-	struct type	*t1 = lookup_type("subconj_prdp_init_phr");
-	struct type *t2 = lookup_type("basic_partitive_num_phrase");
-	unsigned short	array[10000];
-	int	n = find_common_subtypes(t1, t2, array);
-	printf("common subtype count: %d\n", n);
-	if(n)printf("first one: %s\n", types[array[0]]->name);
-*/
-
-	//count_nonleaf_nodes();
-	char	*vmap = calloc(1, ntypes), *cmap = calloc(1, ntypes);
-	compute_partitions(types[0], vmap, cmap);
+	char	*vmap = calloc(1, th->ntypes), *cmap = calloc(1, th->ntypes);
+	parts = NULL;
+	nparts = 0;
+	npartitions = 0;
+	biggest_partition = 0;
+	compute_partitions(th, th->top, vmap, cmap);
 	//printf("%d partitions ; biggest was %d types\n", npartitions, biggest_partition);
 	free(vmap); free(cmap);
 
 	for(i=0;i<nparts;i++)
 	{
 		//printf("partition of %d types\n", parts[i].psize);
-		make_glbs_part(parts+i);
+		make_glbs_part(th, parts+i);
 		free(parts[i].part);
 	}
 	free(parts);
 
-	rebuild_heirarchy(0);
-
-	//printf("exiting now for debugging purposes\n");
-	//exit(-1);
-
-	//struct type	**tc = malloc(sizeof(struct type*)*ntypes);
-	//memcpy(tc, types, sizeof(struct type*)*ntypes);
-	//make_glbs_part(ntypes, types);
+	rebuild_heirarchy(0, th);
 
 	return 0;
 }
@@ -497,10 +484,11 @@ struct type	*new_glb_type()
 {
 	char	name[1024];
 	static int glbtypecounter;
-	sprintf(name, "G(%d)", glbtypecounter++);
+	sprintf(name, "g(%d)", glbtypecounter++);
 	add_type_only(name, -1, NULL);
 	glb_type_count++;
-	return types[ntypes-1];
+	struct type_hierarchy	*th = default_type_hierarchy();
+	return th->types[th->ntypes-1];
 }
 
 // same algorithm as LKB function of similar name
@@ -594,9 +582,7 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 	int	ndec = 0;
 	struct code_record	*dec = NULL;
 
-	int do_print = (!strcmp(cr->t->name, "G(6656)"))?1:0;
-
-	if(do_print)printf("COMPUTING DAUGHTERS OF G(6656)\n");
+	int do_print = 0;
 
 	// building a set of immediate daughters
 	// no need to add a descendent that is subsumed by another already-present daughter
@@ -717,7 +703,7 @@ sanity_check_bitvectors(struct partition	*part, unsigned long long	**vectors)
 		sanity_check_1_bitvector(part, part->part[i], vectors[i]);
 }
 
-int make_glbs_part(struct partition	*part)
+int make_glbs_part(struct type_hierarchy	*th, struct partition	*part)
 {
 	int		bcsize = (part->psize + 63) / 64;
 	unsigned long long	**vectors = calloc(sizeof(unsigned long long*), part->psize);
@@ -750,7 +736,7 @@ int make_glbs_part(struct partition	*part)
 			}
 			assert(tn >= 0 && tn < part->psize);
 			// in theory: part->part[tn] is types[t->descendents[j]]
-			assert(part->part[tn] == types[t->descendents[j]]);
+			assert(part->part[tn] == th->types[t->descendents[j]]);
 			bitvec_set(vectors[i], tn);
 		}
 		struct code_record *cr = malloc(sizeof(*cr));
@@ -765,7 +751,7 @@ int make_glbs_part(struct partition	*part)
 	nglbtypes = 0;
 	glbtypes = NULL;
 
-	//print_subheirarchy(part);
+	//print_subheirarchy(th, part);
 
 	for(i=0;i<part->psize;i++)
 	{
