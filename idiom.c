@@ -36,6 +36,8 @@ int	is_idiom_ep(char	*ep)
 	char	*tail = ep + strlen(ep) - 6;
 	if(!strcmp(tail, "_i_rel"))return 1;
 	if(!strcmp(tail, "-i_rel"))return 1;
+	if(tail>ep && !strcmp(tail-1, "_i_rel\""))return 1;
+	if(tail>ep && !strcmp(tail-1, "-i_rel\""))return 1;
 	return 0;
 }
 
