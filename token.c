@@ -86,7 +86,7 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 	}
 	else for(i=0;i<nwords;i++)
 	{
-		tags[i] = "NNP";
+		tags[i] = NULL;//"NNP";
 		unk[i] = 1;
 	}
 	if(trace)

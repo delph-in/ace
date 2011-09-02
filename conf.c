@@ -20,6 +20,7 @@ char		*g_null_type;
 char		*g_diff_list_type;
 
 char	*top_type;
+char	*semi_top_type;
 
 struct path	*chart_dependencies_from, *chart_dependencies_to;
 int			nchart_dependencies;
@@ -137,7 +138,7 @@ struct conf
 {
 	int	transfer;
 
-	char		*top_type;
+	char		*top_type, *semi_top_type;
 	char		*semarg_type;
 	char		*handle_type;
 	char		*cons_type;
@@ -188,6 +189,7 @@ void	*freeze_conf()
 	struct conf	*c = slab_alloc(sizeof(*c));
 	c->transfer = g_transfer;
 	c->top_type = freeze_string(top_type);
+	c->semi_top_type = freeze_string(semi_top_type);
 	c->semarg_type = freeze_string(semarg_type);
 	c->handle_type = freeze_string(handle_type);
 	c->cons_type = freeze_string(g_cons_type);
@@ -254,6 +256,7 @@ void	recover_conf(void	*vc)
 	struct conf	*c = vc;
 	g_transfer = c->transfer;
 	top_type = c->top_type;
+	semi_top_type = c->semi_top_type;
 	semarg_type = c->semarg_type;
 	handle_type = c->handle_type;
 	g_cons_type = c->cons_type;
@@ -369,6 +372,7 @@ int	load_conf()
 	else load_syntax_conf();
 
 	top_type = get_conf("top-type")?:"*top*";
+	semi_top_type = get_conf("semantic-interface-top-type")?:"top";
 	semarg_type = get_conf("semarg-type")?:"semarg";
 	handle_type = get_conf("handle-type")?:"h";
 	g_cons_type = get_conf("cons-type")?:"cons";

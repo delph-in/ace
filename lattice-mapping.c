@@ -163,8 +163,7 @@ void	extract_regex_constraints(struct dg	*d, struct lattice_regex_constraints	*r
 			rec->paths[rec->count-1].fnums = malloc(sizeof(int)*path.count);
 			memcpy(rec->paths[rec->count-1].fnums, path.fnums, sizeof(int)*path.count);
 			rec->regexs[rec->count-1] = towide(re);
-			extern struct type	*strtype;
-			d->xtype = d->type = strtype;
+			d->xtype = d->type = default_type_hierarchy()->strtype;
 			return;
 		}
 	}

@@ -15,6 +15,7 @@ struct mrs_desc
 	int	neps;
 	int	nhcons;
 	struct mrs_ep_desc	*eps;
+	struct mrs	*mrs;
 	struct dg	*dg;
 };
 

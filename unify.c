@@ -512,7 +512,7 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 
 	if(t != t1 && t!= t2)
 	{
-		if(!t->dg && t->name[0]!='"' && !(t->name[0]=='G' && t->name[1]=='('))
+		if(!t->dg && t->name[0]!='"' && !(t->name[0]=='g' && t->name[1]=='('))
 		{
 			extern struct type	*_current_building_type;
 			if(t != _current_building_type)
@@ -664,7 +664,6 @@ int extra_erg_dag_stash = 0;
 
 void	setup_extra_type_dgs()
 {
-	clear_slab();
 	if(extra_erg_dag_stash)
 	{
 		ocons = lookup_type("*ocons*");
@@ -880,10 +879,10 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 
 	if(t != t1 && t!= t2 && t->dg && t->dg->narcs
 		&& !(0
-		|| (t->name[0]=='G' && t->name[1]=='(')
+		|| (t->name[0]=='g' && t->name[1]=='(')
 		))
 	{
-//		if(t->name[0]=='G' && t->name[1]=='(')
+//		if(t->name[0]=='g' && t->name[1]=='(')
 //			printf("reached glbtype '%s' and will waste time unifying...\n", t->name);
 		if(t->dg->gen != generation)
 		{

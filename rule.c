@@ -570,10 +570,11 @@ void	*freeze_rule_filter()
 	filters->gpacks = freeze_block(filters->gpacks, sizeof(char) * nrules*nrules);
 	filters->rftc = freeze_rxtc(rf_tc, nrules);
 	filters->rltc = freeze_rxtc(rl_tc, nrules);
-	filters->type_rf = freeze_rxtc(type_rf, ntypes);
-	filters->type_rl = freeze_rxtc(type_rl, ntypes);
-	filters->type_rftc = freeze_rxtc(type_rftc, ntypes);
-	filters->type_rltc = freeze_rxtc(type_rltc, ntypes);
+	struct type_hierarchy	*th = default_type_hierarchy();
+	filters->type_rf = freeze_rxtc(type_rf, th->ntypes);
+	filters->type_rl = freeze_rxtc(type_rl, th->ntypes);
+	filters->type_rftc = freeze_rxtc(type_rftc, th->ntypes);
+	filters->type_rltc = freeze_rxtc(type_rltc, th->ntypes);
 	return filters;
 }
 
@@ -634,12 +635,14 @@ char	*type_filter_rule(struct rule	*r, int arg, struct qc **typeqc)
 	char	*table;
 	int	i, j, count = 0, res;
 
-	table = calloc(sizeof(char), ntypes);
+	struct type_hierarchy	*th = default_type_hierarchy();
+
+	table = calloc(sizeof(char), th->ntypes);
 
 	// bottom up, since most types will succeed and we can check if subtypes did
-	for(i=ntypes-1;i>=0;i--)
+	for(i=th->ntypes-1;i>=0;i--)
 	{
-		struct type *t = types[i];
+		struct type *t = th->types[i];
 
 		if(generation > MAX_GEN_RESET)generation = 11; // XXX hack
 
@@ -683,23 +686,25 @@ void	lex_filter_rules()
 	}
 	run_task("rf-transitive closure...", build_rule_filter_transitive_closure);
 
+	struct type_hierarchy	*th = default_type_hierarchy();
+
 	int build_type_rule_filter()
 	{
 		int i, j;
-		struct qc *tqc[ntypes];
+		struct qc *tqc[th->ntypes];
 
 		type_rf = malloc(sizeof(char*) * nrules);
 		type_rl = malloc(sizeof(char*) * nrules);
-		type_rf_t = malloc(sizeof(char*) * ntypes);
-		type_rl_t = malloc(sizeof(char*) * ntypes);
-		for(i=0;i<ntypes;i++)
-			tqc[i] = types[i]->dg?extract_qc(types[i]->dg):0;
+		type_rf_t = malloc(sizeof(char*) * th->ntypes);
+		type_rl_t = malloc(sizeof(char*) * th->ntypes);
+		for(i=0;i<th->ntypes;i++)
+			tqc[i] = th->types[i]->dg?extract_qc(th->types[i]->dg):0;
 		for(i=0;i<nrules;i++)
 		{
 			type_rf[i] = type_filter_rule(rules[i], 0, tqc);
 			type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1, tqc);
 		}
-		for(i=0;i<ntypes;i++)
+		for(i=0;i<th->ntypes;i++)
 		{
 			type_rf_t[i] = malloc(nrules);
 			for(j=0;j<nrules;j++)type_rf_t[i][j] = type_rf[j][i];
@@ -708,7 +713,7 @@ void	lex_filter_rules()
 		}
 		return 0;
 	}
-	//printf("there are %d rules and %d types\n", nrules, ntypes);
+	//printf("there are %d rules and %d types\n", nrules, th->ntypes);
 	//run_task("type-rule filter...", build_type_rule_filter);
 
 	int compose_type_rule_closured_filter()
@@ -719,9 +724,9 @@ void	lex_filter_rules()
 		type_rltc = malloc(sizeof(char*) * nrules);
 		for(i=0;i<nrules;i++)
 		{
-			type_rftc[i] = calloc(sizeof(char), ntypes);
-			type_rltc[i] = calloc(sizeof(char), ntypes);
-			for(j=0;j<ntypes;j++)
+			type_rftc[i] = calloc(sizeof(char), th->ntypes);
+			type_rltc[i] = calloc(sizeof(char), th->ntypes);
+			for(j=0;j<th->ntypes;j++)
 			{
 				char *fit_rule_f = type_rf_t[j];
 				char *fit_rule_l = type_rl_t[j];
@@ -857,10 +862,11 @@ int	nconstraints;
 int always_compatible(struct type	*parent, struct type	*sub)
 {
 	int i;
+	struct type_hierarchy	*th = default_type_hierarchy();
 	for(i=0;i<parent->ndescendents;i++)
-		if(!glb(types[parent->descendents[i]], sub))
+		if(!glb(th->types[parent->descendents[i]], sub))
 		{
-			//printf("%s compatible with %s but not with %s\n", types[parent->descendents[i]]->name, parent->name, sub->name);
+			//printf("%s compatible with %s but not with %s\n", th->types[parent->descendents[i]]->name, parent->name, sub->name);
 			return 0;
 		}
 	return 1;
@@ -872,7 +878,7 @@ decompose_dg(struct rule	*r, int	rarg, struct dg	*dg, int feat)
 	struct type	*at;
 	int			i;
 
-	if(feat != -1)at = most_general_type_for_feat(feat);
+	if(feat != -1)at = most_general_type_for_feat(default_type_hierarchy(), feat);
 	else at = get_top();
 	if(dg->xtype != at && !always_compatible(at, dg->xtype))
 	{

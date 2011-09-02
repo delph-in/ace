@@ -432,7 +432,7 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	}
 	else if(do_itsdb)
 	{
-		num_parses = itsdb_report(nwords, words, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
+		num_parses = itsdb_report(nwords, words, 0, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
 	}
 	else if(lui_mode)
 	{

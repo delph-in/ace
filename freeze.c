@@ -40,13 +40,10 @@ void	recover_transfer(void	*ptr);
 extern char	*grammar_version, *grammar_dir;
 
 // copy all grammar objects to flat blocks
-extern int	ntypes, nlexemes, nrules, norules, ninstances, nfnames, nstrings, ngeneric_les;
-extern struct type	**types;
+extern int	nlexemes, nrules, norules, ninstances, nfnames, ngeneric_les;
 extern struct rule	**rules;
 extern struct lexeme	**lexemes, **generic_les;
 extern struct orule	**orules;
-extern struct type	**strings;
-extern struct type	*strtype;
 extern char		**fnames;
 extern int		*introduce;
 extern char		*lgroups[256];
@@ -56,20 +53,20 @@ extern unsigned int generation;
 struct grammar
 {
 	char		message[128];
-	int		ntypes, nlexemes, nrules, norules, nfnames, nstrings, ngeneric_les;
-	struct type	**types;
+	int		nlexemes, nrules, norules, nfnames, ngeneric_les;
+
+	struct type_hierarchy	*main_th;
+	struct type_hierarchy	*semi_th;
+
 	struct rule	**rules;
 	struct lexeme	**lexemes, **generic_les;
 	struct orule	**orules;
-	struct type	**strings;
 	char		**fnames;
 	char		*lgroups[256];
-	struct type	*strtype;
 	int		*introduce;
 	void	*rule_filter;
 	void	*semindex;
 	void	*stochmodel;
-	void	*typehash;
 	void	*vpm;
 	void	*labels;
 	void	*conf;
@@ -104,24 +101,6 @@ char	*freeze_string(char	*str)
 	return strcpy(copy, str);
 }
 
-struct type	*freeze_type(struct type	*tin)
-{
-	struct type	*tout = slab_alloc(sizeof(struct type));
-
-	// XXX hack!
-	if(generation > MAX_GEN_RESET)generation = 11;
-	// XXX hack!
-
-	*tout = *tin;
-	tout->dg = tin->dg?copy_dg(tin->dg):0;
-	tout->name = freeze_string(tin->name);
-	tout->descendents = freeze_block(tin->descendents, tin->ndescendents * sizeof(short));
-	tout->parents = freeze_block(tin->parents, sizeof(struct type*)*tout->nparents);
-	tout->daughters = freeze_block(tin->daughters, sizeof(struct type*)*tout->ndaughters);
-
-	return tout;
-}
-
 struct rule	*freeze_rule(struct rule	*rin)
 {
 	struct rule	*rout = slab_alloc(sizeof(struct rule));
@@ -138,11 +117,13 @@ struct rule	*freeze_rule(struct rule	*rin)
 	return rout;
 }
 
+struct type_hierarchy	*ft_th;
+
 static struct type	*FT(struct type	*t)
 {
 	if(!t)return 0;
-	else if(t->name[0]=='"')return strings[t->tnum];
-	else return types[t->tnum];
+	else if(t->name[0]=='"')return ft_th->strings[t->tnum];
+	else return ft_th->types[t->tnum];
 }
 
 struct lexeme	*freeze_lexeme(struct lexeme	*lin)
@@ -204,6 +185,71 @@ void	patch_dg(struct dg	*dg)
 		patch_dg(arcs[i]);
 }
 
+struct type	*freeze_type(struct type	*tin)
+{
+	struct type	*tout = slab_alloc(sizeof(struct type));
+
+	// XXX hack!
+	if(generation > MAX_GEN_RESET)generation = 11;
+	// XXX hack!
+
+	*tout = *tin;
+	tout->dg = tin->dg?copy_dg(tin->dg):0;
+	tout->name = freeze_string(tin->name);
+	tout->descendents = freeze_block(tin->descendents, tin->ndescendents * sizeof(short));
+	tout->parents = freeze_block(tin->parents, sizeof(struct type*)*tout->nparents);
+	tout->daughters = freeze_block(tin->daughters, sizeof(struct type*)*tout->ndaughters);
+
+	return tout;
+}
+
+struct type_hierarchy	*freeze_type_hierarchy(struct type_hierarchy	*thin)
+{
+	int	i;
+	if(!thin)return NULL;
+	for(i=0;i<thin->ntypes;i++)
+		if(thin->types[i]->tnum != i)
+		{
+			fprintf(stderr, "type %s tnum %d is wrong.\n", thin->types[i]->name, thin->types[i]->tnum);
+			exit(-1);
+		}
+
+	struct type_hierarchy	*thout = slab_alloc(sizeof(*thout));
+	thout->ntypes = thin->ntypes;
+	thout->types = slab_alloc(sizeof(struct type*)*thout->ntypes);
+	thout->nstrings = thin->nstrings;
+	thout->strings = slab_alloc(sizeof(struct type*)*thout->nstrings);
+
+	for(i=0;i<thout->ntypes;i++)thout->types[i] = freeze_type(thin->types[i]);
+	for(i=0;i<thout->nstrings;i++)thout->strings[i] = freeze_type(thin->strings[i]);
+
+	thout->thash = freeze_hash(thin->thash);
+	thout->id = freeze_string(thin->id);
+	thout->top = thin->top;
+	thout->strtype = thin->strtype;
+	return thout;
+}
+
+void	patch_type_hierarchy(struct type_hierarchy	*th)
+{
+	int	i;
+	if(!th)return;
+
+	struct hash_bucket *walk;
+	for(i=0;i<th->thash->size;i++)
+		for(walk=th->thash->buckets[i];walk;walk=walk->next)
+		{
+			struct type	*tin = walk->value;
+			walk->value = FT(tin);
+		}
+
+	for(i=0;i<th->ntypes;i++)patch_type(th->types[i]);
+	for(i=0;i<th->ntypes;i++)patch_dg(th->types[i]->dg);
+
+	th->top = FT(th->top);
+	th->strtype = FT(th->strtype);
+}
+
 struct dg	*freeze_dg(struct dg	*dg)
 {
 	patch_dg(dg);
@@ -243,12 +289,6 @@ int	freeze_grammar()
 	//print_rule("sing_noun_infl_rule");
 
 	inval_thash();
-	for(i=0;i<ntypes;i++)
-		if(types[i]->tnum != i)
-		{
-			fprintf(stderr, "type %s tnum %d is wrong.\n", types[i]->name, types[i]->tnum);
-			exit(-1);
-		}
 
 	clear_slab();
 
@@ -256,15 +296,14 @@ int	freeze_grammar()
 
 	null_generation();
 
-	for(i=0;i<ntypes;i++)types[i] = freeze_type(types[i]);
+extern struct type_hierarchy	*main_th, *semi_th;
+	G->main_th = freeze_type_hierarchy(main_th);
+	G->semi_th = freeze_type_hierarchy(semi_th);
+	ft_th = G->semi_th;
+	patch_type_hierarchy(G->semi_th);
+	ft_th = G->main_th;
+	patch_type_hierarchy(G->main_th);
 	freezer_note("types");
-
-	for(i=0;i<nstrings;i++)strings[i] = freeze_type(strings[i]);
-	strtype = lookup_type("string");
-	freezer_note("strings");
-
-	for(i=0;i<ntypes;i++)patch_type(types[i]);
-	for(i=0;i<ntypes;i++)patch_dg(types[i]->dg);
 
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->dg);
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->packdg);
@@ -274,7 +313,8 @@ int	freeze_grammar()
 	{
 		if(lexemes[i]->dg)patch_dg(lexemes[i]->dg);
 		for(j=0;j<lexemes[i]->stemlen;j++)
-			lexemes[i]->stem[j] = strings[lexemes[i]->stem[j]->tnum];
+			//lexemes[i]->stem[j] = strings[lexemes[i]->stem[j]->tnum];
+			lexemes[i]->stem[j] = FT(lexemes[i]->stem[j]);
 	}
 
 	for(i=0;i<ngeneric_les;i++)
@@ -327,21 +367,16 @@ int	freeze_grammar()
 	}
 	freezer_note("lex-dgs");
 
-	G->ntypes = ntypes;
 	G->nrules = nrules;
 	G->norules = norules;
 	G->nlexemes = nlexemes;
 	G->ngeneric_les = ngeneric_les;
 	G->nfnames = nfnames;
-	G->nstrings = nstrings;
-	G->types = slab_alloc(sizeof(void*) * G->ntypes);	memcpy(G->types, types, sizeof(void*) * G->ntypes);
 	G->rules = slab_alloc(sizeof(void*) * G->nrules);	memcpy(G->rules, rules, sizeof(void*) * G->nrules);
 	G->orules = slab_alloc(sizeof(void*) * G->norules);	memcpy(G->orules, orules, sizeof(void*) * G->norules);
 	G->lexemes = slab_alloc(sizeof(void*) * G->nlexemes);	memcpy(G->lexemes, lexemes, sizeof(void*) * G->nlexemes);
 	G->generic_les = slab_alloc(sizeof(void*) * G->nlexemes);	memcpy(G->generic_les, generic_les, sizeof(void*) * G->ngeneric_les);
 	G->fnames = slab_alloc(sizeof(void*) * G->nfnames);	memcpy(G->fnames, fnames, sizeof(char*) * G->nfnames);
-	G->strings = slab_alloc(sizeof(void*) * G->nstrings);	memcpy(G->strings, strings, sizeof(void*) * G->nstrings);
-	G->typehash = freeze_typehash();
 	G->vpm = freeze_vpm();
 	G->labels = freeze_labels();
 	G->conf = freeze_conf();
@@ -349,7 +384,6 @@ int	freeze_grammar()
 	G->instances = freeze_instances();
 	G->introduce = introduce;
 	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
-	G->strtype = strtype;
 	G->qc = freeze_qc();
 	freezer_note("miscellaneous");
 	G->semindex = freeze_semantic_index();
@@ -397,21 +431,21 @@ static int	load_freeze()
 		exit(-1);
 	}
 
-	ntypes = G->ntypes;
+extern struct type_hierarchy	*main_th, *semi_th;
+	main_th = G->main_th;
+	semi_th = G->semi_th;
+	set_default_type_hierarchy(main_th);
+
 	nlexemes = G->nlexemes;
 	ngeneric_les = G->ngeneric_les;
 	nrules = G->nrules;
 	norules = G->norules;
 	nfnames = G->nfnames;
-	nstrings = G->nstrings;
 
-	types = G->types;
 	lexemes = G->lexemes;
 	generic_les = G->generic_les;
 	rules = G->rules;
 	orules = G->orules;
-	strings = G->strings;
-	strtype = G->strtype;
 
 	// in case we accidentally add more during parsing
 	fnames = malloc(sizeof(char*) * nfnames);
@@ -420,7 +454,6 @@ static int	load_freeze()
 	memcpy(introduce, G->introduce, sizeof(int) * nfnames);
 
 	recover_rule_filter(G->rule_filter);
-	recover_typehash(G->typehash);
 	recover_repp(G->repp);
 	recover_conf(G->conf);
 	recover_instances(G->instances);
@@ -451,7 +484,7 @@ extern void	*lexical_filtering_rules;
 
 	if(debug_level)
 		fprintf(stderr, "NOTE: %d types, %d lexemes, %d rules, %d orules, %d instances, %d strings, %d features\n",
-				ntypes, nlexemes, nrules, norules, ninstances, nstrings, nfnames);
+				main_th->ntypes, nlexemes, nrules, norules, ninstances, main_th->nstrings, nfnames);
 
 	/*if(mlock(strings[0], sizeof(struct type)*nstrings))
 		perror("unable to mlock strings");*/
@@ -514,6 +547,7 @@ int use_freezer()
 	return 0;
 }
 
+/*
 void	dump_grammar()
 {
 	int	i;
@@ -535,4 +569,4 @@ void	dump_grammar()
 		printf("lex `%s': ", lexemes[i]->word);
 		print_dg(lexemes[i]->dg);printf("\n");
 	}
-}
+}*/

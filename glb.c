@@ -69,9 +69,28 @@ grab:
 	return ht->glb;
 }
 
+/*struct type_hierarchy	*type_hierarchy_of(struct type	*a)
+{
+	extern struct type_hierarchy	*semi_th, *main_th;
+	if(!semi_th)return main_th;
+	if(a->name[0]=='"')
+	{
+		if(a->tnum < main_th->nstrings && main_th->strings[a->tnum]==a)
+			return main_th;
+		if(a->tnum < semi_th->nstrings && semi_th->strings[a->tnum]==a)
+			return semi_th;
+		return NULL;
+	}
+	if(a->tnum < main_th->ntypes && main_th->types[a->tnum]==a)
+		return main_th;
+	if(a->tnum < semi_th->ntypes && semi_th->types[a->tnum]==a)
+		return semi_th;
+	assert(!"no such type hierarchy");
+}*/
+
 struct type	*calc_glb(struct type	*a, struct type	*b)
 {
-	extern struct type	*strtype;
+	struct type_hierarchy	*th = default_type_hierarchy();
 	int	ia, ib;
 
 	if(a->name[0]=='"')
@@ -82,12 +101,12 @@ struct type	*calc_glb(struct type	*a, struct type	*b)
 				return a;
 			return 0;
 		}
-		else if(strtype && descendent_of(strtype->tnum, b))return a;
+		else if(th->strtype && descendent_of(th->strtype->tnum, b))return a;
 		else return 0;
 	}
 	if(b->name[0]=='"')
 	{
-		if(strtype && descendent_of(strtype->tnum, a))return b;
+		if(th->strtype && descendent_of(th->strtype->tnum, a))return b;
 		else return 0;
 	}
 
@@ -98,7 +117,7 @@ struct type	*calc_glb(struct type	*a, struct type	*b)
 		if(a->descendents[ia] == b->descendents[ib])
 		{
 			// must be the glb, since types are in descending order
-			return types[a->descendents[ia]];
+			return th->types[a->descendents[ia]];
 		}
 		else if(a->descendents[ia] < b->descendents[ib])ia++;
 		else ib++;

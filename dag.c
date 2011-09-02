@@ -160,7 +160,8 @@ struct dg	*atomic_dg(char	*name)
 	if(!type)
 	{
 		fprintf(stderr, "atomic_dg: no such type as `%s'\n", name);
-		return 0;
+		exit(-1);
+		return NULL;
 	}
 
 	dg = slab_alloc(sizeof(struct dg));
@@ -440,7 +441,7 @@ struct dg	*wellform_dg(struct dg	*dg)
 	return dg_hop(wfee, 1);
 }
 
-struct type	*most_general_type_for_feat(int	feat)
+struct type	*most_general_type_for_feat(struct type_hierarchy	*th, int	feat)
 {
 	if(feat<0 || feat>=nfnames)return 0;
 	if(introduce[feat] == -1)
@@ -448,14 +449,15 @@ struct type	*most_general_type_for_feat(int	feat)
 		fprintf(stderr, "ERROR: no type is appropriate for feature `%s' yet\n", fnames[feat]);
 		exit(-1);
 	}
-	struct dg	*tdg = types[introduce[feat]]->dg, *h = dg_hop(tdg, feat);
+	struct dg	*tdg = th->types[introduce[feat]]->dg, *h = dg_hop(tdg, feat);
 	return h->xtype;
 }
 
 struct type	*most_general_type_for_dg(struct dg	*d)
 {
+	struct type_hierarchy	*th = default_type_hierarchy();
 	int	i, intro = -1, k;
-	struct type	*up = 0, *th;
+	struct type	*up = 0, *ty;
 
 	for(i=0;i<d->narcs;i++)
 	{
@@ -466,22 +468,22 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 					"which was never introduced in the type heirarchy\n", fnames[d->label[i]]);
 			exit(-1);
 		}
-		th = types[k];
+		ty = th->types[k];
 		/*if(k>intro)
 		{
 			//printf("dag `%s' uses `%s', introduced by %s\n",
 					//d->type->name, fnames[d->label[i]],
-					//types[introduce[d->label[i]]]->name);
+					//th->types[introduce[d->label[i]]]->name);
 			intro = k;
 		}*/
-		if(!up)up = th;
+		if(!up)up = ty;
 		else
 		{
 			struct type *nup;
-			nup = glb(up, th);
+			nup = glb(up, ty);
 			if(!up)
 			{
-				fprintf(stderr, "type inference:  no glb for `%s' and `%s'\n", up->name, th->name);
+				fprintf(stderr, "type inference:  no glb for `%s' and `%s'\n", up->name, ty->name);
 				exit(-1);
 			}
 			up = nup;

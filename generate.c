@@ -15,9 +15,6 @@
 
 extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
 
-		extern int nstrings;
-		extern struct type	**strings;
-
 int	require_neps = 0, n_epsbv = 0, n_avsbv = 0;
 
 int			enable_index_accessibility_filtering = 0;
@@ -282,12 +279,13 @@ int	generate(struct mrs	*mrs)
 
 	// set up the skolemization and specialization dags we'll need.
 	struct dg	*skar[mrs->vlist.nvars];
+	struct type_hierarchy	*th = default_type_hierarchy();
 	for(i=0;i<mrs->vlist.nvars;i++)
 	{
 		struct dg			*skolem;
 		skolem = atomic_dg(top_type);
-		assert(i<nstrings);
-		skolem->type = skolem->xtype = strings[i];
+		assert(i<th->nstrings);
+		skolem->type = skolem->xtype = th->strings[i];
 		skar[i] = skolem;
 	}
 	for(i=0;i<mrs->nhcons;i++)

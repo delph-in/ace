@@ -69,7 +69,7 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 		readings = parse_line(i_input);
 	else
 	{
-		//printf("mrs input: `%s'\n", i_input);
+		//fprintf(stderr, "mrs input: `%s'\n", i_input);
 		char	*mutable_input = strdup(i_input);
 		struct mrs *m = parse_mrs(mutable_input);
 		if(!m)
@@ -93,21 +93,28 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	if(error)capi_printf(" (:error \"%s\")", error);
 }
 
-itsdb_report(int nwords, char **words, int	tforest)
+itsdb_report(int nwords, char **words, int	status, int	tforest)
 {
 	extern int total_edges, real_edges, passive_edges, slab_usage();
 
-	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
-	capi_printf("(:tcpu . %d) ", tforest);
+	if(status == 0)
+	{
+		capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
+		capi_printf("(:tcpu . %d) ", tforest);
 
-	int	readings = capi_print_derivations(nwords, words);
+		int	readings = capi_print_derivations(nwords, words);
 
-	capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
-		readings, passive_edges, real_edges - passive_edges);
+		capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
+			readings, passive_edges, real_edges - passive_edges);
 
-	capi_printf("(:others . %d) ", slab_usage());
-
-	return readings;
+		capi_printf("(:others . %d) ", slab_usage());
+		return readings;
+	}
+	else
+	{
+		capi_printf("(:copies . 0) (:unifications . 0) (:tcpu . 0) (:readings . 0) (:pedges . 0) (:aedges . 0) (:others . 0) ");
+		return -1;
+	}
 }
 
 itsdb_report_gen(int readings)

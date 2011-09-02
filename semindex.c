@@ -65,7 +65,6 @@ static struct hash	*sindex;
 int							nstrpars;
 struct semindex_pred_node	**strpars;
 
-extern struct type *strtype;
 static int predfnum, cargfnum;
 
 void init_index()
@@ -73,21 +72,22 @@ void init_index()
 	struct type	*predsort = lookup_type("predsort");
 	int			i, j;
 
-#define	GLB_TYPE(t)	(t->name[0]=='G' && t->name[1]=='(')	/* XXX crude hack to detect GLB types */
+#define	GLB_TYPE(t)	(t->name[0]=='g' && t->name[1]=='(')	/* XXX crude hack to detect GLB types */
 
 	predfnum = lookup_fname("PRED");
 	cargfnum = lookup_fname("CARG");
 	sindex = hash_new("semantic index");
+	struct type_hierarchy	*th = default_type_hierarchy();
 	for(i=0;i<predsort->ndescendents;i++)
 	{
-		struct type	*t = types[predsort->descendents[i]];
+		struct type	*t = th->types[predsort->descendents[i]];
 		if(GLB_TYPE(t))continue;
 		struct semindex_pred_node *node = lookup_semindex(t->name, 1);
 
-		for(j=1;j<t->ndescendents;j++) if(!GLB_TYPE(types[t->descendents[j]]))
-			add_relative_to_spn(node, lookup_semindex(types[t->descendents[j]]->name, 1));
+		for(j=1;j<t->ndescendents;j++) if(!GLB_TYPE(th->types[t->descendents[j]]))
+			add_relative_to_spn(node, lookup_semindex(th->types[t->descendents[j]]->name, 1));
 
-		if(descendent_of(strtype->tnum, t))
+		if(descendent_of(th->strtype->tnum, t))
 		{
 			nstrpars++;
 			strpars = realloc(strpars, sizeof(struct type*) * nstrpars);

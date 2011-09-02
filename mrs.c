@@ -619,7 +619,8 @@ int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 
 int pred_subsumes(char *in, char *out)
 {
-	extern struct type *strtype;
+	// XXX when SEM-I import works, this is where we make our move...
+	struct type_hierarchy	*th = default_type_hierarchy();
 	struct type *tin, *tout;
 	if(!strcasecmp(in, out))return 1;
 	if(in[0]=='"')return 0;
@@ -632,7 +633,7 @@ int pred_subsumes(char *in, char *out)
 		return 0;
 		exit(-1);
 	}
-	if(out[0]=='"')return descendent_of(strtype->tnum, tin);
+	if(out[0]=='"')return descendent_of(th->strtype->tnum, tin);
 	tout = lookup_type(out);
 	if(!tout)
 	{
