@@ -20,6 +20,7 @@ struct mrs_var
 		struct dg		*dg;
 		struct dbid		*dbid;
 	};
+	struct dg		*semi_dg;
 };
 
 struct mrs_ep
@@ -79,6 +80,7 @@ struct mrs_var	*mrs_find_ep_role(struct mrs_ep	*ep, char	*role);
 void		semantic_lookup(struct mrs	*mrs);
 int			mrs_subsumes(struct mrs	*in, struct mrs	*out);
 struct mrs	*extract_mrs(struct dg	*root);
+struct mrs	*cont_to_mrs(struct dg	*cont);
 void		dagify_mrs_var(struct mrs_var	*var, struct dg	*skolem);
 void		dagify_mrs_ep(struct mrs_ep *ep);
 struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[]);
@@ -96,5 +98,8 @@ struct mrs	*ace_surface_to_mrs(char	*line);
 void	mrs_crange_for_x(struct mrs	*m, struct mrs_var	*x, int	quantified, int	*From, int	*To);
 
 int pred_subsumes(char *in, char *out);
+
+// transforms the ->dg links on the Eps and vars in 'm' to be semi-formatted
+void	semi_reformat_mrs(struct mrs	*m, int	do_forward);
 
 #endif

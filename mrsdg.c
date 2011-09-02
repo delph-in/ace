@@ -313,6 +313,8 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	struct dg	*hook, *rels, *hcons;
 	struct mrs	*mrs = slab_calloc(sizeof(struct mrs), 1);
 
+	if(!cont)return mrs;
+
 	// allocate temporary space for lots and lots of mrs_var*'s
 	static struct mrs_var	**tmp_vlist = NULL;
 	if(!tmp_vlist)tmp_vlist = malloc(sizeof(struct mrs_var*) * 10240);
@@ -393,29 +395,108 @@ struct mrs	*extract_mrs(struct dg	*root)
 
 // mrs to dag conversion
 
+struct dg	*dagify_mrs_var1(struct mrs_var	*var, struct dg	*skolem)
+{
+	struct dg	*dg = atomic_dg(var->type);
+	int			i, path[16], len;
+	for(i=0;i<var->nprops;i++)
+	{
+		char	*vtype = var->props[i].value, *str = strdup(var->props[i].name), *p = str, *p2;
+		len = 0;
+		do {
+			p2 = strchr(p, '.');
+			if(p2)*p2 = 0;
+			path[len++] = lookup_fname(p);
+			p = p2?(p2+1):0;
+		} while(p);
+		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
+	}
+	if(skolem)dg = add_dg_feature(dg, "INSTLOC", skolem);
+	return dg;
+}
+
+static void	semi_reformat_mrs_var(struct mrs_var	*var, int	forward)
+{
+	if(var->semi_dg)return;
+	if(var->is_const)
+	{
+		if(!var->dg)dagify_mrs_var(var, NULL);
+		var->semi_dg = var->dg;
+		return;
+	}
+	struct dg	*instloc_dg = NULL;
+	if(var->dg)
+	{
+		struct dg	*internal_dg = var->dg;
+		static int	instloc = -1;
+		if(instloc == -1)instloc = lookup_fname("INSTLOC");
+		instloc_dg = dg_hop(internal_dg, instloc);
+	}
+	if(!instloc_dg)instloc_dg = atomic_dg(semi_top_type);
+
+	var->semi_dg = dagify_mrs_var1(var, instloc_dg);
+
+	if(var->dg && forward)
+		permanent_forward_dg(var->dg, var->semi_dg);
+}
+
+static struct dg	*main_atomic_dg(char	*type)
+{
+	extern struct type_hierarchy	*main_th, *semi_th;
+	set_default_type_hierarchy(main_th);
+	struct dg	*d = atomic_dg(type);
+	set_default_type_hierarchy(semi_th);
+	return d;
+}
+
+static void semi_reformat_mrs_ep(struct mrs_ep *ep, int	forward)
+{
+	struct dg	*dg = atomic_dg(semi_top_type);
+	int			i;
+
+	dg = add_dg_feature(dg, "PRED", main_atomic_dg(ep->pred));
+	dg = add_dg_feature(dg, "LBL", ep->lbl->semi_dg);
+	for(i=0;i<ep->nargs;i++)
+	{
+		if(ep->args[i].value->is_const == 0)
+		{
+			dg = add_dg_feature(dg, ep->args[i].name, ep->args[i].value->semi_dg);
+		}
+		else
+		{
+			struct dg *k = main_atomic_dg(ep->args[i].value->name);
+			dg = add_dg_feature(dg, ep->args[i].name, k);
+		}
+	}
+	if(ep->dg && forward)
+		permanent_forward_dg(ep->dg, dg);
+	ep->dg = dg;
+}
+
+void	semi_reformat_mrs(struct mrs	*m, int	forward)
+{
+	struct type_hierarchy	*tmp = default_type_hierarchy();
+	extern struct type_hierarchy	*semi_th;
+	set_default_type_hierarchy(semi_th);
+
+	int	i;
+	for(i=0;i<m->vlist.nvars;i++)
+		semi_reformat_mrs_var(m->vlist.vars[i], forward);
+	for(i=0;i<m->nrels;i++)
+		semi_reformat_mrs_ep(&m->rels[i], forward);
+
+	set_default_type_hierarchy(tmp);
+}
+
 void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 {
 	struct dg	*dg;
 	struct mrs_var *var;
-	int			i, path[16], len;
 
 	if(!evar->is_const)
 	{
 		var = external_to_internal_mrs_var(evar);
-		dg = atomic_dg(var->type);
-		for(i=0;i<var->nprops;i++)
-		{
-			char	*vtype = var->props[i].value, *str = strdup(var->props[i].name), *p = str, *p2;
-			len = 0; do
-			{
-				p2 = strchr(p, '.');
-				if(p2)*p2 = 0;
-				path[len++] = lookup_fname(p);
-				p = p2?(p2+1):0;
-			} while(p);
-			dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
-		}
-		dg = add_dg_feature(dg, "INSTLOC", skolem);
+		dg = dagify_mrs_var1(var, skolem);
 		evar->dg = wellform_dg(dg);
 	}
 	else

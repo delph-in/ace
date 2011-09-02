@@ -5,6 +5,8 @@
 #include	<sys/time.h>
 #include	<assert.h>
 
+#define	ALLOW_SEMI_MODE	0
+
 //#define	DEBUG	printf
 #define	DEBUG(...)	do { } while(0)
 
@@ -17,6 +19,8 @@
 #include	"hash.h"
 #include	"conf.h"
 #include	"mrs.h"
+
+extern struct type_hierarchy	*semi_th, *main_th;
 
 int	is_semarg_type(struct type	*x);
 int equal_semarg_types(struct type	*x, struct type	*y);
@@ -53,6 +57,13 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 	if(!dg) { fprintf(stderr, "transfer rule '%s': no '%s' feature.\n", tr->name, feature); return -1; }
 	desc->dg = dg;
 
+	if(semi_th && ALLOW_SEMI_MODE)
+	{
+		// new-fangled system: convert our "internal" TFSes to SEMI-compliant TFSes
+		desc->mrs = cont_to_mrs(desc->dg);
+		semi_reformat_mrs(desc->mrs, 1);
+	}
+
 	// count and save pointers to the EPs
 	struct dg	*rels = dg_hop(dg, lookup_fname("RELS"));
 	struct dg	*list = dg_hop(rels, lookup_fname("LIST"));
@@ -69,6 +80,8 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 		check_pred_re(&desc->eps[desc->neps]);
 		desc->neps++;
 		list = dg_hop(list, lookup_fname("REST"));
+		//printf("rule %s . %s %d = \n", tr->name, feature, desc->neps-1);
+		//print_dg(epdg);printf("\n");
 	}
 
 	// count the HCONS
@@ -202,6 +215,7 @@ int	thaw_transfer_rule(struct transfer_rule	*tr)
 	//printf("thawing rule '%s'\n", tr->name);
 	//print_dg(tr->dg);
 	//printf("\n\n");
+
 	if(0 != process_transfer_rule_part(&tr->input, tr, "INPUT"))
 		return -1;
 	if(0 != process_transfer_rule_part(&tr->context, tr, "CONTEXT"))
@@ -276,28 +290,61 @@ int	is_semarg_type(struct type	*x)
 
 int equal_semarg_types(struct type	*x, struct type	*y)
 {
-	DEBUG("eq-semarg-types: %s =? %s\n", x->name, y->name);
-	if(x==y)return 1;
-	char	*semi_x = internal_to_external_var_type(x->name);
-	char	*semi_y = internal_to_external_var_type(y->name);
-	DEBUG("compare %s [%s] to %s [%s]\n", semi_x, x->name, semi_y, y->name);
-	return strcmp(semi_x, semi_y)?0:1;
+	if(semi_th && ALLOW_SEMI_MODE)
+	{
+		return (x==y)?1:0;
+	}
+	else
+	{
+		DEBUG("eq-semarg-types: %s =? %s\n", x->name, y->name);
+		if(x==y)return 1;
+		char	*semi_x = internal_to_external_var_type(x->name);
+		char	*semi_y = internal_to_external_var_type(y->name);
+		DEBUG("compare %s [%s] to %s [%s]\n", semi_x, x->name, semi_y, y->name);
+		return strcmp(semi_x, semi_y)?0:1;
+	}
+}
+
+struct type	*semi_find_type(char	*name)
+{
+	extern struct type_hierarchy	*semi_th;
+	assert(semi_th != NULL);
+	return hash_find(semi_th->thash, name);
 }
 
 int subsume_semarg_types(struct type	*x, struct type	*y)
 {
-	DEBUG("ss-semarg-types: %s >? %s\n", x->name, y->name);
-	if(x==y)return 1;
-	char	*semi_x = internal_to_external_var_type(x->name);
-	char	*semi_y = internal_to_external_var_type(y->name);
-	char	*local_x = external_to_internal_var_type(semi_x);
-	char	*local_y = external_to_internal_var_type(semi_y);
-	// scared yet?
-	DEBUG("compare %s [%s [%s]] to %s [%s [%s]]\n", local_x, semi_x, x->name, local_y, semi_y, y->name);
-	struct type	*tx = lookup_type(local_x);
-	struct type	*ty = lookup_type(local_y);
-	assert(tx && ty);
-	return descendent_of(ty->tnum, tx)?1:0;
+	if(semi_th && ALLOW_SEMI_MODE)
+	{
+		return (descendent_of(y->tnum, x))?1:0;
+	}
+	else
+	{
+		DEBUG("ss-semarg-types: %s >? %s\n", x->name, y->name);
+		if(x==y)return 1;
+		char	*semi_x = internal_to_external_var_type(x->name);
+		char	*semi_y = internal_to_external_var_type(y->name);
+
+		// method 1
+		struct type	*sx = semi_find_type(semi_x);
+		struct type	*sy = semi_find_type(semi_y);
+		assert(sx && sy);
+		int	r1 = descendent_of(sy->tnum, sx)?1:0;
+
+		// method 2
+		char	*local_x = external_to_internal_var_type(semi_x);
+		char	*local_y = external_to_internal_var_type(semi_y);
+		// scared yet?
+		DEBUG("compare %s [%s [%s]] to %s [%s [%s]]\n", local_x, semi_x, x->name, local_y, semi_y, y->name);
+		struct type	*tx = lookup_type(local_x);
+		struct type	*ty = lookup_type(local_y);
+		assert(tx && ty);
+		int	r2 = descendent_of(ty->tnum, tx)?1:0;
+
+		assert(r1 == r2);
+		//printf("methods agree for '%s >? %s'\n", x->name, y->name);
+		return r2;
+	}
 }
 
 int	nfailed_transfer_unifies, nsuccessful_transfer_unifies;
@@ -517,7 +564,12 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 		print_dg(v->dg);
 		printf("\n");
 	}*/
+
 	// note: generate() has already built the ep->dg's for each input relation
+
+	if(semi_th && ALLOW_SEMI_MODE)
+		semi_reformat_mrs(mrsin, 0);
+
 	for(i=0;i<ntrigger_rules;i++)
 	{
 		void	found_alignment(int	*alignment)
@@ -550,9 +602,15 @@ void	skolemize_for_transfer(struct mrs	*m)
 	// tweak the INSTLOC fields of the mrs variables
 	// so that they won't unify with each other.
 
+	struct type_hierarchy	*th = default_type_hierarchy();
+
 	for(i=0;i<m->vlist.nvars;i++)
 	{
-		struct dg	*dg = m->vlist.vars[i]->dg;
+		struct dg	*dg;
+		if(semi_th && ALLOW_SEMI_MODE)
+			dg = m->vlist.vars[i]->semi_dg;
+		else dg = m->vlist.vars[i]->dg;
+
 		if(!dg)continue;	// invented LTOP, INDEX, XARG
 		if(m->vlist.vars[i]->is_const)continue;
 
@@ -562,10 +620,8 @@ void	skolemize_for_transfer(struct mrs	*m)
 
 		struct dg	*iloc = dg_hop(dg, instloc);
 		assert(iloc != NULL);
-		extern int nstrings;
-		extern struct type	**strings;
-		assert(i<nstrings);
-		iloc->type = iloc->xtype = strings[i];
+		assert(i<th->nstrings);
+		iloc->type = iloc->xtype = th->strings[i];
 	}
 }
 
@@ -645,7 +701,10 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts)
 			// new result.
 			ts->mrs = slab_realloc(ts->mrs, sizeof(struct mrs*)*ts->n, sizeof(struct mrs*)*(ts->n+1));
 			ts->mrs[ts->n++] = mout;
+
+			//printf("rule fired: %s\n", tr->name);
 			//print_mrs(mout);printf("\n");
+
 			nalignments++;
 		}
 		align_transfer_rule(tr, min, found_alignment);
@@ -667,6 +726,9 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts)
 int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct mrs	***Results)
 {
 	int	i;
+
+	if(semi_th && ALLOW_SEMI_MODE)
+		semi_reformat_mrs(m, 0);
 
 	skolemize_for_transfer(m);
 

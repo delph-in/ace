@@ -20,6 +20,7 @@ int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	load_tdl(char	*path);
 
 char	*grammar_version = 0;
+int	loading_semi = 0;
 
 void show_task_name(char *task)
 {
@@ -153,7 +154,7 @@ void	add_tdlline(char	*lhs, char	operation, char	*rhs, char	*odef, int	lnum, cha
 	tdl->rhs = strdup(rhs);
 	tdl->filename = path;
 	tdl->status = tdlstatus?:"instance";
-	tdl->odef = (*odef)?strdup(odef):0;
+	tdl->odef = (odef && *odef)?strdup(odef):NULL;
 	tdl->lnum = lnum;
 	tdl->operation = operation;
 }
@@ -231,10 +232,24 @@ void	tdl_pop_status()
 	tdlstatus = tdlstatus_stack[--tdlstatus_stack_pointer];
 }
 
+char	*path_for_include(char	*parent, char	*what, char	*suffix)
+{
+	char	dirpath[10240];
+	strcpy(dirpath, parent);
+	char	*p = dirpath + strlen(dirpath) - 1;
+	while(p>dirpath && *p!='/')p--;
+	*p = 0;
+	char	iname[10240];
+	sprintf(iname, "%s%s%s", dirpath, dirpath[0]?"/":"", what);
+	if(suffix)
+		if(!strstr(what, suffix))
+			strcat(iname, suffix);
+	return strdup(iname);
+}
+
 int	process_colon_command(char	*parent, char	*cmd)
 {
 	char	*word, *what, *status, *whatstatus, *p;
-	char	iname[1024], dirpath[1024];
 
 	cmd = trim_string(cmd);
 	word = strtok(cmd, " 	\n");
@@ -262,32 +277,20 @@ int	process_colon_command(char	*parent, char	*cmd)
 		tdl_pop_status();
 	else if(word && !strcmp(word, ":include"))
 	{
+		extern int g_transfer;
+		char	*suffix = g_transfer?NULL:".tdl";
 		what = trim_string(cmd + 9);
 		if(what[0]=='"' && what[strlen(what)-1]=='"' && strlen(what) > 2)
 		{
 			what++;
 			what[strlen(what)-1] = 0;
-			strcpy(dirpath, parent);
-			p = dirpath + strlen(dirpath) - 1;
-			while(p>dirpath && *p!='/')p--;
-			*p = 0;
-			sprintf(iname, "%s%s%s", dirpath, dirpath[0]?"/":"", what);
-			extern int g_transfer;
-			if(!g_transfer)
-			{
-				if(!strstr(what, ".tdl"))strcat(iname, ".tdl");
-			}
-			/*if(!tdlstatus && strstr(what, "parse-nodes"))
-			{
-				fprintf(stderr, "WARNING: implicitly setting tdl status to `parse-node'\n");
-				tdl_push_status("parse-node");
-			}*/
-			//printf(" should include `%s'\n", iname);
+			char	*iname = path_for_include(parent, what, suffix);
 			load_tdl(iname);
+			free(iname);
 		}
 		else
 		{
-			fprintf(stderr, "malformed tdl syntax: `:include %s'\n", what);
+			fprintf(stderr, "malformed TDL syntax: `:include %s'\n", what);
 			return -1;
 		}
 	}
@@ -347,6 +350,21 @@ int	load_tdl(char	*path)
 		lp = trim_string(line);
 
 		if(*lp == 0)continue;
+
+		if(loading_semi)
+		{
+			if(strchr(lp, ':') && (!strchr(lp, ' ') || strchr(lp, ':')<strchr(lp, ' ')))
+			{
+				if(process_semi_command(path, lnum, lp))return -1;
+				continue;
+			}
+			else
+			{
+				if(process_semi_line(path, lnum, lp))return -1;
+				continue;
+			}
+		}
+
 		if(lp[0] == '%')
 		{
 			if(lp[1]=='(')setup_morpho(lp+1);
@@ -470,7 +488,7 @@ struct type	*find_type(char	*name, int	constrain)
 	if(!type || (!is_atomic && constrain && !type->dg))
 	{
 		// try to find constraint for this type before returning it
-		if(type && name[0]=='G' && name[1]=='(')
+		if(type && name[0]=='g' && name[1]=='(')
 		{
 			// glb types may not be referenced explicitly
 			type = 0;
@@ -849,7 +867,17 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 	{
 		// handle one feature
 		label = ptr;
+		morelabel:
 		while(*ptr && (*ptr!=' ' && *ptr!='\t' && *ptr!='[' && *ptr!='<'))ptr++;
+		if(*ptr==' ' && (ptr[1] == '.' || (ptr[1] && ptr>label && ptr[-1]=='.')))
+		{
+			// someone put a space in a path, like:
+			// LOCAL .CAT.VAL.COMPS < blah >, or
+			// LOCAL.CAT. VAL.COMPS < blah >
+			// be nice to them.
+			ptr++;
+			goto morelabel;
+		}
 		if(!*ptr)
 		{
 			novalue:
@@ -1167,7 +1195,7 @@ int	iterate_tdl_lex(char	*path)
 }*/
 
 int	g_loaded = 0;
-extern int	ntypes, nlexemes, nrules, norules, ninstances, glb_type_count, debug_level, nfnames, nstrings;
+extern int	nlexemes, nrules, norules, ninstances, glb_type_count, debug_level, nfnames;
 
 void run_task(char *task, int (*worker)())
 {
@@ -1281,10 +1309,148 @@ int	load_grammar_top(char *toptdl)
 
 	if(g_transfer == 0)
 		fprintf(stderr, "%d types (%d glb), %d lexemes, %d rules, %d orules, %d instances, %d strings, %d features\n",
-				ntypes, glb_type_count, nlexemes, nrules, norules, ninstances, nstrings, nfnames);
+				default_type_hierarchy()->ntypes, glb_type_count, nlexemes, nrules, norules, ninstances, default_type_hierarchy()->nstrings, nfnames);
 	else fprintf(stderr, "%d types (%d glb) %d transfer rules, %d strings, %d features\n",
-				ntypes, glb_type_count, ntransfer_rules, nstrings, nfnames);
+				default_type_hierarchy()->ntypes, glb_type_count, ntransfer_rules, default_type_hierarchy()->nstrings, nfnames);
 	return 0;
+}
+
+enum
+{
+	semi_signature = 1,
+	semi_properties = 2,
+	semi_roles = 3,
+	semi_predicates = 4
+};
+
+int	semi_mode = 0;
+
+int	process_semi_command(char	*parent, int	lnum, char	*cmd)
+{
+	if(0) {}
+	else if(!strcasecmp(cmd, "signature:")) semi_mode = semi_signature;
+	else if(!strcasecmp(cmd, "properties:")) semi_mode = semi_properties;
+	else if(!strcasecmp(cmd, "roles:")) semi_mode = semi_roles;
+	else if(!strcasecmp(cmd, "predicates:")) semi_mode = semi_predicates;
+	else if(!strncasecmp(cmd, "include:", 8))
+	{
+		char	*file = trim_string(cmd + 8);
+		char	*iname = path_for_include(parent, file, NULL);
+		//fprintf(stderr, "SEMI INCLUDE %s\n", iname);
+		load_tdl(iname);
+		free(iname);
+	}
+	else
+	{
+		fprintf(stderr, "%s:%d:  unknown SEMI command: %s\n", parent, lnum, cmd);
+		return -1;
+	}
+	return 0;
+}
+
+int	process_semi_signature_line(char	*file, int	lnum, char	*line)
+{
+	int	l = strlen(line);
+	if(l && line[l-1]=='.')line[l-1]=0;
+
+	char	*delim = strstr(line, ":=");
+	if(!delim)
+	{
+		fprintf(stderr, "%s:%d: SEMI signature line with no := operator.\n", file, lnum);
+		return -1;
+	}
+
+	*delim = 0;
+	char	*lhs = trim_string(line);
+	char	*rhs = trim_string(delim + 2);
+
+	if(!*lhs || !*rhs)
+	{
+		fprintf(stderr, "%s:%d: missing operand\n", file, lnum);
+		return -1;
+	}
+
+	//fprintf(stderr, "SEMI signature line: %s   ||    %s\n", lhs, rhs);
+	tdlstatus = "semi-signature";
+	add_tdlline(lhs, '=', rhs, NULL, lnum, file);
+	return 0;
+}
+
+int	process_semi_properties_line(char	*file, int	lnum, char	*line)
+{
+	int	l = strlen(line);
+	if(l && line[l-1]=='.')line[l-1]=0;
+
+	char	*delim = strstr(line, ":");
+	if(!delim)
+	{
+		fprintf(stderr, "%s:%d: SEMI properties line with no : operator.\n", file, lnum);
+		return -1;
+	}
+
+	*delim = 0;
+	char	*lhs = trim_string(line);
+	char	*rhs = trim_string(delim + 2);
+
+	if(!*lhs || !*rhs)
+	{
+		fprintf(stderr, "%s:%d: missing operand\n", file, lnum);
+		return -1;
+	}
+
+	char	*vtype = strchr(lhs, '[');
+	if(!vtype || strlen(vtype) < 3 || !strchr(vtype+1, ']'))
+	{
+		fprintf(stderr, "%s:%d: missing variable type\n", file, lnum);
+		return -1;
+	}
+	*vtype = 0;
+	vtype++;
+	*strchr(vtype, ']') = 0;
+	vtype = trim_string(vtype);
+	lhs = trim_string(lhs);
+
+	//fprintf(stderr, "SEMI properties line: property '%s' on var type '%s' with data type '%s'\n", lhs, vtype, rhs);
+	lookup_fname(lhs);
+	return 0;
+}
+
+int	process_semi_line(char	*parent, int	lnum, char	*line)
+{
+	switch(semi_mode)
+	{
+		case	semi_signature:
+			return process_semi_signature_line(parent, lnum, line);
+		case	semi_properties:
+			return process_semi_properties_line(parent, lnum, line);
+		case	semi_roles:
+			//fprintf(stderr, "SEMI roles line: %s\n", line);
+			return 0;
+		case	semi_predicates:
+			//fprintf(stderr, "SEMI predicates line: %s\n", line);
+			return 0;
+		default:
+			fprintf(stderr, "SEMI line outside of any section: '%s'\n", line);
+			return -1;
+	}
+}
+
+struct type_hierarchy	*semi_th;
+
+int	load_semi(char	*path)
+{
+	tdl_push_status("semi");
+	loading_semi = 1;
+	semi_th = new_type_hierarchy("semi-signature", semi_top_type);
+	struct type_hierarchy	*main_th = default_type_hierarchy();
+	set_default_type_hierarchy(semi_th);
+	load_tdl(path);
+	// the following calls "add_type_only()" on each definition
+	process_tdl_status("semi-signature", typify_tdl_line, NULL);
+	make_glbs();
+	set_default_type_hierarchy(main_th);
+	loading_semi = 0;
+	tdl_pop_status();
 }
 
 int load_grammar(char	*path)
@@ -1325,6 +1491,10 @@ int load_grammar(char	*path)
 
 	int do_load_mem() { load_mem(get_conf_file_path(confdir, "maxent-model")); return 0; }
 	run_task("loading maxent model", do_load_mem);
+
+	char	*semi_path = get_conf_file_path(confdir, "semantic-interface");
+	if(semi_path)load_semi(semi_path);
+
 
 	compile_qc(get_conf_file_path(confdir, "quickcheck-code"));
 
