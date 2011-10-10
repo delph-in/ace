@@ -590,16 +590,13 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 			struct orule_sub *sub = or->sub+j;
 			if(!invert_ipat(sub->pat, sub->patl, sub->rep, sub->repl, wform, forml, stem, or->type))
 			{
-				// good guess; now check whether 'stem' actually inflects to 'form'
-				/*char *check = inflect(or, stem);
-				if(!check || strcasecmp(check, form))
+				// but, if there's an irregs.tab statement saying we don't support this inflection, respect it.
+				char	*irreg_form = hash_find(or->irregs_stem_to_form, stem);
+				if(irreg_form)
 				{
-					fprintf(stderr, "hah! we avoided being tricked; `%s' doesn't disinflect to `%s' under `%s', since that would go to `%s'\n",
-						form, stem, or->rule->name, check?check:"(null)");
-					if(check)free(check);
+					//fprintf(stderr, "hah! we avoided being tricked; `%s' doesn't disinflect to `%s' under `%s', since that would go to `%s'\n", form, stem, or->rule->name, check?check:"(null)");
 					continue;
 				}
-				free(check);*/
 
 				//fprintf(stderr, "form `%S' = stem `%s' under rule `%s'[%d], i.e. `%S' replaced by `%S'\n",
 				//		wform, stem, or->rule->name, j, sub->pat, sub->rep);
@@ -740,7 +737,7 @@ char	*inflect(struct orule	*or, char	*str)
 				break;
 			}
 		}
-		if(i<0)res=0;
+		if(i<0)res=NULL;
 		if(!or->nsub)res = freeze_string(str);
 	}
 	free(wstr);
