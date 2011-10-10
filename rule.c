@@ -197,7 +197,7 @@ struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels)
 		return 0;
 	}
 	// the unification succeeded; copy out the result, applying the packing restrictor
-	enable_packing(2);
+	enable_packing(inhibit_pack?0:2);
 	dg = copy_dg_with_comp_arcs(dg);
 	enable_packing(0);
 	generation++;

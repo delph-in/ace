@@ -15,6 +15,7 @@ char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
+int	dont_unspecialize = 0;
 
 int	preprocess_only = 0;
 extern char mrs_line_breaks;

@@ -744,11 +744,13 @@ int instantiate_hypothesis(struct hypothesis *h)
 	if(!h->string)
 		build_hypothesis_surface(h);
 
-	if(g_mode == GENERATING || !inhibit_pack)
+	extern int	dont_unspecialize;
+	int	unspecialize = (g_mode == GENERATING) && (!dont_unspecialize);
+	if(unspecialize || !inhibit_pack)
 	{
 		if(!arity)
 		{
-			if(g_mode == GENERATING)
+			if(unspecialize)
 			{
 				// generator lexeme.  don't put the specialized RELS list in.
 				h->dg = lexical_dg(h->edge->lex, 0);
@@ -1034,7 +1036,10 @@ int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct 
 	struct hypothesis		*hyp;
 	struct edge			*edge;
 
-	if(!nbest)return exhaustive_unpack(cell, process);
+extern int do_itsdb;
+	// exhaustive_unpack() is maybe a bit faster, but it doesn't do ranking,
+	// and it doesn't know how to `dont_unspecialize'...
+	//if(!nbest && !do_itsdb)return exhaustive_unpack(cell, process);
 
 	static struct scoring_ancestry	root_ancestry = {.nparent_types=0,.parent_types=NULL, .rooted = 1};
 
