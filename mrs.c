@@ -610,9 +610,9 @@ int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 	}
 	for(i=0;i<in->vlist.nvars;i++)vmap[i] = -1;
 	bzero(used, out->nrels);
-	if(in->ltop && !var_subsume(in->ltop, out->ltop, vmap, in->vlist.nvars))return 0;
-	if(in->index && !var_subsume(in->index, out->index, vmap, in->vlist.nvars))return 0;
-	if(in->xarg && !var_subsume(in->xarg, out->xarg, vmap, in->vlist.nvars))return 0;
+	if(in->ltop && out->ltop && !var_subsume(in->ltop, out->ltop, vmap, in->vlist.nvars))return 0;
+	if(in->index && out->index && !var_subsume(in->index, out->index, vmap, in->vlist.nvars))return 0;
+	if(in->xarg && out->xarg && !var_subsume(in->xarg, out->xarg, vmap, in->vlist.nvars))return 0;
 	DEBUG("mrs subsumption passed top-level checks\n");
 	return mrs_subsumes0(in, out, 0, vmap, used);
 }
