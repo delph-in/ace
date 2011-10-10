@@ -245,7 +245,9 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 //if(pft==-1)pft = new_timer("passive copy");
 //start_timer(pft);
 			if(g_mode == GENERATING)
+			{
 				u = finalize_tmp_noss(dg, 1);
+			}
 			else u = finalize_tmp(dg, 1);
 			//u = copy_dg(u);
 //stop_timer(pft, 1);
@@ -307,7 +309,9 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 //if(aft==-1)aft = new_timer("active copy");
 //start_timer(aft);
 			if(g_mode == GENERATING)
+			{
 				u = finalize_tmp_noss(dg, 0);
+			}
 			else u = finalize_tmp(dg, 0);
 //stop_timer(aft, 1);
 #ifdef	TIM
@@ -545,7 +549,9 @@ int	recall_hyper(struct edge	*b)
 	if(unify_dg_tmp(b->ha_dg, b->ha_par, b->ha_arg))
 		hyperfailure(b);
 	if(g_mode == GENERATING)// && b->have==b->need)
+	{
 		b->dg = finalize_tmp_noss(b->ha_par, (b->have==b->need)?1:0);
+	}
 	else b->dg = finalize_tmp(b->ha_par, (b->have==b->need)?1:0);
 #ifdef	TIM
 	gettimeofday(&tv2, 0);

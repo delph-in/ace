@@ -161,6 +161,6 @@ int	exhaustive_unpack(struct chart_cell	*cell, int (*process)(struct hypothesis 
 			}
 		}
 	}
-	fprintf(stderr, "NOTE: %d trees reconstructed\n", ninsthyps);
+	//fprintf(stderr, "NOTE: %d trees reconstructed\n", ninsthyps);
 	return total;
 }

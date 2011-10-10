@@ -348,6 +348,16 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		return -1;
 	}
 
+/*	if(reduce_lexical_lattice(lexical_chart))
+	{
+		fprintf(stderr, "NOTE: post reduction gap\n");
+		stop_timer(chart_setup_timer, 1);
+		return -1;
+	}*/
+
+	// do lexical parsing
+	lexical_parse_lattice(lexical_chart);
+
 	if(reduce_lexical_lattice(lexical_chart))
 	{
 		fprintf(stderr, "NOTE: post reduction gap\n");
@@ -355,8 +365,6 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		return -1;
 	}
 
-	// do lexical parsing
-	lexical_parse_lattice(lexical_chart);
 
 	if(trace)print_lexical_chart(lexical_chart);
 

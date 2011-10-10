@@ -182,6 +182,7 @@ int	reduce_lexical_lattice(struct lattice	*lat)
 		for(i=0;i<nchart_dependencies;i++)
 		{
 			struct dg	*from = dg_path(e1->dg, chart_dependencies_from[i]);
+			//printf("edge #%d %s from = %s\n", e1->id, e1->lex->word, from?from->xtype->name:"NULL");
 			if(from)
 			{
 				int	satisfied = 0;
@@ -198,8 +199,15 @@ int	reduce_lexical_lattice(struct lattice	*lat)
 		}
 		if(i<nchart_dependencies)
 		{
-			e1->frozen = 1;	// reduce
-			//printf("reduce edge #%d\n", e1->id);
+			// reduce
+			// don't mark as frozen; strange but true:
+			// an edge built on top of this one by lexical rules
+			// can survive chart reduction, and if we mark this one as frozen
+			// then the parent might not make it into the chart
+			//e1->frozen = 1;
+			remove_lattice_edge(lat, lat->edges[I]);
+			I--;
+			//printf("reduce edge #%d %s\n", e1->id, e1->lex->word);
 		}
 		else	// keep
 		{
