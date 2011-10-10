@@ -45,7 +45,9 @@ int	compile_qc(char	*qccode_path)
 		exit(-1);
 	}
 
-	char	target_path[128] = "/tmp/qcex.so-XXXXXX";
+	char	*tmpdir = getenv("TMPDIR")?:"/tmp";
+	char	target_path[1280] = "/tmp/qcex.so-XXXXXX";
+	sprintf(target_path, "%s/qcex.so-XXXXXX", tmpdir);
 	int	fd = mkstemp(target_path);
 
 	FILE	*qccode = fopen(qccode_path, "r");
@@ -125,8 +127,15 @@ int	compile_qc(char	*qccode_path)
 
 qc_extractor_function	dynamically_link_qc_extractor()
 {
-	char	path[128] = "/tmp/qcex.so-XXXXXX";
+	//char	path[128] = "/tmp/qcex.so-XXXXXX";
+	//int	fd = mkstemp(path);
+
+
+	char	*tmpdir = getenv("TMPDIR")?:"/tmp";
+	char	path[1280] = "/tmp/qcex.so-XXXXXX";
+	sprintf(path, "%s/qcex.so-XXXXXX", tmpdir);
 	int	fd = mkstemp(path);
+
 	assert(qc_image_size = write(fd, qc_image, qc_image_size));
 	close(fd);
 	void	*dl = dlopen(path, RTLD_NOW);

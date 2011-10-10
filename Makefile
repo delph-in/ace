@@ -20,6 +20,8 @@ CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -falign-loops=32 -funroll-loo
 #CFLAGS+=-fnested-functions
 #CFLAGS+=-fPIC
 
+TIMER_LIB=timer.o
+
 CFLAGS+=${DELPHIN_CFLAGS} ${POST_CFLAGS} ${REPP_CFLAGS}
 
 OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o treebank-control.o token.o lattice-mapping.o lexical-parse.o generalize.o unicode.o transfer.o edge-vectors.o forest-out.o exunpack.o semilattice.o rebuild-th.o compile-qc.o idiom.o
@@ -28,10 +30,10 @@ PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o)
 APPOBJ=${OBJ} main.o
 
 ace: ${APPOBJ}
-	${CC} -Wl,--export-dynamic ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -lboost_regex -lstdc++ -la
+	${CC} -Wl,--export-dynamic ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -lboost_regex -lstdc++ -ldl ${TIMER_LIB}
 
 static: ${APPOBJ}
-	${CC} ${CFLAGS} ${APPOBJ} -static -o ace.static ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -L ~/local/lib/ -lboost_regex -lstdc++ -la
+	${CC} -Wl,--dynamic-list=dylist.txt ${CFLAGS} ${APPOBJ} -static ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -L ~/local/lib/ -lboost_regex -lstdc++ -la -ldl -o ace.static
 
 ${PICOBJS} : pic/%.o: %.c
 	${CC} ${CFLAGS} -fPIC -c $< -o $@
