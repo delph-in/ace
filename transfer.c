@@ -353,7 +353,7 @@ void	show_transfer_counts() __attribute__ ((destructor));
 void	show_transfer_counts()
 {
 	if(g_mode == GENERATING)
-		printf("NOTE: transfer did %d successful unifies and %d failed ones\n", nsuccessful_transfer_unifies, nfailed_transfer_unifies);
+		fprintf(stderr, "NOTE: transfer did %d successful unifies and %d failed ones\n", nsuccessful_transfer_unifies, nfailed_transfer_unifies);
 }
 
 int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total)
