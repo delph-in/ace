@@ -108,8 +108,15 @@ static char	*parse_word(char	**P)
 
 	if(*p==' ')p++;
 	ret = p;
-	while(*p && *p!=' ')p++;
+	int	quoted = 0;
+	while(*p && (*p!=' ' || quoted))
+	{
+		if(*p=='\\' && p[1])p++;
+		else if(*p=='"')quoted=!quoted;
+		p++;
+	}
 	if(*p==' '){*p=0;p++;}
+	else assert(!quoted);
 	*P = p;
 	return *ret?ret:0;
 }

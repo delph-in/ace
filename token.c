@@ -34,14 +34,24 @@ char	*get_token_carg(struct token	*t)
 	return NULL;
 }
 
+struct dg	*new_dag_for_unfrozen_string(char	*str)
+{
+	str = freeze_string(str);
+	struct type	*ty = add_string(str);
+	struct dg	*dg = atomic_dg(top_type);
+	dg->type = dg->xtype = ty;
+	return dg;
+}
+
 struct dg	*build_pos_tags_list(char	*tag)
 {
 	char	tag_str[32];
 	sprintf(tag_str, "\"%s\"", tag);
 	struct dg	*list = atomic_dg("*cons*");
-	struct type	*tagtype = add_string(freeze_string(tag_str));
+	/*struct type	*tagtype = add_string(freeze_string(tag_str));
 	struct dg	*tagdg = tagtype->dg?:atomic_dg(top_type);
-	tagdg->xtype=tagdg->type=tagtype;
+	tagdg->xtype=tagdg->type=tagtype;*/
+	struct dg	*tagdg = new_dag_for_unfrozen_string(tag_str);
 	list = add_dg_hop(list, 1, tagdg);	// FIRST
 	list = add_dg_hop(list, 2, type_dg("*null*"));	// REST
 	return list;
@@ -57,9 +67,9 @@ void	build_token_dag(struct token	*t)
 	sprintf(c_from_str, "\"%d\"", t->cfrom);
 	sprintf(c_to_str, "\"%d\"", t->cto);
 	//print_dg(dg);
-	dg = dg_path_add(dg, token_form_path, temporary_string_type(freeze_string(bigger_string))->dg);
-	dg = dg_path_add(dg, token_from_path, temporary_string_type(freeze_string(c_from_str))->dg);
-	dg = dg_path_add(dg, token_to_path, temporary_string_type(freeze_string(c_to_str))->dg);
+	dg = dg_path_add(dg, token_form_path, new_dag_for_unfrozen_string(bigger_string));//temporary_string_type(freeze_string(bigger_string))->dg);
+	dg = dg_path_add(dg, token_from_path, new_dag_for_unfrozen_string(c_from_str));//temporary_string_type(freeze_string(c_from_str))->dg);
+	dg = dg_path_add(dg, token_to_path, new_dag_for_unfrozen_string(c_to_str));//temporary_string_type(freeze_string(c_to_str))->dg);
 	if(t->postag)dg = dg_path_add(dg, token_postags_path, build_pos_tags_list(t->postag));
 	dg = wellform_dg(dg);
 	t->dg = dg;

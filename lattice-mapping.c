@@ -911,7 +911,7 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 			if(unify_dg_tmp(lattice_dg(inputs[i]), lattice_rule_spot(r, i), -1) != 0)
 			{
 				forget_tmp();
-				DEBUG_VERBOSE(" ... didn't unify\n"); //unify_backtrace(); /*print_dg(lattice_rule_spot(r,i));printf("\n");*/
+				DEBUG_VERBOSE(" ... didn't unify\n"); //unify_backtrace(); print_dg(lattice_rule_spot(r,i));printf("\n");
 				record_failed(inputs, have);
 				return 0;
 			}

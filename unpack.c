@@ -91,6 +91,7 @@ void score_hypothesis(struct hypothesis *h)
 		//printf("should score surface `%s'\n", surface);
 		char	*lhs_sign = edge_sign(e);
 		h->score = maxent_score(lhs_sign, surface, NULL, 0, &h->ancestry);
+		//printf("got score: %f\n", h->score);
 	}
 }
 
