@@ -9,8 +9,8 @@
 #ifdef	TSDB
 #include	<itsdb.h>
 #else
-//#define capi_printf	printf
-#define capi_printf(fmt,...)
+#define capi_printf	printf
+//#define capi_printf(fmt,...)
 #endif
 
 #include	"chart.h"
@@ -18,6 +18,8 @@
 #include	"lexicon.h"
 #include	"mrs.h"
 #include	"unpack.h"
+
+//#define	capi_printf(fmt...)	fprintf(stderr, fmt)
 
 extern int inhibit_results;
 
@@ -47,6 +49,8 @@ extern int best_only;
 
 int	tsdb_i_id = -1;
 
+int tsdb_nanalyses, tsdb_maxanalyses, tsdb_nderivations, tsdb_maxderivations=1000;
+
 static int process_item(int i_id, const char *i_input, int parse_id, 
 		int edges, int nanalyses, int nderivations, int interactive, const char	*who_knows_what_this_argument_is)
 {
@@ -56,8 +60,14 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	clock_t	c0, c1;
 	char	*error = 0;
 
+	//fprintf(stderr, "process_item asked for: %d = nanalyses, %d = nderivations\n", nanalyses, nderivations);
+	tsdb_maxanalyses = nanalyses;
+	tsdb_maxderivations = nderivations;
+	tsdb_nanalyses = 0;
+	tsdb_nderivations = 0;
+
 	inhibit_results = 1;
-	best_only = nderivations;
+	best_only = nanalyses;//nderivations;
 	tsdb_i_id = i_id;
 
 	top_copies = top_unifies_wellform = top_unifies = 0;
@@ -105,7 +115,9 @@ itsdb_report(int nwords, char **words, int	status, int	tforest)
 		int	readings = capi_print_derivations(nwords, words);
 
 		capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
-			readings, passive_edges, real_edges - passive_edges);
+//			readings,
+			tsdb_nanalyses,
+			passive_edges, real_edges - passive_edges);
 
 		capi_printf("(:others . %d) ", slab_usage());
 		return readings;
@@ -122,7 +134,9 @@ itsdb_report_gen(int readings)
 	extern int total_edges, real_edges, passive_edges, slab_usage();
 
 	capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
-		readings, passive_edges, real_edges - passive_edges);
+//		readings,
+		tsdb_nanalyses,
+		passive_edges, real_edges - passive_edges);
 
 	capi_printf("(:others . %d) ", slab_usage());
 
@@ -135,6 +149,11 @@ itsdb_end_results() { capi_printf(")) "); }
 itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 {
 	char		*esc = malloc(strlen(hyp->string)*2+1), *p, *q;
+
+	tsdb_nanalyses++;
+
+	if(tsdb_nderivations >= tsdb_maxderivations)return;
+	tsdb_nderivations++;
 
 	capi_printf("((:result-id . %d)", id++);
 	
@@ -180,15 +199,30 @@ int	capi_print_derivations(int nwords, char **words)
 	id = 0;
 	int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
+		tsdb_nanalyses++;
+		if(tsdb_nderivations >= tsdb_maxderivations)return 1;
+		tsdb_nderivations++;
+
 		char	*derivation = hypothesis_to_dstring(hyp);
 		char	*hesc = heap_escape(derivation), *esc = hesc;
 		free(derivation);
 		capi_printf("((:result-id . %d) (:derivation .\"", id++);
 		// capi_printf can only handle 1kb chunks at a time... :blink:
+		// if we blindly split text up at 1kb boundaries,
+		// we stand a chance of splitting in the middle of a multibyte character.
+		// capi_printf() apparently has a problem with that...
+		// soooo... be more careful?
 		while(strlen(esc) > 1000)
 		{
-			capi_printf("%.*s", 1000, esc);
-			esc += 1000;
+			// figure out how many characters less than 1000
+			// we have to send to avoid stopping in the middle of a multibyte sequence.
+			// this code assumes characters in the middle of a multibyte sequence
+			// are >= 128. (true for UTF-8)
+			int	snark = 0;
+			while(0x80 & esc[1000-snark])
+				snark--;
+			capi_printf("%.*s", 1000-snark, esc);
+			esc += 1000-snark;
 		}
 		capi_printf("%s", esc);
 		free(hesc);
