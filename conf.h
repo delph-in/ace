@@ -29,6 +29,8 @@ extern int			enable_index_accessibility_filtering;
 extern int			extra_erg_dag_stash;
 extern int			enable_post;
 
+extern int			reduce_chart_before_lexical_parsing;
+
 extern char			*token_type;
 extern struct path	token_form_path, token_from_path, token_to_path, token_id_path, token_postags_path, token_posprobs_path;
 extern struct path	lex_tokens_list_path, lex_tokens_last_path;

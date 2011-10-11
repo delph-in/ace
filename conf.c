@@ -24,6 +24,7 @@ char	*semi_top_type;
 
 struct path	*chart_dependencies_from, *chart_dependencies_to;
 int			nchart_dependencies;
+int			reduce_chart_before_lexical_parsing;
 
 int enable_post = 0;
 
@@ -154,6 +155,7 @@ struct conf
 
 	struct path	*chart_dependencies_to, *chart_dependencies_from;
 	int			nchart_dependencies;
+	int			reduce_chart_before_lexical_parsing;
 
 	char	*token_type;
 	struct path	token_form_path, token_from_path, token_to_path,
@@ -229,6 +231,7 @@ void	*freeze_conf()
 		c->chart_dependencies_from = freeze_block(chart_dependencies_from, sizeof(struct path)*nchart_dependencies);
 		c->chart_dependencies_to = freeze_block(chart_dependencies_to, sizeof(struct path)*nchart_dependencies);
 		c->nchart_dependencies = nchart_dependencies;
+		c->reduce_chart_before_lexical_parsing = reduce_chart_before_lexical_parsing;
 
 		c->deleted_daughters = freeze_block(deleted_daughters, restrictor_size);
 		c->parsing_packing = freeze_block(parsing_packing, restrictor_size);
@@ -276,6 +279,7 @@ void	recover_conf(void	*vc)
 		nchart_dependencies = c->nchart_dependencies;
 		chart_dependencies_from = c->chart_dependencies_from;
 		chart_dependencies_to = c->chart_dependencies_to;
+		reduce_chart_before_lexical_parsing = c->reduce_chart_before_lexical_parsing;
 
 		lex_tokens_list_path = c->lex_tokens_list_path;
 		lex_tokens_last_path = c->lex_tokens_last_path;
@@ -337,6 +341,7 @@ load_syntax_conf()
 	extract_mrs_path = get_conf_path("semantics-path");
 
 	load_chart_dependencies(get_conf("chart-dependencies"));
+	reduce_chart_before_lexical_parsing = get_conf_bool("process-chart-dependencies-before-lexical-parsing");
 
 	enable_token_avms = get_conf_bool("token-mapping");
 	if(enable_token_avms)
