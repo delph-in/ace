@@ -582,7 +582,13 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 		if(irreg_stem)
 		{
 			add_ochart_edge(edge, chart, irreg_stem, or);
-			continue;
+			// NOTE: we do NOT want to cut the search here, actually.
+			// in the case of FORWARD morphology,
+			// we would want to; i.e. an irregular spelling supresses regular rules
+			// but for BACKWARDS morphology,
+			// a given surface form could in theory be both the irregular spelling
+			// of one base form AND the regular spelling of a DIFFERENT base form.
+			// continue;
 		}
 
 		for(j=or->nsub-1;j>=0;j--)
@@ -590,7 +596,10 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 			struct orule_sub *sub = or->sub+j;
 			if(!invert_ipat(sub->pat, sub->patl, sub->rep, sub->repl, wform, forml, stem, or->type))
 			{
-				// but, if there's an irregs.tab statement saying we don't support this inflection, respect it.
+				// under regular morphology,
+				// 'stem' would inflect to 'form'.
+				// but, if there's an irregs.tab statement saying something different happens,
+				// then don't go down this route.
 				char	*irreg_form = hash_find(or->irregs_stem_to_form, stem);
 				if(irreg_form)
 				{
