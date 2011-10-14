@@ -332,8 +332,11 @@ int	generate(struct mrs	*mrs)
 		//if(!mrs_subsumes(mrs, mrs_res))
 		if(!mrs_subsumes(hax_ref, hax_res))
 		{
-			if(trace){ printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
-			print_mrs(hax_res); printf("\n"); }
+			if(trace)
+			{
+				printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
+				print_mrs(hax_res); printf("\n");
+			}
 			//print_mrs(mrs_res); printf("\n"); }
 			free_mrs(mrs_res);
 			return 0;

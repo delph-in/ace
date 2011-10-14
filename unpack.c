@@ -1068,6 +1068,7 @@ extern int do_itsdb;
 		}
 	}
 
+	int	complained_about_unidiomatic_input = 0;
 	static int	hyp_timer = -1, inst_timer = -1, mrs_timer = -1;
 	int	ninsthyps = 0;
 	if(hyp_timer==-1)hyp_timer = new_timer("hypothesize");
@@ -1101,7 +1102,16 @@ extern int do_itsdb;
 					m = extract_mrs(hyp->dg);
 					stop_timer(mrs_timer, 1);
 				}
-				if(check_idioms(hyp->dg, m))
+				int idiomatic = check_idioms(hyp->dg, m);
+				if(!idiomatic && (g_mode == GENERATING))
+				{
+					if(!complained_about_unidiomatic_input)
+					{
+						complained_about_unidiomatic_input = 1;
+						fprintf(stderr, "NOTE: generated unidiomatic output; is the generator input idiomatic?\n");
+					}
+				}
+				if(idiomatic || (g_mode == GENERATING))
 				{
 					//printf("hyp = %p\n", hyp);
 					//printf("\n"); print_hypothesis(h, printf); printf("\n");
