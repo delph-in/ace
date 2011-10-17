@@ -616,10 +616,12 @@ int	load_expedients(char	*path)
 		{
 			if(*exp && exp[strlen(exp)-1]=='\n')
 				exp[strlen(exp)-1] = 0;
+			if(*exp==0)continue;
+			if(*exp==';')continue;
 			nexpedients++;
 			expedients = realloc(expedients, sizeof(char*)*(nexpedients+1));
-			expedients[nexpedients-1] = strdup(exp);
-			expedients[nexpedients] = 0;
+			expedients[nexpedients-1] = strdup(trim_string(exp));
+			expedients[nexpedients] = NULL;
 		}
 		fclose(f);
 		return 0;

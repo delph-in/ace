@@ -413,7 +413,7 @@ void iterate_conf_list(char	*key, int	(*callback)(char	*word))
 void	configure_rule(struct rule	*r)
 {
 	r->gen_ignore = 0;
-	if(temporary_expedient(r->name))r->gen_ignore = 1;
+	if(temporary_expedient(r->name)) r->gen_ignore = 1;
 	else add_semantic_index(r, r->dg, 1);
 
 	r->span_only = check_conf_list("spanning-only-rules", r->name);

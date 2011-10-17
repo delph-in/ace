@@ -1475,7 +1475,12 @@ int load_grammar(char	*path)
 	load_conf();
 	load_version(get_conf_file_path(confdir, "version"));
 	load_preprocessor(confdir);
-	load_expedients(get_conf_file_path(confdir, "generation-ignore-signs"));	// before grammar loading so the semindex knows how to build
+
+	// before grammar loading so the semindex knows how to build
+	load_expedients(get_conf_file_path(confdir, "generation-ignore-signs"));
+	load_expedients(get_conf_file_path(confdir, "generation-ignore-lexemes"));
+	load_expedients(get_conf_file_path(confdir, "generation-ignore-rules"));
+
 	load_grammar_top(get_conf_file_path(confdir, "grammar-top"));
 
 	load_triggers(get_conf_file_path(confdir, "generation-trigger-rules"));
