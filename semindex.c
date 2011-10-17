@@ -304,18 +304,18 @@ void print_spn_activation(struct semindex_pred_node	*node)
 	printf("\n");
 }
 
-struct spn_list	*activate_semindex_node(struct semindex_pred_node *node, struct mrs_ep *ep, struct spn_list	*rest)
+int	activate_semindex_node(struct semindex_pred_node *node, struct mrs_ep *ep, struct spn_list	**Rest)
 {
 	struct ep_list				*epl;
 	struct spn_list				*spnl;
 
 	// if this node hasn't been activated yet, record it in our list of activated nodes
-	if(node->activation)spnl = rest;
+	if(node->activation)spnl = *Rest;
 	else
 	{
 		spnl = slab_alloc(sizeof(struct spn_list));
 		spnl->node = node;
-		spnl->next = rest;
+		spnl->next = *Rest;
 	}
 
 	// add the relevant ep to the activation record
@@ -329,7 +329,10 @@ struct spn_list	*activate_semindex_node(struct semindex_pred_node *node, struct 
 		node->activation = epl;
 	}
 
-	return spnl;
+	//printf("node '%s' [%d entities]\n", node->pred, node->nentities);
+
+	*Rest = spnl;
+	return node->nentities;
 }
 
 char *ep_has_carg(struct mrs_ep *ep)
@@ -341,25 +344,72 @@ char *ep_has_carg(struct mrs_ep *ep)
 	return 0;
 }
 
-struct spn_list	*activate_semindex(struct mrs_ep *ep, struct spn_list	*rest)
+struct semindex_pred_node	*invent_semindex_node_for_gle(struct lexeme	*gle)
+{
+	struct semindex_pred_node	*node = slab_alloc(sizeof(*node));
+	bzero(node, sizeof(*node));
+	node->pred = gle->pred->name;
+	node->nentities = node->aentities = 1;
+	struct grammar_entity	*e = slab_alloc(sizeof(*e));
+	bzero(e, sizeof(*e));
+	node->entities = e;
+	e->what = LEXEME;
+	e->lex = gle;
+	return node;
+}
+
+int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
 {
 	char						*carg = ep_has_carg(ep);
 	struct semindex_pred_node	*node = lookup_semindex(ep->pred, 0), *cnode;
-	int							i;
+	int							i, count = 0;
 
-	if(!node)return rest;
+	//printf("activating '%s'\n", ep->pred);
+
+	if(!node)return 0;
 	ep->active = 0;
 	for(i=0;i<node->nrelatives;i++)
 		if(pred_subsumes(node->relatives[i]->pred, node->pred))
-			rest = activate_semindex_node(node->relatives[i], ep, rest);
+			count += activate_semindex_node(node->relatives[i], ep, Rest);
 	if(carg)
 	{
 		// grammar entities with CARG's aren't put into their pred's index slot, but into the carg's index slot.
 		// go looking for those.
 		cnode = lookup_semindex(carg, 0);
-		if(cnode)rest = activate_semindex_node(cnode, ep, rest);
+		if(cnode) count += activate_semindex_node(cnode, ep, Rest);
 	}
-	return activate_semindex_node(node, ep, rest);
+	count += activate_semindex_node(node, ep, Rest);
+
+	if(!count)
+	{
+		// if there is a CARG, we get to look at generic LEs
+		char	*carg = NULL;
+		for(i=0;i<ep->nargs;i++)
+			if(!strcmp(ep->args[i].name, "CARG") && ep->args[i].value->is_const)
+				carg = ep->args[i].value->name;
+		if(carg)
+		{
+			// see if any generic LEs provide this relation
+			for(i=0;i<ngeneric_les;i++)
+			{
+				if(!generic_le_infos[i].for_generation)continue;
+				struct type	*p = generic_les[i]->pred;
+				if(!strcmp(p->name, ep->pred))
+				{
+					// bingo.
+					//printf("NOTE: generic '%s' fires for unknown input EP '%s'\n", generic_les[i]->word, ep->pred);
+					// FIXME the first 'carg' argument below possibly should be a 
+					// modified copy of the string with spaces changed to underscores
+					// (or vice versa?)
+					struct lexeme	*igle = instantiate_gle(generic_les[i], carg, carg);
+					node = invent_semindex_node_for_gle(igle);
+					count += activate_semindex_node(node, ep, Rest);
+				}
+			}
+		}
+	}
+	
+	return count;
 }
 
 // enumeration
@@ -578,12 +628,18 @@ void	check_triggers(int	nx, char	**x, int	ny, char	**y)
 void semantic_lookup(struct mrs	*mrs)
 {
 	extern int debug_level;
-	struct spn_list	*active = 0, *walk;
+	struct spn_list	*active = NULL, *walk;
 	int				i, count = 0;
 
 	// activate index nodes
 	for(i=0;i<mrs->nrels;i++)
-		active = activate_semindex(mrs->rels+i, active);
+	{
+		int	nnodes = activate_semindex(mrs->rels+i, &active);
+		if(!nnodes)
+		{
+			fprintf(stderr, "NOTE: EP '%s' is unknown in the semantic index\n", mrs->rels[i].pred);
+		}
+	}
 
 	// enumerate grammar entity alignments
 	struct ep_alignment	*alignments = NULL, *awalk;

@@ -60,6 +60,7 @@ struct grammar
 
 	struct rule	**rules;
 	struct lexeme	**lexemes, **generic_les;
+	struct generic_le_info	*generic_le_infos;
 	struct orule	**orules;
 	char		**fnames;
 	char		*lgroups[256];
@@ -375,7 +376,8 @@ extern struct type_hierarchy	*main_th, *semi_th;
 	G->rules = slab_alloc(sizeof(void*) * G->nrules);	memcpy(G->rules, rules, sizeof(void*) * G->nrules);
 	G->orules = slab_alloc(sizeof(void*) * G->norules);	memcpy(G->orules, orules, sizeof(void*) * G->norules);
 	G->lexemes = slab_alloc(sizeof(void*) * G->nlexemes);	memcpy(G->lexemes, lexemes, sizeof(void*) * G->nlexemes);
-	G->generic_les = slab_alloc(sizeof(void*) * G->nlexemes);	memcpy(G->generic_les, generic_les, sizeof(void*) * G->ngeneric_les);
+	G->generic_les = slab_alloc(sizeof(void*) * G->ngeneric_les);	memcpy(G->generic_les, generic_les, sizeof(void*) * G->ngeneric_les);
+	G->generic_le_infos = slab_alloc(sizeof(struct generic_le_info) * G->ngeneric_les);	memcpy(G->generic_le_infos, generic_le_infos, sizeof(struct generic_le_info) * G->ngeneric_les);
 	G->fnames = slab_alloc(sizeof(void*) * G->nfnames);	memcpy(G->fnames, fnames, sizeof(char*) * G->nfnames);
 	G->vpm = freeze_vpm();
 	G->labels = freeze_labels();
@@ -444,6 +446,7 @@ extern struct type_hierarchy	*main_th, *semi_th;
 
 	lexemes = G->lexemes;
 	generic_les = G->generic_les;
+	generic_le_infos = G->generic_le_infos;
 	rules = G->rules;
 	orules = G->orules;
 

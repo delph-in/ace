@@ -17,6 +17,7 @@ int		nlexemes;
 int		alexemes = 0;
 
 struct lexeme	**generic_les;
+struct generic_le_info	*generic_le_infos;
 int		ngeneric_les;
 
 extern unsigned int	generation;
@@ -677,6 +678,13 @@ int	study_generic_le(char	*name, struct dg	*dg)
 	ngeneric_les++;
 	generic_les = realloc(generic_les, sizeof(struct lexeme)*ngeneric_les);
 	generic_les[ngeneric_les-1] = l;
+
+	generic_le_infos = realloc(generic_le_infos, sizeof(struct generic_le_info) * ngeneric_les);
+	bzero(&generic_le_infos[ngeneric_les-1], sizeof(struct generic_le_info));
+
+	if(check_conf_list("generic-les-for-semantic-index", name))
+		generic_le_infos[ngeneric_les-1].for_generation = 1;
+
 	return 0;
 }
 
@@ -724,4 +732,37 @@ int	load_lexicon()
 	show_task_name("simple lexemes");
 	printf("%d / %d = %.2f%%\n", nsimpleform, nlexemes, 100*(float)nsimpleform / nlexemes);
 	return 0;
+}
+
+struct lexeme	*instantiate_gle(struct lexeme	*gle, char	*surface, char	*carg)
+{
+	// create a temporary copy of 'gle'
+	// stuff 'surface' in as the orthography value
+	// stuff 'carg' in as the CARG value
+	struct lexeme	*l = slab_alloc(sizeof(*l));
+	bzero(l, sizeof(*l));
+	int	wl = strlen(gle->word);
+	int	sl = strlen(surface);
+	char	wordname[wl + 10 + sl];
+	sprintf(wordname, "%s[%s]", gle->word, surface);
+	l->word = freeze_string(wordname);
+	l->dg = copy_dg(gle->dg);
+	assert(gle->stemlen == 1);
+	l->stemlen = 1;
+	l->onset = gle->onset;
+	l->stem = slab_alloc(sizeof(struct type*));
+	l->lextype = gle->lextype;
+	l->select = gle->select;
+	l->pred = gle->pred;
+
+	// set the orthography value
+	l->stem[0] = add_string(surface);
+	// set the CARG value
+	
+	static int savef[10] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+	struct dg	*carg_dg;
+	carg_dg = walk_dg(l->dg, savef, "SYNSEM", "LOCAL", "CONT", "RELS", "LIST", "FIRST", "CARG", NULL);
+	assert(carg_dg != NULL);
+	carg_dg->type = carg_dg->xtype = add_string(carg);
+	return l;
 }
