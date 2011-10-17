@@ -655,7 +655,11 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 	int vnin = in->vnum, i, j;
 
 	if(in->is_const)
+	{
+		if(!out->is_const)return 0;
 		return !strcmp(in->name, out->name);
+	}
+	else if(out->is_const)return 0;
 
 	//printf(" subsume? %s <=> %s  ;; in.%d->%d and out=%d\n", in->name, out->name, vnin, vmap[vnin], out->vnum);
 	if(vmap[vnin]!=-1)

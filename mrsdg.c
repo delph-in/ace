@@ -160,7 +160,8 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 			//if(var_extract_timer == -1)var_extract_timer = new_timer("mrs var extr");
 			//start_timer(var_extract_timer);
 			var = slab_calloc(sizeof(struct mrs_var), 1);
-			if(!descendent_of(dg->type->tnum, semarg)) var->is_const = 1;
+			struct type	*t = dg->type;
+			if(t->name[0]=='"' || !descendent_of(t->tnum, semarg)) var->is_const = 1;
 			var->dg = dg;
 			var->type = var->is_const?strdup("c"):strdup(dg->type->name);
 			var->name = strdup(dg->type->name);
