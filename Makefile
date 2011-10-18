@@ -5,8 +5,7 @@ PREFIX=/usr/local
 DELPHIN_CFLAGS=-isystem ~/logon/lingo/lkb/include -DTSDB
 DELPHIN_LIBS=-L ~/logon/lingo/lkb/lib/linux.x86.64 -litsdb -lpvm3
 
-POST_CFLAGS=-I../post/ -DPOST
-POST_LIBS=../post/post.o
+POST_CFLAGS=-I post/ -DPOST
 
 REPP_LIBS=-lrepp
 #REPP_CFLAGS=-I ${REPP_DIR}/include/
@@ -24,7 +23,7 @@ TIMER_LIB=timer.o
 
 CFLAGS+=${DELPHIN_CFLAGS} ${POST_CFLAGS} ${REPP_CFLAGS}
 
-OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o treebank-control.o token.o lattice-mapping.o lexical-parse.o generalize.o unicode.o transfer.o edge-vectors.o forest-out.o exunpack.o semilattice.o rebuild-th.o compile-qc.o idiom.o
+OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o treebank-control.o token.o lattice-mapping.o lexical-parse.o generalize.o unicode.o transfer.o edge-vectors.o forest-out.o exunpack.o semilattice.o rebuild-th.o compile-qc.o idiom.o post/post.o
 
 PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o)
 APPOBJ=${OBJ} main.o
@@ -34,6 +33,9 @@ ace: ${APPOBJ}
 
 static: ${APPOBJ}
 	${CC} -Wl,--dynamic-list=dylist.txt ${CFLAGS} ${APPOBJ} -static ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -L ~/local/lib/ -lboost_regex -lstdc++ -la -ldl -o ace.static
+
+post/post.o:
+	make -C post
 
 ${PICOBJS} : pic/%.o: %.c
 	${CC} ${CFLAGS} -fPIC -c $< -o $@

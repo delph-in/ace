@@ -238,7 +238,10 @@ void	initialize_engine()
 		load_grammar(load_grammar_path);
 #ifdef	POST
 		if(enable_post)
-			post_train_from("../post/brown.train.txt");
+		{
+		//	post_train_from("../post/brown.train.txt");
+			post_load_from_text_dump("post/english-postagger.hmm");
+		}
 #endif
 		gettimeofday(&tv2, 0);
 		tv2.tv_sec -= tv1.tv_sec;
