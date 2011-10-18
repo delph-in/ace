@@ -28,7 +28,7 @@ OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.
 PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o)
 APPOBJ=${OBJ} main.o
 
-ace: ${APPOBJ}
+ace: ${APPOBJ} ${TIMER_LIB}
 	${CC} -Wl,--export-dynamic ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -Wl,-Bstatic -lboost_regex -lstdc++ -Wl,-Bdynamic -ldl ${TIMER_LIB}
 
 static: ${APPOBJ}
