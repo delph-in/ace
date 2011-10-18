@@ -3,11 +3,11 @@ PREFIX=/usr/local
 
 
 DELPHIN_CFLAGS=-isystem ~/logon/lingo/lkb/include -DTSDB
-DELPHIN_LIBS=-L ~/logon/lingo/lkb/lib/linux.x86.64 -litsdb -lpvm3
+DELPHIN_LIBS=-L ~/logon/lingo/lkb/lib/linux.x86.64 -Wl,-Bstatic -litsdb -lpvm3 -Wl,-Bdynamic
 
 POST_CFLAGS=-I post/ -DPOST
 
-REPP_LIBS=-lrepp
+REPP_LIBS=-Wl,-Bstatic -lrepp -Wl,-Bdynamic
 #REPP_CFLAGS=-I ${REPP_DIR}/include/
 
 #CPU=-m32
@@ -29,7 +29,7 @@ PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o)
 APPOBJ=${OBJ} main.o
 
 ace: ${APPOBJ}
-	${CC} -Wl,--export-dynamic ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -lboost_regex -lstdc++ -ldl ${TIMER_LIB}
+	${CC} -Wl,--export-dynamic ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -Wl,-Bstatic -lboost_regex -lstdc++ -Wl,-Bdynamic -ldl ${TIMER_LIB}
 
 static: ${APPOBJ}
 	${CC} -Wl,--dynamic-list=dylist.txt ${CFLAGS} ${APPOBJ} -static ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -L ~/local/lib/ -lboost_regex -lstdc++ -la -ldl -o ace.static
