@@ -16,6 +16,7 @@
 #ifdef POST
 #include	"post.h"
 #endif
+#include	"version.h"
 
 //#include	<liba.h>
 
@@ -88,8 +89,11 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "hvpfEPL:lXg:G:m:qtTRe1n:r:jFOs"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "VhvpfEPL:lXg:G:m:qtTRe1n:r:jFOs"))!=255)switch(ch)
 	{
+		case	'V':	printf("ACE version %s\n", ACE_VERSION);
+						printf("compiled at " __TIME__ " on "  __DATE__ "\n");
+						exit(0);
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
 		case	'g':	load_grammar_path = optarg;	break;
@@ -117,6 +121,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'?':	goto usage;
 	}
 	if(optind<argc-1)goto usage;
+	if(!load_grammar_path)goto usage;
 	if(optind<argc)sentence_path = argv[optind];
 	else if(!save_grammar_path)sentence_path = "-";
 }

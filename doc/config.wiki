@@ -17,16 +17,22 @@ Paths to other files:
 || variable-property-mapping || path to the VPM definition ||
 || parse-node-labels || path to a TDL file defining parse node labels (unused) ||
 || generation-ignore-signs || path to a file listing rule and lexeme names to disable for generation ||
+|| generation-ignore-lexemes || path to a file listing more lexeme names to disable for generation ||
+|| generation-ignore-rules || path to a file listing more rule names to disable for generation ||
 || generation-trigger-rules || path to a TDL file defining trigger rules for generation ||
+|| idiom-rules || path to a TDL file defining idiom-checking rules for parsing ||
 || quickcheck-code || path to a text file defining the quickcheck skeleton ||
+|| semantic-interface || path to a .smi file defining the SEMI ||
 
 Types
+|| top-type || name of the type at the root of the type hierarchy ||
 || semarg-type || supertype of MRS variables ||
 || handle-type || type for MRS handles and holes ||
 || list-type || type for lists ||
 || cons-type || type for non-empty lists ||
 || null-type || type for empty lists ||
 || diff-list-type || type for diff-lists ||
+|| semantic-interface-top-type || the name of the type at the top of the SEMI type hierarchy ||
 
 Paths within AVMs
 || orth-path || path to orthography list within a sign ||
@@ -59,6 +65,7 @@ Miscellaneous Switches
 || english-pos-tagger || enabled or disbled.  runs the input through a built-in trigram HMM tagger (but you need to supply the training data) and records the results in the token structures. ||
 || simplify-lexicon || enabled or disabled.  ERG-specific; attempts to represent the lexicon more compactly. ||
 || extra-erg-dag-stash || enabled or disabled.  ERG-specific; keeps extra copies of some common GLB types DAGs on hand. ||
+|| process-chart-dependencies-before-lexical-parsing || enabled or disabled.  when enabled, chart reduction happens before lexical parsing (default is after lexical parsing). ||
 
 General Configuration
 || spanning-only-rules || list of rules to only allow in the spanning chart cell ||
@@ -70,3 +77,5 @@ General Configuration
 || mrs-deleted-roles || list of features on internal MRS variable AVMs that should not be exported when presenting final MRSes (superceded by VPM?) ||
 || parsing-roots || list of root instances enabled for parsing ||
 || generation-roots || list of root instances enabled for generation ||
+|| non-idiom-root || the name of an instance to check against all parsing results to see whether further idiom processing is required ||
+|| generic-les-for-semantic-index || list of the names of the generic lexemes that can be used to provide an unknown relation in generation ||

@@ -18,6 +18,7 @@
 #endif
 #include	"lattice-mapping.h"
 #include	"hash.h"
+#include	"version.h"
 
 extern void		**oldslabs;
 extern int		noldslabs, aoldslabs, currslabsize;
@@ -393,9 +394,14 @@ extern struct type_hierarchy	*main_th, *semi_th;
 	freezer_note("sem-index");
 	G->stochmodel = freeze_stochastic_model();
 	freezer_note("stochastic-model");
-	strcpy(G->message, "frozen grammar file\n");
-	strcat(G->message, grammar_dir); strcat(G->message, "\n");
-	strcat(G->message, grammar_version); strcat(G->message, "\n");
+
+	int l = snprintf(G->message, sizeof(G->message)-1, "frozen grammar file: ace |%s| grammar |%s %s|",
+		ACE_VERSION, grammar_dir, grammar_version);
+	if(l > sizeof(G->message)-3)
+		fprintf(stderr, "WARNING: not enough room in 128 bytes to record grammar information\n");
+	//strcpy(G->message, "frozen grammar file\n");
+	//strcat(G->message, grammar_dir); strcat(G->message, "\n");
+	//strcat(G->message, grammar_version); strcat(G->message, "\n");
 
 #ifdef	POST
 	if(enable_post)
@@ -426,10 +432,29 @@ static int	load_freeze()
 	struct grammar	*G;
 	int		i;
 
+	if(loaded_freeze_size < sizeof(*G))
+	{
+		fprintf(stderr, "this does not appear to be a grammar image.\n");
+		exit(-1);
+	}
+
 	G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, loaded_freeze_fd, 0);
 	if(!G || G==(struct grammar*)0xffffffff)
 	{
 		perror("mmap fixed");
+		exit(-1);
+	}
+	char	frozen_ace_version[128];
+	char	frozen_grammar[128];
+	if(2 != sscanf(G->message, "frozen grammar file: ace |%[^|]| grammar |%[^|]|",
+		frozen_ace_version, frozen_grammar))
+	{
+		fprintf(stderr, "this does not appear to be a grammar image.\n");
+		exit(-1);
+	}
+	if(strcmp(frozen_ace_version, ACE_VERSION))
+	{
+		fprintf(stderr, "version mismatch: this is ACE version %s, but this grammar image was compiled by ACE version %s\n", ACE_VERSION, frozen_ace_version);
 		exit(-1);
 	}
 
