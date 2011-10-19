@@ -127,6 +127,8 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 			build_token_dag(e->token);
 		e->token->oc = NULL;
 	}
+	free(tags);
+	free(unk);
 	tc->lattice_vertex_id_gen = 10000;
 	return tc;
 }
