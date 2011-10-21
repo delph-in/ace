@@ -972,6 +972,12 @@ struct orule	*lookup_orule(char	*rule)
 	return 0;
 }
 
+struct orule	*make_identity_orule_for_rule(struct rule	*r)
+{
+	add_orule(r, strdup("suffix (* )"));
+	return orules[norules-1];
+}
+
 int	load_irregulars(char	*path)
 {
 	FILE	*f = fopen(path, "r");
@@ -999,8 +1005,13 @@ int	load_irregulars(char	*path)
 		or = lookup_orule(rule);
 		if(!or)
 		{
-			fprintf(stderr, "orth: warning -- irregular for nonextant orule `%s'\n", rule);
-			continue;
+			struct rule	*r = lookup_rule(rule);
+			if(!r)
+			{
+				fprintf(stderr, "orth: warning -- irregular for nonextant orule `%s'\n", rule);
+				continue;
+			}
+			else or = make_identity_orule_for_rule(r);
 		}
 		//printf("add form `%s', stem `%s' TO rule: %s\n", form, stem, or->rule->name);
 		stem = strdup(stem);

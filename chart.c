@@ -7,13 +7,13 @@
 #include	<time.h>
 #include	<assert.h>
 
-#include	<liba.h>
-
 #include	"conf.h"
 #include	"chart.h"
 #include	"rule.h"
 #include	"lexicon.h"
 #include	"freeze.h"
+
+#include	"timer.h"
 
 //#define	RULE_STATS
 

@@ -18,7 +18,7 @@
 #endif
 #include	"version.h"
 
-//#include	<liba.h>
+#include	"timer.h"
 
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;

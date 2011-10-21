@@ -3,12 +3,12 @@
 #include	<string.h>
 #include	<time.h>
 
-#include	<liba.h>
-
 #include	"conf.h"
 #include	"chart.h"
 #include	"dag.h"
 #include	"tdl.h"
+
+#include	"timer.h"
 
 //#define	HIDEOUS_HACK
 #undef	HIDEOUS_HACK

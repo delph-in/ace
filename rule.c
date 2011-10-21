@@ -90,13 +90,13 @@ int	rule_is_rtl_key(struct rule	*r)
 	}
 }
 
-struct rule	*lookup_rule(char	*name)
-{
+struct rule	*lookup_rule(char	*name) { return get_rule_by_name(name); }
+/*{
 	int	i;
 	for(i=0;i<nrules;i++)
 		if(!strcmp(rules[i]->name, name))return rules[i];
 	return NULL;
-}
+}*/
 
 int	rule_is_rtl_head(struct rule	*r)
 {

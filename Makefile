@@ -1,9 +1,8 @@
 PREFIX=/usr/local
 
-
-
-DELPHIN_CFLAGS=-isystem ~/logon/lingo/lkb/include -DTSDB
-DELPHIN_LIBS=-L ~/logon/lingo/lkb/lib/linux.x86.64 -Wl,-Bstatic -litsdb -lpvm3 -Wl,-Bdynamic
+# comment out these two lines if you don't want to include [incr tsdb()] support
+DELPHIN_CFLAGS=-isystem ${LOGONROOT}/lingo/lkb/include -DTSDB
+DELPHIN_LIBS=-L ${LOGONROOT}/lingo/lkb/lib/linux.x86.64 -Wl,-Bstatic -litsdb -lpvm3 -Wl,-Bdynamic
 
 POST_CFLAGS=-I post/ -DPOST
 

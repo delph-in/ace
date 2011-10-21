@@ -382,16 +382,16 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 			if(de.pred_re)
 			{
 				wchar_t	*wide = towide(ep_pred->name);
-				//printf("need to see if '%S' and '%S' are RE-compatible\n", wide, de.pred_re);
+				DEBUG("need to see if '%S' and '%S' are RE-compatible\n", wide, de.pred_re);
 				regmatch_t	mat;
 				int	res = regexec(&de.re, wide, 1, &mat, 0);
 				free(wide);
 				if(res != 0)
 				{
-					//printf("nope.\n");
+					DEBUG("nope.\n");
 					return -1;
 				}
-				//else printf("yup!\n");
+				DEBUG("yup!\n");
 			}
 		}
 		if(de_a0 && ep_a0)
@@ -429,6 +429,10 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 			//printf("TRANSFER: ");
 			//unify_backtrace();
 			forget_tmp();
+			//printf("rule ep:\n");
+			//print_dg(de.dg);printf("\n");
+			//printf("input ep:\n");
+			//print_dg(ep->dg);printf("\n");
 			nfailed_transfer_unifies++;
 			allow_unify_swapping = 1;
 			return -1;
