@@ -1,6 +1,6 @@
 ;;; files to load
 
-grammar-top               := "../english-ace.tdl".
+grammar-top               := "../english.tdl".
 variable-property-mapping := "../semi.vpm".
 maxent-model              := "../redwoods.mem".
 preprocessor              := "../rpp/tokenizer.rpp".
@@ -176,3 +176,10 @@ lattice-mapping-input-path := +INPUT.
 lattice-mapping-output-path := +OUTPUT.
 lattice-mapping-context-path := +CONTEXT.
 lattice-mapping-position-path := +POSITION.
+
+
+; below here are not technically settings, but types that ACE needs to import that PET (owner of english.tdl) doesn't need.
+
+:begin :type.
+:include "../mtr".
+:end :type.
