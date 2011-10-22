@@ -885,6 +885,7 @@ void	setup_orule(struct orule	*or, char	*def)
 
 	or->nsub = 0;
 	or->sub = 0;
+	or->type = or_suffix;
 
 	if(!def)return;
 	for(sp=def;*sp && *sp!=' ' && *sp!='\t';sp++) {}
@@ -974,7 +975,7 @@ struct orule	*lookup_orule(char	*rule)
 
 struct orule	*make_identity_orule_for_rule(struct rule	*r)
 {
-	add_orule(r, strdup("suffix (* )"));
+	add_orule(r, NULL);
 	return orules[norules-1];
 }
 
