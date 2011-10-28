@@ -23,18 +23,23 @@ struct darc
 	struct dg	*dest;
 };
 
+#define	DAG_EXTRA_LABELS_SIZE_FOR_COUNT(n)	(((n-1)*2+3)/4 * 4)
+#define	DAG_EXTRA_LABELS_SIZE(dg1)	DAG_EXTRA_LABELS_SIZE_FOR_COUNT(dg1->narcs)
+
 // 32-byte dg structure fits exactly in one standard cacheline
 struct dg
 {
 	struct type	*type;
 	struct type	*xtype;
-#define	DARCS(dg1)	((struct dg**)((void*)dg1+sizeof(struct dg) + (dg1->narcs-2+3)/4 * 4))
+//#define	DARCS(dg1)	((struct dg**)((void*)dg1+sizeof(struct dg) + (dg1->narcs-2+3)/4 * 4))
+#define	DARCS(dg1)	((struct dg**)((void*)dg1+sizeof(struct dg) + DAG_EXTRA_LABELS_SIZE(dg1)))
 	struct dg	*forward;
 	struct darc	*carcs;
 	struct dg	*copy;
 	unsigned int	gen;
 	unsigned char	narcs, ncarcs;
-	unsigned char	label[2];
+	//unsigned char	label[2];
+	unsigned short	label[1];
 };
 
 // basic dag operations

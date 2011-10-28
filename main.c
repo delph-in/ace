@@ -6,6 +6,7 @@
 #include	<string.h>
 #include	<ctype.h>
 #include	<locale.h>
+#include	<sys/fcntl.h>
 #include	"chart.h"
 #include	"net.h"
 #include	"freeze.h"
@@ -237,7 +238,13 @@ void	initialize_engine()
 		struct timeval	tv1, tv2;
 		if(!load_grammar_path)
 			load_grammar_path = "../erg/ace/config.tdl";
-		setup_save_frozen_grammar(save_grammar_path);
+
+		int fd = open(save_grammar_path, O_CREAT | O_TRUNC | O_RDWR, 0600);
+		if(fd == -1)
+		{
+			perror(save_grammar_path);
+			exit(-1);
+		}
 
 		gettimeofday(&tv1, 0);
 		load_grammar(load_grammar_path);
@@ -253,6 +260,8 @@ void	initialize_engine()
 		tv2.tv_usec -= tv1.tv_usec;
 		fprintf(stderr, "loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
 
+		close(fd);
+		setup_save_frozen_grammar(save_grammar_path);
 		freeze_grammar();
 		exit(0);
 	}

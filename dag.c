@@ -9,6 +9,8 @@
 #include	"dag.h"
 #include	"conf.h"
 
+#define	MAX_FEATURES	(256*256-1)
+
 extern int	debug_level;
 extern int	loud_noises;
 
@@ -97,7 +99,7 @@ void	next_slab()
 {
 	if(freeze_next)
 	{
-		fprintf(stderr, "slab: needed more room but next spot is in freezer!\n");
+		fprintf(stderr, "ran out of room in the freezer; try a larger `freezer-megabytes' value.\n");
 		exit(-1);
 	}
 	noldslabs++;
@@ -187,28 +189,27 @@ struct dg	*add_dg_hop(struct dg	*d, int	label, struct dg	*value)
 	if(i==d->narcs || d->label[i]>label)
 	{
 		// need to grow list of arcs
+		int	oab = DAG_EXTRA_LABELS_SIZE(d);
 		d->narcs++;
-		int	oab = (d->narcs-1-2 + 3)/4 * 4;
-		int	ab = (d->narcs-2 + 3)/4 * 4;
+		int	ab = DAG_EXTRA_LABELS_SIZE(d);
 		olen = sizeof(struct dg) + oab + sizeof(struct dg*) * (d->narcs-1);
 		nlen = sizeof(struct dg) + ab + sizeof(struct dg*) * d->narcs;
 		dn = slab_realloc(d, olen, nlen);
 		if(dn != d)
 		{
-			struct dg	**oarcs;
 			// oops! we left the old dg behind, forward it along
 			d->gen = 9;
 			d->forward = dn;
 			d = dn;
-			// arcs go directly after the `struct dg'
-			arcs = (struct dg**)((void*)d + sizeof(*d) + ab);
-			oarcs = (struct dg**)((void*)d + sizeof(*d) + oab);
-			memmove(arcs, oarcs, sizeof(struct dg*)*(d->narcs-1));
 		}
-		else arcs = DARCS(d);
+		// arcs go directly after the `struct dg'
+		struct dg	**oarcs;
+		arcs = (struct dg**)((void*)d + sizeof(*d) + ab);
+		oarcs = (struct dg**)((void*)d + sizeof(*d) + oab);
+		memmove(arcs, oarcs, sizeof(struct dg*)*(d->narcs-1));
 
 		memmove(arcs+i+1, arcs+i, sizeof(struct dg*)*(d->narcs-1-i));
-		memmove(d->label+i+1, d->label+i, d->narcs-1-i);
+		memmove(d->label+i+1, d->label+i, 2*(d->narcs-1-i));
 	}
 	else arcs = DARCS(d);
 
@@ -510,7 +511,7 @@ void	introduce_feature(int	label, int	type)
 	if(introduce[label]==-1 || introduce[label] > type)
 	{
 		introduce[label] = type;
-		//printf("type %s introduces feature %s\n", types[type]->name, fnames[label]);
+		//printf("type %s introduces feature %s\n", default_type_hierarchy()->types[type]->name, fnames[label]);
 	}
 }
 
@@ -529,6 +530,7 @@ int	lookup_fname(char	*label)
 	introduce = realloc(introduce, sizeof(int) * nfnames);
 	introduce[i] = -1;
 	reload_restrictors = 1;
+	if(nfnames >= MAX_FEATURES) { fprintf(stderr, "ERROR: new feature '%s' is %d'th\n", label, MAX_FEATURES); exit(-1); }
 	if(g_mode != -1) { fprintf(stderr, "WARNING: added new feature `%s' at runtime\n", label); }
 	return i;
 }

@@ -137,7 +137,13 @@ static int	count_list(struct dg	*list, char	*rname, char	*fname)
 			break;
 		}
 		struct dg	*item = dg_hop(list, 1);	// FIRST
-		if(!item)return -1;
+		if(!item)
+		{
+			fprintf(stderr, "missing FIRST attribute in lattice mapping rule '%s' %s list [%d]\n", rname, fname, N);
+			print_dg(list);
+			printf("\n");
+			return -1;
+		}
 		N++;
 		list = dg_hop(list, 2);	// REST
 	}
@@ -215,23 +221,47 @@ struct lattice_rule	*study_lattice_rule(char	*name, struct dg	*dg)
 			char	*comma = strchr(cp, ',');
 			if(!comma)comma = strchr(cp, '"');
 			if(comma)*comma = 0;
-			cp = trim_string(cp);
 			again:;
+			cp = trim_string(cp);
 			char	lhs_what, rhs_what, type[3] = {0,0,0};
 			int	lhs_which, rhs_which;
-			if(5 > strlen(cp) || !isdigit(cp[1]))
+			if(cp[0]=='^' || cp[0]=='$')
 			{
-				badconstraint:
-				fprintf(stderr, "lattice mapping rule: bad positional constraint '%s'\n", cp);
-				return NULL;
+				if(strlen(cp) < 4)goto badconstraint;
+				lhs_what = cp[0];
+				lhs_which = 0;
+				cp = trim_string(cp+1);
 			}
-			lhs_what = cp[0];
-			lhs_which = cp[1] - '1';
-			type[0] = cp[2];
-			if(!isalpha(cp[3])) { type[1] = cp[3]; cp++; }
-			rhs_what = cp[3];
-			if(!isdigit(cp[4]))goto badconstraint;
-			rhs_which = cp[4] - '1';
+			else
+			{
+				if(4 > strlen(cp) || !isdigit(cp[1]))
+				{
+					badconstraint:
+					fprintf(stderr, "lattice mapping rule: bad positional constraint '%s'\n", cp);
+					return NULL;
+				}
+				lhs_what = cp[0];
+				lhs_which = cp[1] - '1';
+				cp = trim_string(cp+2);
+			}
+			type[0] = cp[0];
+			if(!isalpha(cp[1]) && cp[1]!=' ' && cp[1]!='$' && cp[1]!='^') { type[1] = cp[1]; cp++; }
+			cp = trim_string(cp+1);
+
+			char *again_rhs = cp;
+			rhs_what = cp[0];
+			if(rhs_what == '^' || rhs_what == '$')
+			{
+				cp = trim_string(cp+1);
+				rhs_which = 0;
+			}
+			else
+			{
+				if(!isdigit(cp[1]))goto badconstraint;
+				rhs_which = cp[1] - '1';
+				cp = trim_string(cp+2);
+			}
+			assert(!((lhs_what == '^' || lhs_what == '$') && (rhs_what == '^' || rhs_what == '$')));
 			//printf("... position constraint: lhs %c # %d,  rhs %c # %d,  type %s\n", lhs_what, lhs_which, rhs_what, rhs_which, type);
 			r->nposition_constraints++;
 			r->position_constraints = realloc(r->position_constraints, sizeof(struct lattice_position_constraint)*r->nposition_constraints);
@@ -267,7 +297,7 @@ struct lattice_rule	*study_lattice_rule(char	*name, struct dg	*dg)
 				pc->type = lpcCovers;
 			}
 			else goto badconstraint;
-			if(strlen(cp) > 5) { cp += 3; goto again; }
+			if(*cp) { cp = again_rhs; goto again; }
 			else if(comma)cp = comma+1;
 			else break;
 		}
@@ -394,7 +424,9 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 			backref = strstr(last, "${");
 			if(backref == NULL)patchto = last + strlen(last);
 			else patchto = backref;
-			buildp += swprintf(buildp, 1023, L"%.*s", patchto-last, last);
+			char	tmp[patchto-last + 5];
+			sprintf(tmp, "%.*s", (int)(patchto-last), last);
+			buildp += swprintf(buildp, 1023, L"%s", tmp);
 			if(backref == NULL)break;
 			backref_end = strchr(backref, '}');
 			if(!backref_end)goto badsyntax;
@@ -806,6 +838,20 @@ static void clear_failed()
 	nfailed_unify_inputs = 0;
 }
 
+int	lattice_vertex_is_initial(struct lattice	*lat, struct lattice_vertex	*v)
+{
+	int i;
+	for(i=0;i<lat->nedges;i++)
+		if(lat->edges[i]->to == v)return 0;
+	return 1;
+}
+
+int lattice_vertex_is_final(struct lattice	*lat, struct lattice_vertex	*v)
+{
+	if(v->nfollowers == 0)return 1;
+	return 0;
+}
+
 // TODO find a more efficient algorithm for finding application sites
 // TODO keep a cache of what rule already failed to unify with what edge... a *lot* of wasted unification attempts
 // TODO   -- or use quickcheck?
@@ -827,20 +873,50 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 			int	rhs_which = pc->rhs_which;
 			if(pc->rhs_what == 'C')rhs_which += r->ninput;
 			if(lhs_which >= have || rhs_which >= have)continue;
-			struct lattice_vertex	*rhs_start = inputs[rhs_which]->from;
-			struct lattice_vertex	*lhs_start = inputs[lhs_which]->from;
-			struct lattice_vertex	*lhs_end = inputs[lhs_which]->to;
-			struct lattice_vertex	*rhs_end = inputs[rhs_which]->to;
+			struct lattice_vertex	*rhs_start, *rhs_end;
+			if(pc->rhs_what == '^' || pc->rhs_what == '$')
+				rhs_start = rhs_end = NULL;
+			else
+			{
+				rhs_start = inputs[rhs_which]->from;
+				rhs_end = inputs[rhs_which]->to;
+			}
+			struct lattice_vertex	*lhs_start, *lhs_end;
+			if(pc->lhs_what == '^' || pc->lhs_what == '$')
+				lhs_start = lhs_end = NULL;
+			else
+			{
+				lhs_start = inputs[lhs_which]->from;
+				lhs_end = inputs[lhs_which]->to;
+			}
 			switch(pc->type)
 			{
 				case	lpcImmediatelyPreceeds:
-					if(lhs_end != rhs_start)
+					assert(pc->lhs_what != '$' && pc->rhs_what != '^');
+					if(pc->lhs_what == '^')
+					{
+						if(!lattice_vertex_is_initial(lat, rhs_start))
+						{
+							DEBUG_VERBOSE("failed ^< test\n");
+							return 0;
+						}
+					}
+					else if(pc->rhs_what == '$')
+					{
+						if(!lattice_vertex_is_final(lat, lhs_end))
+						{
+							DEBUG_VERBOSE("failed <$ test\n");
+							return 0;
+						}
+					}
+					else if(lhs_end != rhs_start)
 					{
 						DEBUG_VERBOSE("failed immediate preceeder test\n");
 						return 0;
 					}
 					break;
 				case	lpcPreceeds:
+					assert(pc->lhs_what != '$' && pc->lhs_what != '^' && pc->rhs_what != '$' && pc->rhs_what != '^');
 					if(!(lattice_vertex_follows(lat, rhs_start, lhs_end) || lhs_end==rhs_start))
 					{
 						DEBUG_VERBOSE("failed somewhere-preceeder test\n");
@@ -848,6 +924,7 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 					}
 					break;
 				case	lpcCovers:
+					assert(pc->lhs_what != '$' && pc->lhs_what != '^' && pc->rhs_what != '$' && pc->rhs_what != '^');
 					if(! ((lattice_vertex_follows(lat, rhs_start, lhs_start) || rhs_start==lhs_start)
 					   && (lattice_vertex_follows(lat, lhs_end, rhs_end) || lhs_end==rhs_end)))
 					{
@@ -992,7 +1069,9 @@ void	apply_lattice_mapping(struct lattice	*lat, struct lattice_rule_set	*rs)
 
 int	load_token_mapping_rules()
 {
-	token_mapping_rules = load_lattice_rules("token-mapping-rule");
+	if(enable_token_avms)
+		token_mapping_rules = load_lattice_rules("token-mapping-rule");
+	else token_mapping_rules = calloc(sizeof(struct lattice_rule_set),1);
 	return 0;
 }
 

@@ -101,8 +101,8 @@ char	*get_conf_file_path(char	*dir, char	*lhs)
 void	augment_definition(struct tdl_line	*tdl, char	*rhs, int	lnum, char	*path)
 {
 	char	*old = tdl->rhs;
-	char	*new = malloc(strlen(old) + strlen(rhs) + 5);
-	sprintf(new, "%s & %s", old, rhs);
+	char	*new = malloc(strlen(old) + strlen(rhs) + 32);
+	sprintf(new, "%s & __ace__unique_corefs & %s", old, rhs);
 	free(tdl->rhs);
 	tdl->rhs = new;
 	//fprintf(stderr, "%s:%d augments type `%s' from %s:%d\n", path, lnum, tdl->lhs, tdl->filename, tdl->lnum);
@@ -561,6 +561,7 @@ struct dagify_record
 		char	*name;
 	}	*corefs;
 	int	ncorefs;
+	int	unique_addendum;
 };
 
 static void coreference(struct dagify_record	*R, char	*name)
@@ -570,7 +571,10 @@ static void coreference(struct dagify_record	*R, char	*name)
 	R->corefs[R->ncorefs-1].path = malloc(sizeof(int) * R->current_pathlen);
 	R->corefs[R->ncorefs-1].pathlen = R->current_pathlen;
 	memcpy(R->corefs[R->ncorefs-1].path, R->current_path, sizeof(int) * R->current_pathlen);
-	R->corefs[R->ncorefs-1].name = strdup(name);
+	char	*uniqname;
+	uniqname = malloc(strlen(name) + 16);
+	sprintf(uniqname, "%s %d", name, R->unique_addendum);
+	R->corefs[R->ncorefs-1].name = uniqname;
 }
 
 static void record_transfer_copy(struct dagify_record	*R)
@@ -638,8 +642,9 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 			rnames[j] = R->corefs[i].name;
 			nr++;
 		}
+		extern char **fnames;
 		//printf("coref %d: %s = ", i, R->corefs[i].name);
-		//for(j=0;j<R->corefs[i].pathlen;j++)printf("%d ", R->corefs[i].path[j]);
+		//for(j=0;j<R->corefs[i].pathlen;j++)printf("%s ", fnames[R->corefs[i].path[j]]);
 		//printf("\n");
 	}
 	for(j=0;j<nr;j++)
@@ -816,6 +821,12 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 
 	str = trim_string(str);
 
+	if(!strcmp(str, "__ace__unique_corefs"))
+	{
+		R->unique_addendum++;
+		return atomic_dg(top_type);
+	}
+
 	if(*str == '#')
 	{
 		if(strchr(str, ' ') || strchr(str, '\t'))
@@ -865,6 +876,9 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 
 	while(*ptr)
 	{
+		// if we are looking at a comma, skip over it (they can appear detached sometimes...)
+		if(*ptr == ',')ptr = trim_string(ptr+1);
+		if(!*ptr)break;
 		// handle one feature
 		label = ptr;
 		morelabel:
@@ -1152,6 +1166,11 @@ int	typify_tdl_line(char	*lhs, char	*rhs_save, void	*ref)
 					// string 'name' is a comment on type 'lhs'
 					// do nothing with it.
 				}
+				else if(!strcmp(name, "__ace__unique_corefs"))
+				{
+					// we artificially insert this to mark the boundary between addenda.
+					// it is not a parent type; ignore it for our current purpose.
+				}
 				else
 				{
 					nparents++;
@@ -1269,6 +1288,7 @@ void	load_idioms(char	*path)
 }
 
 char	*grammar_dir;
+char	*confdir;
 
 int	load_grammar_top(char *toptdl)
 {
@@ -1295,6 +1315,7 @@ int	load_grammar_top(char *toptdl)
 	{
 		run_task("processing rules", load_rules);
 		run_task("processing lex-rules", load_lrules);
+		if(load_all_irregulars())exit(-1);
 		if(load_lexicon())exit(-1);
 		if(load_instances())exit(-1);
 		if(load_token_mapping_rules())exit(-1);
@@ -1453,10 +1474,48 @@ int	load_semi(char	*path)
 	tdl_pop_status();
 }
 
+int	load_quickcheck()
+{
+	char	*qccode_path = get_conf_file_path(confdir, "quickcheck-code");
+	if(!qccode_path)
+	{
+		char	*qcinst_name = get_conf("quickcheck-instance");
+		if(!qcinst_name)
+		{
+			fprintf(stderr, "Neither `quickcheck-code' nor `quickcheck-instance' was configured.\n");
+			exit(-1);
+		}
+		struct dg	*qcinst = find_instance(qcinst_name);
+		if(!qcinst)
+		{
+			fprintf(stderr, "Couldn't find quickcheck instance `%s'\n", qcinst_name);
+			exit(-1);
+		}
+
+		// make a temporary file and write QC code to it
+		char	*tmpdir = getenv("TMPDIR")?:"/tmp";
+		char	target_path[1280];
+		sprintf(target_path, "%s/qcex.txt-XXXXXX", tmpdir);
+		int	fd = mkstemp(target_path);
+		FILE	*f = fopen(target_path, "r");
+		if(!f) { perror(target_path); exit(-1); }
+		write_qccode_from_pet_instance(qcinst, f);
+		fclose(f);
+
+		// compile the code and remove the temporary file
+		compile_qc(target_path);
+		unlink(target_path);
+		close(fd);
+	}
+	else
+	{
+		compile_qc(qccode_path);
+	}
+}
+
 int load_grammar(char	*path)
 {
 	extern int g_mode;
-	char	*confdir;
 
 	g_mode = -1;
 	confdir = strdup(path);
@@ -1500,8 +1559,7 @@ int load_grammar(char	*path)
 	char	*semi_path = get_conf_file_path(confdir, "semantic-interface");
 	if(semi_path)load_semi(semi_path);
 
-
-	compile_qc(get_conf_file_path(confdir, "quickcheck-code"));
+	load_quickcheck();
 
 	setup_rule_filter();
 

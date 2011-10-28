@@ -29,6 +29,9 @@ extern int			enable_index_accessibility_filtering;
 extern int			extra_erg_dag_stash;
 extern int			enable_post;
 
+extern int			ortho_max_rules, ortho_warn_max_rules;
+extern int			freezer_megabytes;
+
 extern int			reduce_chart_before_lexical_parsing;
 
 extern char			*token_type;

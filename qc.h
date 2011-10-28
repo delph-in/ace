@@ -11,6 +11,7 @@ struct type	*qc_type_n(struct qc	*in, int	n);
 #ifdef	CONF_H
 void	gqc_count_failure(struct path	path);
 void	gqc_result();
+void	write_qccode_from_pet_instance(struct dg	*petqc, FILE	*f);
 #endif
 
 extern int __qc_use_heap;

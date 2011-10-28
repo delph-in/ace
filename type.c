@@ -396,10 +396,11 @@ void	wellform(struct dg	*d, char	*typename)
 		}
 		if(t != arcs[i]->type)
 		{
-			//fprintf(stderr, "well-formedness forces dag `%s' -> `%s'  (inside constraint for type %s)\n", arcs[i].dest->type->name, t->name, typename);
-			//for(j=0;j<wfpl;j++)
-				//fprintf(stderr, "%s ", fnames[wfpath[j]]);
-			//fprintf(stderr, "\n");
+			/*printf("well-formedness forces dag `%s' -> `%s'  (inside constraint for type %s)\n", arcs[i]->type->name, t->name, typename);
+			int j;
+			for(j=0;j<wfpl;j++)
+				printf("%s ", fnames[wfpath[j]]);
+			printf("\n");*/
 			if(!descendent_of(t->tnum, arcs[i]->type))
 			{
 				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i]->type->name, t->name);
@@ -425,7 +426,9 @@ void	wellform(struct dg	*d, char	*typename)
 				print_dg(t->dg);printf("\n");
 				exit(-1);
 			}
-			//print_dg(arcs[i]);printf("\n");
+			/*printf("now:\n");
+			print_dg(arcs[i]);printf("\n");
+			printf("\n");*/
 		}
 		wfpl--;
 	}
@@ -458,6 +461,8 @@ int	constrain_glbs_and_wellformedness()
 		//print_dg(default_th->types[i]->dg); printf("\n");
 		wellform(default_th->types[i]->dg, default_th->types[i]->name);
 		descbytes += default_th->types[i]->ndescendents * sizeof(short);
+		//printf("after wellforming, final dag:\n");
+		//print_dg(default_th->types[i]->dg); printf("\n");
 	}
 
 	return 0;

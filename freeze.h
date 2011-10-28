@@ -13,10 +13,4 @@ extern long	loaded_freeze_size;
 
 #define	FREEZER_MMAP_BASE	0x60000000
 
-#ifdef	LP64
-#define	FREEZER_MMAP_SIZE	0x14000000
-#else
-#define	FREEZER_MMAP_SIZE	0x10000000
-#endif
-
 #define	FROZEN(x)		((long)x>=FREEZER_MMAP_BASE && (long)x<(FREEZER_MMAP_BASE+loaded_freeze_size))

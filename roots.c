@@ -7,6 +7,7 @@
 #include	"freeze.h"
 #include	"chart.h"
 #include	"rule.h"
+#include	"conf.h"
 
 struct instance
 {
@@ -20,6 +21,8 @@ char	*use_roots = 0;
 
 char	**rule_inst_filter, *rule_root, *rule_root_utc;//, *rule_left_filter, *rule_right_filter;
 extern char	**rf_tc, **rl_tc;
+
+extern struct path	label_path;
 
 void	build_rif()
 {
@@ -268,10 +271,11 @@ char	*label_dag(struct dg	*dg, char *fallback)
 int	study_label(char	*lhs, struct dg	*dg)
 {
 	char	*name;
-	struct dg *lname = dg_hop(dg, lookup_fname("LNAME"));
+	//struct dg *lname = dg_hop(dg, lookup_fname("LNAME"));
+	struct dg *lname = dg_path(dg, label_path);
 	if(!lname)
 	{
-		fprintf(stderr, "label `%s': no LNAME feature!\n", lhs);
+		fprintf(stderr, "label `%s': no label found at expected path!\n", lhs);
 		return 0;
 	}
 	name = lname->xtype->name;

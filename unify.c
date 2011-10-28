@@ -103,7 +103,6 @@ int	check_cycles(struct dg	*dg)
 static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
-	unsigned char	*alptr, *olptr;
 	struct dg	**aptr, **optr;
 	int		i;
 
@@ -115,7 +114,8 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 
 	if(dg->copy)return dg->copy;
 
-	int	ab = (dg->narcs-2+3)/4 * 4;
+	//int	ab = (dg->narcs-2+3)/4 * 4;
+	int	ab = DAG_EXTRA_LABELS_SIZE_FOR_COUNT(dg->narcs);
 	newcopy = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*dg->narcs);
 	dg->copy = newcopy;
 	*newcopy = *dg;
@@ -130,7 +130,7 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 		newcopy->forward = 0;
 		newcopy->gen = generation;
 	}
-	memcpy(newcopy->label, dg->label, dg->narcs);
+	memcpy(newcopy->label, dg->label, sizeof(unsigned short) * dg->narcs);
 	aptr = DARCS(newcopy);
 	optr = DARCS(dg);
 
@@ -163,7 +163,7 @@ static void print_copy_path(char	*name)
 static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 {
 	struct dg	*dg, **aptr, **optr;
-	unsigned char	*alptr, *olptr;
+	unsigned short	*alptr, *olptr;
 	struct dg	*newcopy;
 	char		forwarded, i, j, ch, st;
 	struct slab_state	state;
@@ -227,7 +227,8 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	for(i=0;i<dg->ncarcs;i++)
 		if(SHOULD_TRIM(dg->carcs[i].label))na--;
 
-	int	ab = (na-2 + 3)/4 * 4;
+	//int	ab = (na-2 + 3)/4 * 4;
+	int		ab = DAG_EXTRA_LABELS_SIZE_FOR_COUNT(na);
 	newcopy = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*na);
 	//*newcopy = *dg;
 	newcopy->xtype = newcopy->type = dg->type;
@@ -279,7 +280,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	else for(j=0,i=0;i<dg->narcs || j<dg->ncarcs;) // mergesort
 	{
 		struct dg		*copyme;
-		unsigned char	copylabel;
+		int				copylabel;
 		if(j<dg->ncarcs && i<dg->narcs)
 		{
 			if(olptr[(int)i] < dg->carcs[(int)j].label)
@@ -366,7 +367,7 @@ int	cdwca_should_trim = 0;
 struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 {
 	struct dg	*newcopy;
-	unsigned char	*alptr, *olptr;
+	unsigned short	*alptr, *olptr;
 	struct dg	**aptr, **optr;
 	int		i, j;
 
@@ -405,8 +406,9 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 		if(CDWCA_RESTRICTOR(dg->label[i]))na--;
 	for(i=0;i<dg->ncarcs;i++)
 		if(CDWCA_RESTRICTOR(dg->carcs[i].label))na--;
-	int	ab = (na-2 + 3)/4 * 4;
 
+	//int	ab = (na-2 + 3)/4 * 4;
+	int		ab = DAG_EXTRA_LABELS_SIZE_FOR_COUNT(na);
 	newcopy = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*na);
 	dg->copy = newcopy;
 	*newcopy = *dg;
@@ -427,7 +429,7 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 	for(j=0,i=0;i<dg->narcs || j<dg->ncarcs;) // mergesort
 	{
 		struct dg		*copyme;
-		unsigned char	copylabel;
+		int				copylabel;
 		if(j<dg->ncarcs && i<dg->narcs)
 		{
 			if(olptr[(int)i] < dg->carcs[(int)j].label)

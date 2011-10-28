@@ -361,6 +361,7 @@ void	init_fnums()
 
 struct dg	*constrain_lex_rels(struct dg *dg, struct dg *rels)
 {
+	// XXX shouldn't the do a unification?
 	return dg_path_add(dg, lex_rels_path, rels);
 }
 

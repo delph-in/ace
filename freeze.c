@@ -438,10 +438,16 @@ static int	load_freeze()
 		exit(-1);
 	}
 
-	G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, loaded_freeze_fd, 0);
+	//G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, loaded_freeze_fd, 0);
+	G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, loaded_freeze_fd, 0);
 	if(!G || G==(struct grammar*)0xffffffff)
 	{
 		perror("mmap fixed");
+		exit(-1);
+	}
+	if(G != (void*)FREEZER_MMAP_BASE)
+	{
+		perror("mmap didn't put the freezer where i wanted it");
 		exit(-1);
 	}
 	char	frozen_ace_version[128];
@@ -551,18 +557,27 @@ int	load_frozen_grammar(char	*path)
 void	*freeze_point = 0, *freeze_next;
 int	freeze_fd;
 
+size_t	FREEZER_MMAP_SIZE = 0x14000000;
+
 // prepare mmap to save flat blocks grammar file
 int	setup_save_frozen_grammar(char	*path)
 {
+	FREEZER_MMAP_SIZE = 1024 * 1024 * (size_t)freezer_megabytes;
 	freeze_fd = open(path, O_RDWR | O_CREAT, 0664);
 
 	if(freeze_fd<0) { perror(path); exit(-1); }
 
 	if(ftruncate(freeze_fd, FREEZER_MMAP_SIZE)) { perror("ftruncate FREEZER_MMAP_SIZE"); exit(-1); }
-	freeze_point = mmap((void*)FREEZER_MMAP_BASE, FREEZER_MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, freeze_fd, 0);
+	//freeze_point = mmap((void*)FREEZER_MMAP_BASE, FREEZER_MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, freeze_fd, 0);
+	freeze_point = mmap((void*)FREEZER_MMAP_BASE, FREEZER_MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, freeze_fd, 0);
 	if(!freeze_point || freeze_point==(void*)0xffffffff)
 	{
 		perror("mmap fixed");
+		exit(-1);
+	}
+	if(freeze_point != (void*)FREEZER_MMAP_BASE)
+	{
+		perror("mmap didn't put the freezer where I wanted it");
 		exit(-1);
 	}
 }

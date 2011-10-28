@@ -9,6 +9,7 @@
 
 #define	USE_GENERICS
 
+//#define	SHOW_ORTH_ROUTE_COUNTS
 //#define	SHOW_ORTH_ROUTES
 
 static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, char	*stem, int type);
@@ -26,8 +27,6 @@ struct lexeme	*proper_noun_lex(char	*name);
 #include	"hash.h"
 
 #include	"token.h"
-
-#define	MAX_ORTH_RULES	7
 
 int				norules;
 struct orule	**orules;
@@ -186,10 +185,11 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		// enumerate all possible ways of reaching each possible stem
 		for(j=0;j<t->oc->nedges;j++)
 			unfold_oroutes(t->oc->edges[j], t->oc->edges[j], 0, 0);
-#ifdef	SHOW_ORTH_ROUTES
+#ifdef	SHOW_ORTH_ROUTE_COUNTS
 		for(j=0;j<t->oc->nedges;j++)
 		{
-			printf("%s -> %s\n", t->string, t->oc->edges[j]->form);
+			printf("%s -> %s [%d ways]\n", t->string, t->oc->edges[j]->form, t->oc->edges[j]->north_routes);
+#ifdef	SHOW_ORTH_ROUTES
 			for(k=0;k<t->oc->edges[j]->north_routes;k++)
 			{
 				struct orth_route *r = t->oc->edges[j]->orth_routes+k;
@@ -198,6 +198,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 				for(l=0;l<r->len;l++)printf(" %s", rules[r->rules[l]]->name);
 				printf("\n");
 			}
+#endif
 		}
 #endif
 	}
@@ -456,13 +457,17 @@ void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int n
 	int i;
 
 	// don't go down garden paths
-	if(nrules >= MAX_ORTH_RULES)
+	if(nrules >= ortho_max_rules)
 	{
-		fprintf(stderr, "WARNING: ran up against MAX_ORTH_RULES limit during orthographemic analysis\n");
-		fprintf(stderr, "WARNING: rule chain from '%s' to '%s':\n", visit->form, target->form);
-		for(i=0;i<nrules;i++)
-			fprintf(stderr, "  %s", rules[rnums[i]]->name);
-		fprintf(stderr, "\n");
+		if(ortho_warn_max_rules)
+		{
+			fprintf(stderr, "WARNING: ran up against orthographemic rule chain limit (configured at %d) during orthographemic analysis\n", ortho_max_rules);
+			fprintf(stderr, "WARNING:   (to suppress this warning, use `ortho-warn-on-max-rules := no.')\n");
+			fprintf(stderr, "WARNING: rule chain from '%s' to '%s':\n", visit->form, target->form);
+			for(i=0;i<nrules;i++)
+				fprintf(stderr, "  %s", rules[rnums[i]]->name);
+			fprintf(stderr, "\n");
+		}
 		return;
 	}
 
@@ -986,6 +991,8 @@ int	load_irregulars(char	*path)
 	char	*form = NULL, *rule = NULL, *stem = NULL;
 	struct orule	*or;
 
+	char	*rule_suffix = get_conf("irregular-form-rule-suffix");
+
 	if(!f) { perror(path); return 0; }
 	while(fgets(line, 1024, f))
 	{
@@ -993,6 +1000,7 @@ int	load_irregulars(char	*path)
 		if(*line=='\n')continue;
 		line[strlen(line)-1] = 0;
 
+		if(!*line)continue;
 		if(*line=='"')continue;	// silly ERG .tab files have "'s at the beginning and ends
 		strcpy(copy, line);
 		form = strtok(line, " \t");
@@ -1003,6 +1011,8 @@ int	load_irregulars(char	*path)
 			fprintf(stderr, "orth: invalid irregular form `%s'\n", copy);
 			return -1;
 		}
+		if(rule_suffix)
+			asprintf(&rule, "%s%s", rule, rule_suffix);
 		or = lookup_orule(rule);
 		if(!or)
 		{
@@ -1038,13 +1048,31 @@ int	load_lrules()
 		fprintf(stderr, "inflr: unable to load, bailing out.\n");
 		exit(-1);
 	}
+	return 0;
+}
 
-	sprintf(fname, "%s/irregs.tab", grammar_dir);
-	if(load_irregulars(fname))
+load_all_irregulars()
+{
+	int	hits = 0;
+	int callback(char	*path)
 	{
-		fprintf(stderr, "inflr: unable to load irregulars table `%s'.\n", fname);
-		exit(-1);
+		extern char	*confdir;
+		char	*mypath = malloc(strlen(confdir) + strlen(path) + 8);
+		sprintf(mypath, "%s/%s", confdir, path);
+		//printf("real path to irregulars file: %s\n", mypath);
+		show_task_name("reading irregular forms");
+		printf("from %s\n", path);
+		if(load_irregulars(mypath))
+		{
+			fprintf(stderr, "inflr: unable to load irregulars table `%s'.\n", path);
+			exit(-1);
+		}
+		free(mypath);
+		hits++;
+		return 0;
 	}
+	iterate_conf_list("irregular-forms", callback);
+	if(!hits) callback("../irregs.tab");
 	return 0;
 }
 

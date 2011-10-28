@@ -1,5 +1,41 @@
 TODO:
 
+berthold wants
+	- possibly commandline access to ACE QC generator
+	- add post-generation token mapping phase (and presumably an inverse REPP phase)
+
+complaints:
+	- generation in GG: to generate from the result of "Dies ist ein Test.", we have a problem... the VPM deletes --sub (which was luk) on the way out and replaces it with 'na' on the way back in, which is incompatible with the rules we need to apply...
+	- GG uses nogen-lex.set and nogen-rule.set files, but they aren't committed.
+
+DONE:
+
+0.9.2
+	- fix TDL reader/dagify to not conflate coreferences with the same name in different :+ addenda
+	- fix a unicode bug in token mapping
+	- fixed an obscure bug wherein GLB types could have incorrect constraints
+	- don't load token mapping rules when token mapping is disabled
+	- support more than 256 features
+	- support ^ and $ in token mapping positional constraints
+	- support spaces showing up in more unexpected places in TDL syntax
+	- the path to the label within parse-node instances is now configurable (LNAME feature)
+	- semantic indexing now pays attention to the lex-rels-path and rule-rels-path configurations
+	- quickcheck can be loaded from a PET QC instance
+	- new configuration options for limiting the number of orthographemic rules to apply
+	- new configuration option to specify how much room to preallocate in the freezer.
+	- new configuration option to specify what file[s] to load irregulars forms from
+	- new configuration option to specify a suffix for rule names given in irregulars tables
+0.9.1
+	- remove dependence on #include <liba.h>
+	- change ~/logon/ to ${LOGONROOT} in Makefile
+0.9
+
+
+
+
+
+-----
+
 - potentially use POS tagger to prune lexical ambiguity
 	- but POS tagger makes mistakes...
 
@@ -16,7 +52,8 @@ TODO:
 - have a unicode.c file with wide-char and mbs routines in it
 
 
-debug: I believe there are 15 747 724 136 275 002 577 605 653 961 181 555 468 044 717 914 527 116 709 366 231 425 076 185 631 031 296 296 protons in the universe and the same number of electrons.
++ debug: I believe there are 15 747 724 136 275 002 577 605 653 961 181 555 468 044 717 914 527 116 709 366 231 425 076 185 631 031 296 296 protons in the universe and the same number of electrons.
+	+ currently, that results in a "too much RAM" error. that seems reasonable.
 
 delete deleted daughters from daughters of rule, since they can't ever be present in unified-in daughters
 

@@ -34,6 +34,13 @@ struct path	lattice_mapping_input_path, lattice_mapping_output_path, lattice_map
 
 char		*token_type;
 
+int			ortho_max_rules = 7;
+int			ortho_warn_max_rules = 1;
+
+// options configured but not saved in the freezer:
+struct path	label_path;
+int			freezer_megabytes = 256;
+
 struct dg	*dg_path(struct dg	*dg, struct path	p)
 {
 	int i;
@@ -124,6 +131,13 @@ struct path	string_to_path(char	*str)
 	return p;
 }
 
+static struct path try_get_conf_path(char	*lhs, char	*deflt)
+{
+	char		*str = get_conf(lhs);
+	if(!str)return string_to_path(deflt);
+	else return string_to_path(str);
+}
+
 static struct path get_conf_path(char	*lhs)
 {
 	char		*str = get_conf(lhs);
@@ -175,6 +189,8 @@ struct conf
 	int		enable_post;
 	int		enable_generalize_edge_top_types;
 	int		extra_erg_dag_stash;
+
+	int		ortho_max_rules, ortho_warn_max_rules;
 };
 
 struct path	freeze_path(struct path	p)
@@ -245,6 +261,9 @@ void	*freeze_conf()
 		c->enable_generalize_edge_top_types = enable_generalize_edge_top_types;
 		c->enable_post = enable_post;
 		c->extra_erg_dag_stash = extra_erg_dag_stash;
+
+		c->ortho_max_rules = ortho_max_rules;
+		c->ortho_warn_max_rules = ortho_warn_max_rules;
 	}
 	else
 	{
@@ -309,16 +328,26 @@ void	recover_conf(void	*vc)
 		enable_generalize_edge_top_types = c->enable_generalize_edge_top_types;
 		enable_post = c->enable_post;
 		extra_erg_dag_stash = c->extra_erg_dag_stash;
+
+		ortho_max_rules = c->ortho_max_rules;
+		ortho_warn_max_rules = c->ortho_warn_max_rules;
 	}
 	else
 	{
 	}
 }
 
-int	get_conf_bool(char	*name)
+int	get_conf_int(char	*name, int dflt)
 {
 	char	*str = get_conf(name);
-	if(!str)return 0;
+	if(!str)return dflt;
+	return atoi(str);
+}
+
+int	get_conf_bool(char	*name, int dflt)
+{
+	char	*str = get_conf(name);
+	if(!str)return dflt;
 	if(!strcasecmp(str, "enabled"))return 1;
 	if(!strcasecmp(str, "on"))return 1;
 	if(!strcasecmp(str, "yes"))return 1;
@@ -339,11 +368,12 @@ load_syntax_conf()
 	lex_pred_path = get_conf_path("lex-pred-path");
 	rule_rels_path = get_conf_path("rule-rels-path");
 	extract_mrs_path = get_conf_path("semantics-path");
+	label_path = try_get_conf_path("label-path", "LNAME");
 
 	load_chart_dependencies(get_conf("chart-dependencies"));
-	reduce_chart_before_lexical_parsing = get_conf_bool("process-chart-dependencies-before-lexical-parsing");
+	reduce_chart_before_lexical_parsing = get_conf_bool("process-chart-dependencies-before-lexical-parsing", 0);
 
-	enable_token_avms = get_conf_bool("token-mapping");
+	enable_token_avms = get_conf_bool("token-mapping", 0);
 	if(enable_token_avms)
 	{
 		lex_tokens_list_path = get_conf_path("lexicon-tokens-path");
@@ -354,25 +384,29 @@ load_syntax_conf()
 		token_id_path = get_conf_path("token-id-path");
 		token_postags_path = get_conf_path("token-postags-path");
 		token_posprobs_path = get_conf_path("token-posprobs-path");
-
-		lattice_mapping_input_path = get_conf_path("lattice-mapping-input-path");
-		lattice_mapping_output_path = get_conf_path("lattice-mapping-output-path");
-		lattice_mapping_context_path = get_conf_path("lattice-mapping-context-path");
-		lattice_mapping_position_path = get_conf_path("lattice-mapping-position-path");
-
 		token_type = get_conf("token-type")?:"token";
 	}
 
-	enable_simple_form_lexicon = get_conf_bool("simplify-lexicon");
-	enable_index_accessibility_filtering = get_conf_bool("index-accessibility-filtering");
-	enable_generalize_edge_top_types = get_conf_bool("generalize-edge-top-types");
-	enable_post = get_conf_bool("english-pos-tagger");
-	extra_erg_dag_stash = get_conf_bool("extra-erg-dag-stash");
+	lattice_mapping_input_path = try_get_conf_path("lattice-mapping-input-path", "+INPUT");
+	lattice_mapping_output_path = try_get_conf_path("lattice-mapping-output-path", "+OUTPUT");
+	lattice_mapping_context_path = try_get_conf_path("lattice-mapping-context-path", "+CONTEXT");
+	lattice_mapping_position_path = try_get_conf_path("lattice-mapping-position-path", "+POSITION");
+
+	enable_simple_form_lexicon = get_conf_bool("simplify-lexicon", 0);
+	enable_index_accessibility_filtering = get_conf_bool("index-accessibility-filtering", 0);
+	enable_generalize_edge_top_types = get_conf_bool("generalize-edge-top-types", 0);
+	enable_post = get_conf_bool("english-pos-tagger", 0);
+	extra_erg_dag_stash = get_conf_bool("extra-erg-dag-stash", 0);
+
+	ortho_max_rules = get_conf_int("ortho-max-rules", 7);
+	ortho_warn_max_rules = get_conf_bool("ortho-warn-on-max-rules", 1);
+
+	freezer_megabytes = get_conf_int("freezer-megabytes", 256);
 }
 
 int	load_conf()
 {
-	g_transfer = get_conf_bool("transfer");
+	g_transfer = get_conf_bool("transfer", 0);
 	if(g_transfer)load_transfer_conf();
 	else load_syntax_conf();
 
@@ -402,10 +436,10 @@ int check_conf_list(char	*key, char	*word)
 void iterate_conf_list(char	*key, int	(*callback)(char	*word))
 {
 	int	hits = 0;
-	char	*list = get_conf(key), *p;
+	char	*list = get_conf(key), *p, *saveptr=NULL;
 	if(!list)return;
 	list = strdup(list);
-	for(p=strtok(list, " \t\n");p;p=strtok(0, " \t\n"))
+	for(p=strtok_r(list, " \t\n", &saveptr);p;p=strtok_r(NULL, " \t\n", &saveptr))
 		if(callback(p))break;
 	free(list);
 }

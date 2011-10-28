@@ -24,7 +24,7 @@ void	*freeze_qc()
 	struct qc_freezer	*f = slab_alloc(sizeof(*f));
 	f->qc_size = qc_size;
 	f->qc_image_size = qc_image_size;
-	f->qc_image = slab_alloc(qc_image_size);
+	f->qc_image = slab_alloc(qc_image_size + 4 - (qc_image_size%4));
 	memcpy(f->qc_image, qc_image, qc_image_size);
 	return f;
 }
@@ -121,6 +121,8 @@ int	compile_qc(char	*qccode_path)
 	qc_image = malloc(len);
 	lseek(fd, 0, SEEK_SET);
 	assert(read(fd, qc_image, len) == len);
+	unlink(target_path);
+	close(fd);
 
 	return 0;
 }
@@ -137,12 +139,12 @@ qc_extractor_function	dynamically_link_qc_extractor()
 	int	fd = mkstemp(path);
 
 	assert(qc_image_size = write(fd, qc_image, qc_image_size));
-	close(fd);
 	void	*dl = dlopen(path, RTLD_NOW);
 	if(!dl) { fprintf(stderr, "dlopen: %s\n", dlerror()); exit(-1); }
 	void	*extr = dlsym(dl, "extractor");
 	if(!extr) { fprintf(stderr, "extractor: %s\n", dlerror()); exit(-1); }
 	unlink(path);
+	close(fd);
 
 	return extr;
 }

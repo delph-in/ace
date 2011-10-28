@@ -292,9 +292,10 @@ int	fix_glbs()
 		//printf("fixing up %s\n", t->name);
 		struct dg	*d = t->parents[0]->dg;
 		assert(d != NULL);
+		assert(t->nparents > 1);
 		for(j=1;j<t->nparents;j++)
 		{
-			struct dg	*d2 = unify_dg(d, t->parents[j]->dg, -1);
+			struct dg	*d2 = unify_dg_noss(d, t->parents[j]->dg, -1);
 			if(!d2)
 			{
 				fprintf(stderr, "glb-fix: unexpected error! glb type `%s' is inconsistent.\n", t->name);

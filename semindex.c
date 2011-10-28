@@ -14,6 +14,7 @@
 #include	"freeze.h"
 #include	"transfer.h"
 #include	"bitvec.h"
+#include	"conf.h"
 
 #define	VACUOUS	"vacuous"
 
@@ -156,8 +157,8 @@ void	entity_add_semantic_index(short what, struct dg *indpred, char *indkey, voi
 	e->pidx = pidx;
 }
 
-static int	savef[10] = {-1,-1,-1,-1,-1,-1,-1,-1};
-static int	rsavef[10] = {-1,-1,-1,-1,-1,-1,-1,-1};
+//static int	savef[10] = {-1,-1,-1,-1,-1,-1,-1,-1};
+//static int	rsavef[10] = {-1,-1,-1,-1,-1,-1,-1,-1};
 
 void	add_semantic_index(struct lexeme *l, struct dg *full, int which)
 {
@@ -165,8 +166,16 @@ void	add_semantic_index(struct lexeme *l, struct dg *full, int which)
 	int			pidx = 0;
 	struct dg	*rels, *Rels;
 
-	if(!which)rels = walk_dg(full, savef, "SYNSEM", "LOCAL", "CONT", "RELS", "LIST", NULL);
-	else rels = walk_dg(full, rsavef, "C-CONT", "RELS", "LIST", NULL);
+//	if(!which)rels = walk_dg(full, savef, "SYNSEM", "LOCAL", "CONT", "RELS", "LIST", NULL);
+//	else rels = walk_dg(full, rsavef, "C-CONT", "RELS", "LIST", NULL);
+
+	if(!which)rels = dg_path(full, lex_rels_path);
+	else rels = dg_path(full, rule_rels_path);
+
+	static int list_fnum = -1;
+	if(list_fnum==-1)
+		list_fnum = lookup_fname("LIST");
+	if(rels)rels = dg_hop(rels, list_fnum);
 
 	Rels = rels;
 	if(!sindex)init_index();
@@ -339,23 +348,9 @@ char *ep_has_carg(struct mrs_ep *ep)
 {
 	int i;
 	for(i=0;i<ep->nargs;i++)
-		if(!strcasecmp(ep->args[i].name, "CARG"))
+		if(!strcasecmp(ep->args[i].name, "CARG") && ep->args[i].value->is_const)
 			return ep->args[i].value->name;
 	return 0;
-}
-
-struct semindex_pred_node	*invent_semindex_node_for_gle(struct lexeme	*gle)
-{
-	struct semindex_pred_node	*node = slab_alloc(sizeof(*node));
-	bzero(node, sizeof(*node));
-	node->pred = gle->pred->name;
-	node->nentities = node->aentities = 1;
-	struct grammar_entity	*e = slab_alloc(sizeof(*e));
-	bzero(e, sizeof(*e));
-	node->entities = e;
-	e->what = LEXEME;
-	e->lex = gle;
-	return node;
 }
 
 int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
@@ -380,41 +375,12 @@ int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
 	}
 	count += activate_semindex_node(node, ep, Rest);
 
-	if(!count)
-	{
-		// if there is a CARG, we get to look at generic LEs
-		char	*carg = NULL;
-		for(i=0;i<ep->nargs;i++)
-			if(!strcmp(ep->args[i].name, "CARG") && ep->args[i].value->is_const)
-				carg = ep->args[i].value->name;
-		if(carg)
-		{
-			// see if any generic LEs provide this relation
-			for(i=0;i<ngeneric_les;i++)
-			{
-				if(!generic_le_infos[i].for_generation)continue;
-				struct type	*p = generic_les[i]->pred;
-				if(!strcmp(p->name, ep->pred))
-				{
-					// bingo.
-					//printf("NOTE: generic '%s' fires for unknown input EP '%s'\n", generic_les[i]->word, ep->pred);
-					// FIXME the first 'carg' argument below possibly should be a 
-					// modified copy of the string with spaces changed to underscores
-					// (or vice versa?)
-					struct lexeme	*igle = instantiate_gle(generic_les[i], carg, carg);
-					node = invent_semindex_node_for_gle(igle);
-					count += activate_semindex_node(node, ep, Rest);
-				}
-			}
-		}
-	}
-	
 	return count;
 }
 
 // enumeration
 
-struct ep_alignment	*enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int ai, int ei, struct mrs_ep	*align[], struct ep_alignment	*rest);
+struct ep_alignment	*enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int ai, int ei, struct mrs_ep	*align[], struct ep_alignment	*rest, char	*ep_hit_map);
 //int constrain_gen_edge(struct edge *e, struct dg	*cont, int	neps, struct mrs_ep	*eps[]);
 struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[]);
 
@@ -463,7 +429,7 @@ int	instantiate_alignment(struct ep_alignment	*a)
 	return edge?1:0;
 }
 
-struct ep_alignment	*record_alignment(struct grammar_entity	*e, struct mrs_ep	*align[], struct ep_alignment	*rest)
+struct ep_alignment	*record_alignment(struct grammar_entity	*e, struct mrs_ep	*align[], struct ep_alignment	*rest, char	*ep_hit_map)
 {
 	struct ep_alignment	*a;
 	int	i;
@@ -483,6 +449,8 @@ struct ep_alignment	*record_alignment(struct grammar_entity	*e, struct mrs_ep	*a
 	a->e = e;
 	memcpy(a->align, align, sizeof(struct mrs_ep*)*(1+e->nextra_preds));
 	a->next = rest;
+	for(i=0;i<=e->nextra_preds;i++)
+		ep_hit_map[align[i]->epnum] = 1;
 	/*printf(" ... accepting new alignment: ");
 	for(i=0;i<=e->nextra_preds;i++)
 		printf(" %s/%p", align[i]->pred, align[i]);
@@ -490,13 +458,13 @@ struct ep_alignment	*record_alignment(struct grammar_entity	*e, struct mrs_ep	*a
 	return a;
 }
 
-struct ep_alignment	*enumerate_alignments(struct grammar_entity	*e, int ei, struct mrs_ep	*align[], struct ep_alignment	*rest)
+struct ep_alignment	*enumerate_alignments(struct grammar_entity	*e, int ei, struct mrs_ep	*align[], struct ep_alignment	*rest, char	*ep_hit_map)
 {
 	if(ei == e->nextra_preds)
 	{
 		// we have produced a complete alignment of 'e' against the input semantics.
 		// record it.
-		return record_alignment(e, align, rest);
+		return record_alignment(e, align, rest, ep_hit_map);
 	}
 	else
 	{
@@ -504,19 +472,19 @@ struct ep_alignment	*enumerate_alignments(struct grammar_entity	*e, int ei, stru
 		struct semindex_pred_node	*next = e->extra_preds[ei];
 		int	i;
 		//printf("enumerating '%s' [%d]\n", next->pred, ei);
-		rest = enumerate_eps(e, next, (ei<e->pidx)?(ei):(ei+1), ei+1, align, rest);
+		rest = enumerate_eps(e, next, (ei<e->pidx)?(ei):(ei+1), ei+1, align, rest, ep_hit_map);
 		//printf(" has %d relatives\n", next->nrelatives);
 		for(i=0;i<next->nrelatives;i++)
 			if(pred_subsumes(next->pred, next->relatives[i]->pred))
 			{
 				//printf(" rel = %s\n", next->relatives[i]->pred);
-				rest = enumerate_eps(e, next->relatives[i], (ei<e->pidx)?(ei):(ei+1), ei+1, align, rest);
+				rest = enumerate_eps(e, next->relatives[i], (ei<e->pidx)?(ei):(ei+1), ei+1, align, rest, ep_hit_map);
 			}
 		return rest;
 	}
 }
 
-struct ep_alignment	*enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int ai, int ei, struct mrs_ep	*align[], struct ep_alignment	*rest)
+struct ep_alignment	*enumerate_eps(struct grammar_entity	*e, struct semindex_pred_node *node, int ai, int ei, struct mrs_ep	*align[], struct ep_alignment	*rest, char	*ep_hit_map)
 {
 	struct ep_list *epl;
 	int count = 0;
@@ -526,13 +494,13 @@ struct ep_alignment	*enumerate_eps(struct grammar_entity	*e, struct semindex_pre
 		if(epl->ep->active)continue;
 		align[ai] = epl->ep;
 		epl->ep->active = 1;
-		rest = enumerate_alignments(e, ei, align, rest);
+		rest = enumerate_alignments(e, ei, align, rest, ep_hit_map);
 		epl->ep->active = 0;
 	}
 	return rest;
 }
 
-struct ep_alignment	*enumerate_semindex(struct semindex_pred_node *node, struct ep_alignment	*rest)
+struct ep_alignment	*enumerate_semindex(struct semindex_pred_node *node, struct ep_alignment	*rest, char	*ep_hit_map)
 {
 	int i, j, count = 0;
 	struct ep_list	*epl;
@@ -556,9 +524,62 @@ struct ep_alignment	*enumerate_semindex(struct semindex_pred_node *node, struct 
 		//for(j=0;j<e->nextra_preds;j++)
 		//	printf(" '%s'", e->extra_preds[j]->pred);
 		//printf("\n");
-		rest = enumerate_eps(e, node, e->pidx, 0, align, rest);
+		rest = enumerate_eps(e, node, e->pidx, 0, align, rest, ep_hit_map);
 	}
 	return rest;
+}
+
+struct semindex_pred_node	*invent_semindex_node_for_gle(struct lexeme	*gle, struct mrs_ep	*ep)
+{
+	struct semindex_pred_node	*node = slab_alloc(sizeof(*node));
+	bzero(node, sizeof(*node));
+	node->pred = gle->pred->name;
+	node->nentities = node->aentities = 1;
+	struct grammar_entity	*e = slab_alloc(sizeof(*e));
+	bzero(e, sizeof(*e));
+	node->entities = e;
+	e->what = LEXEME;
+	e->lex = gle;
+	struct ep_list	*epl = slab_alloc(sizeof(*epl));
+	bzero(epl, sizeof(*epl));
+	epl->ep = ep;
+	epl->next = NULL;
+	node->activation = epl;
+	return node;
+}
+
+int	semindex_try_generics(struct mrs_ep	*ep, struct ep_alignment	**Rest, char	*ep_hit_map)
+{
+	// if there is a CARG, we get to look at generic LEs
+	char	*carg = ep_has_carg(ep);
+	int	i, count = 0;
+	if(carg)
+	{
+		// see if any generic LEs provide this relation
+		//printf("uncovered EP %s has carg %s\n", ep->pred, carg);
+		for(i=0;i<ngeneric_les;i++)
+		{
+			if(!generic_le_infos[i].for_generation)continue;
+			struct type	*p = generic_les[i]->pred;
+			if(!strcmp(p->name, ep->pred))
+			{
+				// bingo.
+				//printf("NOTE: generic '%s' fires for unknown input EP '%s'\n", generic_les[i]->word, ep->pred);
+				// FIXME the first 'carg' argument below possibly should be a 
+				// modified copy of the string with spaces changed to underscores
+				// (or vice versa?)
+				struct lexeme	*igle = instantiate_gle(generic_les[i], carg, carg);
+				struct semindex_pred_node	*node = invent_semindex_node_for_gle(igle, ep);
+				count++;
+				*Rest = enumerate_semindex(node, *Rest, ep_hit_map);
+			}
+		}
+	}
+	if(!count)
+	{
+		// we should look at the other set of generics (activated by the pos tag in the relation name)
+		fprintf(stderr, "NOTE: EP '%s' is unknown in the semantic index\n", ep->pred);
+	}
 }
 
 int evacuate(int nvaclex, char **vaclex)
@@ -633,18 +654,24 @@ void semantic_lookup(struct mrs	*mrs)
 
 	// activate index nodes
 	for(i=0;i<mrs->nrels;i++)
-	{
-		int	nnodes = activate_semindex(mrs->rels+i, &active);
-		if(!nnodes)
-		{
-			fprintf(stderr, "NOTE: EP '%s' is unknown in the semantic index\n", mrs->rels[i].pred);
-		}
-	}
+		activate_semindex(mrs->rels+i, &active);
 
 	// enumerate grammar entity alignments
+	char	ep_hit_map[mrs->nrels];
+	bzero(ep_hit_map, mrs->nrels);
 	struct ep_alignment	*alignments = NULL, *awalk;
 	for(walk=active;walk;walk=walk->next)
-		alignments = enumerate_semindex(walk->node, alignments);
+		alignments = enumerate_semindex(walk->node, alignments, ep_hit_map);
+
+	// see if we need to enumerate any generic lexemes
+	for(i=0;i<mrs->nrels;i++)
+		if(!ep_hit_map[i])
+			semindex_try_generics(mrs->rels+i, &alignments, ep_hit_map);
+	for(i=0;i<mrs->nrels;i++)
+		if(!ep_hit_map[i])
+		{
+			fprintf(stderr, "WARNING: EP '%s' is not covered\n", mrs->rels[i].pred);
+		}
 
 	// clear activation records
 	while(active) { active->node->activation = 0; active = active->next; }

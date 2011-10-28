@@ -344,3 +344,46 @@ void	gqc_result()
 		cheapest, 100 * (filtration[cheapest-1] / filtration[npaths-1]), nhops[cheapest-1], least_cost);
 	gqc_treeify(cheapest, 0);
 }
+
+// code to take a PET quickcheck instance and build a compiled QC extractor
+// we expect this instance to be a tree (no reentrancies), with number strings at the leaves
+// each leaf is a QC location
+// the numbers represent the rank of that path within the QC vector
+// there's an artificial first feature "ARGS" that we need to jump over before starting
+
+int	qc_count_strings(struct dg	*qc)
+{
+	int	i, n=0;
+	struct dg	**arcs = DARCS(qc);
+	if(qc->xtype->name[0]=='"')n++;
+	for(i=0;i<qc->narcs;i++)
+		n += qc_count_strings(arcs[i]);
+	return n;
+}
+
+void	recursive_write_qccode(struct dg	*qc, FILE	*f)
+{
+	if(qc->xtype->name[0]=='"')
+	{
+		int	k = atoi(qc->xtype->name+1);
+		fprintf(f, "REC(%d)\n", k);
+	}
+	int i;
+	struct dg	**arcs = DARCS(qc);
+	for(i=0;i<qc->narcs;i++)
+	{
+		extern char	**fnames;
+		fprintf(f, "PUSH(%s) ", fnames[qc->label[i]]);
+		recursive_write_qccode(arcs[i], f);
+		fprintf(f, "POP ");
+	}
+}
+
+void	write_qccode_from_pet_instance(struct dg	*petqc, FILE	*f)
+{
+	struct dg	*mainqc = dg_hop(petqc, lookup_fname("ARGS"));
+	assert(mainqc != NULL || !"Quickcheck instance had no ARGS feature");
+	int	n = qc_count_strings(mainqc);
+	fprintf(f, "QC_SIZE(%d)\n", n);
+	recursive_write_qccode(mainqc, f);
+}

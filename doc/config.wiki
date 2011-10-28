@@ -22,7 +22,9 @@ Paths to other files:
 || generation-trigger-rules || path to a TDL file defining trigger rules for generation ||
 || idiom-rules || path to a TDL file defining idiom-checking rules for parsing ||
 || quickcheck-code || path to a text file defining the quickcheck skeleton ||
+|| quickcheck-instance || name of an instance containing a PET-style quickcheck skeleton ||
 || semantic-interface || path to a .smi file defining the SEMI ||
+|| irregular-forms || list of ''unquoted'' paths to irregular form tables ||
 
 Types
 || top-type || name of the type at the root of the type hierarchy ||
@@ -41,6 +43,7 @@ Paths within AVMs
 || lex-pred-path || path to PRED of a lexeme's key relation (old, unused) ||
 || rule-rels-path || path to list of EPs supplied by a rule ||
 || semantics-path || path to the MRS structure of a sign ||
+|| label-path || path to the label string on a parse-node instance ||
 || chart-dependencies || a (flat) list of pairs of quoted paths used for removing unwanted lexemes from the chart before parsing.  a lexeme with a non-*top* value for the first path in a pair will only survive if there is another lexeme with a compatible value at the second path in the pair. ||
 
 Token Mapping
@@ -79,3 +82,7 @@ General Configuration
 || generation-roots || list of root instances enabled for generation ||
 || non-idiom-root || the name of an instance to check against all parsing results to see whether further idiom processing is required ||
 || generic-les-for-semantic-index || list of the names of the generic lexemes that can be used to provide an unknown relation in generation ||
+|| ortho-max-rules || maximum length of a chain of orthographemic rules to allow in parsing ||
+|| ortho-warn-on-max-rules || whether to print a warning when the limit of orthographemic rules is reached ||
+|| freezer-megabytes || defaults to 256; make it bigger if you get a warning about it. ||
+|| irregular-form-rule-suffix || a string to append to the rule names found in irregular form tables. ||
