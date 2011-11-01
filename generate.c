@@ -311,7 +311,7 @@ int	generate(struct mrs	*mrs)
 	{
 		if(edge->have == edge->need)npassive_edges++;
 		//printf("... process %p = #%d  ; %d EPs\n", edge, edge->id, edge->neps);
-		if(gen_process_edge(edge)){/*printf("terminated!\n");break;*/}
+		if(gen_process_edge(edge)){break;}
 	}
 	if(debug_level)printf("packed %.4f\n", timer());
 
