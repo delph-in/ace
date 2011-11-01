@@ -971,7 +971,13 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 			fprintf(stderr, "hint: structify -> rdagify failed\n");
 			return 0;
 		}
-		dg = add_dg_path(dg, R->current_path+R->current_pathlen, depth, value);
+		// something might already be at this path, in which case we are supposed to unify this with that
+		struct dg	*previous = dg;
+		int j;
+		for(j=0;previous && j<depth;j++)
+			previous = dg_hop(previous, R->current_path[R->current_pathlen + j]);
+		if(previous) unify_dg_infrom(previous, value);
+		else dg = add_dg_path(dg, R->current_path+R->current_pathlen, depth, value);
 	}
 
 	return dg;
@@ -1497,7 +1503,7 @@ int	load_quickcheck()
 		char	target_path[1280];
 		sprintf(target_path, "%s/qcex.txt-XXXXXX", tmpdir);
 		int	fd = mkstemp(target_path);
-		FILE	*f = fopen(target_path, "r");
+		FILE	*f = fopen(target_path, "w");
 		if(!f) { perror(target_path); exit(-1); }
 		write_qccode_from_pet_instance(qcinst, f);
 		fclose(f);

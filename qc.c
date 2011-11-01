@@ -361,11 +361,16 @@ int	qc_count_strings(struct dg	*qc)
 	return n;
 }
 
-void	recursive_write_qccode(struct dg	*qc, FILE	*f)
+void	recursive_write_qccode(struct dg	*qc, FILE	*f, int	count)
 {
 	if(qc->xtype->name[0]=='"')
 	{
 		int	k = atoi(qc->xtype->name+1);
+		if(k >= count)
+		{
+			fprintf(stderr, "quickcheck instance compiler: find path %d but only thought there were %d paths\n", k, count);
+			exit(-1);
+		}
 		fprintf(f, "REC(%d)\n", k);
 	}
 	int i;
@@ -374,7 +379,7 @@ void	recursive_write_qccode(struct dg	*qc, FILE	*f)
 	{
 		extern char	**fnames;
 		fprintf(f, "PUSH(%s) ", fnames[qc->label[i]]);
-		recursive_write_qccode(arcs[i], f);
+		recursive_write_qccode(arcs[i], f, count);
 		fprintf(f, "POP ");
 	}
 }
@@ -385,5 +390,5 @@ void	write_qccode_from_pet_instance(struct dg	*petqc, FILE	*f)
 	assert(mainqc != NULL || !"Quickcheck instance had no ARGS feature");
 	int	n = qc_count_strings(mainqc);
 	fprintf(f, "QC_SIZE(%d)\n", n);
-	recursive_write_qccode(mainqc, f);
+	recursive_write_qccode(mainqc, f, n);
 }
