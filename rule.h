@@ -34,6 +34,8 @@ struct rule	*lookup_rule(char	*name);	// same as get_rule_by_name
 extern int		nrules;
 extern struct rule	**rules;
 
+extern char	*nosplexrftc;
+
 static inline int	check_rf(struct rule	*m, struct rule	*d, int	arg)
 {
 	char	byte;

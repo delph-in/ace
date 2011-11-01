@@ -14,11 +14,13 @@
 #include	"lexicon.h"
 
 struct dg	*constrain_rule_rels(struct dg *dg, struct dg *rels);
+char	*compute_nosplexrftc();
 
 struct rule	**rules;
 int		nrules;
 
 char	*rule_filter, *rule_sfilter;
+char	*nosplexrftc;
 int	*nhactive, *nactive, *npassive, *nrecomb, *nused, *nptries, *natries;
 int	used_total = 0, pused_total = 0;
 extern int nfinal, trace, inhibit_pack;
@@ -521,6 +523,8 @@ struct rule_filters
 	char	**rftc, **rltc;
 	char	**type_rf, **type_rl;
 	char	**type_rftc, **type_rltc;
+	char	*nopack_nosplexrftc;
+	char	*pack_nosplexrftc;
 }	*filters;
 
 void setup_rule_filter()
@@ -534,6 +538,12 @@ void setup_rule_filter()
 	filters->packs = rule_sfilter;
 	filters->gpack = setup_rule_filter1(2);
 	filters->gpacks = rule_sfilter;
+
+	rule_filter = filters->nopack;
+	filters->nopack_nosplexrftc = compute_nosplexrftc();
+	rule_filter = filters->pack;
+	filters->pack_nosplexrftc = compute_nosplexrftc();
+
 	rule_filter = filters->nopack;	// type_rxtc is applied before packing starts
 	rule_sfilter = filters->nopacks;
 	lex_filter_rules();
@@ -575,6 +585,8 @@ void	*freeze_rule_filter()
 	filters->type_rl = freeze_rxtc(type_rl, th->ntypes);
 	filters->type_rftc = freeze_rxtc(type_rftc, th->ntypes);
 	filters->type_rltc = freeze_rxtc(type_rltc, th->ntypes);
+	filters->nopack_nosplexrftc = freeze_block(filters->nopack_nosplexrftc, nrules*nrules);
+	filters->pack_nosplexrftc = freeze_block(filters->pack_nosplexrftc, nrules*nrules);
 	return filters;
 }
 
@@ -600,6 +612,62 @@ void	install_rf(int what)
 	else if(what==1)rule_sfilter = filters->packs;
 	else if(what==2)rule_sfilter = filters->gpacks;
 	else assert(!"Not reached");
+
+	if(what==0)nosplexrftc = filters->nopack_nosplexrftc;
+	else nosplexrftc = filters->pack_nosplexrftc;
+}
+
+// compute a table showing what chains are possible of non-spelling-change lexical rules
+char	*compute_nosplexrftc()
+{
+	char	*table = calloc(nrules,nrules);
+	char	*process = calloc(nrules,1);
+	char	*reprocess = calloc(nrules,1);
+	int	i, j, k, n;
+	// initialize with a copy of the rule filter
+	for(i=0;i<nrules;i++)
+	{
+		for(j=0;j<nrules;j++)
+		{
+			// rules[j] can be the immediate daughter of rules[i]
+			table[i*nrules + j] = check_rf(rules[i], rules[j], 0);
+			//if(rules[i]->lexical && rules[j]->lexical)
+				//printf("check_rf for mother %s daughter %s = %d\n", rules[i]->name, rules[j]->name, table[i*nrules+j]);
+		}
+		reprocess[i] = 1;
+	}
+	do
+	{
+		n = 0;
+		memcpy(process, reprocess, nrules);
+		bzero(reprocess, nrules);
+		for(i=0;i<nrules;i++)
+		{
+			if(!rules[i]->lexical)continue;
+			for(j=0;j<nrules;j++)
+			{
+				if(!rules[j]->lexical)continue;
+				if(table[i*nrules + j])continue;	// already know this is possible
+				if(!(process[i]&1) && !(process[j]&2))
+					continue; // nothing new known about either i or j
+				// see if we can find an intermediary non-spelling-change lexical rule
+				for(k=0;k<nrules;k++)
+				{
+					struct rule	*x = rules[k];
+					if(!x->lexical || x->orth)continue;
+					if(table[i*nrules + k] && table[k*nrules + j])
+					{
+						table[i*nrules + j] = 1;
+						reprocess[i] |= 1;
+						reprocess[j] |= 2;
+						n++;
+						break;
+					}
+				}
+			}
+		}
+	} while(n);
+	return table;
 }
 
 // compute the set of rules which can appear as the x'th constituent of this rule, somewhere down the left edge of the subtree

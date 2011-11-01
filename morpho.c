@@ -49,7 +49,7 @@ struct ochart
 };
 
 void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule);
-void	unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int nrules, int *rnums);
+void	unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int routelen, int *rnums);
 
 int	check_mbs(char	*mbs);
 /*int	check_mbs(char	*mbs)
@@ -407,7 +407,7 @@ int	*longer_rule_list_rev(int nr, int *ru, struct orule	*or)
 /* record that you can get to stem form 'e' from the 
  * surface form by applying rules 'rnums' each in the backwards direction
  */
-int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
+int record_oroute(struct ochart_edge *e, int routelen, int *rnums)
 {
 	int i, j;
 
@@ -416,7 +416,7 @@ int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
 	for(i=0;i<e->north_routes;i++)
 	{
 		struct orth_route *r = e->orth_routes+i;
-		if(r->len == nrules && !memcmp(r->rules, rnums, sizeof(int)*nrules))
+		if(r->len == routelen && !memcmp(r->rules, rnums, sizeof(int)*routelen))
 		{
 			assert(!"duplicate oroute recorded");
 			return 0;
@@ -424,14 +424,22 @@ int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
 	}
 
 	// check if it is doomed by transitive rule filter
-	for(i=0;i<nrules;i++)
+	for(i=0;i<routelen;i++)
 	{
-		for(j=i+1;j<nrules;j++)
+		if(i+1 < routelen)
+		{
+			if(nosplexrftc[rnums[i+1]*nrules + rnums[i]] == 0)
+			{
+				fprintf(stderr, "NOTE: killing rule chain containing adjacent pair `%s %s'\n", rules[rnums[i]]->name, rules[rnums[i+1]]->name);
+				return 0;
+			}
+		}
+		for(j=i+1;j<routelen;j++)
 		{
 			extern char	**rf_tc;
 			if(!rf_tc[rnums[j]][rnums[i]])
 			{
-				printf("killing rule chain containing pair `%s %s'\n", rules[rnums[i]]->name, rules[rnums[j]]->name);
+				fprintf(stderr, "NOTE: killing rule chain containing pair `%s %s'\n", rules[rnums[i]]->name, rules[rnums[j]]->name);
 				return 0;
 			}
 		}
@@ -442,7 +450,7 @@ int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
 	e->orth_routes = slab_realloc(e->orth_routes,
 		sizeof(struct orth_route) * (e->north_routes-1),
 		sizeof(struct orth_route) * e->north_routes);
-	e->orth_routes[e->north_routes-1].len = nrules;
+	e->orth_routes[e->north_routes-1].len = routelen;
 	e->orth_routes[e->north_routes-1].rules = rnums;
 	return 1;
 }
@@ -452,19 +460,19 @@ int record_oroute(struct ochart_edge *e, int nrules, int *rnums)
  * a path of backwards rules leading to 'target'.
  * so really we want to figure out how to get from start to 'visit'.
  */
-void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int nrules, int *rnums)
+void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int routelen, int *rnums)
 {
 	int i;
 
 	// don't go down garden paths
-	if(nrules >= ortho_max_rules)
+	if(routelen >= ortho_max_rules)
 	{
 		if(ortho_warn_max_rules)
 		{
 			fprintf(stderr, "WARNING: ran up against orthographemic rule chain limit (configured at %d) during orthographemic analysis\n", ortho_max_rules);
 			fprintf(stderr, "WARNING:   (to suppress this warning, use `ortho-warn-on-max-rules := no.')\n");
 			fprintf(stderr, "WARNING: rule chain from '%s' to '%s':\n", visit->form, target->form);
-			for(i=0;i<nrules;i++)
+			for(i=0;i<routelen;i++)
 				fprintf(stderr, "  %s", rules[rnums[i]]->name);
 			fprintf(stderr, "\n");
 		}
@@ -479,9 +487,16 @@ void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int n
 		if(d->edge)
 		{
 			// we got here by applying d->rule backwards to d->edge
+			extern char	*nosplexrftc;
+			if(routelen > 0 && !nosplexrftc[d->rule->rule->rnum * nrules + rnums[routelen-1]])
+			{
+				//fprintf(stderr, "NOTE: nosplexrftc blocked exploration of '%s' when last rule was '%s'\n",
+					//d->rule->rule->name, rules[rnums[routelen-1]]->name);
+				continue;
+			}
 			// see if d->rule is incompatible with any rules already on this o-route
 			int j;
-			for(j=0;j<nrules;j++)
+			for(j=0;j<routelen;j++)
 			{
 				extern char	**rf_tc;
 				if(!rf_tc[d->rule->rule->rnum][rnums[j]])
@@ -507,17 +522,17 @@ void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int n
 					}
 				}
 			}
-			if(j<nrules) continue;
+			if(j<routelen) continue;
 			// recurse and see about ways to get to d->edge from the starting form.
 			assert(d->rule != NULL);
-			int		*mnums = longer_rule_list_rev(nrules, rnums, d->rule);
-			unfold_oroutes(target, d->edge, nrules+1, mnums);
+			int		*mnums = longer_rule_list_rev(routelen, rnums, d->rule);
+			unfold_oroutes(target, d->edge, routelen+1, mnums);
 		}
 		else
 		{
 			// we're at the starting form;
 			// record the complete route to get here.
-			record_oroute(target, nrules, rnums);
+			record_oroute(target, routelen, rnums);
 		}
 	}
 }
