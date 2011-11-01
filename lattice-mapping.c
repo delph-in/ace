@@ -22,6 +22,7 @@
 
 #include	"lattice-mapping.h"
 #include	"token.h"
+#include	"timer.h"
 
 #include	"unicode.h"
 
@@ -798,43 +799,47 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 }
 
 // for the currently active rule:
-int					nfailed_unify_inputs;
-int					*failed_haves;
-struct lattice_edge	***failed_unify_inputs;
-
-static int	same_unify_inputs(struct lattice_edge	**ins, int	have, struct lattice_edge	**ins2, int	have2)
+struct failure
 {
-	if(have != have2)return 0;
+	int	from, to;
+	struct lattice_edge	**inputs;
+}	*failed_unify_inputs;
+int					nfailed_unify_inputs;
+
+static int	same_unify_inputs(struct lattice_edge	**ins, int	from, int	to, struct failure	*fail)
+{
+	if(from != fail->from || to != fail->to)return 0;
 	int i;
-	for(i=0;i<have;i++)
-		if(ins[i] != ins2[i])return 0;
+	for(i=from;i<to;i++)
+		if(ins[i] != fail->inputs[i-from])return 0;
 	return 1;
 }
 
-static int	check_already_failed(struct lattice_edge	**inputs, int	have)
+static int	check_already_failed(struct lattice_edge	**inputs, int	from, int	to)
 {
 	int	i;
 	for(i=0;i<nfailed_unify_inputs;i++)
-		if(same_unify_inputs(inputs, have, failed_unify_inputs[i], failed_haves[i]))
+		if(same_unify_inputs(inputs, from, to, &failed_unify_inputs[i]))
 			return 1;
 	return 0;
 }
 
-static void	record_failed(struct lattice_edge	**inputs, int	have)
+static void	record_failed(struct lattice_edge	**inputs, int	from, int	to)
 {
 	nfailed_unify_inputs++;
-	failed_haves = realloc(failed_haves, sizeof(int)*nfailed_unify_inputs);
-	failed_haves[nfailed_unify_inputs-1] = have;
-	failed_unify_inputs = realloc(failed_unify_inputs, sizeof(void**)*nfailed_unify_inputs);
-	failed_unify_inputs[nfailed_unify_inputs-1] = malloc(sizeof(void*)*have);
-	memcpy(failed_unify_inputs[nfailed_unify_inputs-1], inputs, sizeof(void*)*have);
+	failed_unify_inputs = realloc(failed_unify_inputs, sizeof(struct failure)*nfailed_unify_inputs);
+	struct failure	*f = &failed_unify_inputs[nfailed_unify_inputs-1];
+	f->from = from;
+	f->to = to;
+	f->inputs = malloc(sizeof(void*)*(to-from));
+	memcpy(f->inputs, inputs+from, sizeof(void*)*(to-from));
 }
 
 static void clear_failed()
 {
 	int i;
 	for(i=0;i<nfailed_unify_inputs;i++)
-		free(failed_unify_inputs[i]);
+		free(failed_unify_inputs[i].inputs);
 	nfailed_unify_inputs = 0;
 }
 
@@ -852,147 +857,154 @@ int lattice_vertex_is_final(struct lattice	*lat, struct lattice_vertex	*v)
 	return 0;
 }
 
-// TODO find a more efficient algorithm for finding application sites
-// TODO keep a cache of what rule already failed to unify with what edge... a *lot* of wasted unification attempts
-// TODO   -- or use quickcheck?
-int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct lattice_edge	**inputs, int	have)
+int	lattice_rule_matches(struct lattice	*lat, struct lattice_rule	*r, struct lattice_edge	**inputs, int	from, int	to, struct re_match_set	*mats)
 {
-	int i, j;
-	struct re_match_set	*mats = NULL;
-	if(have==r->ninput + r->ncontext)
-		mats = slab_alloc(sizeof(struct re_match_set)*have);
-	if(have>0)
+	int	i, j;
+
+	// verify that the inputs match the position constraints
+	for(i=0;i<r->nposition_constraints;i++)
 	{
-		// verify the inputs match the position constraints
-		for(i=0;i<r->nposition_constraints;i++)
+		struct lattice_position_constraint	*pc = r->position_constraints+i;
+		if(pc->lhs_what == 'O' || pc->rhs_what == 'O')continue;
+		int	lhs_which = pc->lhs_which;
+		if(pc->lhs_what == 'C')lhs_which += r->ninput;
+		int	rhs_which = pc->rhs_which;
+		if(pc->rhs_what == 'C')rhs_which += r->ninput;
+		struct lattice_vertex	*rhs_start, *rhs_end;
+		if(pc->rhs_what == '^' || pc->rhs_what == '$')
+			rhs_start = rhs_end = NULL;
+		else
 		{
-			struct lattice_position_constraint	*pc = r->position_constraints+i;
-			if(pc->lhs_what == 'O' || pc->rhs_what == 'O')continue;
-			int	lhs_which = pc->lhs_which;
-			if(pc->lhs_what == 'C')lhs_which += r->ninput;
-			int	rhs_which = pc->rhs_which;
-			if(pc->rhs_what == 'C')rhs_which += r->ninput;
-			if(lhs_which >= have || rhs_which >= have)continue;
-			struct lattice_vertex	*rhs_start, *rhs_end;
-			if(pc->rhs_what == '^' || pc->rhs_what == '$')
-				rhs_start = rhs_end = NULL;
-			else
-			{
-				rhs_start = inputs[rhs_which]->from;
-				rhs_end = inputs[rhs_which]->to;
-			}
-			struct lattice_vertex	*lhs_start, *lhs_end;
-			if(pc->lhs_what == '^' || pc->lhs_what == '$')
-				lhs_start = lhs_end = NULL;
-			else
-			{
-				lhs_start = inputs[lhs_which]->from;
-				lhs_end = inputs[lhs_which]->to;
-			}
-			switch(pc->type)
-			{
-				case	lpcImmediatelyPreceeds:
-					assert(pc->lhs_what != '$' && pc->rhs_what != '^');
-					if(pc->lhs_what == '^')
-					{
-						if(!lattice_vertex_is_initial(lat, rhs_start))
-						{
-							DEBUG_VERBOSE("failed ^< test\n");
-							return 0;
-						}
-					}
-					else if(pc->rhs_what == '$')
-					{
-						if(!lattice_vertex_is_final(lat, lhs_end))
-						{
-							DEBUG_VERBOSE("failed <$ test\n");
-							return 0;
-						}
-					}
-					else if(lhs_end != rhs_start)
-					{
-						DEBUG_VERBOSE("failed immediate preceeder test\n");
-						return 0;
-					}
-					break;
-				case	lpcPreceeds:
-					assert(pc->lhs_what != '$' && pc->lhs_what != '^' && pc->rhs_what != '$' && pc->rhs_what != '^');
-					if(!(lattice_vertex_follows(lat, rhs_start, lhs_end) || lhs_end==rhs_start))
-					{
-						DEBUG_VERBOSE("failed somewhere-preceeder test\n");
-						return 0;
-					}
-					break;
-				case	lpcCovers:
-					assert(pc->lhs_what != '$' && pc->lhs_what != '^' && pc->rhs_what != '$' && pc->rhs_what != '^');
-					if(! ((lattice_vertex_follows(lat, rhs_start, lhs_start) || rhs_start==lhs_start)
-					   && (lattice_vertex_follows(lat, lhs_end, rhs_end) || lhs_end==rhs_end)))
-					{
-						DEBUG_VERBOSE("failed covers test\n");
-						return 0;
-					}
-					break;
-			}
+			if(rhs_which >= to || rhs_which < from)continue;
+			rhs_start = inputs[rhs_which]->from;
+			rhs_end = inputs[rhs_which]->to;
 		}
-		// verify regular expression matches
-		for(i=0;i<have;i++)
+		struct lattice_vertex	*lhs_start, *lhs_end;
+		if(pc->lhs_what == '^' || pc->lhs_what == '$')
+			lhs_start = lhs_end = NULL;
+		else
 		{
-			struct dg	*idg = lattice_dg(inputs[i]);//lattice_rule_spot(r, i);
-			struct lattice_regex_constraints	*rec = r->regex_constraints+i;
-			if(mats)
-			{
-				mats[i].strings = slab_alloc(sizeof(wchar_t*) * rec->count);
-				mats[i].matches = slab_alloc(sizeof(regmatch_t*) * rec->count);
-			}
-			for(j=0;j<rec->count;j++)
-			{
-				//printf("... should hop path: "); print_path(rec->paths[j]); printf("\n");
-				//printf(" from dg: "); print_dg(idg); printf("\n");
-				struct dg	*str_dg = dg_path(idg, rec->paths[j]);
-				if(str_dg)
+			if(lhs_which >= to || lhs_which < from)continue;
+			lhs_start = inputs[lhs_which]->from;
+			lhs_end = inputs[lhs_which]->to;
+		}
+		switch(pc->type)
+		{
+			case	lpcImmediatelyPreceeds:
+				assert(pc->lhs_what != '$' && pc->rhs_what != '^');
+				if(pc->lhs_what == '^')
 				{
-					char	*str = str_dg->xtype->name;
-					int	l = strlen(str);
-					char	copy[256];
-					sprintf(copy, "%.*s", l-2, str+1);
-					wchar_t	*wcopy = towide(copy);
-					regex_t	re = rec->re[j];
-					DEBUG_VERBOSE("... comparing string '%S' against regex '%S'\n", wcopy, rec->regexs[j]);
-					regmatch_t	m[re.re_nsub+1], *M = m;
-					if(mats)
+					if(!lattice_vertex_is_initial(lat, rhs_start))
 					{
-						mats[i].strings[j] = freeze_wcs(wcopy);
-						mats[i].matches[j] = slab_alloc(sizeof(regmatch_t) * (re.re_nsub+1));
-						M = mats[i].matches[j];
-					}
-					int	result = regexec(&re, wcopy, re.re_nsub+1, M, 0);
-					//int	wl = wstrlen(wcopy);
-					free(wcopy);
-					if(0 == result)// && M[0].rm_so==0 && M[0].rm_eo==wl)
-					{
-						DEBUG_VERBOSE(" ... matched!\n");
-					}
-					else
-					{
-						DEBUG_VERBOSE(" ... didn't match.\n");
+						DEBUG_VERBOSE("failed ^< test\n");
 						return 0;
 					}
 				}
-				else return 0;
-			}
+				else if(pc->rhs_what == '$')
+				{
+					if(!lattice_vertex_is_final(lat, lhs_end))
+					{
+						DEBUG_VERBOSE("failed <$ test\n");
+						return 0;
+					}
+				}
+				else if(lhs_end != rhs_start)
+				{
+					DEBUG_VERBOSE("failed immediate preceeder test\n");
+					return 0;
+				}
+				break;
+			case	lpcPreceeds:
+				assert(pc->lhs_what != '$' && pc->lhs_what != '^' && pc->rhs_what != '$' && pc->rhs_what != '^');
+				if(!(lattice_vertex_follows(lat, rhs_start, lhs_end) || lhs_end==rhs_start))
+				{
+					DEBUG_VERBOSE("failed somewhere-preceeder test\n");
+					return 0;
+				}
+				break;
+			case	lpcCovers:
+				assert(pc->lhs_what != '$' && pc->lhs_what != '^' && pc->rhs_what != '$' && pc->rhs_what != '^');
+				if(! ((lattice_vertex_follows(lat, rhs_start, lhs_start) || rhs_start==lhs_start)
+				   && (lattice_vertex_follows(lat, lhs_end, rhs_end) || lhs_end==rhs_end)))
+				{
+					DEBUG_VERBOSE("failed covers test\n");
+					return 0;
+				}
+				break;
 		}
-		if(check_already_failed(inputs, have))return 0;
-		// verify inputs unify into the rule
-		for(i=0;i<have;i++)
+	}
+	// verify regular expression matches
+	for(i=from;i<to;i++)
+	{
+		struct dg	*idg = lattice_dg(inputs[i]);//lattice_rule_spot(r, i);
+		struct lattice_regex_constraints	*rec = r->regex_constraints+i;
+		if(mats)
 		{
-			if(unify_dg_tmp(lattice_dg(inputs[i]), lattice_rule_spot(r, i), -1) != 0)
-			{
-				forget_tmp();
-				DEBUG_VERBOSE(" ... didn't unify\n"); //unify_backtrace(); print_dg(lattice_rule_spot(r,i));printf("\n");
-				record_failed(inputs, have);
-				return 0;
-			}
+			mats[i].strings = slab_alloc(sizeof(wchar_t*) * rec->count);
+			mats[i].matches = slab_alloc(sizeof(regmatch_t*) * rec->count);
 		}
+		for(j=0;j<rec->count;j++)
+		{
+			//printf("... should hop path: "); print_path(rec->paths[j]); printf("\n");
+			//printf(" from dg: "); print_dg(idg); printf("\n");
+			struct dg	*str_dg = dg_path(idg, rec->paths[j]);
+			if(str_dg)
+			{
+				char	*str = str_dg->xtype->name;
+				int	l = strlen(str);
+				char	copy[256];
+				sprintf(copy, "%.*s", l-2, str+1);
+				wchar_t	*wcopy = towide(copy);
+				regex_t	re = rec->re[j];
+				DEBUG_VERBOSE("... comparing string '%S' against regex '%S'\n", wcopy, rec->regexs[j]);
+				regmatch_t	m[re.re_nsub+1], *M = m;
+				if(mats)
+				{
+					mats[i].strings[j] = freeze_wcs(wcopy);
+					mats[i].matches[j] = slab_alloc(sizeof(regmatch_t) * (re.re_nsub+1));
+					M = mats[i].matches[j];
+				}
+				int	result = regexec(&re, wcopy, re.re_nsub+1, M, 0);
+				//int	wl = wstrlen(wcopy);
+				free(wcopy);
+				if(0 == result)// && M[0].rm_so==0 && M[0].rm_eo==wl)
+				{
+					DEBUG_VERBOSE(" ... matched!\n");
+				}
+				else
+				{
+					DEBUG_VERBOSE(" ... didn't match.\n");
+					return 0;
+				}
+			}
+			else return 0;
+		}
+	}
+	if(check_already_failed(inputs, from, to))return 0;
+	// verify inputs unify into the rule
+	for(i=from;i<to;i++)
+	{
+		if(unify_dg_tmp(lattice_dg(inputs[i]), lattice_rule_spot(r, i), -1) != 0)
+		{
+			forget_tmp();
+			DEBUG_VERBOSE(" ... didn't unify\n"); //unify_backtrace(); print_dg(lattice_rule_spot(r,i));printf("\n");
+			record_failed(inputs, from, to);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+// TODO find a more efficient algorithm for finding application sites
+// TODO keep a cache of what rule already failed to unify with what edge... a *lot* of wasted unification attempts
+// TODO   -- or use quickcheck?
+int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct lattice_edge	**inputs, int	have, char	*possible_map, struct re_match_set	*mats)
+{
+	int i, j;
+	if(have>0)
+	{
+		if(0 == lattice_rule_matches(lat, r, inputs, 0, have, mats))
+			return 0;
 	}
 	if(have == r->ninput + r->ncontext)
 	{
@@ -1022,10 +1034,18 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 	{
 		if(have)bump_generation();
 		// find next input candidate
-		for(i=0;i<lat->nvertices;i++)
-			for(j=0;j<lat->vertices[i]->nfollowers;j++)
+
+	//	for(i=0;i<lat->nvertices;i++)
+	//		for(j=0;j<lat->vertices[i]->nfollowers;j++)
+	//		{
+	//			struct lattice_edge	*e = lat->vertices[i]->followers[j];
+		for(i=0;i<lat->nedges;i++)
 			{
-				struct lattice_edge	*e = lat->vertices[i]->followers[j];
+				struct lattice_edge	*e = lat->edges[i];
+
+				// make sure we haven't already ruled out this input
+				if(possible_map && !possible_map[have*lat->nedges + i])
+					continue;
 				// make sure we don't already have 'e' in inputs[]
 				int k;
 				for(k=0;k<have;k++)
@@ -1036,7 +1056,7 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 					DEBUG_VERBOSE(".. considering '%s' as inputs[%d] for rule %s\n", e->token->string, have, r->name);
 				else 
 					DEBUG_VERBOSE(".. considering '#%d' as inputs[%d] for rule %s\n", e->edge->id, have, r->name);
-				int	result = apply_lattice_rule1(lat, r, inputs, have+1);
+				int	result = apply_lattice_rule1(lat, r, inputs, have+1, possible_map, mats);
 				if(result)return result;
 			}
 		return 0;
@@ -1045,9 +1065,45 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 
 int	apply_lattice_rule(struct lattice	*lat, struct lattice_rule	*r)
 {
+	DEBUG("trying to apply '%s'...\n", r->name);
 	struct lattice_edge	*inputs[r->ninput + r->ncontext];
-	DEBUG_VERBOSE("trying to apply '%s'...\n", r->name);
-	return apply_lattice_rule1(lat, r, inputs, 0);
+	struct re_match_set	*mats = malloc(sizeof(struct re_match_set)*(r->ninput+r->ncontext));
+	char	*possible_map = NULL;
+	if(r->ninput + r->ncontext > 1)
+	{
+		possible_map = malloc((r->ninput+r->ncontext) * lat->nedges);
+		int i, j;
+		for(i=0;i<r->ninput+r->ncontext;i++)
+		{
+			for(j=0;j<lat->nedges;j++)
+			{
+				inputs[i] = lat->edges[j];
+				bump_generation();
+				possible_map[i*lat->nedges + j] = lattice_rule_matches(lat, r, inputs, i, i+1, mats);
+			}
+		}
+	}
+	int result = apply_lattice_rule1(lat, r, inputs, 0, possible_map, mats);
+	if(possible_map)free(possible_map);
+	free(mats);
+	return result;
+}
+
+struct profiler	**tmr_profilers = NULL;
+struct profiler	**lfr_profilers = NULL;
+struct profiler	*lattice_mapping_profiler = NULL;
+extern int g_profiling;
+
+struct profiler	*start_lmr_profiler(struct lattice_rule_set	*rs, int	ri)
+{
+	struct profiler	***lmr_profilers = ((rs==token_mapping_rules)?(&tmr_profilers):((rs==lexical_filtering_rules)?(&lfr_profilers):NULL));
+	if(!lmr_profilers)return NULL;
+	if(!lattice_mapping_profiler)return NULL;
+
+	lattice_mapping_profiler->sortable = 5;
+	if(!*lmr_profilers)*lmr_profilers = calloc(sizeof(**lmr_profilers), rs->nrules);
+	start_and_alloc_profiler((*lmr_profilers)+ri, rs->rules[ri]->name, lattice_mapping_profiler, NULL);
+	return (*lmr_profilers)[ri];
 }
 
 void	apply_lattice_mapping(struct lattice	*lat, struct lattice_rule_set	*rs)
@@ -1057,7 +1113,10 @@ void	apply_lattice_mapping(struct lattice	*lat, struct lattice_rule_set	*rs)
 	for(i=0;i<rs->nrules;i++)
 	{
 		clear_failed();
+		struct profiler	*prof = NULL;
+		if(g_profiling)prof = start_lmr_profiler(rs, i);
 		while(apply_lattice_rule(lat, rs->rules[i])){}
+		if(prof)stop_profiler(prof, 1);
 	}
 
 /*again:
@@ -1077,6 +1136,7 @@ int	load_token_mapping_rules()
 
 void	apply_token_mapping(struct lattice	*lat)
 {
+	lattice_mapping_profiler = token_mapping_profiler;
 	apply_lattice_mapping(lat, token_mapping_rules);
 }
 
@@ -1088,5 +1148,6 @@ int	load_lexical_filtering_rules()
 
 void	apply_lexical_filtering(struct lattice	*lat)
 {
+	lattice_mapping_profiler = lexical_filtering_profiler;
 	apply_lattice_mapping(lat, lexical_filtering_rules);
 }
