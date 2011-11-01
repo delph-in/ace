@@ -1069,21 +1069,27 @@ int	apply_lattice_rule(struct lattice	*lat, struct lattice_rule	*r)
 	struct lattice_edge	*inputs[r->ninput + r->ncontext];
 	struct re_match_set	*mats = malloc(sizeof(struct re_match_set)*(r->ninput+r->ncontext));
 	char	*possible_map = NULL;
+	int result = 0;
 	if(r->ninput + r->ncontext > 1)
 	{
 		possible_map = malloc((r->ninput+r->ncontext) * lat->nedges);
 		int i, j;
 		for(i=0;i<r->ninput+r->ncontext;i++)
 		{
+			int	count = 0;
 			for(j=0;j<lat->nedges;j++)
 			{
 				inputs[i] = lat->edges[j];
 				bump_generation();
-				possible_map[i*lat->nedges + j] = lattice_rule_matches(lat, r, inputs, i, i+1, mats);
+				int pos = lattice_rule_matches(lat, r, inputs, i, i+1, mats);
+				possible_map[i*lat->nedges + j] = pos;
+				if(pos)count++;
 			}
+			if(!count)goto skip;	// no possible matches for this rule position.
 		}
 	}
-	int result = apply_lattice_rule1(lat, r, inputs, 0, possible_map, mats);
+	result = apply_lattice_rule1(lat, r, inputs, 0, possible_map, mats);
+skip:
 	if(possible_map)free(possible_map);
 	free(mats);
 	return result;
