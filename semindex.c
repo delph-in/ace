@@ -359,13 +359,16 @@ int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
 	struct semindex_pred_node	*node = lookup_semindex(ep->pred, 0), *cnode;
 	int							i, count = 0;
 
-	//printf("activating '%s'\n", ep->pred);
+	//printf("activating '%s' with carg '%s'\n", ep->pred, carg);
 
-	if(!node)return 0;
 	ep->active = 0;
-	for(i=0;i<node->nrelatives;i++)
-		if(pred_subsumes(node->relatives[i]->pred, node->pred))
-			count += activate_semindex_node(node->relatives[i], ep, Rest);
+	if(node)
+	{
+		for(i=0;i<node->nrelatives;i++)
+			if(pred_subsumes(node->relatives[i]->pred, node->pred))
+				count += activate_semindex_node(node->relatives[i], ep, Rest);
+		count += activate_semindex_node(node, ep, Rest);
+	}
 	if(carg)
 	{
 		// grammar entities with CARG's aren't put into their pred's index slot, but into the carg's index slot.
@@ -373,7 +376,6 @@ int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
 		cnode = lookup_semindex(carg, 0);
 		if(cnode) count += activate_semindex_node(cnode, ep, Rest);
 	}
-	count += activate_semindex_node(node, ep, Rest);
 
 	return count;
 }
