@@ -639,7 +639,7 @@ int temporary_expedient(char *sign)
 	int i;
 
 	for(i=0;i<nexpedients;i++)
-		if(!strcmp(sign, expedients[i]))return 1;
+		if(!strcasecmp(sign, expedients[i]))return 1;
 	return 0;
 }
 
