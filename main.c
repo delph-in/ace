@@ -41,6 +41,7 @@ extern int	g_loaded, inhibit_results, trace;
 extern long long	accum_ram_usage;
 extern char			*use_roots, *disable_signs;
 extern int do_forest;
+extern int g_profiling;
 float	stdin_time = 0;
 
 int	form_to_relation = 0;
@@ -90,7 +91,7 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "VhvpfEPL:lXg:G:m:qtTRe1n:r:jFOs"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "VhvpfEPL:lXg:G:m:qtTRe1n:r:jFOsi"))!=255)switch(ch)
 	{
 		case	'V':	printf("ACE version %s\n", ACE_VERSION);
 						printf("compiled at " __TIME__ " on "  __DATE__ "\n");
@@ -119,6 +120,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'j':	output_edge_vectors = 1;	break;
 		case	'F':	form_to_relation = 1;	break;
 		case	's':	dont_unspecialize = 1;	break;
+		case	'i':	g_profiling = 1;		break;
 		case	'?':	goto usage;
 	}
 	if(optind<argc-1)goto usage;
@@ -332,6 +334,14 @@ int	main(int	argc, char	*argv[])
 
 	shutdown_net();
 	report_stats(stats);
+	if(g_profiling)
+	{
+		if(g_mode == PARSING)
+		{
+			extern struct profiler	*parse_profiler;
+			report_profiler(parse_profiler);
+		}
+	}
 	if(debug_level)freport_timers(stderr);
 	wait_for_lui();
 

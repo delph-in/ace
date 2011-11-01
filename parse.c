@@ -13,6 +13,7 @@
 #include	"token.h"
 #include	"lattice-mapping.h"
 #include	"lexical-parse.h"
+#include	"timer.h"
 
 extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trace, used_total, pused_total;
 extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only;
@@ -23,6 +24,43 @@ float	level_times[100];
 #endif
 int		level = 0;
 int	do_forest = 0;
+extern int debug_level;
+
+int	g_profiling = 0;
+
+struct profiler	*start_sign_profiler(struct edge	*e)
+{
+	static struct profiler	**active_rule_profilers = NULL;
+	static struct profiler	**passive_rule_profilers = NULL;
+	static struct profiler	*passive_lex_profiler = NULL;
+	chart_parsing_profiler->sortable = 10;
+	if(!active_rule_profilers)
+	{
+		active_rule_profilers = calloc(sizeof(struct profiler*), nrules);
+		passive_rule_profilers = calloc(sizeof(struct profiler*), nrules);
+	}
+	if(e->have == e->need)
+	{
+		if(e->have == 0)
+		{
+			start_and_alloc_profiler(&passive_lex_profiler, "lexeme", chart_parsing_profiler, NULL);
+			return passive_lex_profiler;
+		}
+		struct rule	*r = e->rule;
+		char	name[1024];
+		sprintf(name, "passive: %s", r->name);
+		start_and_alloc_profiler(&passive_rule_profilers[r->rnum], name, chart_parsing_profiler, NULL);
+		return passive_rule_profilers[r->rnum];
+	}
+	else
+	{
+		struct rule	*r = e->rule;
+		char	name[1024];
+		sprintf(name, "active: %s", r->name);
+		start_and_alloc_profiler(&active_rule_profilers[r->rnum], name, chart_parsing_profiler, NULL);
+		return active_rule_profilers[r->rnum];
+	}
+}
 
 static int	parse_process_edge(struct edge	*e)
 {
@@ -53,12 +91,20 @@ static int	parse_process_edge(struct edge	*e)
 		static int packtimer = -1;
 		if(packtimer==-1)packtimer = new_timer("packing");
 		IFCLOCK( start_timer(packtimer); );
+		if(g_profiling)
+			start_and_alloc_profiler(&packing_profiler, "packing", chart_parsing_profiler, NULL);
 		pack = pack_edge(e);
+		if(g_profiling)
+			stop_profiler(packing_profiler, 1);
 		IFCLOCK( stop_timer(packtimer, 1); );
 		if(pack==1)
 			return 0;	// big savings! woohoo!
 	}
 	if(pack==0)add_edge_to_chart(e);
+
+	struct profiler	*prof = NULL;
+	if(g_profiling)
+		prof = start_sign_profiler(e);
 
 	if(!alist){list=calloc(sizeof(struct edge*), 4); alist=4;}
 #define	LADD(e)	do { if(nlist+1 > alist) { \
@@ -114,7 +160,11 @@ static int	parse_process_edge(struct edge	*e)
 	}
 	//printf(" edge #%d found %d potential neighbors\n", e->id, nlist);
 
-	if(!nlist)return 0;
+	if(!nlist)
+	{
+		if(prof)stop_profiler(prof, 1);
+		return 0;
+	}
 
 	if(e->have == e->need)
 	{
@@ -140,7 +190,11 @@ static int	parse_process_edge(struct edge	*e)
 	}
 	nlist = j;
 
-	if(!nlist)return 0;
+	if(!nlist)
+	{
+		if(prof)stop_profiler(prof, 1);
+		return 0;
+	}
 
 /*
 int	cmp(const void	*a, const void	*b)
@@ -165,6 +219,7 @@ qsort(list, nlist, sizeof(void*), cmp);
 		for(i=0;i<nlist;i++)
 			if(unify_and_build(e, list[i]) == -1)return -1;
 	}
+	if(prof)stop_profiler(prof, 1);
 	return 0;
 }
 
@@ -331,6 +386,8 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	// a starting place for main-chart edge IDs
 	reset_edges();
 
+	if(g_profiling)start_and_alloc_profiler(&token_mapping_profiler, "token mapping", parse_profiler, preprocess_profiler);
+
 	// setup a token lattice and do token mapping
 	struct lattice	*token_chart = build_token_chart(nwords, words, cfrom, cto);
 	if(!token_chart) { stop_timer(chart_setup_timer, 1); return -1; }
@@ -338,6 +395,10 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	apply_token_mapping(token_chart);
 
 	if(trace)print_token_chart(token_chart);
+
+	if(trace)printf("finished token mapping\n");
+
+	if(g_profiling)start_and_alloc_profiler(&lexical_lookup_profiler, "lexical lookup", parse_profiler, token_mapping_profiler);
 
 	// do lexical lookup
 	struct lattice	*lexical_chart = lexical_lookup_into_chart(token_chart);
@@ -347,6 +408,9 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		stop_timer(chart_setup_timer, 1);
 		return -1;
 	}
+	if(trace)printf("finished lexical lookup\n");
+
+	if(g_profiling)start_and_alloc_profiler(&lexical_parsing_profiler, "lexical parsing", parse_profiler, lexical_lookup_profiler);
 
 	extern int reduce_chart_before_lexical_parsing;
 
@@ -367,9 +431,15 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		lexical_parse_lattice(lexical_chart);
 
 	if(trace)print_lexical_chart(lexical_chart);
+	if(trace)printf("finished lexical parsing\n");
+
+	if(g_profiling)start_and_alloc_profiler(&lexical_filtering_profiler, "lexical filtering", parse_profiler, lexical_parsing_profiler);
 
 	// do lexical filtering
 	apply_lexical_filtering(lexical_chart);
+	if(trace)printf("finished lexical filtering\n");
+
+	if(g_profiling)start_and_alloc_profiler(&chart_parsing_profiler, "chart parsing", parse_profiler, lexical_filtering_profiler);
 
 	// setup the main parse chart
 	nwords = prepare_parse_chart(lexical_chart);
@@ -397,6 +467,8 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	if(chart_parsing_timer == -1)chart_parsing_timer = new_timer("chart parsing");
 	start_timer(chart_parsing_timer);
 
+	if(trace)printf("finished packing\n");
+
 	t_setup = timer();
 
 	// do the actual parsing
@@ -414,6 +486,8 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	}
 
 	stop_timer(chart_parsing_timer, 1);
+
+	if(g_profiling)start_and_alloc_profiler(&unpacking_profiler, "unpacking", parse_profiler, chart_parsing_profiler);
 
 	t_forest = t_half + timer();
 	cforest = clock() - start;
@@ -483,6 +557,12 @@ int	parse_line(char	*line)
 	extern int preprocess_only;
 
 	timer();
+	if(g_profiling)
+	{
+		if(parse_profiler)stop_profilers_recursively(parse_profiler);
+		start_and_alloc_profiler(&parse_profiler, "parsing", NULL, NULL);
+		start_and_alloc_profiler(&preprocess_profiler, "REPP", parse_profiler, NULL);
+	}
 
 	current_sentence = "(preparing)";
 	while(line[0] && line[strlen(line)-1] == '\n')line[strlen(line)-1] = 0;
@@ -534,6 +614,7 @@ int	check_mbs(char	*mbs);
 	if(do_itsdb && nparse==-1)itsdb_report(nwords, words, -1, 0);
 
 finished:
+	if(g_profiling)stop_profilers_recursively(parse_profiler);
 	clear_mrs();
 	clear_slab();
 	for(i=0;i<nwords;i++)free(words[i]);
