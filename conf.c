@@ -36,6 +36,7 @@ char		*token_type;
 
 int			ortho_max_rules = 7;
 int			ortho_warn_max_rules = 1;
+extern int invent_ltop;
 
 // options configured but not saved in the freezer:
 struct path	label_path;
@@ -166,6 +167,7 @@ struct conf
 	struct path	lex_pred_path;
 	struct path	rule_rels_path;
 	struct path	extract_mrs_path;
+	int	invent_ltop;
 
 	struct path	*chart_dependencies_to, *chart_dependencies_from;
 	int			nchart_dependencies;
@@ -214,6 +216,7 @@ void	*freeze_conf()
 	c->list_type = freeze_string(g_list_type);
 	c->null_type = freeze_string(g_null_type);
 	c->diff_list_type = freeze_string(g_diff_list_type);
+	c->invent_ltop = invent_ltop;
 
 	if(!g_transfer)
 	{
@@ -285,6 +288,7 @@ void	recover_conf(void	*vc)
 	g_list_type = c->list_type;
 	g_null_type = c->null_type;
 	g_diff_list_type = c->diff_list_type;
+	invent_ltop = c->invent_ltop;
 
 	if(!g_transfer)
 	{
@@ -418,6 +422,8 @@ int	load_conf()
 	g_list_type = get_conf("list-type")?:"list";
 	g_null_type = get_conf("null-type")?:"null";
 	g_diff_list_type = get_conf("diff-list-type")?:"diff-list";
+
+	invent_ltop = get_conf_bool("invent-ltop", 1);	// msg-less grammars tend to want their LTOP to be floating
 
 	recover_conf(freeze_conf());
 }

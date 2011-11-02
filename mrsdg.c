@@ -22,6 +22,8 @@ struct multifeature
 
 int	inhibit_vpm = 0;
 
+int	invent_ltop;
+
 // dag to mrs conversion
 
 // XXX a lot of strings in here are allocated to the heap,
@@ -349,9 +351,12 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	hcons = dg_hop(cont, hconsf);
 	if(hook)
 	{
-		// XXX hack see chat w/ oe 2010-08-30
-		//mrs->ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
-		mrs->ltop = invent_mrs_var(handle_type, &mrs->vlist);
+		if(invent_ltop)
+		{
+			// XXX hack see chat w/ oe 2010-08-30
+			mrs->ltop = invent_mrs_var(handle_type, &mrs->vlist);
+		}
+		else mrs->ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
 		mrs->index = dg_to_mrs_var(dg_hop(hook, indexf), &mrs->vlist);
 		mrs->xarg = dg_to_mrs_var(dg_hop(hook, xargf), &mrs->vlist);
 	}

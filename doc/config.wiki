@@ -86,3 +86,4 @@ General Configuration
 || ortho-warn-on-max-rules || whether to print a warning when the limit of orthographemic rules is reached ||
 || freezer-megabytes || defaults to 256; make it bigger if you get a warning about it. ||
 || irregular-form-rule-suffix || a string to append to the rule names found in irregular form tables. ||
+|| invent-ltop || enabled or disabled.  if disabled, the MRS LTOP will be extracted from the grammar.  otherwise, it will be invented as a free variable. ||
