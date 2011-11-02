@@ -3,13 +3,52 @@ TODO:
 berthold wants
 	- possibly commandline access to ACE QC generator
 	- add post-generation token mapping phase (and presumably an inverse REPP phase)
+	- TSDB timing information for generation
+	- send MRS to TSDB
+	- probably send tree to TSDB for generation
+	- full transfer: MRS fixup before generation
+		- transfer: apply a list of rules one at a time; at each step, the process can fork (a big tree)
+		- for a particular rule, there can be many ways to apply it to the input
+		- for mrs fixup rules, it generally won't matter what order you apply them in, but for the more general case it could
+		for mrs fixup:
+		- if there are 6 sites where a particular rule applies, there will be 2^6=64 intermediate MRSes... yick.
+			- worse still, without packing (currently not implemented) there will be 6!=720 orderings
+			- each requiring 6 applications ~= 4320 rule applications
+		- but only one mrs (where all the sites have been applied) can proceed to the next rule
+			- 720 mrses proceed without packing...
+		- we would like to do each of the 6 applications only once...
+
+ideas:
+	- automatic time profile of a grammar
+		parsing: pretty good, but add
+			- orthographemic analysis
+			- each rule for lexical parsing
+			- MRS extraction
+			- idiom checking
+		generation:
+			- trigger rule application
+				- each rule
+			- [ MRS fixup application ]
+			- semantic index lookup
+			- main generation
+			- unpacking
+				- MRS extraction
+				- subsumption checking
+				- idiom checking?
 
 complaints:
 	- generation in GG: to generate from the result of "Dies ist ein Test.", we have a problem... the VPM deletes --sub (which was luk) on the way out and replaces it with 'na' on the way back in, which is incompatible with the rules we need to apply...
-	- GG uses nogen-lex.set and nogen-rule.set files, but they aren't committed.
+	- HaG has no VPM rule to map 'u' inputs, so they stay 'u', which cannot be skolemized, causing ACE to exit
 
 DONE:
 
+unreleased:
+	- better parsing of MRS string constants
+	- config option to specify whether LTOP is extracted or invented
+	- fix QC-from-instance loader
+	- changes that speed up lattice mapping a lot in some cases
+	- profiling mode "-i", for parsing
+	- improved filtering of orthographemic rule chain hypotheses
 0.9.2
 	- fix TDL reader/dagify to not conflate coreferences with the same name in different :+ addenda
 	- fix a unicode bug in token mapping
