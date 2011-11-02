@@ -146,11 +146,17 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 	int		defined = 0, i;
 	char	*word, *var_name;
 
-	var_name = parse_word(P, 1);
+	var_name = parse_word(P, 0);
 	if(!var_name)
 	{
 		FAIL("var lacks a name");
 	}
+	if(var_name[0]=='"')
+	{
+		// this is probably a const variable.
+		return parse_mrs_const(vlist, P);
+	}
+	parse_word(P, 1);	// consume the name
 	if((word=parse_word(P,0)) && !strcmp("[", word))
 	{
 		int		aprops = 8;
@@ -329,9 +335,7 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 				if(word[0]!=':' && word[strlen(word)-1]==':')
 					word[strlen(word)-1] = 0;
 				role->name = strdup(word);
-				if(!strcmp(word, "CARG"))
-					role->value = parse_mrs_const(vlist, P);
-				else role->value = parse_mrs_var(vlist, P);
+				role->value = parse_mrs_var(vlist, P);
 			}
 		}
 		if(!word)
