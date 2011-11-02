@@ -12,6 +12,7 @@
 #include "chart.h"
 #include "unpack.h"
 #include	"conf.h"
+#include	"transfer.h"
 
 extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
 
@@ -300,6 +301,8 @@ int	generate(struct mrs	*mrs)
 	for(i=0;i<mrs->nrels;i++)
 		dagify_mrs_ep(mrs->rels+i);
 	if(debug_level)printf("mrs-to-dg %.4f\n", timer());
+
+	mrs = fixup_mrs(mrs);
 
 	// set up some lexemes and rules for the generator to play with
 	semantic_lookup(mrs);

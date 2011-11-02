@@ -211,7 +211,7 @@ struct mrs_var	*parse_mrs_var(struct mrs_vlist	*vlist, char	**P)
 		// assume name up to number is type
 		bzero(&var, sizeof(var));
 		var.name = var_name;
-		for(i=0;var.name[i]>'9';i++) {}
+		for(i=0;var.name[i] && !isdigit(var.name[i]);i++) {}
 		var.type = slab_malloc(i+1);
 		memcpy(var.type, var.name, i);
 		var.type[i] = 0;

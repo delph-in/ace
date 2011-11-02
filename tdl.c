@@ -562,6 +562,9 @@ struct dagify_record
 	}	*corefs;
 	int	ncorefs;
 	int	unique_addendum;
+
+	struct tcopy	*tcopies;
+	int	ntcopies;
 };
 
 static void coreference(struct dagify_record	*R, char	*name)
@@ -581,20 +584,13 @@ static void record_transfer_copy(struct dagify_record	*R)
 {
 	// as near as I can tell, +copy+ means the (say, I'th) output should be
 	// identical to the I'th input, with some additional constraints thrown in.
-	// rather than letting the additional constraints fail when we try to build the new EP,
-	// it makes much more sense to just add a coreference between the relevant input and output;
-	// that way, the constraints are present on the rule's input and we get the copying for free.
-	static int	input = -1, output = -1;
-	if(input==-1) { input = lookup_fname("INPUT"); output = lookup_fname("OUTPUT"); }
-	static int tcidx = 1;
-	static char	tccorefname[256];
-	sprintf(tccorefname, "_+copy+_%d", tcidx++);
-	assert((R->current_pathlen > 0 && R->current_path[0] == output)
-			|| !"+copy+ can only appear in the OUTPUT of a transfer rule.");
-	R->current_path[0] = input;
-	coreference(R, tccorefname);
-	R->current_path[0] = output;
-	coreference(R, tccorefname);
+	// the additional output specifications are meant to override features of the input when copied.
+	// they are *not* constraints on the input, so we can't implement this with a coreference.
+	R->ntcopies++;
+	R->tcopies = realloc(R->tcopies, sizeof(struct tcopy)*R->ntcopies);
+	R->tcopies[R->ntcopies-1].path = malloc(sizeof(int) * R->current_pathlen);
+	R->tcopies[R->ntcopies-1].pathlen = R->current_pathlen;
+	memcpy(R->tcopies[R->ntcopies-1].path, R->current_path, sizeof(int) * R->current_pathlen);
 }
 
 struct dg *add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
@@ -1076,6 +1072,12 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 	}
 	if(R.corefs)free(R.corefs);
 
+	if(R.ntcopies)
+	{
+		saved_tcopies = R.tcopies;
+		saved_ntcopies = R.ntcopies;
+	}
+
 	return dg;
 }
 
@@ -1291,6 +1293,17 @@ void	load_idioms(char	*path)
 	load_tdl(path);
 	tdl_pop_status();
 	process_tdl_dgs_status("idiom-rule", study_idiom_rule);
+}
+
+void	load_fixup_rules(char	*path)
+{
+	if(!path)return;
+	tdl_push_status("fixup-rule");
+	load_tdl(path);
+	tdl_pop_status();
+	g_transfer = 1;
+	process_tdl_dgs_status("fixup-rule", study_fixup_rule);
+	g_transfer = 0;
 }
 
 char	*grammar_dir;
@@ -1549,6 +1562,7 @@ int load_grammar(char	*path)
 	load_grammar_top(get_conf_file_path(confdir, "grammar-top"));
 
 	load_triggers(get_conf_file_path(confdir, "generation-trigger-rules"));
+	load_fixup_rules(get_conf_file_path(confdir, "generation-fixup-rules"));
 	load_idioms(get_conf_file_path(confdir, "idiom-rules"));
 
 	// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...

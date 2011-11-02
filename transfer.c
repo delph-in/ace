@@ -22,6 +22,9 @@
 
 extern struct type_hierarchy	*semi_th, *main_th;
 
+int	saved_ntcopies = 0;
+struct tcopy	*saved_tcopies = NULL;
+
 int	is_semarg_type(struct type	*x);
 int equal_semarg_types(struct type	*x, struct type	*y);
 
@@ -91,15 +94,32 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 	return 0;
 }
 
-struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg)
+void	process_saved_tcopy(struct transfer_rule	*r, struct tcopy	*c)
 {
-	struct transfer_rule	*tr = calloc(sizeof(struct transfer_rule), 1);
-	tr->name = strdup(name);
-	static int flagspath[5] = {-1,-1};
-	struct dg	*optdg = walk_dg(dg, flagspath, "FLAGS", "OPTIONAL", 0);
-	tr->optional = optdg?(!strcmp(optdg->xtype->name, "+")):0;
-	tr->dg = dg;
-	return tr;
+	if(c->pathlen < 4)goto badcopy;
+	if(c->path[0] != lookup_fname("OUTPUT"))goto  badcopy;
+	if(c->path[1] != lookup_fname("RELS"))goto  badcopy;
+	if(c->path[2] != lookup_fname("LIST"))goto  badcopy;
+	int	i;
+	for(i=3;i<c->pathlen;i++)
+		if(c->path[i] != lookup_fname("REST"))break;
+	if(i != c->pathlen-1)goto badcopy;
+	if(c->path[i] != lookup_fname("FIRST"))goto badcopy;
+
+	int	argn = c->pathlen - 4;
+	//fprintf(stderr, "transfer rule `%s' has +copy+ on OUTPUT REL %d\n", r->name, argn);
+	r->ncopy++;
+	r->copy = realloc(r->copy, sizeof(int)*r->ncopy);
+	r->copy[r->ncopy-1] = argn;
+
+	return;
+	badcopy:;
+	fprintf(stderr, "transfer rule `%s': +copy+ can only appear at the top level of an EP structure in the OUTPUT.RELS list\n", r->name);
+	extern char	**fnames;
+	for(i=0;i<c->pathlen;i++)
+		fprintf(stderr, " %s", fnames[c->path[i]]);
+	fprintf(stderr, "\n");
+	exit(-1);
 }
 
 void warn_about_equals(struct transfer_rule	*tr)
@@ -118,11 +138,33 @@ void warn_about_equals(struct transfer_rule	*tr)
 	}
 }
 
+struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg)
+{
+	struct transfer_rule	*tr = calloc(sizeof(struct transfer_rule), 1);
+	tr->name = strdup(name);
+	static int flagspath[5] = {-1,-1};
+	struct dg	*optdg = walk_dg(dg, flagspath, "FLAGS", "OPTIONAL", 0);
+	tr->optional = optdg?(!strcmp(optdg->xtype->name, "+")):0;
+	tr->dg = dg;
+	warn_about_equals(tr);
+	int i;
+	for(i=0;i<saved_ntcopies;i++)
+	{
+		process_saved_tcopy(tr, &saved_tcopies[i]);
+		free(saved_tcopies[i].path);
+		saved_ntcopies = 0;
+	}
+	return tr;
+}
+
 struct transfer_rule	**transfer_rules;
 int						ntransfer_rules;
 
 struct transfer_rule	**trigger_rules;
 int						ntrigger_rules;
+
+struct transfer_rule	**fixup_rules;
+int						nfixup_rules;
 
 int	study_trigger_rule(char	*name, struct dg	*dg)
 {
@@ -131,9 +173,20 @@ int	study_trigger_rule(char	*name, struct dg	*dg)
 	wellform(dg, "transfer rule");
 	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
 	if(!tr)return -1;
-	warn_about_equals(tr);
 	trigger_rules = realloc(trigger_rules, sizeof(struct transfer_rule*)*(ntrigger_rules+1));
 	trigger_rules[ntrigger_rules++] = tr;
+	return 0;
+}
+
+int	study_fixup_rule(char	*name, struct dg	*dg)
+{
+	//printf("loading fixup rule '%s'\n", name);
+	//printf("	dg type '%s'\n", dg->xtype->name);
+	wellform(dg, "transfer rule");
+	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
+	if(!tr)return -1;
+	fixup_rules = realloc(fixup_rules, sizeof(struct transfer_rule*)*(nfixup_rules+1));
+	fixup_rules[nfixup_rules++] = tr;
 	return 0;
 }
 
@@ -144,7 +197,6 @@ int	study_transfer_rule(char	*name, struct dg	*dg)
 	wellform(dg, "transfer rule");
 	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
 	if(!tr)return -1;
-	warn_about_equals(tr);
 	transfer_rules = realloc(transfer_rules, sizeof(struct transfer_rule*)*(ntransfer_rules+1));
 	transfer_rules[ntransfer_rules++] = tr;
 	return 0;
@@ -165,6 +217,8 @@ struct transfer_freezer
 {
 	struct transfer_rule	**trigger_rules;
 	int						ntrigger_rules;
+	struct transfer_rule	**fixup_rules;
+	int						nfixup_rules;
 	struct transfer_rule	**idiom_rules;
 	int						nidiom_rules;
 	char					*non_idiom_root;
@@ -181,6 +235,8 @@ struct transfer_rule	*freeze_transfer_rule(struct transfer_rule	*tr)
 	bzero(fr, sizeof(*fr));
 	fr->name = freeze_string(tr->name);
 	fr->dg = freeze_dg(tr->dg);
+	fr->ncopy = tr->ncopy;
+	fr->copy = freeze_block(tr->copy, sizeof(int)*fr->ncopy);
 	return fr;
 }
 
@@ -193,6 +249,11 @@ void	*freeze_transfer()
 	for(i=0;i<ntrigger_rules;i++)
 		fz->trigger_rules[i] = freeze_transfer_rule(trigger_rules[i]);
 	fz->ntrigger_rules = ntrigger_rules;
+
+	fz->fixup_rules = slab_alloc(sizeof(struct transfer_rule*)*nfixup_rules);
+	for(i=0;i<nfixup_rules;i++)
+		fz->fixup_rules[i] = freeze_transfer_rule(fixup_rules[i]);
+	fz->nfixup_rules = nfixup_rules;
 
 	fz->idiom_rules = slab_alloc(sizeof(struct transfer_rule*)*nidiom_rules);
 	for(i=0;i<nidiom_rules;i++)
@@ -245,6 +306,14 @@ int	thaw_transfer_rule(struct transfer_rule	*tr)
 	}
 	//printf("rule %s has %d EQs and %d SSs\n", tr->name, tr->neq, tr->nss);
 
+	tr->output_copy_map = calloc(1, tr->output.neps);
+	int i;
+	for(i=0;i<tr->ncopy;i++)
+	{
+		assert(tr->copy[i] >= 0 && tr->copy[i] < tr->output.neps);
+		tr->output_copy_map[tr->copy[i]] = 1;
+	}
+
 	return 0;
 }
 
@@ -259,6 +328,10 @@ void	recover_transfer(void	*transfer)
 		for(i=0;i<ntrigger_rules;i++)
 			thaw_transfer_rule(trigger_rules[i]);
 		//fprintf(stderr, "NOTE: thawed %d trigger rules.\n", ntrigger_rules);
+		fixup_rules = fz->fixup_rules;
+		nfixup_rules = fz->nfixup_rules;
+		for(i=0;i<nfixup_rules;i++)
+			thaw_transfer_rule(fixup_rules[i]);
 	}
 	idiom_rules = fz->idiom_rules;
 	nidiom_rules = fz->nidiom_rules;
@@ -748,4 +821,15 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 
 	if(Results)*Results = ts.mrs;
 	return ts.n;
+}
+
+struct mrs	*fixup_mrs(struct mrs	*m)
+{
+	return m;
+	struct mrs	**results = NULL;
+	int	n = transfer_mrs(nfixup_rules, fixup_rules, m, &results);
+	assert(n >= 0);
+	if(n > 1)
+		fprintf(stderr, "WARNING: ambiguity in generator fixup rules; using first result.\n");
+	return results[0];
 }
