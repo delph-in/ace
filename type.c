@@ -366,6 +366,32 @@ int		wfpath[1024], wfpl = 0;
 
 long top_unifies_wellform;
 
+int	wellforming_th = 0, nwfu;
+char	*wellforming_th_map;
+begin_wellforming_th(struct type_hierarchy	*th)
+{
+	wellforming_th = 1;
+	nwfu = 0;
+	wellforming_th_map = calloc(th->ntypes, 1);
+}
+int end_wellforming_th()
+{
+	wellforming_th = 0;
+	free(wellforming_th_map);
+	return nwfu;
+}
+struct type	*wellforming_type;
+now_wellforming_type(struct type	*t)
+{
+	wellforming_type = t;
+}
+mark_as_updated() { if(wellforming_th)wellforming_th_map[wellforming_type->tnum] = 1; nwfu++; }
+int	type_has_been_updated(struct type	*t)
+{
+	if(t->name[0]=='"')return 0;
+	return wellforming_th_map[t->tnum];
+}
+
 // make children well-formed
 void	wellform(struct dg	*d, char	*typename)
 {
@@ -394,7 +420,7 @@ void	wellform(struct dg	*d, char	*typename)
 			fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", arcs[i]->type->name);
 			exit(-1);
 		}
-		if(t != arcs[i]->type)
+		if(t != arcs[i]->type || (wellforming_th && type_has_been_updated(t)))
 		{
 			/*printf("well-formedness forces dag `%s' -> `%s'  (inside constraint for type %s)\n", arcs[i]->type->name, t->name, typename);
 			int j;
@@ -426,6 +452,8 @@ void	wellform(struct dg	*d, char	*typename)
 				print_dg(t->dg);printf("\n");
 				exit(-1);
 			}
+			if(wellforming_th)
+				mark_as_updated();
 			/*printf("now:\n");
 			print_dg(arcs[i]);printf("\n");
 			printf("\n");*/
@@ -455,15 +483,33 @@ int	constrain_glbs_and_wellformedness()
 	generation = 11;
 	// XXX hack!
 
+	int	first_time = 1;
+	again:
+	begin_wellforming_th(default_th);
+	if(first_time)
+	{
+		for(i=0;i<default_th->ntypes;i++)
+			wellforming_th_map[i] = 1;
+		first_time = 0;
+	}
+	descbytes = 0;
 	for(i=0;i<default_th->ntypes;i++)
 	{
 		//printf("well-forming `%s', current dag:\n", default_th->types[i]->name);
 		//print_dg(default_th->types[i]->dg); printf("\n");
+		now_wellforming_type(default_th->types[i]);
 		wellform(default_th->types[i]->dg, default_th->types[i]->name);
 		descbytes += default_th->types[i]->ndescendents * sizeof(short);
 		//printf("after wellforming, final dag:\n");
 		//print_dg(default_th->types[i]->dg); printf("\n");
 	}
+	int changes = end_wellforming_th();
+	if(changes)
+	{
+		//printf("wellforming type hierarchy: %d changes on that pass\n", changes);
+		goto again;
+	}
+	//printf("no changes\n");
 
 	return 0;
 }

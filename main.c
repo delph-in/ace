@@ -191,6 +191,10 @@ struct job_stats	main_input_loop(FILE	*fin)
 				if(l>3)line[l-1] = 0;
 				if(line[1]=='r' && line[2]==' ')
 					lui_rule(line+3);
+				if(line[1]=='l' && line[2]==' ')
+					lui_lex(line+3);
+				if(line[1]=='t' && line[2]==' ')
+					lui_type(line+3);
 				if(line[1]=='h' && line[2]==' ')
 					show_heirarchy(line+3);
 				if(line[1]=='g' && line[2]==' ')

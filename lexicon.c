@@ -66,6 +66,17 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 	return dg;
 }
 
+void	lui_lex(char	*name)
+{
+	struct lexeme *l = get_lex_by_name(name);
+	if(l)
+	{
+		struct dg	*d = lexical_dg(l, NULL);
+		output_lui_dg(d, name);
+	}
+	else printf("no such\n");
+}
+
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 {
 	struct edge	*edge = slab_alloc(sizeof(struct edge));
