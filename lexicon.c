@@ -554,9 +554,9 @@ struct lexeme	*make_lexeme(char	*word, struct dg	*dg, struct type	*type, struct 
 	{
 		str = dg_hop(stem, ffeat);
 		if(!str)break;	// end of list.
-		if(str->type->name[0] != '"')
+		if(str->type->name[0] != '"' && 0)	// generics sometimes give STEM < *top* >...
 		{
-			fprintf(stderr, "lexicon: stem[%d] in word `%s' is not a string\n", l->stemlen, word);
+			fprintf(stderr, "lexicon: stem[%d] in word `%s' is not a string [%s]\n", l->stemlen, word, str->type->name);
 			exit(-1);
 		}
 		l->stemlen++;
