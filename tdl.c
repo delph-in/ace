@@ -303,9 +303,9 @@ int	load_tdl(char	*path)
 	if(!path)
 		return -1;
 	FILE	*f = fopen(path, "r");
-	char	buffer[10240], *lhs, *rhs, *end;
-	char	line[10240], *lp;
-	char	odef[10240], doing[256];
+	char	buffer[102400], *lhs, *rhs, *end;
+	char	line[102400], *lp;
+	char	odef[102400], doing[256];
 	int	in_comment = 0;
 	int	lnum = 0;
 	char	*tdlstatuses = 0;
@@ -338,7 +338,7 @@ int	load_tdl(char	*path)
 
 	path = strdup(path);	// make our own copy so we can put it in tdlline records without duplicating further
 	*odef = 0;
-	while(fgets(line, 10239, f))
+	while(fgets(line, 102399, f))
 	{
 		if(line[0]==0)break;
 		lnum++;
@@ -376,7 +376,7 @@ int	load_tdl(char	*path)
 		strcat(buffer, lp);
 		if(!buffer[0])continue;
 		//printf("... accum tdl '%s'\n", buffer);
-		if(strlen(buffer) > 9000)
+		if(strlen(buffer) > 100000)
 		{
 			fprintf(stderr, "tdl statement too long: `%s'\n", buffer);
 			return -1;
