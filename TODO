@@ -1,11 +1,32 @@
 TODO:
 
+fully automated regression testing
+	two cases:
+		1. changes to ACE
+			compare ACE results before to ACE results after
+			profile for before
+			profile for after
+			expect no diffs, except when changes dictate
+			should be able to automatically run for all kinds of test suites
+		2. changes to a grammar
+			in general, not expected to turn up any new ACE bugs.
+			but might turn up an old ACE bug.
+			finding that is hard.
+			compare ACE to PET and ACE to LKB before, write down diffs
+			compare ACE to PET and ACE to LKB *after*, write down diffs
+			compare the "before" diffs to the "after" diffs
+	case 1 above we should be able to fully automate. may as well look at:
+		both parsing and generation
+		ERG: mrs, csli, hike, maybe something else too
+		HaG: hausa.items
+		GG: mrs, babel
+
 berthold wants
 	- possibly commandline access to ACE QC generator
 	- add post-generation token mapping phase (and presumably an inverse REPP phase)
-	- TSDB timing information for generation
-	- send MRS to TSDB
-	- probably send tree to TSDB for generation
+	**- TSDB timing information for generation
+	**- send MRS to TSDB
+	**- probably send tree to TSDB for generation
 
 ideas:
 	- automatic time profile of a grammar
