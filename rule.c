@@ -147,7 +147,7 @@ struct edge	*epsilon_edge(struct rule	*r, int	x, int	rtl, struct dg	*rels)
 		e->dg = constrain_rule_rels(r->dg, rels);
 		if(!e->dg)
 		{
-			//printf("failed to constrain rule; "); unify_backtrace();
+			//printf("failed to constrain rule %s; ", r->name); unify_backtrace();
 			return 0;
 		}
 	}
@@ -339,7 +339,7 @@ struct rule	*get_rule_by_name(char	*name)
 void	lui_rule(char	*name)
 {
 	struct rule	*r = get_rule_by_name(name);
-	output_lui_dg(r->packdg, name);
+	output_lui_dg(r->dg, name);
 }
 
 void	print_rule(char	*name)

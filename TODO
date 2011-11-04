@@ -1,4 +1,6 @@
 TODO:
+	- prepare my laptop for visiting UW
+	- print a campus map
 
 fully automated regression testing
 	two cases:
@@ -24,6 +26,15 @@ fully automated regression testing
 berthold wants
 	- possibly commandline access to ACE QC generator
 	- add post-generation token mapping phase (and presumably an inverse REPP phase)
+	+ ace parses 34 readings vs pet/lkb 20 for GG mrs item 95
+		a MWE aligned two different ways... second token generic vs second token native (not blocked by grammar)
+	- GG generation issues:
+		+ broken portmanteau "im"
+			+ turned out to be broken type constraint propagation
+		+ coordination of events
+			+ turned out to be the VPM throwing away info on the way out and reinstating incompatible info on the way back in. specifically, the ARG0.E.TENSE of the message relation got set to 'none', which kept the filler-h rule out of generation.
+		- number names
+	- *updating* an ace tsdb profile -- doesn't work, apparently?
 	**- TSDB timing information for generation
 	**- send MRS to TSDB
 	**- probably send tree to TSDB for generation
@@ -61,6 +72,9 @@ ideas:
 DONE:
 
 unreleased:
+0.9.3pre2
+	- bigger TDL buffer: JaCY's QC skeleton needed it
+	- allow lexemes to have STEM parts that aren't strings
 0.9.3pre1
 	- better parsing of MRS string constants
 	- config option to specify whether LTOP is extracted or invented
