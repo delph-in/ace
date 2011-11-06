@@ -308,6 +308,7 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 	th_add(t);
 
 	if(npar>=0)setup_type_lineage(t, npar, par);
+	return 0;
 }
 
 void	add_to_ancestors(struct type	*a, int	tnum)
