@@ -2,6 +2,7 @@
 #include	<stdlib.h>
 #include	<string.h>
 #include	<assert.h>
+#include	<sys/fcntl.h>
 
 #include	<dlfcn.h>
 
@@ -54,7 +55,8 @@ int	compile_qc(char	*qccode_path)
 	if(!qccode) { perror(qccode_path); exit(-1); }
 
 	char	command[10240];
-	sprintf(command, "gcc -x c -shared -fPIC -DPIC - -o '%s'", target_path);
+	//sprintf(command, "gcc -x c -shared -fPIC -DPIC - -o '%s'", target_path);
+	sprintf(command, "gcc -x c -dynamic -dynamiclib -undefined suppress -flat_namespace -m64 -fPIC -DPIC - -o '%s'", target_path);
 	FILE	*gcc = popen(command, "w");
 	if(!gcc) { perror("popen"); exit(-1); }
 
@@ -115,6 +117,9 @@ int	compile_qc(char	*qccode_path)
 	int res = pclose(gcc);
 	if(res != 0) { perror("gcc"); exit(-1); }
 
+	close(fd);
+	fd = open(target_path, O_RDONLY);
+	assert(fd > 0);
 	off_t	len = lseek(fd, 0, SEEK_END);
 
 	qc_image_size = len;
