@@ -63,6 +63,28 @@ void	check_pred_re(struct mrs_ep_desc	*ep)
 	}
 }
 
+// job: take all variable types in 'm' and map them forwards and then backwards through the VPM.
+// without doing this, we will fail to unify against cases where that funky maneuver makes a rule variable type more general. yuck?
+patch_variable_types(struct mrs	*m)
+{
+	int i;
+	for(i=0;i<m->vlist.nvars;i++)
+	{
+		struct mrs_var	*v = m->vlist.vars[i];
+		if(v->is_const)continue;
+		char	*type = v->type;
+		type = internal_to_external_var_type(type);
+		type = external_to_internal_var_type(type);
+		//printf("shifting '%s' to '%s'\n", v->type, type);
+		v->type = type;
+		if(v->dg)
+		{
+			struct type	*tp = lookup_type(type);
+			v->dg->type = v->dg->xtype = tp;
+		}
+	}
+}
+
 int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, char	*feature)
 {
 	struct dg	*dg = dg_hop(tr->dg, lookup_fname(feature));
@@ -80,6 +102,7 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 		extern int inhibit_vpm;
 		inhibit_vpm++;
 		desc->mrs = cont_to_mrs(desc->dg);
+		patch_variable_types(desc->mrs);
 		inhibit_vpm--;
 	}
 
@@ -859,11 +882,13 @@ void	skolemize_mrs(struct mrs	*m, int	equate_qeqs)
 
 void	skolemize_for_transfer(struct mrs	*m)
 {
+	skolem_counter = 0;
 	skolemize_mrs(m, 0);
 }
 
 void	skolemize_for_generation(struct mrs	*m)
 {
+	skolem_counter = 0;
 	skolemize_mrs(m, 1);
 }
 
@@ -1311,7 +1336,6 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 	if(semi_th && ALLOW_SEMI_MODE)
 		semi_reformat_mrs(m, 0);
 
-	skolem_counter = 0;
 	skolemize_for_transfer(m);
 
 	struct transfer_mrs_set	ts;
