@@ -191,6 +191,7 @@ void	freport_profiler_indent(FILE	*fout, struct profiler	*prof, int	ind)
 
 void	report_profiler(struct profiler	*prof)
 {
+	if(!prof)return;
 	freport_profiler_indent(stdout, prof, 0);
 }
 
@@ -211,3 +212,4 @@ struct profiler	*lexical_filtering_profiler;
 struct profiler	*chart_parsing_profiler;
 struct profiler	  *packing_profiler;
 struct profiler	*unpacking_profiler;
+struct profiler	*transfer_profiler;

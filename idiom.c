@@ -72,7 +72,7 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 	if(!m)m = extract_mrs(dg);
 
 	struct mrs	**results;
-	int	n = transfer_mrs(nidiom_rules, idiom_rules, m, &results);
+	int	n = transfer_mrs(nidiom_rules, idiom_rules, m, &results, 0);
 	//printf("%d idiom rule transfer result[s]\n", n);
 
 	int	i;

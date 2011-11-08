@@ -451,8 +451,9 @@ struct ep_alignment	*record_alignment(struct grammar_entity	*e, struct mrs_ep	*a
 	a->e = e;
 	memcpy(a->align, align, sizeof(struct mrs_ep*)*(1+e->nextra_preds));
 	a->next = rest;
+	int	mark = (e->what == LEXEME)?1:2;
 	for(i=0;i<=e->nextra_preds;i++)
-		ep_hit_map[align[i]->epnum] = 1;
+		ep_hit_map[align[i]->epnum] |= mark;
 	/*printf(" ... accepting new alignment: ");
 	for(i=0;i<=e->nextra_preds;i++)
 		printf(" %s/%p", align[i]->pred, align[i]);
@@ -670,10 +671,17 @@ void semantic_lookup(struct mrs	*mrs)
 		if(!ep_hit_map[i])
 			semindex_try_generics(mrs->rels+i, &alignments, ep_hit_map);
 	for(i=0;i<mrs->nrels;i++)
+	{
 		if(!ep_hit_map[i])
 		{
 			fprintf(stderr, "WARNING: EP '%s' is not covered\n", mrs->rels[i].pred);
 		}
+		if(ep_hit_map[i] & 2)
+		{
+			//printf("ep `%s' can be ccont\n", mrs->rels[i].pred);
+			bitvec_set(can_be_ccont_ep_bv, i);
+		}
+	}
 
 	// clear activation records
 	while(active) { active->node->activation = 0; active = active->next; }

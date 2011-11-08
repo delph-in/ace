@@ -88,4 +88,22 @@ static inline bitvec_test(unsigned long long	*x, int	bit)
 	return (x[w] & ((unsigned long long)1 << b))?1:0;
 }
 
+static inline int	bit_count(unsigned long long	x)
+{
+	unsigned int x1 = (unsigned int)x;
+	unsigned int x2 = (unsigned int)(x>>32);
+	return __builtin_popcount(x1) + __builtin_popcount(x2);
+}
+
+static inline int bitvec_three_way_or_count(unsigned long long	*a, unsigned long long	*b, unsigned long long	*c, int	n)
+{
+	int	i, C = 0;
+	for(i=0;i<n;i++)
+	{
+		unsigned long long	x = a[i] | b[i] | c[i];
+		C += bit_count(x);
+	}
+	return C;
+}
+
 #endif

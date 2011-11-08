@@ -670,6 +670,27 @@ int	filter(struct edge	*a, struct edge	*b)
 		}
 	}
 
+	/*if(gmode == GENERATING && a->have == a->need-1)
+	{
+		// contemplating building a passive edge
+		if(a->rule->span_only)
+		{
+			// if there are unrealized EPs that cannot be supplied by C-CONT rules,
+			// then we can't be at the top of the final tree (must add more lexemes)
+			// so we shouldn't allow span_only rules to fire.
+			// purely_lexical_eps = ~can_be_ccont_eps
+			// if(~(a->ep_span | b->ep_span) & purely_lexical_eps)return 0;
+			// = ~ (a->ep_span | b->ep_span | can_be_ccont_eps)
+			int n_reachable_eps = bitvec_three_way_or_count(a->ep_span_bv, b->ep_span_bv, can_be_ccont_ep_bv, n_epsbv);
+			printf("spanning only rule '%s' wants to combine #%d and #%d; could reach %d / %d EPs\n", a->rule->name, a->id, b->id, n_reachable_eps, require_neps);
+			if(n_reachable_eps < require_neps)
+			{
+				printf("not allowing spanning only rule '%s' to combine #%d and #%d\n", a->rule->name, a->id, b->id);
+				return 0;
+			}
+		}
+	}*/
+
 	unify_attempts_total++;
 	if(rf)return 0;
 

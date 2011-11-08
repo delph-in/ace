@@ -621,6 +621,94 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 	return 0;
 }
 
+// walk the dags together, pushing types to the GLB whenever the GLB exists, returning with no error when it doesn't.
+// for now when the GLB doesn't exist, don't recurse.
+// we may(?) want to keep going and keep dg1 as the preferred type, only recursing/copying on arcs that are appropriate to dg1's type.
+// basically a copy of unify_dg_infrom that doesn't return on inner errors.
+int		unify_dg_defaults(struct dg	*dg1, struct dg	*dg2)
+{
+	int	i, j, k;
+	unsigned char	news[256], nn=0;
+	struct type	*t, *t1, *t2;
+	struct dg	*extra=0;
+	struct dg	**arcs1, **arcs2;
+
+	dg1 = dereference_dg(dg1);
+	dg2 = dereference_dg(dg2);
+	if(!dg1 || !dg2)return -1;
+
+	t1 = (dg1->gen==generation)?dg1->type:dg1->xtype;
+	t2 = (dg2->gen==generation)?dg2->type:dg2->xtype;
+
+	if(dg1->copy)dg1->copy = 0;
+	if(dg2->copy)dg2->copy = 0;
+	if(dg1 == dg2)return 0;
+
+	// destructively unify
+
+	t = glb(t1, t2);
+	if(!t)return -1;
+
+	if(t != t1 && t!= t2)
+	{
+		if(!t->dg && t->name[0]!='"')
+			assert(!"not reached");
+		if(t->dg && t->dg->narcs)
+		{
+			dagreset_c(t->dg);
+			extra = copy_dg_with_comp_arcs(t->dg);
+			dagreset_c(t->dg);
+		}
+	}
+	if(dg1->gen != generation)
+	{
+		dg1->ncarcs = 0;
+		dg1->carcs = 0;
+	}
+	dg1->xtype = dg1->type = t;
+	dg1->forward = 0;
+	dg1->gen = generation;
+	//printf("type `%s' at ", t->name); unify_backtrace();
+
+	p_forward_dg(dg2, dg1);
+
+	int result_code = 0;
+	// unify dg2's arcs into dg1's arcs
+	// this version of the unifier ignores carcs... for simplicity
+	arcs1 = DARCS(dg1);
+	arcs2 = DARCS(dg2);
+	for(j=0,i=0;i<dg2->narcs;i++)
+	{
+		for(;j<dg1->narcs && dg2->label[i]>dg1->label[j];j++){}
+		if(j==dg1->narcs || dg2->label[i] != dg1->label[j])news[nn++] = i;
+		else
+		{
+#ifdef	UNIFY_PATHS
+			upath[upathl++] = dg2->label[i];
+#endif
+			if(unify_dg_defaults(arcs1[j], arcs2[i]))result_code = -1;
+#ifdef	UNIFY_PATHS
+			upathl--;
+#endif
+		}
+	}
+
+	// add remaining dg2 arcs to dg1
+	if(nn > 0)
+	{
+		//printf("adding %d new arcs to %s\n", nn, dg1->xtype->name);
+		for(k=0;k<nn;k++)
+			dg1 = add_dg_hop(dg1, dg2->label[news[k]], arcs2[news[k]]);
+		arcs1 = DARCS(dg1);
+		//qsort(dg1->arcs, dg1->narcs, sizeof(struct darc), darc_cmp);
+	}
+
+	if(extra && unify_dg_infrom(dg1, extra))
+		result_code = -1;
+
+	return result_code;
+}
+
 static struct dg	*extra_ocons, *extra_substcons, *extra_anti_synsem;
 static struct type	*ocons, *substcons, *anti_synsem;
 

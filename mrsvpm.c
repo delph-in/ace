@@ -445,12 +445,22 @@ char		*external_to_internal_var_type(char	*ex)
 	return convert_mrs_var_type(vinv, ex);
 }
 
+make_reliable_vnums(struct mrs	*m)
+{
+	// when multiple MRSes share mrs_var structures, the ->vnum fields are hard to interpret, since they are supposed to be indices into the ->vlist.vars[] array of a particular MRS that the variable appears in.
+	int i;
+	for(i=0;i<m->vlist.nvars;i++)
+		m->vlist.vars[i]->vnum = i;
+}
+
 // produce a copy of 'min' on the slab, with internal MRS variables
 struct mrs	*external_to_internal_mrs(struct mrs	*min)
 {
 	struct mrs	*mout = slab_calloc(sizeof(*mout),1);
 	bzero(mout, sizeof(*mout));
 	int	i, j;
+
+	make_reliable_vnums(min);
 
 	mout->vlist.nvars = min->vlist.nvars;
 	mout->vlist.vars = slab_malloc(sizeof(struct mrs_var*) * mout->vlist.nvars);

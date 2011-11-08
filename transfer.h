@@ -48,7 +48,7 @@ struct tcopy
 extern int saved_ntcopies;
 extern struct tcopy	*saved_tcopies;
 
-void	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, void	(*callback)(int	*alignment));
+int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callback)(int	*alignment));
 struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg);
 
 int	study_trigger_rule(char	*name, struct dg	*dg);
@@ -61,4 +61,4 @@ int	check_idioms(struct dg	*dg, struct mrs	*m);
 int	study_fixup_rule(char	*name, struct dg	*dg);
 struct mrs	*fixup_mrs(struct mrs	*m);
 
-int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct mrs	***Results);
+int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct mrs	***Results, int first_route_only);

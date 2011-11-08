@@ -341,10 +341,9 @@ int	main(int	argc, char	*argv[])
 	if(g_profiling)
 	{
 		if(g_mode == PARSING)
-		{
-			extern struct profiler	*parse_profiler;
 			report_profiler(parse_profiler);
-		}
+		if(g_mode == GENERATING)
+			report_profiler(transfer_profiler);
 	}
 	if(debug_level)freport_timers(stderr);
 	wait_for_lui();

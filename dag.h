@@ -73,6 +73,7 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg);
 
 // for hyperactive parsing
 int		unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg);
+int		unify_dg_defaults(struct dg	*indef, struct dg	*def);
 struct dg	*finalize_tmp(struct dg	*d, int trim);
 struct dg	*finalize_tmp_noss(struct dg	*d, int trim);
 int		check_cycles(struct dg	*dg);

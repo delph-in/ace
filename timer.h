@@ -54,6 +54,8 @@ extern struct profiler	*lexical_filtering_profiler;
 extern struct profiler	*chart_parsing_profiler;
 extern struct profiler	  *packing_profiler;
 extern struct profiler	*unpacking_profiler;
+extern struct profiler	*transfer_profiler;
+extern int g_profiling;
 
 void	start_profiler(struct profiler	*prof);
 void	start_and_alloc_profiler(struct profiler	**prof, char	*name, struct profiler	*parent, struct profiler	*tostop);

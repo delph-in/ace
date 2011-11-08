@@ -5,6 +5,13 @@
 #include	<sys/time.h>
 #include	<assert.h>
 
+#define	MAX_TRANSFER_CHUNKS	2560
+
+#define	FIXUP_FIRST_ROUTE_ONLY	0
+
+#undef	NO_FIXUP
+//#define	NO_FIXUP
+
 #define	ALLOW_SEMI_MODE	0
 
 //#define	DEBUG	printf
@@ -19,8 +26,10 @@
 #include	"hash.h"
 #include	"conf.h"
 #include	"mrs.h"
+#include	"timer.h"
 
 extern struct type_hierarchy	*semi_th, *main_th;
+extern int inhibit_vpm;
 
 int	saved_ntcopies = 0;
 struct tcopy	*saved_tcopies = NULL;
@@ -62,9 +71,16 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 
 	if(semi_th && ALLOW_SEMI_MODE)
 	{
-		// new-fangled system: convert our "internal" TFSes to SEMI-compliant TFSes
 		desc->mrs = cont_to_mrs(desc->dg);
+		// new-fangled system: convert our "internal" TFSes to SEMI-compliant TFSes
 		semi_reformat_mrs(desc->mrs, 1);
+	}
+	else
+	{
+		extern int inhibit_vpm;
+		inhibit_vpm++;
+		desc->mrs = cont_to_mrs(desc->dg);
+		inhibit_vpm--;
 	}
 
 	// count and save pointers to the EPs
@@ -401,8 +417,14 @@ int subsume_semarg_types(struct type	*x, struct type	*y)
 		// method 1
 		struct type	*sx = semi_find_type(semi_x);
 		struct type	*sy = semi_find_type(semi_y);
-		assert(sx && sy);
-		int	r1 = descendent_of(sy->tnum, sx)?1:0;
+		int r1;
+		if(!(sx && sy))
+		{
+			//fprintf(stderr, "ERROR: checking whether '%s' subsumes '%s', but one of those didn't exist in the SEMI\n", semi_x, semi_y);
+			//exit(-1);
+			r1 = -1;
+		}
+		else r1 = descendent_of(sy->tnum, sx)?1:0;
 
 		// method 2
 		char	*local_x = external_to_internal_var_type(semi_x);
@@ -413,6 +435,7 @@ int subsume_semarg_types(struct type	*x, struct type	*y)
 		struct type	*ty = lookup_type(local_y);
 		assert(tx && ty);
 		int	r2 = descendent_of(ty->tnum, tx)?1:0;
+		if(r1 == -1)r2 = r1;
 
 		assert(r1 == r2);
 		//printf("methods agree for '%s >? %s'\n", x->name, y->name);
@@ -429,7 +452,65 @@ void	show_transfer_counts()
 		fprintf(stderr, "NOTE: transfer did %d successful unifies and %d failed ones\n", nsuccessful_transfer_unifies, nfailed_transfer_unifies);
 }
 
-int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total)
+int	any_carc_points_to(struct mrs	*m, int	*align, int	count, struct dg	*to)
+{
+	int i, j;
+	for(i=0;i<count;i++)
+	{
+		struct mrs_ep	*ep = m->rels + align[i];
+		struct dg	*d = ep->dg;
+		extern unsigned int generation;
+		//printf("does EP `%s' (align %d) have %p as a carc?\n", ep->pred, i, to);
+		if(d->gen != generation)continue;
+		for(j=0;j<d->ncarcs;j++)
+			if(dereference_dg(d->carcs[j].dest) == to)return 1;
+	}
+	return 0;
+}
+
+struct mrs_hcons	find_hc(struct transfer_rule	*tr, int	idx)
+{
+	if(idx < tr->input.mrs->nhcons)
+		return tr->input.mrs->hcons[idx];
+	idx -= tr->input.mrs->nhcons;
+	if(idx < tr->context.mrs->nhcons)
+		return tr->context.mrs->hcons[idx];
+	idx -= tr->context.mrs->nhcons;
+	if(idx < tr->filter.mrs->nhcons)
+		return tr->filter.mrs->hcons[idx];
+	idx -= tr->filter.mrs->nhcons;
+	assert(!"not reached: no such HCONS");
+}
+
+int	unifiable_hcons(struct mrs_hcons	x, struct mrs_hcons	y)
+{
+	// don't actually perform any unifications; we have a fragile temporary DAG already.
+	// determine whether x and y say the same thing.
+	if(dereference_dg(x.hi->dg) != dereference_dg(y.hi->dg))return 0;
+	if(dereference_dg(x.lo->dg) != dereference_dg(y.lo->dg))return 0;
+	return 1;
+}
+
+int satisfiable_hconses(struct transfer_rule	*tr, int idx, int	need, struct mrs	*m, char	*usedmap)
+{
+	if(idx == need)return 1;
+
+	struct mrs_hcons	hc = find_hc(tr, idx);
+	int i;
+	for(i=0;i<m->nhcons;i++)
+		if(!usedmap[i])
+		{
+			if(!unifiable_hcons(hc, m->hcons[i]))
+				continue;
+			usedmap[i] = 1;
+			if(satisfiable_hconses(tr, idx+1, need, m, usedmap))
+				return 1;
+			usedmap[i] = 0;
+		}
+	return 0;
+}
+
+int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total, int is_filter)
 {
 	int	i;
 	for(i=0;i<count;i++)
@@ -492,6 +573,13 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	// if that turns out not to work... as a last resort, we could
 	// recurse on the input EP's dag and find all nodes that are forwarded
 	// to the same place as tr->eq[i]... but that sounds slow.
+	// nov-8-2011: the forwarding chain idea won't work, because
+	// we want to fail the SS or EQ test in cases where there was no
+	// corresponding node on the input.  since these are only used
+	// for variable nodes, we now use a variant of the "slow" idea
+	// that just looks at the input EPs' top level dag nodes' ->carcs slots.
+	// note that we *still* don't support the case where several input nodes unify to the EQ node...
+	// we need to implement the forwarding-chain-walker.
 	for(i=0;i<count;i++)
 	{
 		struct mrs_ep	*ep = &mrs->rels[align[i]];
@@ -512,6 +600,22 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 		}
 		nsuccessful_transfer_unifies++;
 	}
+	// also unify the input MRS's LTOP and INDEX into the INPUT and CONTEXT mrs descriptions' HOOKs.
+	int unify_vars(struct mrs_var	*vin, struct mrs_var	*vrule)
+	{
+		if(!vin || !vin->dg || !vrule || !vrule->dg)return 0;
+		if(0 != unify_dg_tmp(vrule->dg, vin->dg, -1))
+		{
+			forget_tmp();
+			allow_unify_swapping = 1;
+			return -1;
+		}
+		return 0;
+	}
+	if(unify_vars(mrs->ltop, tr->input.mrs->ltop))return -1;
+	if(unify_vars(mrs->ltop, tr->context.mrs->ltop))return -1;
+	if(unify_vars(mrs->index, tr->input.mrs->index))return -1;
+	if(unify_vars(mrs->index, tr->context.mrs->index))return -1;
 	allow_unify_swapping = 1;
 
 	if(count == total)
@@ -541,6 +645,12 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 				forget_tmp();
 				return -1;
 			}
+			if(any_carc_points_to(mrs, align, count, ep_original))
+			{
+				DEBUG("fail EQ test: one of the inputs didn't have this path at all\n");
+				forget_tmp();
+				return -1;
+			}
 			DEBUG("passed EQ test %d for rule '%s'\n", i, tr->name);
 		}
 		for(i=0;i<tr->nss;i++)
@@ -565,16 +675,37 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 				forget_tmp();
 				return -1;
 			}
+			if(any_carc_points_to(mrs, align, count, ep_original))
+			{
+				DEBUG("fail SS test: one of the inputs didn't have this path at all\n");
+				forget_tmp();
+				return -1;
+			}
 		}
+		// ensure that CONTEXT and FILTER HCONS specifications are satisfiable.
+		char	used_hcons[mrs->nhcons];
+		bzero(used_hcons, sizeof(used_hcons));
+		int	nhc = tr->input.mrs->nhcons + tr->context.mrs->nhcons;
+		if(is_filter)nhc += tr->filter.mrs->nhcons;
+		if(satisfiable_hconses(tr, 0, nhc, mrs, used_hcons) == 0)
+		{
+			DEBUG("failed HCONS test\n");
+			forget_tmp();
+			return -1;
+		}
+		
+		// don't forget_tmp() if we succeeded with the match and it was a complete match.
+		return 0;
 	}
+	// succeeded with the match, but it was incomplete.
 	forget_tmp();
 	return 0;
 }
 
-void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, int	total, int	*alignment, void	(*callback)(int	*alignment))
+int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, int	total, int	*alignment, int	(*callback)(int	*alignment), int	is_filter)
 {
 	int	i;
-	if(place == tr->input.neps + tr->context.neps && place == total)
+	if(place == total && !is_filter)
 	{
 		/*printf("produced a complete alignment for rule '%s' [%d input, %d ctx]: ", tr->name, tr->input.neps, tr->context.neps);
 		print_dg(tr->dg);
@@ -584,23 +715,29 @@ void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, 
 		if(tr->filter.neps)
 		{
 			// see if we can match the filter portion... uh oh!
+			forget_tmp();
 			int	did_filter = 0;
-			void	filtercb(int	*filtalign) { did_filter = 1; }
-			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, filtercb);
+			int	filtercb(int	*filtalign) { did_filter = 1; return 1; }	// return of 1 indicates we don't care about more alignments; one is enough to say it was filtered.
+			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, filtercb, 1);
 			if(did_filter)
 			{
 				//printf("FILTER fired for rule '%s'.\n", tr->name);
-				return;
+				return 0;
 			}
+			// if the rule has output, we need to reconstruct the temporary unifications, now that we've verified there were no filter firings :-/
+			if(tr->output.neps)
+				assert(0 == test_transfer_alignment(tr, mrs, place, alignment, total, is_filter));
 		}
-		callback(alignment);
-		return;
+		int rv = callback(alignment);
+		forget_tmp();
+		return rv;
 	}
 	else if(place == total)
 	{
 		// FILTER callback
-		callback(alignment);
-		return;
+		int rv = callback(alignment);
+		forget_tmp();
+		return rv;
 	}
 
 	// try to align 'place' to an unused EP in 'mrs'
@@ -609,16 +746,18 @@ void	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, 
 		if(mrs->rels[i].active)continue;
 		alignment[place] = i;
 		DEBUG("how about rule %s spot %d for '%s'?\n", tr->name, place, mrs->rels[i].pred);
-		if(0 != test_transfer_alignment(tr, mrs, place+1, alignment, tr->input.neps + tr->context.neps))
+		if(0 != test_transfer_alignment(tr, mrs, place+1, alignment, tr->input.neps + tr->context.neps, is_filter))
 			continue;
 		DEBUG("passed test.\n");
 		mrs->rels[i].active = 1;
-		align_transfer_rule0(tr, mrs, place+1, total, alignment, callback);
+		int rv = align_transfer_rule0(tr, mrs, place+1, total, alignment, callback, is_filter);
 		mrs->rels[i].active = 0;
+		if(rv != 0)return rv;
 	}
+	return 0;
 }
 
-void	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, void	(*callback)(int	*alignment))
+int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callback)(int	*alignment))
 {
 	int	i;
 	for(i=0;i<mrs->nrels;i++)
@@ -627,7 +766,7 @@ void	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, void	(*callb
 	DEBUG("trying to align %s\n", tr->name);
 	int	nplaces = tr->input.neps + tr->context.neps + tr->filter.neps;
 	int	alignment[nplaces];
-	align_transfer_rule0(tr, mrs, 0, tr->input.neps + tr->context.neps, alignment, callback);
+	return align_transfer_rule0(tr, mrs, 0, tr->input.neps + tr->context.neps, alignment, callback, 0);
 }
 
 void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
@@ -649,7 +788,7 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 
 	for(i=0;i<ntrigger_rules;i++)
 	{
-		void	found_alignment(int	*alignment)
+		int	found_alignment(int	*alignment)
 		{
 			struct dg	*flags = dg_hop(trigger_rules[i]->dg, lookup_fname("FLAGS"));
 			struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
@@ -658,10 +797,14 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 			if(temporary_expedient(lexid))
 			{
 				//printf("not triggering '%s' via '%s' because it is disabled for generation\n", lexid, trigger_rules[i]->name);
-				return;
+				//return;
 			}
-			//printf("triggering '%s' via '%s', aligned on %s\n", lexid, trigger_rules[i]->name, mrsin->rels[alignment[0]].pred);
-			trigger(lexid);
+			else
+			{
+				//printf("triggering '%s' via '%s', aligned on %s\n", lexid, trigger_rules[i]->name, mrsin->rels[alignment[0]].pred);
+				trigger(lexid);
+			}
+			return 1;	// don't care to hear about more alignments; it's triggered.
 		}
 		align_transfer_rule(trigger_rules[i], mrsin, found_alignment);
 	}
@@ -670,7 +813,14 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 
 
 
-void	skolemize_for_transfer(struct mrs	*m)
+int	skolem_counter;
+struct type	*transfer_next_skolem_constant()
+{
+	assert(default_type_hierarchy()->nstrings > skolem_counter);
+	return default_type_hierarchy()->strings[skolem_counter++];
+}
+
+void	skolemize_mrs(struct mrs	*m, int	equate_qeqs)
 {
 	int	i;
 	static int instloc = -1;
@@ -679,7 +829,13 @@ void	skolemize_for_transfer(struct mrs	*m)
 	// tweak the INSTLOC fields of the mrs variables
 	// so that they won't unify with each other.
 
-	struct type_hierarchy	*th = default_type_hierarchy();
+	struct type	*sktypes[m->vlist.nvars];
+	for(i=0;i<m->vlist.nvars;i++)
+		sktypes[i] = transfer_next_skolem_constant();
+
+	if(equate_qeqs)
+		for(i=0;i<m->nhcons;i++)
+			sktypes[m->hcons[i].hi->vnum] = sktypes[m->hcons[i].lo->vnum];
 
 	for(i=0;i<m->vlist.nvars;i++)
 	{
@@ -697,9 +853,18 @@ void	skolemize_for_transfer(struct mrs	*m)
 
 		struct dg	*iloc = dg_hop(dg, instloc);
 		assert(iloc != NULL);
-		assert(i<th->nstrings);
-		iloc->type = iloc->xtype = th->strings[i];
+		iloc->type = iloc->xtype = sktypes[i];
 	}
+}
+
+void	skolemize_for_transfer(struct mrs	*m)
+{
+	skolemize_mrs(m, 0);
+}
+
+void	skolemize_for_generation(struct mrs	*m)
+{
+	skolemize_mrs(m, 1);
 }
 
 void	unskolemize_for_transfer(struct mrs	*m)
@@ -722,13 +887,176 @@ void	unskolemize_for_transfer(struct mrs	*m)
 	}
 }
 
+check_mrs_var_is_on_vlist(struct mrs_var	*v, struct mrs_vlist	*vl)
+{
+	if(!v)return 0;
+	assert(v->vnum >= 0 && v->vnum < vl->nvars);
+	assert(vl->vars[v->vnum] == v);
+}
+
+check_all_mrs_vars_are_on_vlist(struct mrs	*m)
+{
+	int	i;
+	make_reliable_vnums(m);
+	check_mrs_var_is_on_vlist(m->ltop, &m->vlist);
+	check_mrs_var_is_on_vlist(m->xarg, &m->vlist);
+	check_mrs_var_is_on_vlist(m->index, &m->vlist);
+	for(i=0;i<m->nrels;i++)
+	{
+		struct mrs_ep	*ep = m->rels+i;
+		check_mrs_var_is_on_vlist(ep->lbl, &m->vlist);
+		int j;
+		for(j=0;j<ep->nargs;j++)
+			check_mrs_var_is_on_vlist(ep->args[j].value, &m->vlist);
+	}
+	for(i=0;i<m->nhcons;i++)
+	{
+		struct mrs_hcons	*hc = m->hcons+i;
+		check_mrs_var_is_on_vlist(hc->hi, &m->vlist);
+		check_mrs_var_is_on_vlist(hc->lo, &m->vlist);
+	}
+}
+
+// when creating a new EP (i.e. on the output list),
+// in principal all of the variables it references are (potentially) changed or new.
+// we can get away with considering them all new.
+// *but* they may be / will be reentrant with variables referenced by other parts of the MRS.
+// use the new variables' INSTLOC to see what old variable they correspond to,
+// and in the result MRS, update all obsoleted old variables to their new counterparts.
 
 struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct mrs	*min)
 {
-	// for now, we only support deleting EPs.
-	// XXX when we support creating new EPs (and hence new variables),
-	// we won't be able to just copy straight over the hcons and vlist anymore
-	assert(tr->output.neps == 0);
+	struct mrs_vlist	new_vars;
+	bzero(&new_vars, sizeof(new_vars));
+	struct mrs_var	*vpbuffer[64];
+	new_vars.vars = vpbuffer;
+
+	//printf("finding result of transfer rule '%s'\n", tr->name);
+	//check_all_mrs_vars_are_on_vlist(min);
+
+	struct mrs_ep	new_eps[tr->output.neps];
+	int i, j;
+
+	struct dg	*copy_ep_out_dgs[tr->output.neps];
+	struct dg	*copy_ep_in_dgs[tr->input.neps];
+	for(i=0;i<tr->output.neps;i++)
+	{
+		copy_ep_out_dgs[i] = copy_dg_with_comp_arcs(tr->output.eps[i].dg);
+		if(copy_ep_out_dgs[i] == NULL)
+			return NULL;	// cycle detected; the unification really failed but we didn't notice until now.
+		if(tr->output_copy_map[i])	// copy whatever we can from input[i]
+		{
+			assert(i < tr->input.neps);
+			// default unify is destructive, for now.
+			copy_ep_in_dgs[i] = copy_dg_with_comp_arcs(tr->input.eps[i].dg);
+			if(copy_ep_in_dgs[i] == NULL)
+				return NULL;	// cycle detected; the unification really failed but we didn't notice until now.
+		}
+	}
+	bump_generation();
+	for(i=0;i<tr->output.neps;i++)
+		if(tr->output_copy_map[i])	// copy whatever we can from input[i]
+		{
+			/*printf("applying +copy+; input dag to copy is:\n");
+			print_dg(copy_ep_in_dgs[i]);printf("\n");
+			printf("applying +copy+; output dag to refine is:\n");
+			print_dg(copy_ep_out_dgs[i]);printf("\n");*/
+			unify_dg_defaults(copy_ep_out_dgs[i], copy_ep_in_dgs[i]);
+			/*printf("applying +copy+; revised output dag is:\n");
+			print_dg(copy_ep_out_dgs[i]);printf("\n");*/
+		}
+
+	inhibit_vpm = 1;	// in SEMI-mode, the variables are already external.  in non-SEMI-mode, we want to keep variables internal.
+	clear_mrs();	// we don't want spurious reentrancies with variables read off of previous invocations of this rule
+	for(i=0;i<tr->output.neps;i++)
+	{
+		dg_to_mrs_ep(copy_ep_out_dgs[i], &new_vars, &new_eps[i]);
+		/*printf("new EP %d:    ", i);
+		printf("[ %s LBL: ", new_eps[i].pred);
+		print_mrs_var(new_eps[i].lbl);
+		for(j=0;j<new_eps[i].nargs;j++)
+		{
+			printf(" %s: ", new_eps[i].args[j].name);
+			print_mrs_var(new_eps[i].args[j].value);
+		}
+		printf(" ]\n");*/
+	}
+	for(i=0;i<new_vars.nvars;i++)
+		new_vars.vars[i]->dg->copy = NULL;	// make sure dg_to_mrs_var in future passes doesn't return this by mistake
+	inhibit_vpm = 0;
+	// see if any of the new variables are old variables in disguise.
+	// for truly new variables, issue a new INSTLOC.
+	static int instloc = -1;
+	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
+	struct mrs_var	*new_var_map[min->vlist.nvars];
+	bzero(new_var_map, sizeof(new_var_map));
+	for(i=0;i<new_vars.nvars;i++)
+	{
+		struct mrs_var	*v = new_vars.vars[i];
+		if(v->is_const)continue;	// don't try to align new constants to old constants; they aren't skolemized anyway.
+		struct dg	*vdg = v->dg;
+		if(ALLOW_SEMI_MODE)
+			v->semi_dg = vdg;
+		struct dg	*iloc = dg_hop(vdg, instloc);
+		assert(iloc != NULL);
+		char	*ilt = iloc->xtype->name;
+		if(*ilt == '"')
+		{
+			// INSTLOC was set; this variable exists in the input MRS. find it.
+			//printf("new var %d was really old; has instloc type %s\n", i, ilt);
+			for(j=0;j<min->vlist.nvars;j++)
+			{
+				struct mrs_var	*ivar = min->vlist.vars[j];
+				if(ivar->is_const)continue;
+				struct dg	*ivdg = ALLOW_SEMI_MODE?ivar->semi_dg:ivar->dg;
+				struct dg	*iiloc = dg_hop(ivdg, instloc);
+				assert(iiloc != NULL);
+				if(iiloc->xtype == iloc->xtype)break;
+			}
+			if(j == min->vlist.nvars)
+			{
+				printf("ERROR: found INSTLOC %s in output Ep variable, but that is not a variable in the input MRS\n", ilt);
+				assert(j < min->vlist.nvars);
+			}
+			//printf(" ... was actually old variable %s%d\n", min->vlist.vars[j]->type, j);
+			new_var_map[j] = v;
+		}
+		else
+		{
+			// INSTLOC was not set; this variable is being invented brand new by this rule.
+			// give it an INSTLOC for future use.
+			iloc->xtype = iloc->type = transfer_next_skolem_constant();
+			//printf("new var %d was really new\n", i);
+		}
+	}
+
+	/*for(i=0;i<tr->output.neps;i++)
+	{
+		printf("output EP dag:\n");
+		print_dg(copy_ep_out_dgs[i]);
+		printf("\n");
+	}*/
+
+	int ncarried_input_variables = 0;
+	char	input_variable_is_carried[min->vlist.nvars];
+	bzero(input_variable_is_carried, sizeof(input_variable_is_carried));
+	make_reliable_vnums(min);
+	struct mrs_var	*map_variable(struct mrs_var	*vin)
+	{
+		if(!vin)return NULL;
+		assert(vin->vnum >= 0 && vin->vnum < min->vlist.nvars);
+		struct mrs_var	*corresponding_new_var = new_var_map[vin->vnum];
+		if(corresponding_new_var)
+			return corresponding_new_var;
+		if(!input_variable_is_carried[vin->vnum])
+		{
+			input_variable_is_carried[vin->vnum] = 1;
+			ncarried_input_variables++;
+		}
+		return vin;
+	}
+
+	// no support for deleting or creating HCONS just now
 	assert(tr->output.nhcons == 0);
 	assert(tr->input.nhcons == 0);
 
@@ -737,22 +1065,139 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct
 	struct mrs	*mout = slab_alloc(sizeof(*mout));
 	bzero(mout, sizeof(*mout));
 	mout->nhcons = min->nhcons;
-	mout->hcons = min->hcons;
-	mout->vlist = min->vlist;
-	mout->ltop = min->ltop;
-	mout->index = min->index;
-	mout->xarg = min->xarg;
-	mout->nrels = min->nrels - tr->input.neps;
+	mout->hcons = slab_alloc(sizeof(struct mrs_hcons) * mout->nhcons);
+	for(i=0;i<min->nhcons;i++)
+	{
+		struct mrs_hcons	*hcin = min->hcons+i;
+		struct mrs_hcons	*hcout = mout->hcons+i;
+		hcout->type = hcin->type;
+		hcout->hi = map_variable(hcin->hi);
+		hcout->lo = map_variable(hcin->lo);
+	}
+	mout->ltop = map_variable(min->ltop);
+	mout->index = map_variable(min->index);
+	mout->xarg = map_variable(min->xarg);
+	mout->nrels = min->nrels - tr->input.neps + tr->output.neps;
 	mout->rels = slab_alloc(sizeof(struct mrs_ep) * mout->nrels);
-	int i, j;
 	char	ep_ditch[min->nrels];
 	bzero(ep_ditch, sizeof(ep_ditch));
 	for(i=0;i<tr->input.neps;i++)
 		ep_ditch[alignment[i]] = 1;
 	for(i=j=0;i<min->nrels;i++)
 		if(!ep_ditch[i])
-			mout->rels[j++] = min->rels[i];
+		{
+			struct mrs_ep	*epin = min->rels+i;
+			struct mrs_ep	*epout = mout->rels+j;
+			*epout = *epin;
+			epout->args = slab_alloc(sizeof(struct mrs_ep_role)*epin->nargs);
+			int k, anydiff = 1;
+			char	diffarg[epin->nargs];
+			epout->lbl = map_variable(epin->lbl);
+			for(k=0;k<epin->nargs;k++)
+			{
+				epout->args[k].name = epin->args[k].name;
+				epout->args[k].value = map_variable(epin->args[k].value);
+				if(epout->args[k].value != epin->args[k].value)
+				{
+					anydiff = 1;
+					diffarg[k] = 1;
+				}
+				else diffarg[k] = 0;
+			}
+			if(anydiff)
+			{
+				// need to build a new DAG for this EP
+				struct dg	*odg = dereference_dg(epin->dg);
+				int	label_bytes = DAG_EXTRA_LABELS_SIZE_FOR_COUNT(odg->narcs);
+				struct dg	*ndg = slab_alloc(sizeof(struct dg) + label_bytes + sizeof(struct dg*)*odg->narcs);
+				bzero(ndg, sizeof(struct dg));
+				ndg->type = ndg->xtype = odg->xtype;
+				ndg->narcs = odg->narcs;
+				struct dg	**narcs = DARCS(ndg);
+				struct dg	**oarcs = DARCS(odg);
+				for(k=0;k<odg->narcs;k++)
+				{
+					ndg->label[k] = odg->label[k];
+					extern char	**fnames;
+					char	*role = fnames[ndg->label[k]];
+					int l = -1;
+					if(!strcmp(role, "LBL"))
+					{
+						struct mrs_var	*v = epout->lbl;
+						narcs[k] = ALLOW_SEMI_MODE?v->semi_dg:v->dg;
+					}
+					else for(l=0;l<epout->nargs;l++)
+						if(!strcasecmp(role, epout->args[l].name))
+						{
+							struct mrs_var	*v = epout->args[l].value;
+							narcs[k] = ALLOW_SEMI_MODE?v->semi_dg:v->dg;
+							break;
+						}
+					if(l==epout->nargs)
+						narcs[k] = oarcs[k];
+					assert(narcs[k] != NULL);
+				}
+				epout->dg = ndg;
+				/*if(ALLOW_SEMI_MODE)
+					semi_reformat_mrs_ep(epout, 0);
+				else dagify_mrs_ep(epout);*/
+			}
+			epout->epnum = j;
+			j++;
+		}
+	for(i=0;i<tr->output.neps;i++)
+	{
+		mout->rels[j] = new_eps[i];
+		mout->rels[j].epnum = j;
+		j++;
+	}
+	assert(j == mout->nrels);
+	// the new vlist should have the old variables that were returned by map_variable(), union the new variables
+	mout->vlist.nvars = ncarried_input_variables + new_vars.nvars;
+	mout->vlist.vars = slab_alloc(sizeof(struct mrs_var*) * mout->vlist.nvars);
+	for(i=j=0;i<min->vlist.nvars;i++)
+		if(input_variable_is_carried[i])
+			mout->vlist.vars[j++] = map_variable(min->vlist.vars[i]);
+	for(i=0;i<new_vars.nvars;i++)
+		mout->vlist.vars[j++] = new_vars.vars[i];
+	assert(j == mout->vlist.nvars);
+	for(i=0;i<mout->vlist.nvars;i++)
+		mout->vlist.vars[i]->vnum = -1;	// the 'vnum' property is not reliable, since variables can be shared between different MRSes, and should only be used for printing purposes. set it to -1 to encourage crashing if we mistakenly try to rely on it some day.
+
+	setup_tmp();	// make sure subsequent forget_tmp() calls don't delete our saved EP dags or MRS structure
+
+	//check_all_mrs_vars_are_on_vlist(mout);
+	//check_all_mrs_vars_are_on_vlist(min);
+
+	//printf("result mrs = ");
+	//print_mrs(mout);
 	return mout;
+}
+
+int	equiv_mrs(struct mrs	*x, struct mrs	*y)
+{
+	/*printf("is %p eq %p?\n", x, y);
+	print_mrs(x);
+	printf(" vs \n");
+	print_mrs(y);
+	printf("???\n");*/
+	extern int g_mrs_test_demand_equality;
+	g_mrs_test_demand_equality = 1;
+	int result = mrs_subsumes(x,y);
+	g_mrs_test_demand_equality = 0;
+	return result;
+	//if(!mrs_subsumes(x,y))return 0;
+	//if(!mrs_subsumes(y,x))return 0;
+	//printf("yes\n");
+	return 1;
+}
+
+int	mrs_is_on_list(struct mrs	*m, int	n, struct mrs	**l)
+{
+	int	i;
+	for(i=0;i<n;i++)
+		if(equiv_mrs(m, l[i]))return 1;
+	return 0;
 }
 
 struct transfer_mrs_set
@@ -761,52 +1206,112 @@ struct transfer_mrs_set
 	struct mrs	**mrs;
 };
 
-int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts)
+int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, struct mrs	*min, struct transfer_mrs_set	*ts, int	pack_start)
 {
-	int	i, nresult = 0;
+	struct mrs	*mout = transfer_mrs_result(tr, alignment, min);
+	if(!mout)return -1;	// latent cycle check failed
+
+	// make a copy of 'mout', so we don't have to worry about structure sharing in subsumption tests
+	// the problem with structure sharing is each side has its own ->vnum's
+	mout = slab_copy_mrs(mout, 1);
+	if(!mrs_is_on_list(mout, ts->n - pack_start, ts->mrs + pack_start))
+	{
+		// new result.
+		ts->mrs = slab_realloc(ts->mrs, sizeof(struct mrs*)*ts->n, sizeof(struct mrs*)*(ts->n+1));
+		ts->mrs[ts->n++] = mout;
+		setup_tmp();	// prevent subsequent forget_tmp()'s from destroying this
+	}
+
+	//printf("rule fired: %s\n", tr->name);
+	//print_mrs(mout);printf("\n");
+	return 0;
+}
+
+int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int first_route_only)
+{
+	//printf("rule %s\n", tr->name);
+	int	i, nresult = 0, nfires = 0;
 	struct mrs	**result = NULL;
+	int	pack_start = ts->n;
 	for(i=0;i<ts->n;i++)
 	{
-		struct mrs	*min = ts->mrs[i];
-		int	nalignments = 0;
-		void	found_alignment(int	*alignment)
+		extern int noldslabs;
+		if(noldslabs >= MAX_TRANSFER_CHUNKS)
 		{
-			struct mrs	*mout = transfer_mrs_result(tr, alignment, min);
-			// XXX TODO: figure out how to pack results
-			// the tricky question is whether to put a packed MRS on the final result list or not
+			printf("NOTE: hit RAM limit while transfering\n");
+			return -1;
+		}
+		struct mrs	*min = ts->mrs[i];
+		if(i == pack_start)
+		{
+			// we've processed all of the results that have had K applications
+			// henceforth all results we see have had K+1 applications
+			// furthermore, no results have been generated with K+2 applications
+			// keep track of where the K+2 generation starts...
+			pack_start = ts->n;
+			// this assumes that it is impossible for two edges that have had different numbers of applications of `tr' to pack with each other.  likely, to say the least.  if the assumption is violated, the worst that happens is we have suboptimal packing.
+		}
 
-			// new result.
-			ts->mrs = slab_realloc(ts->mrs, sizeof(struct mrs*)*ts->n, sizeof(struct mrs*)*(ts->n+1));
-			ts->mrs[ts->n++] = mout;
-
-			//printf("rule fired: %s\n", tr->name);
-			//print_mrs(mout);printf("\n");
+		int	nalignments = 0;
+		int	found_alignment(int	*alignment)
+		{
+			if(0 != process_one_transfer_result(tr, alignment, min, ts, pack_start))
+				return 0;
 
 			nalignments++;
+			nfires++;
+			return first_route_only;
 		}
 		align_transfer_rule(tr, min, found_alignment);
 		if(nalignments == 0 || tr->optional)
 		{
+			// make a copy of 'min', so we don't have to worry about structure sharing in subsumption tests
+			//if(nresult)min = slab_copy_mrs(min,1);
+			//printf("ts[%d] being saved as %p\n", i, min);
 			// keep this mrs
-			result = slab_realloc(result, sizeof(struct mrs*)*nresult, sizeof(struct mrs*)*(nresult+1));
-			result[nresult++] = min;
+			// ... but make sure it's not already on the result list.
+			if(!mrs_is_on_list(min, nresult, result))
+			{
+				result = slab_realloc(result, sizeof(struct mrs*)*nresult, sizeof(struct mrs*)*(nresult+1));
+				setup_tmp();	// prevent subsequent forget_tmp()'s from destroying this
+				result[nresult++] = min;
+			}
+			else
+			{
+				assert(!"packing didn't do its job");
+			}
 		}
 		else
 		{
 			// ditch this mrs
 		}
 	}
+	if(nfires)
+	{
+		printf("rule %s fired %d times; %d intermediates; %d results to pass on\n", tr->name, nfires, ts->n, nresult);
+		//for(i=0;i<nresult;i++)print_mrs(result[i]);
+	}
 	ts->n = nresult;
 	ts->mrs = result;
+	return nfires;
 }
 
-int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct mrs	***Results)
+struct profiler	**transfer_rule_profilers;
+
+int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct mrs	***Results, int first_route_only)
 {
 	int	i;
+
+	if(g_profiling)
+	{
+		start_and_alloc_profiler(&transfer_profiler, "transfer", NULL, NULL);
+		transfer_profiler->sortable = 5;
+	}
 
 	if(semi_th && ALLOW_SEMI_MODE)
 		semi_reformat_mrs(m, 0);
 
+	skolem_counter = 0;
 	skolemize_for_transfer(m);
 
 	struct transfer_mrs_set	ts;
@@ -815,21 +1320,84 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 	ts.mrs[0] = m;
 
 	for(i=0;i<nrules;i++)
-		transfer_mrs1(rules[i], &ts);
+	{
+		if(g_profiling)
+		{
+			if(!transfer_rule_profilers)
+				transfer_rule_profilers = calloc(sizeof(struct profiler*), nrules);
+			start_and_alloc_profiler(transfer_rule_profilers+i, rules[i]->name, transfer_profiler, NULL);
+		}
+		int nfires = transfer_mrs1(rules[i], &ts, first_route_only);
+		if(nfires == -1)
+		{
+			if(g_profiling)
+			{
+				stop_profiler(transfer_rule_profilers[i], 0);
+				stop_profiler(transfer_profiler, 0);
+			}
+			return -1;
+		}
+		if(g_profiling)
+			stop_profiler(transfer_rule_profilers[i], nfires);
+	}
 
 	unskolemize_for_transfer(m);
+
+	// since we copy every output mrs, the following will actually work
+	// and will lead to less confusion for consumers
+	for(i=0;i<ts.n;i++)
+		make_reliable_vnums(ts.mrs[i]);
+
+	if(g_profiling)stop_profiler(transfer_profiler, 1);
 
 	if(Results)*Results = ts.mrs;
 	return ts.n;
 }
 
+struct mrs	*reformat_mrs_for_transfer(struct mrs	*m)
+{
+	// what this does is re-extract every variable and EP from the DG representation,
+	// so that it matches what the results of transfer rules will look like.
+	// if we don't do this, some transfer rules can unintentially create slight differences
+	// in places that they don't want to, defeating packing.
+	clear_mrs();
+	int i;
+	struct mrs_vlist	new_vlist;
+
+	new_vlist.nvars = 0;
+	new_vlist.vars = slab_alloc(sizeof(struct mrs_var*) * m->vlist.nvars);
+	inhibit_vpm++;
+	m->ltop = m->ltop?dg_to_mrs_var(m->ltop->dg, &new_vlist):NULL;
+	m->index = m->index?dg_to_mrs_var(m->index->dg, &new_vlist):NULL;
+	m->xarg = m->xarg?dg_to_mrs_var(m->xarg->dg, &new_vlist):NULL;
+	for(i=0;i<m->nrels;i++)
+	{
+		dg_to_mrs_ep(m->rels[i].dg, &new_vlist, m->rels+i);
+		m->rels[i].epnum = i;
+	}
+	for(i=0;i<m->nhcons;i++)
+	{
+		m->hcons[i].hi = dg_to_mrs_var(m->hcons[i].hi->dg, &new_vlist);
+		m->hcons[i].lo = dg_to_mrs_var(m->hcons[i].lo->dg, &new_vlist);
+	}
+	m->vlist = new_vlist;
+	inhibit_vpm--;
+	return m;
+}
+
 struct mrs	*fixup_mrs(struct mrs	*m)
 {
+#ifdef	NO_FIXUP
 	return m;
+#else
+	m = reformat_mrs_for_transfer(m);
+	//printf("reformatted mrs:\n");
+	//print_mrs(m);
 	struct mrs	**results = NULL;
-	int	n = transfer_mrs(nfixup_rules, fixup_rules, m, &results);
+	int	n = transfer_mrs(nfixup_rules, fixup_rules, m, &results, FIXUP_FIRST_ROUTE_ONLY);
 	assert(n >= 0);
 	if(n > 1)
 		fprintf(stderr, "WARNING: ambiguity in generator fixup rules; using first result.\n");
 	return results[0];
+#endif
 }

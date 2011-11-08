@@ -135,10 +135,11 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 {
 	static struct type *semarg = 0;
 
+	if(!dg)return NULL;
+	dg = dereference_dg(dg);
+
 	if(!semarg)
 		assert(semarg = lookup_type(semarg_type));
-
-	if(!dg)return NULL;
 
 	if(dg->gen != 1 || !dg->copy || ((struct mrs_var*)dg->copy)->dg!=dg)
 	{
@@ -208,6 +209,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 
 void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 {
+	dg = dereference_dg(dg);
 	struct dg	**arcs = DARCS(dg);
 	struct dg		*pred;
 	static int		lblf = -1, predf, cfromf, ctof;
@@ -224,14 +226,15 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 			ctof = lookup_fname("CTO");
 		}
 	}
+	bzero(ep, sizeof(*ep));
 	pred = dg_hop(dg, predf);
 	if(!pred)
 	{
-		fprintf(stderr, "EP dag had no PRED\n");
-		exit(-1);
+		ep->pred = strdup("*top*");
+		//fprintf(stderr, "EP dag had no PRED\n");
+		//exit(-1);
 	}
-	bzero(ep, sizeof(*ep));
-	ep->pred = strdup(pred->xtype->name);
+	else ep->pred = strdup(pred->xtype->name);
 	ep->dg = dg;
 	ep->lbl = dg_to_mrs_var(dg_hop(dg, lblf), vlist);
 	int	neps = 0;
@@ -501,7 +504,10 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 
 	if(!evar->is_const)
 	{
-		var = external_to_internal_mrs_var(evar);
+		// XXX significant change.  we now do NOT apply the VPM during dagify().
+		// instead, the generator driver applies it BEFORE dagify()'ing.
+		//var = external_to_internal_mrs_var(evar);
+		var = evar;
 		dg = dagify_mrs_var1(var, skolem);
 		evar->dg = wellform_dg(dg);
 	}

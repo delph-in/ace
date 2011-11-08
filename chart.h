@@ -104,6 +104,7 @@ void	setup_lexrule_edge(struct edge	*e);
 extern struct chart_cell	*cells;
 extern int					chart_size;
 extern int					require_neps, n_epsbv, n_avsbv;
+extern unsigned long long	*can_be_ccont_ep_bv;
 
 extern int enable_generalize_edge_top_types;
 

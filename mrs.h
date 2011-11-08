@@ -13,7 +13,7 @@ struct mrs_var
 	}			*props;
 	short		nprops:15, is_const:1;
 	short		refs;
-	int			vnum;
+	int			vnum;	// in contexts where multiple MRSes are floating around, they may share mrs_var structures.  in this case, the vnum fields will not be reliable indicators of the index of the variable in the MRS's vlist.
 
 	union
 	{
@@ -91,7 +91,11 @@ struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin);
 char		*internal_to_external_var_type(char	*in);
 char		*external_to_internal_var_type(char	*in);
 
+struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist);
+void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep);
+
 struct mrs	*copy_mrs(struct mrs	*m);
+struct mrs	*slab_copy_mrs(struct mrs	*min, int share_strings);
 struct mrs	*external_to_internal_mrs(struct mrs	*min);
 struct mrs	*ace_surface_to_mrs(char	*line);
 

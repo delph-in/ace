@@ -7,6 +7,7 @@
 #include	"type.h"
 #include	"dag.h"
 #include	"chart.h"
+#include	"freeze.h"
 #endif
 
 #include	"mrs.h"
@@ -523,6 +524,8 @@ int	snprint_mrs(char	*str, int	len, struct mrs	*mrs)
 	if(timer==-1)timer = new_timer("mrs printing");
 	start_timer(timer);
 
+	make_reliable_vnums(mrs);
+
 	char	*marked = calloc(sizeof(char), mrs->vlist.nvars);
 	int	l = 0;
 
@@ -596,16 +599,22 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv);
 //#define	DEBUG	printf
 #define	DEBUG(x...)	do {} while(0)
 
+int	g_mrs_test_demand_equality = 0;
+
 int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 {
 	int	i;
 	int	vmap[in->vlist.nvars];
 	char used[out->nrels];
 
-	if(mrs_no_extra)
+	make_reliable_vnums(in);
+	make_reliable_vnums(out);
+
+	if(mrs_no_extra || g_mrs_test_demand_equality)
 	{
 		if(in->nrels != out->nrels)return 0;
 		if(in->nhcons != out->nhcons)return 0;
+		if(g_mrs_test_demand_equality && in->vlist.nvars != out->vlist.nvars)return 0;
 	}
 	else
 	{
@@ -624,13 +633,25 @@ int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 int pred_subsumes(char *in, char *out)
 {
 	// XXX when SEM-I import works, this is where we make our move...
+	// more on that: this function is called by:
+	//   1. mrs subsumption testing
+	//   2. semantic index lookup
+	//   3. vpm (via prop_subsumes)
+	// (1) can be in either type hierarchy.
+	// (2) will only be in the internal hierarchy.
+	// (3) can be in either type hierarchy.
+	// *so*, we need a way to specify which hierarchy we want to use!
+	// answer: default_type_hierarchy()
+	// leave it up to the caller to set the right hierarchy.
 	struct type_hierarchy	*th = default_type_hierarchy();
 	struct type *tin, *tout;
 	if(!strcasecmp(in, out))return 1;
-	if(in[0]=='"')return 0;
+	if(g_mrs_test_demand_equality)return 0;
+	if(in[0]=='"')return 0;	// strings don't subsume anything but themself
 	tin = lookup_type(in);
 	if(!tin)
 	{
+		// XXX ignoring this is wrong; find out where these types are coming from.
 		// the VPM can introduce some types that aren't in the heirarchy;
 		// apparently the correct behavior is to treat them as having no inheritance
 		//fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", in, in, out);
@@ -641,6 +662,7 @@ int pred_subsumes(char *in, char *out)
 	tout = lookup_type(out);
 	if(!tout)
 	{
+		// XXX where are these coming from?
 		//fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", out, in, out);
 		return 0;
 		exit(-1);
@@ -691,7 +713,8 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 		if(j==out->nprops)return 0;
 		if(!prop_subsumes(in->props[i].value, out->props[j].value))return 0;
 	}
-	
+	if(g_mrs_test_demand_equality && in->nprops != out->nprops)
+		return 0;
 
 	// compatible.  establish a mapping and succeed.
 	vmap[vnin] = out->vnum;
@@ -739,6 +762,7 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 			}
 		}
 		if(j<ep->nargs)continue;
+		if(g_mrs_test_demand_equality && ep->nargs != op->nargs)continue;
 
 		DEBUG("mrs subsumption: in %d <=> out %d\n", epi, i);
 
@@ -792,6 +816,8 @@ struct mrs	*copy_mrs(struct mrs	*min)
 	struct mrs	*mout = calloc(sizeof(*mout),1);
 	int	i, j;
 
+	make_reliable_vnums(min);
+
 	mout->vlist.nvars = min->vlist.nvars;
 	mout->vlist.vars = malloc(sizeof(struct mrs_var*) * mout->vlist.nvars);
 	for(i=0;i<mout->vlist.nvars;i++)
@@ -844,6 +870,76 @@ struct mrs	*copy_mrs(struct mrs	*min)
 		for(j=0;j<eout->nargs;j++)
 		{
 			eout->args[j].name = strdup(ein->args[j].name);
+			eout->args[j].value = mout->vlist.vars[ein->args[j].value->vnum];
+		}
+	}
+
+	return mout;
+}
+
+// produce a copy of 'min' entirely on the slab
+struct mrs	*slab_copy_mrs(struct mrs	*min, int share_strings)
+{
+	struct mrs	*mout = slab_calloc(sizeof(*mout),1);
+	int	i, j;
+
+	make_reliable_vnums(min);
+
+	mout->vlist.nvars = min->vlist.nvars;
+	mout->vlist.vars = slab_malloc(sizeof(struct mrs_var*) * mout->vlist.nvars);
+	for(i=0;i<mout->vlist.nvars;i++)
+	{
+		mout->vlist.vars[i] = slab_calloc(sizeof(struct mrs_var),1);
+		struct mrs_var	*vin = min->vlist.vars[i];
+		struct mrs_var	*vout = mout->vlist.vars[i];
+		vout->name = share_strings?vin->name:freeze_string(vin->name);
+		vout->type = share_strings?vin->type:freeze_string(vin->type);
+		vout->is_const = vin->is_const;
+		vout->refs = vin->refs;
+		vout->vnum = vin->vnum;
+		vout->nprops = vin->nprops;
+		vout->props = slab_malloc(sizeof(struct mrs_var_property) * vout->nprops);
+		for(j=0;j<vout->nprops;j++)
+		{
+			vout->props[j].name = share_strings?vin->props[j].name:freeze_string(vin->props[j].name);
+			vout->props[j].value = share_strings?vin->props[j].value:freeze_string(vin->props[j].value);
+		}
+		vout->dg = vin->dg;
+		vout->semi_dg = vin->semi_dg;
+	}
+
+	mout->nhcons = min->nhcons;
+	mout->hcons = slab_malloc(sizeof(struct mrs_hcons) * mout->nhcons);
+	for(i=0;i<mout->nhcons;i++)
+	{
+		struct mrs_hcons	*hin = min->hcons+i;
+		struct mrs_hcons	*hout = mout->hcons+i;
+		hout->type = hin->type;
+		hout->hi = mout->vlist.vars[hin->hi->vnum];
+		hout->lo = mout->vlist.vars[hin->lo->vnum];
+	}
+
+	if(min->ltop)mout->ltop = mout->vlist.vars[min->ltop->vnum];
+	if(min->index)mout->index = mout->vlist.vars[min->index->vnum];
+	if(min->xarg)mout->xarg = mout->vlist.vars[min->xarg->vnum];
+
+	mout->nrels = min->nrels;
+	mout->rels = slab_calloc(sizeof(struct mrs_ep), mout->nrels);
+	for(i=0;i<mout->nrels;i++)
+	{
+		struct mrs_ep	*ein = min->rels+i;
+		struct mrs_ep	*eout = mout->rels+i;
+		eout->pred = share_strings?ein->pred:freeze_string(ein->pred);
+		eout->lbl = mout->vlist.vars[ein->lbl->vnum];
+		eout->epnum = ein->epnum;
+		eout->cfrom = ein->cfrom;
+		eout->cto = ein->cto;
+		eout->nargs = ein->nargs;
+		eout->args = slab_malloc(sizeof(struct mrs_ep_role) * eout->nargs);
+		eout->dg = ein->dg;
+		for(j=0;j<eout->nargs;j++)
+		{
+			eout->args[j].name = share_strings?ein->args[j].name:freeze_string(ein->args[j].name);
 			eout->args[j].value = mout->vlist.vars[ein->args[j].value->vnum];
 		}
 	}

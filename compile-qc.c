@@ -55,8 +55,11 @@ int	compile_qc(char	*qccode_path)
 	if(!qccode) { perror(qccode_path); exit(-1); }
 
 	char	command[10240];
-	//sprintf(command, "gcc -x c -shared -fPIC -DPIC - -o '%s'", target_path);
+#ifdef	MACOSX_GCC
 	sprintf(command, "gcc -x c -dynamic -dynamiclib -undefined suppress -flat_namespace -m64 -fPIC -DPIC - -o '%s'", target_path);
+#else
+	sprintf(command, "gcc -x c -shared -fPIC -DPIC - -o '%s'", target_path);
+#endif
 	FILE	*gcc = popen(command, "w");
 	if(!gcc) { perror("popen"); exit(-1); }
 

@@ -17,6 +17,7 @@
 extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
 
 int	require_neps = 0, n_epsbv = 0, n_avsbv = 0;
+unsigned long long	*can_be_ccont_ep_bv;
 
 int			enable_index_accessibility_filtering = 0;
 
@@ -266,9 +267,15 @@ int	generate(struct mrs	*mrs)
 	reset_edges();
 	clear_chart(1);
 
+	struct mrs	*external_mrs = mrs;
+	mrs = external_to_internal_mrs(mrs);
+
 	if(debug_level)
 	{
-		printf("trying to generate from MRS:\n");
+		printf("\n");
+		printf("external MRS:\n");
+		print_mrs(external_mrs); printf("\n");
+		printf("internal MRS:\n");
 		print_mrs(mrs); printf("\n");
 	}
 
@@ -277,6 +284,13 @@ int	generate(struct mrs	*mrs)
 	require_neps = mrs->nrels;
 	n_epsbv = bitvec_n(mrs->nrels);
 	n_avsbv = bitvec_n(mrs->vlist.nvars);
+
+	can_be_ccont_ep_bv = bitvec_slab_alloc(n_epsbv);
+	bitvec_clear_all(can_be_ccont_ep_bv, n_epsbv);
+
+	// XXX now that we are doing skolemize_for_generation(),
+	// and now that fixup() is undoing the following skolemization work,
+	// it would probably make sense to just not do this work.
 
 	// set up the skolemization and specialization dags we'll need.
 	struct dg	*skar[mrs->vlist.nvars];
@@ -290,7 +304,12 @@ int	generate(struct mrs	*mrs)
 		skar[i] = skolem;
 	}
 	for(i=0;i<mrs->nhcons;i++)
-		skar[mrs->hcons[i].hi->vnum] = skar[mrs->hcons[i].lo->vnum];
+	{
+		//skar[mrs->hcons[i].hi->vnum] = skar[mrs->hcons[i].lo->vnum];
+		struct dg	*hi = skar[mrs->hcons[i].hi->vnum];
+		struct dg	*lo = skar[mrs->hcons[i].lo->vnum];
+		hi->type = hi->xtype = lo->xtype;
+	}
 	for(i=0;i<mrs->vlist.nvars;i++)
 	{
 		dagify_mrs_var(mrs->vlist.vars[i], skar[i]);
@@ -302,10 +321,18 @@ int	generate(struct mrs	*mrs)
 		dagify_mrs_ep(mrs->rels+i);
 	if(debug_level)printf("mrs-to-dg %.4f\n", timer());
 
-	mrs = fixup_mrs(mrs);
+	struct mrs	*fixed_up_mrs = fixup_mrs(mrs);
+	if(debug_level)
+	{
+		printf("fixup result:\n");
+		print_mrs(fixed_up_mrs);
+	}
+	skolemize_for_generation(fixed_up_mrs);
 
 	// set up some lexemes and rules for the generator to play with
-	semantic_lookup(mrs);
+	// XXX for testing fixup speed, don't look anything up into the chart
+	semantic_lookup(fixed_up_mrs);
+
 	if(debug_level)printf("semlook %.4f\n", timer());
 
 	int	npassive_edges = 0;
@@ -318,27 +345,36 @@ int	generate(struct mrs	*mrs)
 	}
 	if(debug_level)printf("packed %.4f\n", timer());
 
-	struct mrs	*hax_ref = external_to_internal_mrs(mrs);
+	/*struct mrs	*hax_ref = external_to_internal_mrs(mrs);
 	if(trace)
 	{
 		printf("internal version of MRS:\n");
 		print_mrs(hax_ref);
 		printf("\n");
-	}
+	}*/
 
 	int show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
 	{
-		// ugly hack: LKB compares *internal* MRSes,
-		// by going through the VPM *twice* "to get defaults".
+		// LKB compares *internal* MRSes, by going through the VPM *twice* "to get defaults".
 		// see comment in lkb/mrs/generate.lisp near line 765.
-		struct mrs	*hax_res = external_to_internal_mrs(mrs_res);
+		// Note that "x subsumes y" does not technically imply "vpm(x) subsumes vpm(y)"
+		// (for either forward or backwards vpm), *but* for sane vpm's it *should*.
+		// VPM is a lossy map.
+		// What is really false is that "vpm(x) subsumes vpm(y)" implies "x subsumes y".
+		// So, testing whether (input) subsumes vpm(result) *should* be
+		// *stricter* than testing whether (ivpm(input) subsumes ivpm(vpm(result))).
+		// ACE is going to try doing that stricter test and see what happens...
+		// Note that other processors may not have this option, due to not loading the SEMI signature.
+//		struct mrs	*hax_res = external_to_internal_mrs(mrs_res);
 		//if(!mrs_subsumes(mrs, mrs_res))
-		if(!mrs_subsumes(hax_ref, hax_res))
+		//if(!mrs_subsumes(hax_ref, hax_res))
+		if(!mrs_subsumes(current_input_mrs, mrs_res))	// totally SEMI-side comparison
 		{
 			if(trace)
 			{
 				printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
-				print_mrs(hax_res); printf("\n");
+				//print_mrs(hax_res); printf("\n");
+				print_mrs(mrs_res); printf("\n");
 			}
 			//print_mrs(mrs_res); printf("\n"); }
 			free_mrs(mrs_res);
@@ -352,7 +388,8 @@ int	generate(struct mrs	*mrs)
 		//if(trace>0){ print_mrs(mrs_res); printf("\n"); }
 		if(trace>0)
 		{
-			print_mrs(hax_res);
+			//print_mrs(hax_res);
+			print_mrs(mrs_res);
 			printf("\n");
 			char	*dstr = hypothesis_to_dstring(hyp);
 			puts(dstr);
