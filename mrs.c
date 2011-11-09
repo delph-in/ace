@@ -755,9 +755,13 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 				DEBUG("no `%s'\n", ep->args[j].name);
 				break;
 			}
-			if(!var_subsume(ep->args[j].value, op->args[k].value, vm, in->vlist.nvars))
+			struct mrs_var	*iv = ep->args[j].value, *ov = op->args[k].value;
+			if(!var_subsume(iv, ov, vm, in->vlist.nvars))
 			{
-				DEBUG("in var %s%d incompatible with out var %s%d\n", ep->args[j].value->type, ep->args[j].value->vnum, op->args[k].value->type, op->args[k].value->vnum);
+				if(iv->is_const)DEBUG("in var is  const %s\n", iv->name);
+				if(ov->is_const)DEBUG("out var is const %s\n", ov->name);
+				DEBUG("in var %s%d incompatible with out var %s%d\n",
+					iv->type, iv->vnum, ov->type, ov->vnum);
 				break;
 			}
 		}

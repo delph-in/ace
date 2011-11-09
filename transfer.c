@@ -9,8 +9,8 @@
 
 #define	FIXUP_FIRST_ROUTE_ONLY	0
 
-#undef	NO_FIXUP
-//#define	NO_FIXUP
+//#undef	NO_FIXUP
+#define	NO_FIXUP
 
 #define	ALLOW_SEMI_MODE	0
 
@@ -1313,8 +1313,12 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 	}
 	if(nfires)
 	{
-		printf("rule %s fired %d times; %d intermediates; %d results to pass on\n", tr->name, nfires, ts->n, nresult);
-		//for(i=0;i<nresult;i++)print_mrs(result[i]);
+		extern int debug_level;
+		if(debug_level)
+		{
+			printf("transfer rule %s fired %d times; %d intermediates; %d results to pass on\n", tr->name, nfires, ts->n, nresult);
+			//for(i=0;i<nresult;i++)print_mrs(result[i]);
+		}
 	}
 	ts->n = nresult;
 	ts->mrs = result;

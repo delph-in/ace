@@ -62,6 +62,7 @@ void accessible_vars(struct edge	*e, unsigned long long	*bv)
 }
 
 struct mrs	*current_input_mrs;
+struct mrs	*current_internal_input_mrs;
 
 int	index_accessibility_filter_one_var(struct edge	*e, struct mrs_var	*v)
 {
@@ -81,9 +82,9 @@ int index_accessibility_filter_one_ep(struct edge	*e, struct mrs_ep	*ep)
 int	index_accessibility_filter(struct edge	*e)
 {
 	int	i;
-	for(i=0;i<current_input_mrs->nrels;i++)
+	for(i=0;i<current_internal_input_mrs->nrels;i++)
 		if(!bitvec_test(e->ep_span_bv, i))
-			if(index_accessibility_filter_one_ep(e, current_input_mrs->rels+i))
+			if(index_accessibility_filter_one_ep(e, current_internal_input_mrs->rels+i))
 				return 1;
 	return 0;
 }
@@ -203,7 +204,7 @@ int	gen_process_edge(struct edge	*e)
 		bitvec_or(previously_inaccessible, newly_inaccessible, e->inaccessible_vars_bv, n_avsbv);
 		if(index_accessibility_filter(e))
 		{
-			//printf("filtered.\n");
+			//printf("filtered edge #%d.\n", e->id);
 			return 0;
 		}
 	}
@@ -279,7 +280,7 @@ int	generate(struct mrs	*mrs)
 		print_mrs(mrs); printf("\n");
 	}
 
-	fprintf(stderr, "NOTE: input semantics had %d EPs and %d variables\n", mrs->nrels, mrs->vlist.nvars);
+	//fprintf(stderr, "NOTE: input semantics had %d EPs and %d variables\n", mrs->nrels, mrs->vlist.nvars);
 
 	require_neps = mrs->nrels;
 	n_epsbv = bitvec_n(mrs->nrels);
@@ -328,6 +329,7 @@ int	generate(struct mrs	*mrs)
 		print_mrs(fixed_up_mrs);
 	}
 	skolemize_for_generation(fixed_up_mrs);
+	current_internal_input_mrs = fixed_up_mrs;	// used by index accessibility filter
 
 	// set up some lexemes and rules for the generator to play with
 	// XXX for testing fixup speed, don't look anything up into the chart
