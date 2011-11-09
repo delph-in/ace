@@ -58,7 +58,10 @@ ideas:
 
 DONE:
 
-unreleased:
+unreleased
+0.9.3
+	- basic version of output-enabled transfer rules, used for mrs fixup for generation
+	- changed post-generation subsumption test to operate on *external* MRSes
 0.9.3pre2
 	- bigger TDL buffer: JaCY's QC skeleton needed it
 	- allow lexemes to have STEM parts that aren't strings
