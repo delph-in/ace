@@ -55,6 +55,7 @@ install: ace libace.so
 	cp *.h ${PREFIX}/include/ace/
 
 clean:
-	rm -f ${OBJ} ace ace.static
+	rm -f ${OBJ} ${APPOBJ} ace ace.static
 	rm -f libace.a libace.so
 	rm -f ${PICOBJS}
+	make -C post clean
