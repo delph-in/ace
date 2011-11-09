@@ -1,3 +1,12 @@
+/* TODO
+
+Increase configurability of the input AVMs (rules):
+	- so far as I know, INPUT/OUTPUT/CONTEXT/ etc are universal...
+	- but most syntax grammars use RELS.LIST for the EPs (for trigger, fixup and idiom rules), i.e. a diff-list
+	- while transfer grammars use RELS for the EPs, i.e. a plain list
+
+*/
+
 #define		_GNU_SOURCE
 #include	<stdio.h>
 #include	<string.h>
