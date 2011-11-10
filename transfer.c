@@ -16,10 +16,10 @@ Increase configurability of the input AVMs (rules):
 
 #define	MAX_TRANSFER_CHUNKS	2560
 
-#define	FIXUP_FIRST_ROUTE_ONLY	0
+#define	FIXUP_FIRST_ROUTE_ONLY	1
 
-//#undef	NO_FIXUP
-#define	NO_FIXUP
+#undef	NO_FIXUP
+//#define	NO_FIXUP
 
 #define	ALLOW_SEMI_MODE	0
 
@@ -1401,8 +1401,10 @@ struct mrs	*reformat_mrs_for_transfer(struct mrs	*m)
 	int i;
 	struct mrs_vlist	new_vlist;
 
+	// be careful. we have to allocate enough room for the number of variables that we will actually get out of the DAG, not how many we think there ought to be.
 	new_vlist.nvars = 0;
-	new_vlist.vars = slab_alloc(sizeof(struct mrs_var*) * m->vlist.nvars);
+	struct mrs_var	**tmp_vlist = malloc(sizeof(struct mrs_var*) * 10240);
+	new_vlist.vars = tmp_vlist;
 	inhibit_vpm++;
 	m->ltop = m->ltop?dg_to_mrs_var(m->ltop->dg, &new_vlist):NULL;
 	m->index = m->index?dg_to_mrs_var(m->index->dg, &new_vlist):NULL;
@@ -1417,6 +1419,9 @@ struct mrs	*reformat_mrs_for_transfer(struct mrs	*m)
 		m->hcons[i].hi = dg_to_mrs_var(m->hcons[i].hi->dg, &new_vlist);
 		m->hcons[i].lo = dg_to_mrs_var(m->hcons[i].lo->dg, &new_vlist);
 	}
+	new_vlist.vars = malloc(sizeof(struct mrs_var*) * new_vlist.nvars);
+	memcpy(new_vlist.vars, tmp_vlist, sizeof(struct mrs_var*) * new_vlist.nvars);
+	free(tmp_vlist);
 	m->vlist = new_vlist;
 	inhibit_vpm--;
 	return m;
