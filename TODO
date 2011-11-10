@@ -24,18 +24,10 @@ fully automated regression testing
 berthold wants
 	- possibly commandline access to ACE QC generator
 	- add post-generation token mapping phase (and presumably an inverse REPP phase)
+	- add post-parsing and post-generation transfer phase (like fixup)
 	+ ace parses 34 readings vs pet/lkb 20 for GG mrs item 95
 		a MWE aligned two different ways... second token generic vs second token native (not blocked by grammar)
-	- GG generation issues:
-		+ broken portmanteau "im"
-			+ turned out to be broken type constraint propagation
-		+ coordination of events
-			+ turned out to be the VPM throwing away info on the way out and reinstating incompatible info on the way back in. specifically, the ARG0.E.TENSE of the message relation got set to 'none', which kept the filler-h rule out of generation.
-		- number names
 	- *updating* an ace tsdb profile -- doesn't work, apparently?
-	**- TSDB timing information for generation
-	**- send MRS to TSDB
-	**- probably send tree to TSDB for generation
 
 ideas:
 	- automatic time profile of a grammar
@@ -59,6 +51,9 @@ ideas:
 DONE:
 
 unreleased
+0.9.4pre1
+	- bug fixes in fixup
+	- moving towards configurability for transfer-only grammars
 0.9.3
 	- basic version of output-enabled transfer rules, used for mrs fixup for generation
 	- changed post-generation subsumption test to operate on *external* MRSes

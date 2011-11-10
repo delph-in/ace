@@ -282,13 +282,6 @@ int	generate(struct mrs	*mrs)
 
 	//fprintf(stderr, "NOTE: input semantics had %d EPs and %d variables\n", mrs->nrels, mrs->vlist.nvars);
 
-	require_neps = mrs->nrels;
-	n_epsbv = bitvec_n(mrs->nrels);
-	n_avsbv = bitvec_n(mrs->vlist.nvars);
-
-	can_be_ccont_ep_bv = bitvec_slab_alloc(n_epsbv);
-	bitvec_clear_all(can_be_ccont_ep_bv, n_epsbv);
-
 	// XXX now that we are doing skolemize_for_generation(),
 	// and now that fixup() is undoing the following skolemization work,
 	// it would probably make sense to just not do this work.
@@ -330,6 +323,13 @@ int	generate(struct mrs	*mrs)
 	}
 	skolemize_for_generation(fixed_up_mrs);
 	current_internal_input_mrs = fixed_up_mrs;	// used by index accessibility filter
+
+	require_neps = fixed_up_mrs->nrels;
+	n_epsbv = bitvec_n(fixed_up_mrs->nrels);
+	n_avsbv = bitvec_n(fixed_up_mrs->vlist.nvars);
+
+	can_be_ccont_ep_bv = bitvec_slab_alloc(n_epsbv);
+	bitvec_clear_all(can_be_ccont_ep_bv, n_epsbv);
 
 	// set up some lexemes and rules for the generator to play with
 	// XXX for testing fixup speed, don't look anything up into the chart
