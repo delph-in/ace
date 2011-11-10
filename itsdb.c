@@ -6,6 +6,45 @@
 #include	<sys/time.h>
 #include	<stdarg.h>
 
+/* notes:
+
+There are 4 top-level entry points where the ITSDB communication loop calls back to ACE:
+
+create_test_run()
+	reports the name of the engine back to ITSDB
+
+process_item()
+	either parses or generates from text input, for one item.
+		parse_line(blah) ... calls back to:
+			itsdb_report() ... which reports various stats and calls:
+				capi_print_derivations() .. which calls the unpacker to call:
+					capi_print_tree() .. which reports individual results
+		generate(blah) ... calls back to:
+			itsdb_start_results()
+			itsdb_report_genresult()
+			itsdb_end_results()
+			itsdb_report_gen()
+	measures and reports :total = :tcpu (clock()) and :treal (wallclock), and possibly :error
+
+reconstruct_item()
+	we don't support this at the moment
+
+complete_test_run()
+	uncertain what this is supposed to do.
+
+
+questions:
+	- what is complete_test_run() supposed to do?
+	- what is reconstruct_item() supposed to do?
+	- how is ITSDB supposed to tell us whether to parse or to generate (or to transfer)?
+		currently, we get that info from the commandline invocation, but it would be nice to be able to present a single CPU definition and have ITSDB tell us which operation it is interested in.
+	- are we reporting the right memory usage?
+	- what is the correct interpretation of each of the time reports?
+	- how do we send back MRSes?
+	- how do we send back a tree for generation?
+
+*/
+
 #ifdef	TSDB
 #include	<itsdb.h>
 #else
@@ -21,7 +60,12 @@
 
 //#define	capi_printf(fmt...)	fprintf(stderr, fmt)
 
+void tsdb_report_derivation(struct hypothesis	*hyp);
+void tsdb_report_mrs(struct mrs	*mrs);
+
 extern int inhibit_results;
+
+const int itsdb_wants_mrs = 1;
 
 static int create_test_run(const char *data, int run_id, const char *comment,
 		int interactive, int protocol_version, const char *custom)
@@ -55,7 +99,7 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 		int edges, int nanalyses, int nderivations, int interactive, const char	*who_knows_what_this_argument_is)
 {
 	extern int total_edges, real_edges, passive_edges;
-	int readings, msec;
+	int readings;
 	struct timeval tv1, tv2;
 	clock_t	c0, c1;
 	char	*error = 0;
@@ -71,6 +115,9 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	tsdb_i_id = i_id;
 
 	top_copies = top_unifies_wellform = top_unifies = 0;
+
+	extern int want_mrs;
+	want_mrs = itsdb_wants_mrs;
 
 	gettimeofday(&tv1, 0);
 	c0 = clock();
@@ -97,9 +144,12 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	}
 	gettimeofday(&tv2, 0);
 	c1 = clock();
-	msec = 1000*(tv2.tv_sec - tv1.tv_sec) + 0.001*(tv2.tv_usec - tv1.tv_usec);
 
-	capi_printf(" (:total . %d) (:treal . %d)", (int)((long long)(c1-c0)*1000 / CLOCKS_PER_SEC), msec);
+	int	wallclock_msec = 1000*(tv2.tv_sec - tv1.tv_sec) + 0.001*(tv2.tv_usec - tv1.tv_usec);
+	int	cpuclock_msec = (int)((long long)(c1-c0)*1000 / CLOCKS_PER_SEC);
+	capi_printf(" (:total . %d) (:treal . %d)", cpuclock_msec, wallclock_msec);
+	capi_printf(" (:tcpu . %d)", cpuclock_msec);
+
 	if(error)capi_printf(" (:error \"%s\")", error);
 }
 
@@ -110,7 +160,7 @@ itsdb_report(int nwords, char **words, int	status, int	tforest)
 	if(status == 0)
 	{
 		capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
-		capi_printf("(:tcpu . %d) ", tforest);
+		//capi_printf("(:tcpu . %d) ", tforest);
 
 		int	readings = capi_print_derivations(nwords, words);
 
@@ -172,7 +222,13 @@ itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 	*q=0;
 	capi_printf("(:surface . \"%s\") ", esc);
 	capi_printf("(:tree . \"%s\") ", esc);
-	fprintf(stderr, "ITSDB output '%s'\n", esc);
+	//fprintf(stderr, "ITSDB output '%s'\n", esc);
+
+	// report the derivation and the MRS as well
+	tsdb_report_derivation(hyp);
+	if(itsdb_wants_mrs)
+		tsdb_report_mrs(mrs);
+
 	free(esc);
 	capi_printf("(:score . %f)) ", hyp->score);
 }
@@ -191,11 +247,61 @@ char	*heap_escape(char	*str)
 	return esc;
 }
 
+void capi_escape_and_print_long_string(char	*unesc)
+{
+	char	*hesc = heap_escape(unesc), *esc = hesc;
+	// capi_printf can only handle 1kb chunks at a time... :blink:
+	// if we blindly split text up at 1kb boundaries,
+	// we stand a chance of splitting in the middle of a multibyte character.
+	// capi_printf() apparently has a problem with that...
+	// soooo... be more careful?
+	while(strlen(esc) > 1000)
+	{
+		// figure out how many characters less than 1000
+		// we have to send to avoid stopping in the middle of a multibyte sequence.
+		// this code assumes characters in the middle of a multibyte sequence
+		// are >= 128. (true for UTF-8)
+		int	snark = 0;
+		while(0x80 & esc[1000-snark])
+			snark--;
+		capi_printf("%.*s", 1000-snark, esc);
+		esc += 1000-snark;
+	}
+	capi_printf("%s", esc);
+	free(hesc);
+}
+
+void tsdb_report_derivation(struct hypothesis	*hyp)
+{
+	capi_printf(" (:derivation .\"");
+	char	*derivation = hypothesis_to_dstring(hyp);
+	capi_escape_and_print_long_string(derivation);
+	free(derivation);
+	capi_printf("\")");
+}
+
+void tsdb_report_mrs(struct mrs	*mrs)
+{
+	capi_printf(" (:mrs .\"");
+	static char	*buffer = NULL;
+	#define	MRS_BUFFER_LEN	(1024*32)
+	if(!buffer)buffer = malloc(MRS_BUFFER_LEN);
+	int l = snprint_mrs(buffer, MRS_BUFFER_LEN-1, mrs);
+	if(l < MRS_BUFFER_LEN-1)capi_escape_and_print_long_string(buffer);
+	else
+	{
+		char	*tmp = malloc(l+10);
+		snprint_mrs(tmp, l+10, mrs);
+		capi_escape_and_print_long_string(tmp);
+		free(tmp);
+	}
+	capi_printf("\")");
+}
+
 int	capi_print_derivations(int nwords, char **words)
 {
 	int id;
 
-	capi_printf("(:results . (");
 	id = 0;
 	int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
@@ -203,39 +309,22 @@ int	capi_print_derivations(int nwords, char **words)
 		if(tsdb_nderivations >= tsdb_maxderivations)return 1;
 		tsdb_nderivations++;
 
-		char	*derivation = hypothesis_to_dstring(hyp);
-		char	*hesc = heap_escape(derivation), *esc = hesc;
-		free(derivation);
-		capi_printf("((:result-id . %d) (:derivation .\"", id++);
-		// capi_printf can only handle 1kb chunks at a time... :blink:
-		// if we blindly split text up at 1kb boundaries,
-		// we stand a chance of splitting in the middle of a multibyte character.
-		// capi_printf() apparently has a problem with that...
-		// soooo... be more careful?
-		while(strlen(esc) > 1000)
-		{
-			// figure out how many characters less than 1000
-			// we have to send to avoid stopping in the middle of a multibyte sequence.
-			// this code assumes characters in the middle of a multibyte sequence
-			// are >= 128. (true for UTF-8)
-			int	snark = 0;
-			while(0x80 & esc[1000-snark])
-				snark--;
-			capi_printf("%.*s", 1000-snark, esc);
-			esc += 1000-snark;
-		}
-		capi_printf("%s", esc);
-		free(hesc);
-		capi_printf("\") (:score .%f))", hyp->score);
+		capi_printf("((:result-id . %d)", id++);
+
+		tsdb_report_derivation(hyp);
+
+		if(itsdb_wants_mrs)
+			tsdb_report_mrs(mrs);
+
+		capi_printf(" (:score .%f))", hyp->score);
 #ifndef TSDB
 		capi_printf("\n");
 #endif
 		return 1;
 	}
-	extern int want_mrs;
-	want_mrs = 0;
+	itsdb_start_results();
 	int	n = iterate_cell_root_hypotheses(&cells[chart_size-1], capi_print_tree, best_only);
-	capi_printf("))");
+	itsdb_end_results();
 	return n;
 }
 
