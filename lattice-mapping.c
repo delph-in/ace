@@ -31,6 +31,18 @@ struct lattice_rule	**tmrules = NULL;
 
 struct lattice_rule_set	*token_mapping_rules = NULL;
 struct lattice_rule_set	*lexical_filtering_rules = NULL;
+struct lattice_rule_set	*post_generation_mapping_rules = NULL;
+
+int	mapping_tokens = 0;
+
+struct edge	*new_edge(struct dg	*d)
+{
+	struct edge	*E = slab_alloc(sizeof(*E));
+	bzero(E, sizeof(*E));
+	E->id = -1;
+	E->dg = d;
+	return E;
+}
 
 struct lattice_rule	*freeze_lattice_rule(struct lattice_rule	*r)
 {
@@ -779,8 +791,15 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 		}
 		save_le[i] = NULL;
 
-		le[i].token = extract_token_from_dg(out_dg[i]);
-		DEBUG("O%d = `%s' [%d - %d] = %p\n", i+1, le[i].token->string, le[i].from->id, le[i].to->id, &le[i]);
+		if(mapping_tokens)
+		{
+			le[i].token = extract_token_from_dg(out_dg[i]);
+			DEBUG("O%d = `%s' [%d - %d] = %p\n", i+1, le[i].token->string, le[i].from->id, le[i].to->id, &le[i]);
+		}
+		else
+		{
+			le[i].edge = new_edge(out_dg[i]);
+		}
 		add_lattice_edge(lat, &le[i]);
 		did_add++;
 	}
@@ -1143,7 +1162,9 @@ int	load_token_mapping_rules()
 void	apply_token_mapping(struct lattice	*lat)
 {
 	lattice_mapping_profiler = token_mapping_profiler;
+	mapping_tokens = 1;
 	apply_lattice_mapping(lat, token_mapping_rules);
+	mapping_tokens = 0;
 }
 
 int	load_lexical_filtering_rules()
@@ -1156,4 +1177,34 @@ void	apply_lexical_filtering(struct lattice	*lat)
 {
 	lattice_mapping_profiler = lexical_filtering_profiler;
 	apply_lattice_mapping(lat, lexical_filtering_rules);
+}
+
+int	load_post_generation_mapping_rules()
+{
+	post_generation_mapping_rules = load_lattice_rules("post-generation-mapping-rule");
+	return 0;
+}
+
+void	apply_post_generation_mapping_rules(struct lattice	*lat)
+{
+	lattice_mapping_profiler = post_generation_mapping_profiler;
+	apply_lattice_mapping(lat, post_generation_mapping_rules);
+}
+
+struct lattice	*edge_list_to_lattice(int	n, void	**list)
+{
+	struct lattice	*l = slab_alloc(sizeof(*l));
+	bzero(l, sizeof(*l));
+	int k;
+	for(k=0;k<=n;k++)new_lattice_vertex(l);
+	for(k=0;k<n;k++)
+	{
+		struct lattice_edge	*e = slab_alloc(sizeof(*e));
+		bzero(e, sizeof(*e));
+		e->from = l->vertices[k];
+		e->to = l->vertices[k+1];
+		e->edge = list[k];
+		add_lattice_edge(l, e);
+	}
+	return l;
 }

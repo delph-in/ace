@@ -15,6 +15,7 @@
 #include	"token.h"
 #include	"transfer.h"
 #include	"unicode.h"
+#include	"freeze.h"
 
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
@@ -31,6 +32,8 @@ unsigned long long	ndecomposed;
 int	max_grandparenting = 3;
 
 int	total_hyps;
+
+int	enable_post_generation_mapping = 0;
 
 struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry	ancestry);
 struct hypothesis	*get_cui_hypothesis(struct context_unpack_info	*cui, int	rank);
@@ -948,6 +951,55 @@ char	*hypothesis_to_dstring(struct hypothesis	*h)
 	return derivation;
 }
 
+/*
+struct token	*gen_extract_one_token(struct hypothesis	*h, int	k)
+{
+	assert(h->edge->lex && !h->edge->rule);
+	struct dg	*toklist = dg_path(h->dg, lex_tokens_list_path);
+	assert(toklist != NULL);
+	while(k>0)
+	{
+		toklist = dg_hop(toklist, 2);	// REST
+		assert(toklist != NULL);
+	}
+	struct dg	*tokdg = dg_hop(toklist, 1);
+	assert(tokdg != NULL);
+
+	struct token	*t = slab_alloc(sizeof(*t));
+	bzero(t, sizeof(*t));
+	struct dg	*form_dg = dg_path(tokdg, token_form_path);
+	t->string = form_dg->xtype->name;
+	t->dg = tokdg;
+	return t;
+}*/
+
+void	install_orth(struct dg	*dg, char	*surface)
+{
+	char	buffer[1024];
+	sprintf(buffer, "\"%s\"", surface);
+	struct type	*ot = add_string(freeze_string(buffer));
+	struct dg	*stem_list = dg_path(dg, lex_stem_path);
+	assert(stem_list);
+	struct dg	*stem_first = dg_hop(stem_list, 1);	// FIRST
+	assert(stem_first);
+	stem_first->type = stem_first->xtype = ot;
+}
+
+int	gen_extract_lexemes(struct hypothesis	*h, int	k, struct edge	**L)
+{
+	int	i;
+	if(h->edge->lex)
+	{
+		L[k] = h->edge;
+		h->edge->dg = h->dg;
+		install_orth(h->dg, h->string);
+		return k+1;
+	}
+	for(i=0;i<h->arity;i++)
+		k = gen_extract_lexemes(h->rhslist[i], k, L);
+	return k;
+}
+
 /* ERG's Lisp code to do this roughly translates as:
 bool gen-extract-surface(edge, initialp, cliticp)
 {
@@ -993,6 +1045,37 @@ bool gen-extract-surface(edge, initialp, cliticp)
 
 void	fixup_generator_string(struct hypothesis	*h)
 {
+	if(enable_post_generation_mapping)
+	{
+		printf("should extract a lexeme list from hypothesis %p (spans %d tokens)\n", h, h->toklen);
+		struct edge	**lexeme_list = slab_alloc(sizeof(struct edge*) * h->toklen);
+		int n = gen_extract_lexemes(h, 0, lexeme_list);
+		int k;
+		for(k=0;k<n;k++)
+		{
+			printf("lexeme %d: %s\n", k, lexeme_list[k]->lex->word);
+			//print_dg(lexeme_list[k]->dg);
+			//printf("\n");
+		}
+		struct lattice	*l = edge_list_to_lattice(n, (void**)lexeme_list);
+		apply_post_generation_mapping_rules(l);
+		sort_lattice(l);
+		struct lattice_vertex	*v = l->vertices[0];
+		while(v && v->nfollowers)
+		{
+			assert(v->nfollowers == 1);
+			struct lattice_edge	*e = v->followers[0];
+			struct dg	*dg = e->edge->dg;
+			struct dg	*orth = dg_path(dg, lex_stem_path);
+			assert(orth);
+			struct dg	*of = dg_hop(orth, 1);	// FIRST
+			assert(of);
+			printf("output edge %s\n", of->xtype->name);
+			v = e->to;
+		}
+	}
+
+
 	wchar_t	*w = towide(h->string);
 	wchar_t	*p = w, *q = w;
 	int		initialp = 1;

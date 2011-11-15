@@ -77,6 +77,7 @@ struct grammar
 	void	*post;
 	void	*token_mapping_rules;
 	void	*lexical_filtering_rules;
+	void	*post_generation_mapping_rules;
 	void	*transfer;
 	void	*qc;
 };
@@ -413,9 +414,10 @@ extern struct type_hierarchy	*main_th, *semi_th;
 	else G->post = NULL;
 #endif
 
-extern void	*token_mapping_rules, *lexical_filtering_rules;
+extern void	*token_mapping_rules, *lexical_filtering_rules, *post_generation_mapping_rules;
 	G->token_mapping_rules = freeze_lattice_rule_set(token_mapping_rules);
 	G->lexical_filtering_rules = freeze_lattice_rule_set(lexical_filtering_rules);
+	G->post_generation_mapping_rules = freeze_lattice_rule_set(post_generation_mapping_rules);
 	freezer_note("latmap rules");
 
 	//printf("\n"); print_rule("sing_noun_infl_rule");
@@ -505,10 +507,13 @@ extern struct type_hierarchy	*main_th, *semi_th;
 
 extern void	*token_mapping_rules;
 extern void	*lexical_filtering_rules;
+extern void	*post_generation_mapping_rules;
 	token_mapping_rules = G->token_mapping_rules;
 	compile_lattice_rule_set(token_mapping_rules);
 	lexical_filtering_rules = G->lexical_filtering_rules;
 	compile_lattice_rule_set(lexical_filtering_rules);
+	post_generation_mapping_rules = G->post_generation_mapping_rules;
+	compile_lattice_rule_set(post_generation_mapping_rules);
 
 	for(i=0;i<256;i++)
 	{

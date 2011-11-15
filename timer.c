@@ -212,4 +212,5 @@ struct profiler	*lexical_filtering_profiler;
 struct profiler	*chart_parsing_profiler;
 struct profiler	  *packing_profiler;
 struct profiler	*unpacking_profiler;
+struct profiler	*post_generation_mapping_profiler;
 struct profiler	*transfer_profiler;

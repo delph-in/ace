@@ -1339,6 +1339,7 @@ int	load_grammar_top(char *toptdl)
 		if(load_instances())exit(-1);
 		if(load_token_mapping_rules())exit(-1);
 		if(load_lexical_filtering_rules())exit(-1);
+		if(load_post_generation_mapping_rules())exit(-1);
 	}
 	else
 	{
