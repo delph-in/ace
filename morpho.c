@@ -157,7 +157,7 @@ char	*mbsdowncase(char	*mbsin)
 	for(i=0;i<n;i++)
 		wcs[i] = towlower(wcs[i]);
 	int	olen = wcstombs(NULL, wcs, 0) + 1;
-	char	*mbsout = malloc(n + 2);
+	char	*mbsout = malloc(olen + 2);
 	wcstombs(mbsout, wcs, olen+1);
 	return mbsout;
 }
