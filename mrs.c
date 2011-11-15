@@ -317,6 +317,12 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		ep = eps+nrels-1;
 		bzero(ep,sizeof(*ep));
 		ep->pred = (word=parse_word(P,1))?preddup(word):0;
+		if(word && strchr(word, '<'))
+		{
+			char	*characterization = strchr(word, '<');
+			if(2 != sscanf(characterization, "<%d:%d>", &ep->cfrom, &ep->cto))
+				FAIL("unparseable characterization");
+		}
 		ep->epnum = nrels-1;
 		struct mrs_ep_role	args[20];
 		while((word=parse_word(P,1)) && strcmp(word,"]"))
@@ -539,7 +545,7 @@ int	snprint_mrs(char	*str, int	len, struct mrs	*mrs)
 	{
 		struct mrs_ep	*ep = mrs->rels+i;
 		int				j;
-		l += safe_snprintf(str+l, len-l, "%c[ %s CFROM: %d CTO: %d LBL: ", mrs_tab, ep->pred, ep->cfrom, ep->cto);
+		l += safe_snprintf(str+l, len-l, "%c[ %s<%d:%d> LBL: ", mrs_tab, ep->pred, ep->cfrom, ep->cto);
 		l += snprint_mrs_var_marked(str+l, len-l, ep->lbl, marked);
 		for(j=0;j<ep->nargs;j++)
 		{
