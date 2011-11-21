@@ -39,7 +39,7 @@ struct edge	*new_edge(struct dg	*d)
 {
 	struct edge	*E = slab_alloc(sizeof(*E));
 	bzero(E, sizeof(*E));
-	E->id = -1;
+	E->id = next_eid();
 	E->dg = d;
 	return E;
 }
@@ -56,6 +56,7 @@ struct lattice_rule	*freeze_lattice_rule(struct lattice_rule	*r)
 	fr->position_constraints = freeze_block(r->position_constraints,
 		sizeof(struct lattice_position_constraint)*(r->nposition_constraints));
 	fr->regex_constraints = slab_alloc(sizeof(struct lattice_regex_constraints)*(fr->ninput+fr->ncontext));
+	fr->jump_on_match = r->jump_on_match;
 	int i, j;
 	for(i=0;i<fr->ninput+fr->ncontext;i++)
 	{
@@ -318,6 +319,36 @@ struct lattice_rule	*study_lattice_rule(char	*name, struct dg	*dg)
 	return r;
 }
 
+void	process_lattice_rule_set_flow_control(struct lattice_rule_set	*rs)
+{
+	int	i, k;
+	for(i=0;i<rs->nrules;i++)
+	{
+		struct lattice_rule	*r = rs->rules[i];
+		struct dg	*jump = dg_hop(r->dg, lookup_fname("+JUMP"));
+		if(!jump || jump->xtype->name[0]!='"')
+		{
+			r->jump_on_match = i;	// default action is to repeat a rule when we find a match
+			continue;
+		}
+		char	*jumpto = jump->xtype->name+1;
+		int	tlen = strlen(jumpto)-1;
+		assert(tlen > 0);
+		for(k=0;k<rs->nrules;k++)
+		{
+			if(strncasecmp(rs->rules[k]->name, jumpto, tlen))continue;
+			if(strlen(rs->rules[k]->name) != tlen)continue;
+			r->jump_on_match = k;
+			break;
+		}
+		if(k==rs->nrules)
+		{
+			fprintf(stderr, "lattice-mapping rule '%s': +JUMP to undefined rule '%.*s'\n", r->name, tlen, jumpto);
+			exit(-1);
+		}
+	}
+}
+
 struct lattice_rule_set	*load_lattice_rules(char	*tdl_status)
 {
 	struct lattice_rule_set	*rs = calloc(sizeof(*rs),1);
@@ -335,6 +366,7 @@ struct lattice_rule_set	*load_lattice_rules(char	*tdl_status)
 		fprintf(stderr, "token-mapping-rules: unable to load rules, bailing out.\n");
 		exit(-1);
 	}
+	process_lattice_rule_set_flow_control(rs);
 	return rs;
 }
 
@@ -449,12 +481,17 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 			char	*from = strtok(expr, ":");
 			char	*pathstr = strtok(NULL, ":");
 			char	*cgnum_str = strtok(NULL, ":");
-			int	do_lowercase = 0;
+			int	do_lowercase = 0, do_uppercase = 0;
 			if(!strncmp(from, "lc(", 3))
 			{
 				// XXX an ugly hack in the "standard" calls for an ugly hack in the implementation...
 				from += 3;
 				do_lowercase = 1;
+			}
+			if(!strncmp(from, "uc(", 3))
+			{
+				from += 3;
+				do_uppercase = 1;
 			}
 			if(!from || !pathstr || !cgnum_str || !isalpha(from[0]) || !isdigit(from[1]))
 			{
@@ -487,7 +524,7 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 			int	so = mat->matches[i][cgnum+1].rm_so;
 			int	eo = mat->matches[i][cgnum+1].rm_eo;
 			wchar_t	*ptr = mat->strings[i]+so;
-			if(!do_lowercase)
+			if(!do_lowercase && !do_uppercase)
 			{
 				while(so<eo)
 				{
@@ -499,13 +536,29 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 			{
 				wchar_t	str[512], *wp = str;
 				swprintf(str, 511, L"%.*S", eo-so, ptr);
-				while(*wp) { *wp = towlower(*wp);
-					if(iswupper(*wp))
+				while(*wp)
+				{
+					if(do_lowercase)
 					{
-						fprintf(stderr, "yikes! '%C' is uppercase and lowercase\n", *wp);
-						exit(-1);
+						*wp = towlower(*wp);
+						if(iswupper(*wp))
+						{
+							fprintf(stderr, "yikes! '%C' is uppercase and lowercase\n", *wp);
+							exit(-1);
+						}
+						wp++;
 					}
-					wp++; }
+					else if(do_uppercase)
+					{
+						*wp = towupper(*wp);
+						if(iswlower(*wp))
+						{
+							fprintf(stderr, "yikes! '%C' is uppercase and lowercase\n", *wp);
+							exit(-1);
+						}
+						wp++;
+					}
+				}
 				wp = str;
 				while(*wp)
 					*buildp++ = *wp++;
@@ -798,7 +851,9 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 		}
 		else
 		{
+			struct lexeme	*inlex = r->ninput?inputs[0]->edge->lex:NULL;
 			le[i].edge = new_edge(out_dg[i]);
+			le[i].edge->lex = inlex;
 		}
 		add_lattice_edge(lat, &le[i]);
 		did_add++;
@@ -1036,8 +1091,20 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 		}
 		else
 		{
-			for(i=0;i<r->ninput;i++)DEBUG("I%d = '#%d' %s %d-%d\n", i+1, inputs[i]->edge->id, inputs[i]->edge->lex->word, inputs[i]->edge->from, inputs[i]->edge->to);
-			for(i=0;i<r->ncontext;i++)DEBUG("C%d = '#%d' %s %d-%d\n", i+1, inputs[r->ninput+i]->edge->id, inputs[r->ninput+i]->edge->lex->word, inputs[r->ninput+i]->edge->from, inputs[r->ninput+i]->edge->to);
+			for(i=0;i<r->ninput;i++)
+			{
+				if(inputs[i]->edge->lex)
+				{
+					DEBUG("I%d = '#%d' %s %d-%d\n", i+1, inputs[i]->edge->id, inputs[i]->edge->lex->word, inputs[i]->edge->from, inputs[i]->edge->to);
+				}
+			}
+			for(i=0;i<r->ncontext;i++)
+			{
+				if(inputs[r->ninput+i]->edge->lex)
+				{
+					DEBUG("C%d = '#%d' %s %d-%d\n", i+1, inputs[r->ninput+i]->edge->id, inputs[r->ninput+i]->edge->lex->word, inputs[r->ninput+i]->edge->from, inputs[r->ninput+i]->edge->to);
+				}
+			}
 		}
 		struct dg	*out_dg[r->noutput];
 		for(i=0;i<r->noutput;i++)
@@ -1133,22 +1200,26 @@ struct profiler	*start_lmr_profiler(struct lattice_rule_set	*rs, int	ri)
 
 void	apply_lattice_mapping(struct lattice	*lat, struct lattice_rule_set	*rs)
 {
-	int	i, redo = 0;
+	int	pc = 0;
 
-	for(i=0;i<rs->nrules;i++)
+	while(pc < rs->nrules)
 	{
 		clear_failed();
 		struct profiler	*prof = NULL;
-		if(g_profiling)prof = start_lmr_profiler(rs, i);
-		while(apply_lattice_rule(lat, rs->rules[i])){}
+		if(g_profiling)prof = start_lmr_profiler(rs, pc);
+		int result = apply_lattice_rule(lat, rs->rules[pc]);
+		if(result != 0)
+		{
+			// found and applied a match.
+			pc = rs->rules[pc]->jump_on_match;
+		}
+		else
+		{
+			// no more matches for this rule.
+			pc++;
+		}
 		if(prof)stop_profiler(prof, 1);
 	}
-
-/*again:
-	redo = 0;
-	for(i=0;i<rs->nrules;i++)
-		redo += apply_lattice_rule(lat, rs->rules[i]);
-	if(redo)goto again;*/
 }
 
 int	load_token_mapping_rules()
@@ -1182,6 +1253,11 @@ void	apply_lexical_filtering(struct lattice	*lat)
 int	load_post_generation_mapping_rules()
 {
 	post_generation_mapping_rules = load_lattice_rules("post-generation-mapping-rule");
+	if(post_generation_mapping_rules->nrules)
+	{
+		extern int enable_post_generation_mapping;
+		enable_post_generation_mapping = 1;
+	}
 	return 0;
 }
 

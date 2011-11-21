@@ -23,12 +23,13 @@ fully automated regression testing
 
 berthold wants
 	- possibly commandline access to ACE QC generator
-	- add post-generation token mapping phase (and presumably an inverse REPP phase)
+	+ add post-generation token mapping phase (and presumably an inverse REPP phase)
 		+ started playing with this with ERG.  I can extract a lattice of lexemes from a generation result, and apply a suite of lattice-mapping rules to it (my test case was affixing possessive markers:
 			John 's -> John's
-		- should also be able to do a rule to uppercase the first word in a sentence...
-		- and a rule to join words when the first ends in a hyphen
+		+ should also be able to do a rule to uppercase the first word in a sentence...
+		+ and a rule to join words when the first ends in a hyphen
 		- how about changing underscores to spaces? best done in a REPP phase?
+			- we could do it with token mapping easily enough; i can't find a case where this actually applies?
 	- add post-parsing and post-generation transfer phase (like fixup)
 	- ace as a generation server a-la-LKB
 	+ ace parses 34 readings vs pet/lkb 20 for GG mrs item 95
@@ -62,6 +63,9 @@ ideas:
 DONE:
 
 unreleased
+0.9.4pre2
+	- fix MRS characterization output format (thanks Berthold)
+	- new optional post-generation token mapping stage, for visually fixing up generated strings
 0.9.4pre1
 	- bug fixes in fixup
 	- moving towards configurability for transfer-only grammars

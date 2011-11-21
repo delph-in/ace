@@ -16,6 +16,7 @@
 #include	"transfer.h"
 #include	"unicode.h"
 #include	"freeze.h"
+#include	"conf.h"
 
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
@@ -32,8 +33,6 @@ unsigned long long	ndecomposed;
 int	max_grandparenting = 3;
 
 int	total_hyps;
-
-int	enable_post_generation_mapping = 0;
 
 struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry	ancestry);
 struct hypothesis	*get_cui_hypothesis(struct context_unpack_info	*cui, int	rank);
@@ -295,6 +294,17 @@ void	add_hypothesis_to_agenda(struct hypagenda_item	**agenda, struct hypothesis	
 	ha->right = NULL;
 
 	add_uagenda(agenda, ha);
+}
+
+char	*type_to_string(struct type	*ty)
+{
+	assert(ty->name[0]=='"');
+	int	i, slen = strlen(ty->name)-2, alen = slen;
+	assert(slen >= 0 && ty->name[slen+1]=='"');
+	if(alen%4)alen = (alen&~3)+4;
+	char	*s = slab_alloc(alen);
+	sprintf(s, "%.*s", slen, ty->name+1);
+	return s;
 }
 
 void	build_hypothesis_surface(struct hypothesis	*h)
@@ -973,16 +983,41 @@ struct token	*gen_extract_one_token(struct hypothesis	*h, int	k)
 	return t;
 }*/
 
-void	install_orth(struct dg	*dg, char	*surface)
+void	install_orth(struct dg	*dg, int	nforms, char	**forms)
 {
-	char	buffer[1024];
-	sprintf(buffer, "\"%s\"", surface);
-	struct type	*ot = add_string(freeze_string(buffer));
 	struct dg	*stem_list = dg_path(dg, lex_stem_path);
+	int	k = 0;
+	for(k=0;k<nforms;k++)
+	{
+		assert(stem_list);
+		struct dg	*stem_first = dg_hop(stem_list, 1);	// FIRST
+		assert(stem_first);
+
+		char	buffer[1024];
+		sprintf(buffer, "\"%s\"", forms[k]);
+		struct type	*ot = add_string(freeze_string(buffer));
+		stem_first->type = stem_first->xtype = ot;
+		stem_list = dg_hop(stem_list, 2);	// REST
+	}
 	assert(stem_list);
-	struct dg	*stem_first = dg_hop(stem_list, 1);	// FIRST
-	assert(stem_first);
-	stem_first->type = stem_first->xtype = ot;
+	stem_list->xtype = lookup_type(g_null_type);
+}
+
+inflect_mwe_chain(int	ntoks, char	**forms, struct hypothesis	*h)
+{
+	if(h->edge->rule)
+	{
+		assert(h->arity == 1);	// lexical rules are unary.
+		inflect_mwe_chain(ntoks, forms, h->rhslist[0]);
+		if(h->edge->rule->orth)
+		{
+			struct orule	*o = h->edge->rule->orth;
+			int	k = 0;
+			if(o->type == or_suffix)
+				k = ntoks-1;
+			forms[k] = inflect(o, forms[k]);
+		}
+	}
 }
 
 int	gen_extract_lexemes(struct hypothesis	*h, int	k, struct edge	**L)
@@ -990,9 +1025,18 @@ int	gen_extract_lexemes(struct hypothesis	*h, int	k, struct edge	**L)
 	int	i;
 	if(h->edge->lex)
 	{
+		// we need to build the orthographies of each token for MWEs;
+		// starting with the base forms in the lexicon,
+		int	n = h->edge->lex->stemlen;
+		char	*forms[n];
+		for(i=0;i<n;i++)forms[i] = type_to_string(h->edge->lex->stem[i]);
+		// apply all the inflections in the lexical rule chain,
+		// applying suffix rules to the right-hand edge of the MWE
+		// and prefix rules to the left-hand-edge.
+		inflect_mwe_chain(n, forms, h);
 		L[k] = h->edge;
 		h->edge->dg = h->dg;
-		install_orth(h->dg, h->string);
+		install_orth(h->dg, n, forms);
 		return k+1;
 	}
 	for(i=0;i<h->arity;i++)
@@ -1045,15 +1089,15 @@ bool gen-extract-surface(edge, initialp, cliticp)
 
 void	fixup_generator_string(struct hypothesis	*h)
 {
+	extern int trace;
 	if(enable_post_generation_mapping)
 	{
-		printf("should extract a lexeme list from hypothesis %p (spans %d tokens)\n", h, h->toklen);
 		struct edge	**lexeme_list = slab_alloc(sizeof(struct edge*) * h->toklen);
 		int n = gen_extract_lexemes(h, 0, lexeme_list);
 		int k;
 		for(k=0;k<n;k++)
 		{
-			printf("lexeme %d: %s\n", k, lexeme_list[k]->lex->word);
+			if(trace>0)printf("lexeme %d: %s\n", k, lexeme_list[k]->lex->word);
 			//print_dg(lexeme_list[k]->dg);
 			//printf("\n");
 		}
@@ -1061,6 +1105,9 @@ void	fixup_generator_string(struct hypothesis	*h)
 		apply_post_generation_mapping_rules(l);
 		sort_lattice(l);
 		struct lattice_vertex	*v = l->vertices[0];
+		int	slen = 0, nedges = 0;
+		int	maxedges = l->nedges * 2 + 1024;
+		char	*tokens[maxedges];
 		while(v && v->nfollowers)
 		{
 			assert(v->nfollowers == 1);
@@ -1068,47 +1115,66 @@ void	fixup_generator_string(struct hypothesis	*h)
 			struct dg	*dg = e->edge->dg;
 			struct dg	*orth = dg_path(dg, lex_stem_path);
 			assert(orth);
-			struct dg	*of = dg_hop(orth, 1);	// FIRST
-			assert(of);
-			printf("output edge %s\n", of->xtype->name);
-			v = e->to;
+			while(orth)
+			{
+				struct dg	*of = dg_hop(orth, 1);	// FIRST
+				if(!of)break;
+				if(trace>0)printf("output edge %s\n", of->xtype->name);
+				v = e->to;
+				char	*token = of->xtype->name;
+				tokens[nedges++] = token;
+				slen += strlen(token) - 2 + 1;	// discount ""s on the type name; add a space.
+				orth = dg_hop(orth, 2);	// REST
+				assert(nedges < maxedges);
+			}
 		}
+		slen += 1;
+		if(slen % 4)slen = slen + 4 - (slen%4);
+		h->string = slab_alloc(slen);
+		char	*ptr = h->string;
+		for(k=0;k<nedges;k++)
+		{
+			if(k)*ptr++ = ' ';
+			ptr += sprintf(ptr, "%.*s", (int)strlen(tokens[k])-2, tokens[k]+1);
+		}
+		*ptr = 0;
 	}
-
-
-	wchar_t	*w = towide(h->string);
-	wchar_t	*p = w, *q = w;
-	int		initialp = 1;
-
-	while(*p)
+	else
 	{
-		if(initialp && iswalnum(*p))
+		wchar_t	*w = towide(h->string);
+		wchar_t	*p = w, *q = w;
+		int		initialp = 1;
+
+		while(*p)
 		{
-			// capitalize the first alphanumeric
-			*q++ = towupper(*p++);
-			initialp = 0;
+			if(initialp && iswalnum(*p))
+			{
+				// capitalize the first alphanumeric
+				*q++ = towupper(*p++);
+				initialp = 0;
+			}
+			else if(*p == ' ' && p>w && p[-1]=='-')
+			{
+				// gobble up space after hyphens
+				p++;
+			}
+			else if(*p == ' ' && p[1] == '\'' && p[2] && p[2]!=' ')
+			{
+				// gobble up space before clitics
+				p++;
+			}
+			else if(*p == '_')
+			{
+				// convert to a space
+				*q++ = ' ';
+				p++;
+			}
+			else *q++ = *p++;
 		}
-		else if(*p == ' ' && p>w && p[-1]=='-')
-		{
-			// gobble up space after hyphens
-			p++;
-		}
-		else if(*p == ' ' && p[1] == '\'' && p[2] && p[2]!=' ')
-		{
-			// gobble up space before clitics
-			p++;
-		}
-		else if(*p == '_')
-		{
-			// convert to a space
-			*q++ = ' ';
-			p++;
-		}
-		else *q++ = *p++;
+		*q = 0;
+		h->string = freeze_tombs(w);
+		free(w);
 	}
-	*q = 0;
-	h->string = freeze_tombs(w);
-	free(w);
 }
 
 int want_mrs = 1;

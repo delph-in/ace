@@ -33,6 +33,7 @@ extern int			ortho_max_rules, ortho_warn_max_rules;
 extern int			freezer_megabytes;
 
 extern int			reduce_chart_before_lexical_parsing;
+extern int			enable_post_generation_mapping;
 
 extern char			*token_type;
 extern struct path	token_form_path, token_from_path, token_to_path, token_id_path, token_postags_path, token_posprobs_path;

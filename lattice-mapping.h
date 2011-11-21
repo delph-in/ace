@@ -57,6 +57,7 @@ struct lattice_rule
 			lpcCovers
 		}	type;
 	}	*position_constraints;
+	int	jump_on_match;
 };
 
 struct lattice_rule_set

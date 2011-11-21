@@ -27,6 +27,7 @@ int			nchart_dependencies;
 int			reduce_chart_before_lexical_parsing;
 
 int enable_post = 0;
+int			enable_post_generation_mapping = 0;
 
 struct path	token_form_path, token_from_path, token_to_path, token_id_path, token_postags_path, token_posprobs_path;
 struct path	lex_tokens_list_path, lex_tokens_last_path;
@@ -193,6 +194,7 @@ struct conf
 	int		extra_erg_dag_stash;
 
 	int		ortho_max_rules, ortho_warn_max_rules;
+	int		enable_post_generation_mapping;
 };
 
 struct path	freeze_path(struct path	p)
@@ -263,6 +265,7 @@ void	*freeze_conf()
 		c->enable_index_accessibility_filtering = enable_index_accessibility_filtering;
 		c->enable_generalize_edge_top_types = enable_generalize_edge_top_types;
 		c->enable_post = enable_post;
+		c->enable_post_generation_mapping = enable_post_generation_mapping;
 		c->extra_erg_dag_stash = extra_erg_dag_stash;
 
 		c->ortho_max_rules = ortho_max_rules;
@@ -331,6 +334,7 @@ void	recover_conf(void	*vc)
 		enable_index_accessibility_filtering = c->enable_index_accessibility_filtering;
 		enable_generalize_edge_top_types = c->enable_generalize_edge_top_types;
 		enable_post = c->enable_post;
+		enable_post_generation_mapping = c->enable_post_generation_mapping;
 		extra_erg_dag_stash = c->extra_erg_dag_stash;
 
 		ortho_max_rules = c->ortho_max_rules;
