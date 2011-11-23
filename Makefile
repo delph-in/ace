@@ -9,15 +9,20 @@ POST_CFLAGS=-I post/ -DPOST
 REPP_LIBS=-Wl,-Bstatic -lrepp -Wl,-Bdynamic
 #REPP_CFLAGS=-I ${REPP_DIR}/include/
 
+BOOST_REGEX_LIBS=-Wl,-Bstatic -lboost_regex -lstdc++ -Wl,-Bdynamic
+
 #CPU=-m32
 CC=gcc
 CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -falign-loops=32 -funroll-loops ${CPU}
 #CFLAGS=-g -O6 -funsigned-char -falign-loops=32 -funroll-loops ${CPU}  -pg
 #CFLAGS=-g -O2 -funsigned-char
 #CFLAGS=-g -O2 -pg -funsigned-char
-#CFLAGS=-g -funsigned-char
-#CFLAGS+=-fnested-functions
+CFLAGS=-g -funsigned-char
 #CFLAGS+=-fPIC
+
+EXPORT_DYNAMIC_CFLAG=-Wl,--export-dynamic
+
+include MacOSX.config
 
 TIMER_LIB=timer.o
 
@@ -29,7 +34,7 @@ PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o) pic/timer.o
 APPOBJ=${OBJ} main.o post/post.o
 
 ace: ${APPOBJ} ${TIMER_LIB}
-	${CC} -Wl,--export-dynamic ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -Wl,-Bstatic -lboost_regex -lstdc++ -Wl,-Bdynamic -ldl ${TIMER_LIB}
+	${CC} ${EXPORT_DYNAMIC_CFLAG} ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm ${BOOST_REGEX_LIBS} -ldl ${TIMER_LIB}
 
 static: ${APPOBJ}
 	${CC} -Wl,--dynamic-list=dylist.txt ${CFLAGS} ${APPOBJ} -static ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -L ~/local/lib/ -lboost_regex -lstdc++ -la -ldl -o ace.static

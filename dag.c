@@ -520,7 +520,7 @@ int reload_restrictors = 1, restrictor_size = 0;
 int	lookup_fname(char	*label)
 {
 	int	i;
-	extern int g_mode;
+	extern int g_mode, g_transfer;
 
 	for(i=0;i<nfnames;i++)
 		if(!strcasecmp(fnames[i], label))return i;
@@ -529,9 +529,12 @@ int	lookup_fname(char	*label)
 	fnames[i] = strdup(label);
 	introduce = realloc(introduce, sizeof(int) * nfnames);
 	introduce[i] = -1;
-	reload_restrictors = 1;
-	if(nfnames >= MAX_FEATURES) { fprintf(stderr, "ERROR: new feature '%s' is %d'th\n", label, MAX_FEATURES); exit(-1); }
-	if(g_mode != -1) { fprintf(stderr, "WARNING: added new feature `%s' at runtime\n", label); }
+	if(!g_transfer)
+	{
+		reload_restrictors = 1;
+		if(nfnames >= MAX_FEATURES) { fprintf(stderr, "ERROR: new feature '%s' is %d'th\n", label, MAX_FEATURES); exit(-1); }
+		if(g_mode != -1) { fprintf(stderr, "WARNING: added new feature `%s' at runtime\n", label); }
+	}
 	return i;
 }
 
@@ -608,7 +611,8 @@ void print_restrictor(char *name, char *restr)
 void load_restrictors()
 {
 	int		i;
-	extern int g_mode;
+	extern int g_mode, g_transfer;
+	if(g_transfer)return;
 	assert(g_mode == -1);
 
 	if(deleted_daughters)free(deleted_daughters);

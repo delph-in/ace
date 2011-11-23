@@ -571,6 +571,7 @@ char	**freeze_rxtc(char	**ptr, int dim)
 
 void	*freeze_rule_filter()
 {
+	if(!filters)return NULL;
 	filters = freeze_block(filters, sizeof(*filters));
 	filters->nopack = freeze_block(filters->nopack, sizeof(char) * nrules*nrules);
 	filters->nopacks = freeze_block(filters->nopacks, sizeof(char) * nrules*nrules);
@@ -593,6 +594,7 @@ void	*freeze_rule_filter()
 void	recover_rule_filter(void *rf)
 {
 	filters = rf;
+	if(!filters)return;
 	rf_tc = filters->rftc;
 	rl_tc = filters->rltc;
 	type_rf = filters->type_rf;

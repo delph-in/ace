@@ -1329,6 +1329,16 @@ int	load_grammar_top(char *toptdl)
 	tdlstatus = 0;
 #endif
 
+	if(g_transfer)
+	{
+		char	buffer[1024];
+		extern char	**fnames;
+		sprintf(buffer, "[ %s %s ]", fnames[instloc_feature], top_type);
+		tdlstatus = "type";
+		add_tdlline(semarg_type, '+', strdup(buffer), NULL, 0, "internal");
+		tdlstatus = NULL;
+	}
+
 	if(load_types())exit(-1);
 	if(g_transfer == 0)
 	{
@@ -1553,39 +1563,44 @@ int load_grammar(char	*path)
 	init_fnames();
 	load_conf();
 	load_version(get_conf_file_path(confdir, "version"));
-	load_preprocessor(confdir);
 
-	// before grammar loading so the semindex knows how to build
-	load_expedients(get_conf_file_path(confdir, "generation-ignore-signs"));
-	load_expedients(get_conf_file_path(confdir, "generation-ignore-lexemes"));
-	load_expedients(get_conf_file_path(confdir, "generation-ignore-rules"));
+	if(!g_transfer)
+	{
+		load_preprocessor(confdir);
+
+		// before grammar loading so the semindex knows how to build
+		load_expedients(get_conf_file_path(confdir, "generation-ignore-signs"));
+		load_expedients(get_conf_file_path(confdir, "generation-ignore-lexemes"));
+		load_expedients(get_conf_file_path(confdir, "generation-ignore-rules"));
+	}
 
 	load_grammar_top(get_conf_file_path(confdir, "grammar-top"));
 
-	load_triggers(get_conf_file_path(confdir, "generation-trigger-rules"));
-	load_fixup_rules(get_conf_file_path(confdir, "generation-fixup-rules"));
-	load_idioms(get_conf_file_path(confdir, "idiom-rules"));
+	if(!g_transfer)
+	{
+		load_triggers(get_conf_file_path(confdir, "generation-trigger-rules"));
+		load_fixup_rules(get_conf_file_path(confdir, "generation-fixup-rules"));
+		load_idioms(get_conf_file_path(confdir, "idiom-rules"));
 
-	// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...
-	tdl_push_status("tree-node-label");
-	load_tdl(get_conf_file_path(confdir, "parse-node-labels"));
-	tdl_pop_status();
-	if(load_labels())exit(-1);
+		load_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
 
-	load_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
+		int do_load_mem() { load_mem(get_conf_file_path(confdir, "maxent-model")); return 0; }
+		run_task("loading maxent model", do_load_mem);
 
-	int do_load_mem() { load_mem(get_conf_file_path(confdir, "maxent-model")); return 0; }
-	run_task("loading maxent model", do_load_mem);
+		char	*semi_path = get_conf_file_path(confdir, "semantic-interface");
+		if(semi_path)load_semi(semi_path);
 
-	char	*semi_path = get_conf_file_path(confdir, "semantic-interface");
-	if(semi_path)load_semi(semi_path);
+		// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...
+		tdl_push_status("tree-node-label");
+		load_tdl(get_conf_file_path(confdir, "parse-node-labels"));
+		tdl_pop_status();
+		if(load_labels())exit(-1);
 
-	load_quickcheck();
-
-	setup_rule_filter();
-
-	// make sure we have complete restrictor sets in case recent activity has added new features...
-	load_restrictors();
+		load_quickcheck();
+		setup_rule_filter();
+		// make sure we have complete restrictor sets in case recent activity has added new features...
+		load_restrictors();
+	}
 
 	// make sure none of the grammar is auto-freed when the first parse is over
 	free_tdl();

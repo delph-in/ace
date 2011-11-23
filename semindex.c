@@ -254,6 +254,8 @@ void	*freeze_semantic_index()
 	// The old lexicon memory still exists and our hash table points to it.
 	// We arranged to leave forwarding addresses in lex->dg slots.
 
+	if(!sindex)return NULL;
+
 	// tricky process.  first make slab copies of all the SPNs, with forwarding addresses in the ->activation slots.
 	for(i=0;i<sindex->size;i++)
 		for(walk=sindex->buckets[i];walk;walk=walk->next)
@@ -279,6 +281,7 @@ void	recover_semantic_index(void *frozen)
 {
 	extern int debug_level;
 	struct semantic_index	*freeze = frozen;
+	if(!freeze)return;
 	sindex = freeze->sindex;
 	nexpedients = freeze->nexpedients;
 	expedients = freeze->expedients;

@@ -1,12 +1,3 @@
-/* TODO
-
-Increase configurability of the input AVMs (rules):
-	- so far as I know, INPUT/OUTPUT/CONTEXT/ etc are universal...
-	- but most syntax grammars use RELS.LIST for the EPs (for trigger, fixup and idiom rules), i.e. a diff-list
-	- while transfer grammars use RELS for the EPs, i.e. a plain list
-
-*/
-
 #define		_GNU_SOURCE
 #include	<stdio.h>
 #include	<string.h>
@@ -39,6 +30,8 @@ Increase configurability of the input AVMs (rules):
 
 extern struct type_hierarchy	*semi_th, *main_th;
 extern int inhibit_vpm;
+
+extern int	instloc_feature;
 
 int	saved_ntcopies = 0;
 struct tcopy	*saved_tcopies = NULL;
@@ -103,6 +96,7 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 	if(semi_th && ALLOW_SEMI_MODE)
 	{
 		desc->mrs = cont_to_mrs(desc->dg);
+		desc->mrs = copy_mrs(desc->mrs);
 		// new-fangled system: convert our "internal" TFSes to SEMI-compliant TFSes
 		semi_reformat_mrs(desc->mrs, 1);
 	}
@@ -111,17 +105,20 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 		extern int inhibit_vpm;
 		inhibit_vpm++;
 		desc->mrs = cont_to_mrs(desc->dg);
+		desc->mrs = copy_mrs(desc->mrs);
 		patch_variable_types(desc->mrs);
 		inhibit_vpm--;
 	}
 
 	// count and save pointers to the EPs
-	struct dg	*rels = dg_hop(dg, lookup_fname("RELS"));
-	struct dg	*list = dg_hop(rels, lookup_fname("LIST"));
+	struct dg	*list = dg_path(dg, rels_list_path);
+	//struct dg	*rels = dg_hop(dg, lookup_fname("RELS"));
+	//struct dg	*list = dg_hop(rels, lookup_fname("LIST"));
 	while(list) { if(dg_hop(list, lookup_fname("FIRST")))desc->neps++; list = dg_hop(list, lookup_fname("REST")); }
 	desc->eps = malloc(sizeof(struct mrs_ep_desc)*desc->neps);
 	desc->neps=0;
-	list = dg_hop(rels, lookup_fname("LIST"));
+	//list = dg_hop(rels, lookup_fname("LIST"));
+	list = dg_path(dg, rels_list_path);
 	while(list)
 	{
 		struct dg	*epdg = dg_hop(list, lookup_fname("FIRST"));
@@ -136,25 +133,27 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 	}
 
 	// count the HCONS
-	struct dg	*hcons = dg_hop(dg, lookup_fname("HCONS"));
-	list = dg_hop(hcons, lookup_fname("LIST"));
+	list = dg_path(dg, hcons_list_path);
+	//struct dg	*hcons = dg_hop(dg, lookup_fname("HCONS"));
+	//list = dg_hop(hcons, lookup_fname("LIST"));
 	while(list) { if(dg_hop(list, lookup_fname("FIRST")))desc->nhcons++; list = dg_hop(list, lookup_fname("REST")); }
 	return 0;
 }
 
 void	process_saved_tcopy(struct transfer_rule	*r, struct tcopy	*c)
 {
-	if(c->pathlen < 4)goto badcopy;
-	if(c->path[0] != lookup_fname("OUTPUT"))goto  badcopy;
-	if(c->path[1] != lookup_fname("RELS"))goto  badcopy;
-	if(c->path[2] != lookup_fname("LIST"))goto  badcopy;
 	int	i;
-	for(i=3;i<c->pathlen;i++)
+	int minlen = 2 + rels_list_path.count;
+	if(c->pathlen < minlen)goto badcopy;
+	if(c->path[0] != lookup_fname("OUTPUT"))goto  badcopy;
+	for(i=0;i<rels_list_path.count;i++)
+		if(c->path[i+1] != rels_list_path.fnums[i])goto  badcopy;
+	for(i=minlen-1;i<c->pathlen;i++)
 		if(c->path[i] != lookup_fname("REST"))break;
 	if(i != c->pathlen-1)goto badcopy;
 	if(c->path[i] != lookup_fname("FIRST"))goto badcopy;
 
-	int	argn = c->pathlen - 4;
+	int	argn = c->pathlen - minlen;
 	//fprintf(stderr, "transfer rule `%s' has +copy+ on OUTPUT REL %d\n", r->name, argn);
 	r->ncopy++;
 	r->copy = realloc(r->copy, sizeof(int)*r->ncopy);
@@ -162,7 +161,7 @@ void	process_saved_tcopy(struct transfer_rule	*r, struct tcopy	*c)
 
 	return;
 	badcopy:;
-	fprintf(stderr, "transfer rule `%s': +copy+ can only appear at the top level of an EP structure in the OUTPUT.RELS list\n", r->name);
+	fprintf(stderr, "transfer rule `%s': +copy+ can only appear at the top level of an EP structure in the OUTPUT.RELS list (see parameter `mrs-rels-list')\n", r->name);
 	extern char	**fnames;
 	for(i=0;i<c->pathlen;i++)
 		fprintf(stderr, " %s", fnames[c->path[i]]);
@@ -369,6 +368,7 @@ void	recover_transfer(void	*transfer)
 {
 	int	i;
 	struct transfer_freezer	*fz = transfer;
+	clear_slab();
 	if(g_mode == GENERATING)
 	{
 		trigger_rules = fz->trigger_rules;
@@ -381,13 +381,19 @@ void	recover_transfer(void	*transfer)
 		for(i=0;i<nfixup_rules;i++)
 			thaw_transfer_rule(fixup_rules[i]);
 	}
+	if(g_transfer)
+	{
+		transfer_rules = fz->transfer_rules;
+		ntransfer_rules = fz->ntransfer_rules;
+		for(i=0;i<ntransfer_rules;i++)
+			thaw_transfer_rule(transfer_rules[i]);
+	}
 	idiom_rules = fz->idiom_rules;
 	nidiom_rules = fz->nidiom_rules;
 	for(i=0;i<nidiom_rules;i++)
 		thaw_transfer_rule(idiom_rules[i]);
 	non_idiom_root = fz->non_idiom_root;
-	transfer_rules = fz->transfer_rules;
-	ntransfer_rules = fz->ntransfer_rules;
+	clear_slab();
 	//printf("recover: %s\n", non_idiom_root);
 }
 
@@ -855,8 +861,6 @@ struct type	*transfer_next_skolem_constant()
 void	skolemize_mrs(struct mrs	*m, int	equate_qeqs)
 {
 	int	i;
-	static int instloc = -1;
-	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
 
 	// tweak the INSTLOC fields of the mrs variables
 	// so that they won't unify with each other.
@@ -883,7 +887,7 @@ void	skolemize_mrs(struct mrs	*m, int	equate_qeqs)
 		print_dg(dg);
 		printf("\n");*/
 
-		struct dg	*iloc = dg_hop(dg, instloc);
+		struct dg	*iloc = dg_hop(dg, instloc_feature);
 		assert(iloc != NULL);
 		iloc->type = iloc->xtype = sktypes[i];
 	}
@@ -904,8 +908,6 @@ void	skolemize_for_generation(struct mrs	*m)
 void	unskolemize_for_transfer(struct mrs	*m)
 {
 	int	i;
-	static int instloc = -1;
-	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
 
 	// untweak the INSTLOC fields of the mrs variables
 
@@ -915,7 +917,7 @@ void	unskolemize_for_transfer(struct mrs	*m)
 		if(!dg)continue;	// invented LTOP, INDEX, XARG
 		if(m->vlist.vars[i]->is_const)continue;
 
-		struct dg	*iloc = dg_hop(dg, instloc);
+		struct dg	*iloc = dg_hop(dg, instloc_feature);
 		assert(iloc != NULL);
 		iloc->type = iloc->xtype = get_top();
 	}
@@ -1020,8 +1022,6 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct
 	inhibit_vpm = 0;
 	// see if any of the new variables are old variables in disguise.
 	// for truly new variables, issue a new INSTLOC.
-	static int instloc = -1;
-	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
 	struct mrs_var	*new_var_map[min->vlist.nvars];
 	bzero(new_var_map, sizeof(new_var_map));
 	for(i=0;i<new_vars.nvars;i++)
@@ -1031,7 +1031,7 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct
 		struct dg	*vdg = v->dg;
 		if(ALLOW_SEMI_MODE)
 			v->semi_dg = vdg;
-		struct dg	*iloc = dg_hop(vdg, instloc);
+		struct dg	*iloc = dg_hop(vdg, instloc_feature);
 		assert(iloc != NULL);
 		char	*ilt = iloc->xtype->name;
 		if(*ilt == '"')
@@ -1043,7 +1043,7 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct
 				struct mrs_var	*ivar = min->vlist.vars[j];
 				if(ivar->is_const)continue;
 				struct dg	*ivdg = ALLOW_SEMI_MODE?ivar->semi_dg:ivar->dg;
-				struct dg	*iiloc = dg_hop(ivdg, instloc);
+				struct dg	*iiloc = dg_hop(ivdg, instloc_feature);
 				assert(iiloc != NULL);
 				if(iiloc->xtype == iloc->xtype)break;
 			}
@@ -1256,8 +1256,8 @@ int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, struct
 		setup_tmp();	// prevent subsequent forget_tmp()'s from destroying this
 	}
 
-	//printf("rule fired: %s\n", tr->name);
-	//print_mrs(mout);printf("\n");
+	printf("rule fired: %s\n", tr->name);
+	print_mrs(mout);printf("\n");
 	return 0;
 }
 
@@ -1398,7 +1398,14 @@ struct mrs	*reformat_mrs_for_transfer(struct mrs	*m)
 	// if we don't do this, some transfer rules can unintentially create slight differences
 	// in places that they don't want to, defeating packing.
 	clear_mrs();
+
 	int i;
+	for(i=0;i<m->vlist.nvars;i++)
+		if(!m->vlist.vars[i]->dg)
+			dagify_mrs_var(m->vlist.vars[i], NULL);
+	for(i=0;i<m->nrels;i++)
+		dagify_mrs_ep(m->rels+i);
+
 	struct mrs_vlist	new_vlist;
 
 	// be careful. we have to allocate enough room for the number of variables that we will actually get out of the DAG, not how many we think there ought to be.
@@ -1442,4 +1449,20 @@ struct mrs	*fixup_mrs(struct mrs	*m)
 		fprintf(stderr, "WARNING: ambiguity in generator fixup rules; using first result.\n");
 	return results[0];
 #endif
+}
+
+int	transfer(struct mrs	*m)
+{
+	m = reformat_mrs_for_transfer(m);
+	//printf("reformatted mrs:\n");
+	//print_mrs(m);
+	struct mrs	**results = NULL;
+	int	n = transfer_mrs(ntransfer_rules, transfer_rules, m, &results, 0);
+	int i;
+	for(i=0;i<n;i++)
+		print_mrs(results[i]);
+	fprintf(stderr, "NOTE: %d transfer results\t", n);
+	print_slab_stats();
+	clear_mrs();
+	clear_slab();
 }

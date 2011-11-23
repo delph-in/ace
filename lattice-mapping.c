@@ -77,6 +77,7 @@ struct lattice_rule	*freeze_lattice_rule(struct lattice_rule	*r)
 
 struct lattice_rule_set	*freeze_lattice_rule_set(struct lattice_rule_set	*rs)
 {
+	if(!rs)return NULL;
 	struct lattice_rule_set	*frs = slab_alloc(sizeof(*frs));
 	int	i;
 	frs->nrules = rs->nrules;
@@ -89,6 +90,7 @@ struct lattice_rule_set	*freeze_lattice_rule_set(struct lattice_rule_set	*rs)
 void	compile_lattice_rule_set(struct lattice_rule_set	*rs)
 {
 	int	i, j, k;
+	if(!rs)return;
 	for(i=0;i<rs->nrules;i++)
 		for(j=0;j<rs->rules[i]->ninput+rs->rules[i]->ncontext;j++)
 		{

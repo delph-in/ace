@@ -442,13 +442,14 @@ static int	load_freeze()
 
 	//G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, loaded_freeze_fd, 0);
 	G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, loaded_freeze_fd, 0);
-	if(!G || G==(struct grammar*)0xffffffff)
+	if(G == (void*)MAP_FAILED)
 	{
-		perror("mmap fixed");
+		perror("mmap");
 		exit(-1);
 	}
 	if(G != (void*)FREEZER_MMAP_BASE)
 	{
+		fprintf(stderr, "mmap returned %p\n", G);
 		perror("mmap didn't put the freezer where i wanted it");
 		exit(-1);
 	}
@@ -575,13 +576,14 @@ int	setup_save_frozen_grammar(char	*path)
 	if(ftruncate(freeze_fd, FREEZER_MMAP_SIZE)) { perror("ftruncate FREEZER_MMAP_SIZE"); exit(-1); }
 	//freeze_point = mmap((void*)FREEZER_MMAP_BASE, FREEZER_MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, freeze_fd, 0);
 	freeze_point = mmap((void*)FREEZER_MMAP_BASE, FREEZER_MMAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, freeze_fd, 0);
-	if(!freeze_point || freeze_point==(void*)0xffffffff)
+	if(freeze_point == (void*)MAP_FAILED)
 	{
 		perror("mmap fixed");
 		exit(-1);
 	}
 	if(freeze_point != (void*)FREEZER_MMAP_BASE)
 	{
+		fprintf(stderr, "mmap returned %p\n", freeze_point);
 		perror("mmap didn't put the freezer where I wanted it");
 		exit(-1);
 	}

@@ -22,12 +22,14 @@ int	load_repp(char	*fname)
 
 void	*freeze_repp()
 {
+	if(!repp)return NULL;
 	return repp_clone(repp, slab_alloc);
 }
 
 void	recover_repp(void	*ptr)
 {
 	repp = ptr;
+	if(!repp)return;
 	repp_compile_rules(repp);
 }
 

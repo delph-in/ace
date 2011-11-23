@@ -23,6 +23,7 @@ char	**rule_inst_filter, *rule_root, *rule_root_utc;//, *rule_left_filter, *rule
 extern char	**rf_tc, **rl_tc;
 
 extern struct path	label_path;
+extern int g_transfer;
 
 void	build_rif()
 {
@@ -152,7 +153,8 @@ void	recover_instances(void	*ptr)
 		}
 	}
 
-	build_rif();
+	if(!g_transfer)
+		build_rif();
 }
 
 extern int trace;

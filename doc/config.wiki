@@ -28,8 +28,9 @@ Paths to other files:
 
 Types
 || top-type || name of the type at the root of the type hierarchy ||
-|| semarg-type || supertype of MRS variables ||
-|| handle-type || type for MRS handles and holes ||
+|| semarg-type || grammar-internal supertype of MRS variables ||
+|| handle-type || SEMI type for MRS handles and holes ||
+|| skolem-feature || feature name where skolem constants are put (defaults to INSTLOC) ||
 || list-type || type for lists ||
 || cons-type || type for non-empty lists ||
 || null-type || type for empty lists ||

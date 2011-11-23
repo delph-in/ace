@@ -20,6 +20,8 @@ extern char			*semi_top_type;
 
 extern char			*handle_type;
 
+extern int instloc_feature;
+
 extern struct path	*chart_dependencies_from, *chart_dependencies_to;
 extern int			nchart_dependencies;
 
@@ -40,6 +42,8 @@ extern struct path	token_form_path, token_from_path, token_to_path, token_id_pat
 extern struct path	lex_tokens_list_path, lex_tokens_last_path;
 
 extern struct path	lattice_mapping_input_path, lattice_mapping_output_path, lattice_mapping_context_path, lattice_mapping_position_path;
+
+extern struct path	rels_list_path, hcons_list_path;
 
 struct dg	*dg_path(struct dg	*dg, struct path	p);
 struct dg	*dg_path_add(struct dg	*dg, struct path	p, struct dg	*add);

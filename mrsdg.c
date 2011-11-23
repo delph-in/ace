@@ -242,7 +242,7 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 	{
 		extern char	**fnames;
 		if(dg->label[i] == lblf || dg->label[i]==predf)continue;
-		if(ep_drop[dg->label[i]])continue;
+		if(ep_drop && ep_drop[dg->label[i]])continue;
 		neps++;
 	}
 	ep->args = slab_alloc(sizeof(struct mrs_ep_role) * neps);
@@ -250,7 +250,7 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 	{
 		extern char	**fnames;
 		if(dg->label[i] == lblf || dg->label[i]==predf)continue;
-		if(ep_drop[dg->label[i]])continue;
+		if(ep_drop && ep_drop[dg->label[i]])continue;
 		ep->nargs++;
 		ep->args[ep->nargs-1].name = freeze_string(fnames[dg->label[i]]);
 		ep->args[ep->nargs-1].value = dg_to_mrs_var(arcs[i], vlist);
@@ -420,7 +420,8 @@ struct dg	*dagify_mrs_var1(struct mrs_var	*var, struct dg	*skolem)
 		} while(p);
 		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
 	}
-	if(skolem)dg = add_dg_feature(dg, "INSTLOC", skolem);
+	if(!skolem)skolem = copy_dg(default_type_hierarchy()->top->dg);
+	dg = add_dg_hop(dg, instloc_feature, skolem);
 	return dg;
 }
 

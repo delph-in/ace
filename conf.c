@@ -27,11 +27,14 @@ int			nchart_dependencies;
 int			reduce_chart_before_lexical_parsing;
 
 int enable_post = 0;
+int instloc_feature = -1;
 int			enable_post_generation_mapping = 0;
 
 struct path	token_form_path, token_from_path, token_to_path, token_id_path, token_postags_path, token_posprobs_path;
 struct path	lex_tokens_list_path, lex_tokens_last_path;
 struct path	lattice_mapping_input_path, lattice_mapping_output_path, lattice_mapping_context_path, lattice_mapping_position_path;
+
+struct path	rels_list_path, hcons_list_path;
 
 char		*token_type;
 
@@ -169,6 +172,7 @@ struct conf
 	struct path	rule_rels_path;
 	struct path	extract_mrs_path;
 	int	invent_ltop;
+	int	instloc_feature;
 
 	struct path	*chart_dependencies_to, *chart_dependencies_from;
 	int			nchart_dependencies;
@@ -194,6 +198,8 @@ struct conf
 	int		extra_erg_dag_stash;
 
 	int		ortho_max_rules, ortho_warn_max_rules;
+
+	struct path	rels_list_path, hcons_list_path;
 	int		enable_post_generation_mapping;
 };
 
@@ -210,6 +216,7 @@ void	*freeze_conf()
 {
 	struct conf	*c = slab_alloc(sizeof(*c));
 	c->transfer = g_transfer;
+	c->instloc_feature = instloc_feature;
 	c->top_type = freeze_string(top_type);
 	c->semi_top_type = freeze_string(semi_top_type);
 	c->semarg_type = freeze_string(semarg_type);
@@ -219,6 +226,9 @@ void	*freeze_conf()
 	c->null_type = freeze_string(g_null_type);
 	c->diff_list_type = freeze_string(g_diff_list_type);
 	c->invent_ltop = invent_ltop;
+
+	c->rels_list_path = freeze_path(rels_list_path);
+	c->hcons_list_path = freeze_path(hcons_list_path);
 
 	if(!g_transfer)
 	{
@@ -284,6 +294,7 @@ void	recover_conf(void	*vc)
 	struct conf	*c = vc;
 	g_transfer = c->transfer;
 	top_type = c->top_type;
+	instloc_feature = c->instloc_feature;
 	semi_top_type = c->semi_top_type;
 	semarg_type = c->semarg_type;
 	handle_type = c->handle_type;
@@ -292,6 +303,9 @@ void	recover_conf(void	*vc)
 	g_null_type = c->null_type;
 	g_diff_list_type = c->diff_list_type;
 	invent_ltop = c->invent_ltop;
+
+	rels_list_path = c->rels_list_path;
+	hcons_list_path = c->hcons_list_path;
 
 	if(!g_transfer)
 	{
@@ -419,6 +433,7 @@ int	load_conf()
 	else load_syntax_conf();
 
 	top_type = get_conf("top-type")?:"*top*";
+	instloc_feature = lookup_fname(get_conf("skolem-feature")?:"INSTLOC");
 	semi_top_type = get_conf("semantic-interface-top-type")?:"top";
 	semarg_type = get_conf("semarg-type")?:"semarg";
 	handle_type = get_conf("handle-type")?:"h";
@@ -428,6 +443,9 @@ int	load_conf()
 	g_diff_list_type = get_conf("diff-list-type")?:"diff-list";
 
 	invent_ltop = get_conf_bool("invent-ltop", 1);	// msg-less grammars tend to want their LTOP to be floating
+
+	rels_list_path = try_get_conf_path("mrs-rels-list", "RELS LIST");
+	hcons_list_path = try_get_conf_path("mrs-hcons-list", "HCONS LIST");
 
 	recover_conf(freeze_conf());
 }

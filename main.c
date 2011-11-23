@@ -14,6 +14,7 @@
 #include	"rule.h"
 #include	"lexicon.h"
 #include	"mrs.h"
+#include	"transfer.h"
 #ifdef POST
 #include	"post.h"
 #endif
@@ -211,7 +212,9 @@ struct job_stats	main_input_loop(FILE	*fin)
 			struct mrs	*mrs = read_mrs(fin);
 			if(fin==stdin)stdin_time += timer();
 			if(!mrs && feof(fin))break;
-			num_results = generate(mrs);
+			if(g_mode == GENERATING)
+				num_results = generate(mrs);
+			else num_results = transfer(mrs);
 			free_mrs(mrs);
 		}
 		if(num_results==-1 || num_results==-2)
@@ -275,7 +278,10 @@ void	initialize_engine()
 	setup_extra_type_dgs();
 	g_loaded = 1;
 
-	install_rf(inhibit_pack?0:((g_mode == PARSING)?1:2));
+	if(g_transfer)g_mode = TRANSFER;
+
+	if(g_mode != TRANSFER)
+		install_rf(inhibit_pack?0:((g_mode == PARSING)?1:2));
 	init_rstats();
 
 	if(export_parts)

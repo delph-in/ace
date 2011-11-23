@@ -3,6 +3,8 @@ CFLAGS=-O3 -g -fPIC
 #CFLAGS=-g
 OBJS = train.o words.o tags.o hmm.o
 
+include ../MacOSX.config
+
 # compilation flags:
 
 CFLAGS += -DUSE_HMM

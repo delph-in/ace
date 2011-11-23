@@ -110,6 +110,7 @@ extern int enable_generalize_edge_top_types;
 
 #define PARSING 1
 #define GENERATING 2
+#define	TRANSFER 3
 extern int g_mode;
 
 #endif
