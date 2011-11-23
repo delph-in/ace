@@ -1256,8 +1256,8 @@ int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, struct
 		setup_tmp();	// prevent subsequent forget_tmp()'s from destroying this
 	}
 
-	printf("rule fired: %s\n", tr->name);
-	print_mrs(mout);printf("\n");
+	//printf("rule fired: %s\n", tr->name);
+	//print_mrs(mout);printf("\n");
 	return 0;
 }
 
