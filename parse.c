@@ -25,6 +25,7 @@ float	level_times[100];
 int		level = 0;
 int	do_forest = 0;
 extern int debug_level;
+int yy_mode = 0;
 
 int	g_profiling = 0;
 
@@ -369,17 +370,12 @@ int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs)
 	return 1;
 }
 
+static int chart_setup_timer = -1;
+
 int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 {
-	int		i, count, cforest;
-	int		num_parses = 0, num_entries;
-	float	t_setup, t_forest, t_unpack;
-	struct dg	*root;
-	struct dg	*sem;
-	struct edge	*edge;
 	clock_t	start = clock();
 
-	static int chart_setup_timer = -1;
 	if(chart_setup_timer == -1)chart_setup_timer = new_timer("chart setup");
 	start_timer(chart_setup_timer);
 
@@ -391,6 +387,18 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	// setup a token lattice and do token mapping
 	struct lattice	*token_chart = build_token_chart(nwords, words, cfrom, cto);
 	if(!token_chart) { stop_timer(chart_setup_timer, 1); return -1; }
+
+	return parse_with_token_chart(token_chart, start);
+}
+
+int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
+{
+	int		i, count, cforest;
+	int		num_parses = 0, num_entries;
+	float	t_setup, t_forest, t_unpack;
+	struct dg	*root;
+	struct dg	*sem;
+	struct edge	*edge;
 
 	apply_token_mapping(token_chart);
 
@@ -442,7 +450,7 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	if(g_profiling)start_and_alloc_profiler(&chart_parsing_profiler, "chart parsing", parse_profiler, lexical_filtering_profiler);
 
 	// setup the main parse chart
-	nwords = prepare_parse_chart(lexical_chart);
+	int nwords = prepare_parse_chart(lexical_chart);
 	if(nwords < 0)
 	{
 		fprintf(stderr, "NOTE: negative lexical chart length\n");
@@ -514,11 +522,11 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 	}
 	else if(do_itsdb)
 	{
-		num_parses = itsdb_report(nwords, words, 0, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
+		num_parses = itsdb_report(0, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
 	}
 	else if(lui_mode)
 	{
-		num_parses = output_lui_trees(cells+chart_size-1, sentence, best_only, 0);
+		num_parses = output_lui_trees(cells+chart_size-1, current_sentence, best_only, 0);
 		if(!num_parses){}//output_lui_chart(words);
 	}
 
@@ -537,7 +545,7 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 		//extern long long ndecomposed;
 		//static long long ond = 0;
 		if(!f)f = fopen("/tmp/times", "w");
-		fprintf(f, "%d	%d	%f	%f	%f	%s\n", nwords, num_parses, t_setup, t_forest, t_unpack, sentence);
+		fprintf(f, "%d	%d	%f	%f	%f	%s\n", nwords, num_parses, t_setup, t_forest, t_unpack, current_sentence);
 		//ond = ndecomposed;
 		fflush(f);
 	}
@@ -555,6 +563,12 @@ int	parse_line(char	*line)
 	int		*cfrom, *cto;
 	char	**words, *p, *q;
 	extern int preprocess_only;
+
+	if(yy_mode)
+	{
+		current_sentence = "(yy mode)";
+		return parse_yy(line);
+	}
 
 	timer();
 	if(g_profiling)
@@ -611,7 +625,7 @@ int	check_mbs(char	*mbs);
 #endif
 
 	if(nparse==-1)fprintf(stderr, "NOTE: ignoring `%s'\n", current_sentence);
-	if(do_itsdb && nparse==-1)itsdb_report(nwords, words, -1, 0);
+	if(do_itsdb && nparse==-1)itsdb_report(-1, 0);
 
 finished:
 	if(g_profiling)stop_profilers_recursively(parse_profiler);

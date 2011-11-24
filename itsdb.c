@@ -153,7 +153,7 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	if(error)capi_printf(" (:error \"%s\")", error);
 }
 
-itsdb_report(int nwords, char **words, int	status, int	tforest)
+itsdb_report(int	status, int	tforest)
 {
 	extern int total_edges, real_edges, passive_edges, slab_usage();
 
@@ -162,7 +162,7 @@ itsdb_report(int nwords, char **words, int	status, int	tforest)
 		capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
 		//capi_printf("(:tcpu . %d) ", tforest);
 
-		int	readings = capi_print_derivations(nwords, words);
+		int	readings = capi_print_derivations();
 
 		capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
 //			readings,
@@ -298,7 +298,7 @@ void tsdb_report_mrs(struct mrs	*mrs)
 	capi_printf("\")");
 }
 
-int	capi_print_derivations(int nwords, char **words)
+int	capi_print_derivations()
 {
 	int id;
 

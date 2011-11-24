@@ -39,6 +39,7 @@ int g_mode = PARSING, print_trees = 1;
 int	die = 0;
 
 extern int	g_loaded, inhibit_results, trace;
+extern int yy_mode;
 extern long long	accum_ram_usage;
 extern char			*use_roots, *disable_signs;
 extern int do_forest;
@@ -92,13 +93,14 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "VhvpfEPL:lXg:G:m:qtTRe1n:r:jFOsi"))!=255)switch(ch)
+	while((ch=getopt(argc, argv, "VhvpfEPL:lXg:G:m:qtTRe1n:r:jFOsiy"))!=255)switch(ch)
 	{
 		case	'V':	printf("ACE version %s\n", ACE_VERSION);
 						printf("compiled at " __TIME__ " on "  __DATE__ "\n");
 						exit(0);
 		case	'h':	usage: printf("usage: %s [-h] [-v] [-l] [-p] [-X] [-c] [-m masternode] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
+		case	'y':	yy_mode = 1; break;
 		case	'g':	load_grammar_path = optarg;	break;
 		case	'G':	save_grammar_path = optarg;	break;
 		case	'O':	do_forest = 1;	break;
