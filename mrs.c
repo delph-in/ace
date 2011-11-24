@@ -492,8 +492,12 @@ int	snprint_mrs_var(char	*str, int	len, struct mrs_var	*var)
 	if(var->is_const)return safe_snprintf(str, len, "%s", var->name);
 	else
 	{
-		l += safe_snprintf(str+l, len-l, "%s%d ", var->type, var->vnum);
-		l += snprint_mrs_var_props(str+l, len-l, var);
+		l += safe_snprintf(str+l, len-l, "%s%d", var->type, var->vnum);
+		if(var->nprops > 0)	// berthold crysmann noticed that the LKB fails to parse MRSes with a properties-clause on handles in QEQs... a rare condition indeed. (23-nov-2011)
+		{
+			l += safe_snprintf(str+l, len-l, " ");
+			l += snprint_mrs_var_props(str+l, len-l, var);
+		}
 		return l;
 	}
 }

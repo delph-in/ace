@@ -63,6 +63,9 @@ ideas:
 DONE:
 
 unreleased
+0.9.4pre3
+	- YY mode
+	- don't output a properties clause for MRS variables that have no properties
 0.9.4pre2
 	- fix MRS characterization output format (thanks Berthold)
 	- new optional post-generation token mapping stage, for visually fixing up generated strings
