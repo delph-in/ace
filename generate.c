@@ -405,6 +405,7 @@ int	generate(struct mrs	*mrs)
 	if(do_itsdb)itsdb_report_gen(count);
 	if(debug_level)printf("unpacked %.4f\n", timer());
 
+	fflush(stdout);
 	fprintf(stderr, "NOTE: %d passive, %d active edges in final generation chart; built %d passives total. [%d results]\n",
 		cells->p_nedges, cells->al_nedges + cells->ar_nedges, npassive_edges, count);
 
