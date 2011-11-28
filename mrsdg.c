@@ -237,6 +237,12 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 	else ep->pred = strdup(pred->xtype->name);
 	ep->dg = dg;
 	ep->lbl = dg_to_mrs_var(dg_hop(dg, lblf), vlist);
+	if(!ep->lbl)
+	{
+		char	*lbltype = handle_type;
+		if(inhibit_vpm)lbltype = external_to_internal_var_type(lbltype);
+		ep->lbl = invent_mrs_var(lbltype, vlist);
+	}
 	int	neps = 0;
 	for(i=0;i<dg->narcs;i++)
 	{
