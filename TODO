@@ -42,7 +42,6 @@ berthold wants
 		-simple MRS
 
 ideas:
-	- mode to output trees and MRSes for generation results on command-line
 	- mode to output labeled trees to ITSDB
 	- mode to make output more script-friendly
 	- automatic time profile of a grammar
@@ -69,6 +68,8 @@ unreleased
 	- fflush for generator script consumption
 	- don't crash when EPs have no LBL
 	- derivation trees from generation have proper token structures and orthographies
+	- new option --show-realization-trees, which prints derivation trees for generation results
+	- new option --show-realization-mrses, which prints MRSes for generation results
 0.9.4pre3
 	- YY mode
 	- don't output a properties clause for MRS variables that have no properties

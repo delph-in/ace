@@ -47,6 +47,8 @@ extern int g_profiling;
 float	stdin_time = 0;
 
 int	form_to_relation = 0;
+int	show_realization_trees = 0;
+int	show_realization_mrses = 0;
 
 extern float timer();
 
@@ -93,7 +95,13 @@ void	parse_args(int	argc, char	*argv[])
 		if(!strcmp(tla, "age"))g_mode = GENERATING;
 	}
 
-	while((ch=getopt(argc, argv, "VhvpfEPL:lXg:G:m:qtTRe1n:r:jFOsiy"))!=255)switch(ch)
+	struct option long_options[] = {
+		{"show-realization-trees", 0, &show_realization_trees, 1},
+		{"show-realization-mrses", 0, &show_realization_mrses, 1},
+		{NULL,0,NULL,0}
+		};
+
+	while((ch=getopt_long(argc, argv, "VhvpfEPL:lXg:G:m:qtTRe1n:r:jFOsiy", long_options, NULL))!=255)switch(ch)
 	{
 		case	'V':	printf("ACE version %s\n", ACE_VERSION);
 						printf("compiled at " __TIME__ " on "  __DATE__ "\n");
@@ -125,6 +133,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	's':	dont_unspecialize = 1;	break;
 		case	'i':	g_profiling = 1;		break;
 		case	'?':	goto usage;
+		case	0:	continue;	// auto-handled long option
 	}
 	if(optind<argc-1)goto usage;
 	if(!load_grammar_path)goto usage;

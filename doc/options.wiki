@@ -32,3 +32,5 @@ Complete Reference:
 || -L lexemes || Disable certain lexemes when parsing. ||
 || -i || Perform a fine-grained timing profile of the operation requested (experimental). ||
 || -y || Enable YY input mode (experimental). ||
+|| --show-realization-trees || Enables console output of trees when generating. ||
+|| --show-realization-mrses || Enables console output of MRSes when generating. ||

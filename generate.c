@@ -20,6 +20,8 @@ int	require_neps = 0, n_epsbv = 0, n_avsbv = 0;
 unsigned long long	*can_be_ccont_ep_bv;
 
 int			enable_index_accessibility_filtering = 0;
+extern int show_realization_trees;
+extern int show_realization_mrses;
 
 void collect_vars(struct dg	*dg, unsigned long long	*bv)
 {
@@ -395,6 +397,16 @@ int	generate(struct mrs	*mrs)
 			printf("\n");
 			char	*dstr = hypothesis_to_dstring(hyp);
 			puts(dstr);
+		}
+		if(show_realization_trees && !do_itsdb)
+		{
+			char	*dstr = hypothesis_to_dstring(hyp);
+			printf("DTREE = %s\n", dstr);
+		}
+		if(show_realization_mrses && !do_itsdb)
+		{
+			printf("MRS = ");
+			print_mrs(mrs_res);
 		}
 		free_mrs(mrs_res);
 		return 1;
