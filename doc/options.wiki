@@ -13,7 +13,7 @@ Complete Reference:
 || -g filename || Identify the grammar to be used.  Normally, a compiled grammar image.  When compiling a grammar, the location of that grammar's config.tdl file.  ||
 || -G filename || Enable grammar-compilation mode, and specify where to save the compiled grammar. ||
 || -e || Generate, rather than parse. ||
-|| -n count || Use selective unpacking to enumerate only the top ''count' results. ||
+|| -n count || Use selective unpacking to enumerate only the top ''count'' results. ||
 || -1 || Equivalent to ''-n 1''. ||
 || -r roots || Supplies a space-delimited list of root instances (overriding the setting compiled into the grammar image). ||
 || -l || Enable LUI mode.  You must have a working ''yzlui'' binary in your PATH. ||
@@ -30,3 +30,5 @@ Complete Reference:
 || -q || Suppress printing the input sentence in cases of successful parsing. ||
 || -X || Stop when the first result is found, rather than generating the complete packed forest. Not recommended. ||
 || -L lexemes || Disable certain lexemes when parsing. ||
+|| -i || Perform a fine-grained timing profile of the operation requested (experimental). ||
+|| -y || Enable YY input mode (experimental). ||

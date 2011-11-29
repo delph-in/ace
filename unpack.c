@@ -299,7 +299,7 @@ void	add_hypothesis_to_agenda(struct hypagenda_item	**agenda, struct hypothesis	
 char	*type_to_string(struct type	*ty)
 {
 	assert(ty->name[0]=='"');
-	int	i, slen = strlen(ty->name)-2, alen = slen;
+	int	i, slen = strlen(ty->name)-2, alen = slen + 1;
 	assert(slen >= 0 && ty->name[slen+1]=='"');
 	if(alen%4)alen = (alen&~3)+4;
 	char	*s = slab_alloc(alen);
@@ -849,12 +849,57 @@ void	dstr_save(struct hypothesis	*h, int	o, char	*str)
 	dstr_cache[hc].gen = dstr_cache_gen;
 }
 
+struct token	*gen_extract_one_token(struct hypothesis	*h, int	k, char	*inflected_form)
+{
+	assert(h->edge->lex && !h->edge->rule);
+	struct dg	*toklist = dg_path(h->dg, lex_tokens_list_path);
+	assert(toklist != NULL);
+	int	kk = k;
+	while(kk>0)
+	{
+		toklist = dg_hop(toklist, 2);	// REST
+		assert(toklist != NULL);
+		kk--;
+	}
+	struct dg	*tokdg = dg_hop(toklist, 1);
+	assert(tokdg != NULL);
+
+	struct token	*t = slab_alloc(sizeof(*t));
+	bzero(t, sizeof(*t));
+	struct dg	*form_dg = dg_path(tokdg, token_form_path);
+	if(form_dg->xtype->name[0]=='"')
+		t->string = type_to_string(form_dg->xtype);
+	else t->string = inflected_form;//type_to_string(h->edge->lex->stem[k]);
+	t->dg = tokdg;
+	return t;
+}
+
 void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 {
-	void	print_tree0(struct hypothesis *hyp, int from)
+	void	print_tree0(struct hypothesis *hyp, int from, char	**genwordforms)
 	{
 		int i;
 		struct edge *e = hyp->edge;
+
+		if(e->lex && g_mode == GENERATING)
+		{
+			if(!genwordforms)
+			{
+				struct lexeme	*l = e->lex;
+				int				nforms = l->stemlen;
+				char	*forms[nforms];
+				for(i=0;i<nforms;i++)
+					forms[i] = type_to_string(l->stem[i]);
+				print_tree0(hyp, from, forms);
+				return;
+			}
+			else if(e->rule && e->rule->orth)
+			{
+				struct orule	*or = e->rule->orth;
+				int k = (or->type == or_suffix)?(e->lex->stemlen-1):0;
+				genwordforms[k] = inflect(or, genwordforms[k]);
+			}
+		}
 
 		// print out the edge, with span information
 		char	*sign = "no-sign";
@@ -869,56 +914,56 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 		{
 			for(i=0;i<e->have;i++)
 			{
-				print_tree0(hyp->rhslist[i], from);
+				print_tree0(hyp->rhslist[i], from, genwordforms);
 				from += hyp->rhslist[i]->toklen;
 			}
 		}
 		else if(e->lex)
 		{
-			if(g_mode == PARSING)
+			extern int enable_token_avms;
+			if(enable_token_avms)
 			{
-				extern int enable_token_avms;
-				if(enable_token_avms)
+				int	ntokens = e->lex->stemlen;
+				struct token	*tokens[ntokens];
+				for(i=0;i<ntokens;i++)
 				{
-					int	ntokens = e->lex->stemlen;
-					print(" (\"");
-					for(i=0;i<ntokens;i++)
-					{
-						struct token	*tok = (struct token*)e->daughters[i];
-						char	*form = tok->string;
-						if(i>0)print(" ");
-						print("%s", slab_escape(form));
-					}
-					print("\"");
+					if(g_mode == PARSING)
+						tokens[i] = (struct token*)e->daughters[i];
+					else tokens[i] = gen_extract_one_token(hyp, i, genwordforms[i]);
+				}
+				print(" (\"");
+				for(i=0;i<ntokens;i++)
+				{
+					struct token	*tok = tokens[i];
+					char	*form = tok->string;
+					if(i>0)print(" ");
+					print("%s", slab_escape(form));
+				}
+				print("\"");
 
-					for(i=0;i<ntokens;i++)
-					{
-						struct token	*tok = (struct token*)e->daughters[i];
-						int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
-						char	*tokstr = dstr_lookup((void*)tok, from);
-						if(!tokstr)
-						{
-							char	token_str[10240];
-							extern int dag_print_style;
-							dag_print_style = 1;
-							snprint_dg(token_str, 10239, tok->dg);
-							// *token_str = 0;
-							dag_print_style = 0;
-							tokstr = slab_escape(token_str);
-							dstr_save((void*)tok, from, tokstr);
-						}
-						print(" %d \"%s\"", id, tokstr);
-					}
-					print(")");
-				}
-				else
+				for(i=0;i<ntokens;i++)
 				{
-					print(" (\"?\")");
+					struct token	*tok = tokens[i];
+					int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
+					char	*tokstr = dstr_lookup((void*)tok, from);
+					if(!tokstr)
+					{
+						char	token_str[10240];
+						extern int dag_print_style;
+						dag_print_style = 1;
+						snprint_dg(token_str, 10239, tok->dg);
+						// *token_str = 0;
+						dag_print_style = 0;
+						tokstr = slab_escape(token_str);
+						dstr_save((void*)tok, from, tokstr);
+					}
+					print(" %d \"%s\"", id, tokstr);
 				}
+				print(")");
 			}
-			else if(g_mode == GENERATING)
+			else
 			{
-				print(" (\"-\" 0 \"-\")");
+				print(" (\"?\")");
 			}
 		}
 		print(")");
@@ -929,7 +974,7 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 	//struct slab_state	st;
 	//get_slabstate(&st);	// the slab_escape() nonsense for escaping token structures shouldn't stay with us forever!
 	// actually, it should since we're caching them now
-	print_tree0(hyp, 0);
+	print_tree0(hyp, 0, NULL);
 	//set_slabstate(&st);
 	stop_timer(timer, 1);
 }
@@ -960,28 +1005,6 @@ char	*hypothesis_to_dstring(struct hypothesis	*h)
 	print_hypothesis(h, dprintf);
 	return derivation;
 }
-
-/*
-struct token	*gen_extract_one_token(struct hypothesis	*h, int	k)
-{
-	assert(h->edge->lex && !h->edge->rule);
-	struct dg	*toklist = dg_path(h->dg, lex_tokens_list_path);
-	assert(toklist != NULL);
-	while(k>0)
-	{
-		toklist = dg_hop(toklist, 2);	// REST
-		assert(toklist != NULL);
-	}
-	struct dg	*tokdg = dg_hop(toklist, 1);
-	assert(tokdg != NULL);
-
-	struct token	*t = slab_alloc(sizeof(*t));
-	bzero(t, sizeof(*t));
-	struct dg	*form_dg = dg_path(tokdg, token_form_path);
-	t->string = form_dg->xtype->name;
-	t->dg = tokdg;
-	return t;
-}*/
 
 void	install_orth(struct dg	*dg, int	nforms, char	**forms)
 {
