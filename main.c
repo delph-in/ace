@@ -50,6 +50,8 @@ int	form_to_relation = 0;
 int	show_realization_trees = 0;
 int	show_realization_mrses = 0;
 
+int	max_chart_megabytes = 1200, max_unpack_megabytes = 1500;
+
 extern float timer();
 
 int	parse_line(char	*line);
@@ -98,11 +100,19 @@ void	parse_args(int	argc, char	*argv[])
 	struct option long_options[] = {
 		{"show-realization-trees", 0, &show_realization_trees, 1},
 		{"show-realization-mrses", 0, &show_realization_mrses, 1},
+#define	MAX_UNPACK_MEGABYTES_OPTION	1000
+		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},
+#define	MAX_CHART_MEGABYTES_OPTION	1001
+		{"max-chart-megabytes", 1, NULL, MAX_CHART_MEGABYTES_OPTION},
 		{NULL,0,NULL,0}
 		};
 
-	while((ch=getopt_long(argc, argv, "VhvpfEPL:lXg:G:m:qtTRe1n:r:jFOsiy", long_options, NULL))!=255)switch(ch)
+	int	gorv;
+	while(1)
 	{
+		gorv = getopt_long(argc, argv, "VhvpfEPL:lXg:G:m:qtTRe1n:r:jFOsiy", long_options, NULL);
+		if(gorv == -1)break;
+		switch(gorv) {
 		case	'V':	printf("ACE version %s\n", ACE_VERSION);
 						printf("compiled at " __TIME__ " on "  __DATE__ "\n");
 						exit(0);
@@ -133,8 +143,11 @@ void	parse_args(int	argc, char	*argv[])
 		case	's':	dont_unspecialize = 1;	break;
 		case	'i':	g_profiling = 1;		break;
 		case	'?':	goto usage;
+
+		case	MAX_UNPACK_MEGABYTES_OPTION:	max_unpack_megabytes = atoi(optarg);	break;
+		case	MAX_CHART_MEGABYTES_OPTION:		max_chart_megabytes = atoi(optarg);		break;
 		case	0:	continue;	// auto-handled long option
-	}
+	} }
 	if(optind<argc-1)goto usage;
 	if(!load_grammar_path)goto usage;
 	if(optind<argc)sentence_path = argv[optind];
@@ -211,6 +224,8 @@ struct job_stats	main_input_loop(FILE	*fin)
 					show_heirarchy(line+3);
 				if(line[1]=='g' && line[2]==' ')
 					show_glb(line+3);
+				if(line[1]=='c')
+					show_last_parse_chart();
 				num_results = -2;
 			}
 			else num_results = parse_line(line);

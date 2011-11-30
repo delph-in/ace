@@ -51,10 +51,11 @@ unsigned long long unify_clock, unify_count;
 
 struct edge	*sentential = 0;
 
+extern int max_chart_megabytes;
 //#define	MAX_CHUNKS	60000	// when to give up on a parse
 //#define	MAX_CHUNKS	6000	// when to give up on a parse
 //#define	MAX_CHUNKS	2560	// when to give up on a parse
-#define	MAX_CHUNKS	1200		// when to give up on a parse
+//#define	MAX_CHUNKS	1200		// when to give up on a parse
 //#define	MAX_CHUNKS	800		// when to give up on a parse
 //#define	MAX_CHUNKS	71	// when to give up on a parse
 
@@ -853,7 +854,7 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 			//printf("build_edge found a cycle\n");
 			return 0;
 		}
-		if(noldslabs >= MAX_CHUNKS)
+		if(noldslabs >= max_chart_megabytes)
 		{
 			fprintf(stderr, "NOTE: terminating search, too much RAM\n");
 			return -1;	// give up :(

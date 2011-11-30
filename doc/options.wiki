@@ -34,3 +34,5 @@ Complete Reference:
 || -y || Enable YY input mode (experimental). ||
 || --show-realization-trees || Enables console output of trees when generating. ||
 || --show-realization-mrses || Enables console output of MRSes when generating. ||
+|| --max-chart-megabytes N || Limits memory consumption to N megabytes during forest generation. ||
+|| --max-unpack-megabytes N || Limits memory consumption to N megabytes during unpacking (inclusive of memory consumed during forest generation). ||

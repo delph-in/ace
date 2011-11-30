@@ -21,9 +21,10 @@
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
 
+extern int max_unpack_megabytes;
 //#define	MAX_UNPACK_CHUNKS	70000
 //#define	MAX_UNPACK_CHUNKS	7000
-#define	MAX_UNPACK_CHUNKS	1500
+//#define	MAX_UNPACK_CHUNKS	1500
 extern int noldslabs;
 
 extern int debug_level, inhibit_pack;
@@ -1295,7 +1296,7 @@ extern int do_itsdb;
 			else DEBUG("... wasn't root after unpacking\n");
 		}
 		else g_checkup++;	// mark that we need to look for subfailures before hypothesizing
-		if(noldslabs >= MAX_UNPACK_CHUNKS)
+		if(noldslabs >= max_unpack_megabytes)
 		{
 			printf("NOTE: hit RAM limit while unpacking\n");
 			break;
