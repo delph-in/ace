@@ -31,7 +31,6 @@ berthold wants
 		- how about changing underscores to spaces? best done in a REPP phase?
 			- we could do it with token mapping easily enough; i can't find a case where this actually applies?
 	- add post-parsing and post-generation transfer phase (like fixup)
-	- ace as a generation server a-la-LKB
 	+ ace parses 34 readings vs pet/lkb 20 for GG mrs item 95
 		a MWE aligned two different ways... second token generic vs second token native (not blocked by grammar)
 	- *updating* an ace tsdb profile -- doesn't work, apparently?
@@ -64,6 +63,9 @@ ideas:
 DONE:
 
 unreleased
+	- new --generation-server=LANG option (watches ~/tmp/.transfer.USER.LANG and generates from it)
+	- LUI support for displaying realizations (click for tree, with active nodes)
+0.9.4pre4
 	- fflush for generator script consumption
 	- don't crash when EPs have no LBL
 	- derivation trees from generation have proper token structures and orthographies

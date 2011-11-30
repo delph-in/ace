@@ -39,7 +39,7 @@ void	*lui_listener(void *foo)
 				char what[256];
 				sscanf(lp, "browse %d %d %s\n", &cid, &eid, what);
 				if(cid != chart_id)
-					fprintf(stderr, "LUI: out-of-date chart %d requested\n", cid);
+					fprintf(stderr, "LUI: out-of-date chart %d requested [%d is current]\n", cid, chart_id);
 				else browse_lui(eid, what);
 			}
 			else if(!strncmp(lp, "version ", 8)) {}
@@ -170,25 +170,77 @@ void	output_lui_dg(struct dg	*dg, char *wtitle)
 	//fprintf(stderr, "LUI: wrote out a dag `%p'\n", dg);
 }
 
+void lui_format_tree(struct hypothesis *h, char *surf)
+{
+	struct edge *e = h->edge;
+	char	*sign;
+	if(e->rule)
+		sign = e->rule->name;
+	else
+	{
+		// XXX switch here
+		sign = e->lex->word;
+		//sign = e->lex->lextype->name;
+	}
+	//char	*sign = e->rule?e->rule->name:e->lex->word;
+	char	*label = label_dag(h->dg, sign);
+	int arity = e->have, i;
+
+	if(!surf && e->lex)surf = h->string;
+	if(!arity)
+		fprintf(lui_write, " #T[%d \"%s\" \"%s\" %d %s",
+			e->id, label, surf, e->id, sign);
+	else
+	{
+		fprintf(lui_write, " #T[%d \"%s\" %s %d %s",
+			e->id, label, "nil", e->id, sign);
+		for(i=0;i<arity;i++)
+			lui_format_tree(h->rhslist[i], surf);
+	}
+	fprintf(lui_write, "]");
+}
+
 void	browse_lui(int eid, char *what)
 {
 	int i, j, k, l;
 	struct edge *e, *E;
 
-	//fprintf(stderr, "LUI: browse edge %d's %s\n", eid, what);
-	for(i=0;i<chart_size;i++)
-		for(j=0;j<chart_size;j++)
-			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
-			{
-				E = cells[j*chart_size + i].p_edges[k];
-				for(l=-1;l<E->npack;l++)
+	if(!strstr(what, "gen-"))
+	{
+		find_edge:
+		//fprintf(stderr, "LUI: browse edge %d's %s\n", eid, what);
+		for(i=0;i<chart_size;i++)
+			for(j=0;j<chart_size;j++)
+				for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
 				{
-					e = (l==-1)?E:E->pack[l];
-					if(e->id != eid)continue;
-					if(!strcmp(what, "avm"))output_lui_dg(e->dg, "edge");
-					else fprintf(stderr, "LUI: don't know how to browse edge %d's `%s'\n", eid, what);
+					E = cells[j*chart_size + i].p_edges[k];
+					for(l=-1;l<E->npack;l++)
+					{
+						e = (l==-1)?E:E->pack[l];
+						if(e->id != eid)continue;
+						if(!strcmp(what, "avm"))output_lui_dg(e->dg, "edge");
+						else fprintf(stderr, "LUI: don't know how to browse edge %d's `%s'\n", eid, what);
+					}
 				}
-			}
+	}
+	else
+	{
+		char			*s;
+		struct hypothesis	*h;
+		struct mrs		*m;
+		if(0 != get_nth_realization(eid, &s, &h, &m))
+		{
+			fprintf(stderr, "LUI: unable to find realization %d\n", eid);
+			return;
+		}
+		if(!strcmp(what, "gen-tree"))
+		{
+			fprintf(lui_write, "tree %d ", chart_id);
+			lui_format_tree(h, NULL);
+			fprintf(lui_write, " \"Realization %d\"\n", eid);
+			fflush(lui_write);
+		}
+	}
 }
 
 int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs)
@@ -217,38 +269,9 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 
 	int show_tree(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
-		void rtree(struct hypothesis *h, char *surf)
-		{
-			struct edge *e = h->edge;
-			char	*sign;
-			if(e->rule)
-				sign = e->rule->name;
-			else
-			{
-				// XXX switch here
-				sign = e->lex->word;
-				//sign = e->lex->lextype->name;
-			}
-			//char	*sign = e->rule?e->rule->name:e->lex->word;
-			char	*label = label_dag(h->dg, sign);
-			int arity = e->have, i;
-
-			if(!surf && e->lex)surf = h->string;
-			if(!arity)
-				fprintf(lui_write, " #T[%d \"%s\" \"%s\" %d %s",
-					e->id, label, surf, e->id, sign);
-			else
-			{
-				fprintf(lui_write, " #T[%d \"%s\" %s %d %s",
-					e->id, label, "nil", e->id, sign);
-				for(i=0;i<arity;i++)
-					rtree(h->rhslist[i], surf);
-			}
-			fprintf(lui_write, "]");
-		}
 		if(require_mrs && !mrs_subsumes(require_mrs, mrs))return 0;
 		fprintf(lui_write, "tree %d", chart_id);
-		rtree(hyp, 0);
+		lui_format_tree(hyp, NULL);
 		fprintf(lui_write, " \"%s\"\n", sent);
 		//printf("lui wrote a tree\n");
 		return 1;
@@ -262,4 +285,35 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 	fflush(lui_write);
 
 	return count;
+}
+
+int	xtext_id_gen = 1, ngenresults = 0;
+
+void	lui_begin_gen_results(int	n)
+{
+	lui_initialize();
+	ngenresults = n;
+	fprintf(lui_write, "text %d #X[\"Generation Results (%d total):\" newline\n", ++chart_id, n);
+}
+
+void	lui_gen_result(int	idx, char	*surface)
+{
+	fprintf(lui_write, " #X[%d \"%s\"] newline\n", idx, surface);
+}
+
+void	lui_end_gen_results()
+{
+	fprintf(lui_write, "] #M[ \"Tree\" \"browse %d %%d gen-tree\"", chart_id);
+	int i;
+	for(i=0;i<ngenresults;i++)
+		fprintf(lui_write, " %d", i);
+	fprintf(lui_write, "] \"Generation Results\"\n");
+	fflush(lui_write);
+}
+
+void	lui_text(char	*message)
+{
+	lui_initialize();
+	fprintf(lui_write, "text %d #X[\"%s\"] \"ACE message\"\n", ++chart_id, message);
+	fflush(lui_write);
 }

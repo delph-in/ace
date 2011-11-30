@@ -251,6 +251,24 @@ float timer()
 	return ret;
 }
 
+struct realization
+{
+	char			*surface;
+	struct hypothesis	*hyp;
+	struct mrs		*mrs;
+};
+struct realization	*saved_realizations;
+int			saved_nrealizations;
+
+int	get_nth_realization(int	idx, char	**s, struct hypothesis	**h, struct mrs	**m)
+{
+	if(idx < 0 || idx >= saved_nrealizations)return -1;
+	*s = saved_realizations[idx].surface;
+	*h = saved_realizations[idx].hyp;
+	*m = saved_realizations[idx].mrs;
+	return 0;
+}
+
 // driver
 
 int	generate(struct mrs	*mrs)
@@ -357,6 +375,9 @@ int	generate(struct mrs	*mrs)
 		printf("\n");
 	}*/
 
+	struct realization	*realizations=NULL;
+	int	nrealizations=0, arealizations = 0;
+
 	int show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
 	{
 		// LKB compares *internal* MRSes, by going through the VPM *twice* "to get defaults".
@@ -380,10 +401,19 @@ int	generate(struct mrs	*mrs)
 				//print_mrs(hax_res); printf("\n");
 				print_mrs(mrs_res); printf("\n");
 			}
-			//print_mrs(mrs_res); printf("\n"); }
+			//print_mrs(mrs_res); printf("\n");
 			free_mrs(mrs_res);
 			return 0;
 		}
+		if((nrealizations+1) > arealizations)
+		{
+			arealizations = (arealizations+2)*2;
+			realizations = realloc(realizations, sizeof(struct realization)*arealizations);
+		}
+		struct realization	*R = &realizations[nrealizations++];
+		R->surface = hyp->string;
+		R->hyp = hyp;
+		R->mrs = mrs_res;
 		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
 		if(!inhibit_results)printf("%s\n", hyp->string);
@@ -417,6 +447,21 @@ int	generate(struct mrs	*mrs)
 	if(do_itsdb)itsdb_report_gen(count);
 	if(debug_level)printf("unpacked %.4f\n", timer());
 
+	if(lui_mode)
+	{
+		if(nrealizations == 0)lui_text("No realization results.");
+		else
+		{
+			int i;
+			lui_begin_gen_results(nrealizations);
+			for(i=0;i<nrealizations;i++)
+				lui_gen_result(i, realizations[i].surface);
+			lui_end_gen_results();
+			saved_realizations = realizations;
+			saved_nrealizations = nrealizations;
+		}
+	}
+
 	fflush(stdout);
 	fprintf(stderr, "NOTE: %d passive, %d active edges in final generation chart; built %d passives total. [%d results]\n",
 		cells->p_nedges, cells->al_nedges + cells->ar_nedges, npassive_edges, count);
@@ -426,11 +471,6 @@ int	generate(struct mrs	*mrs)
 		char	*words[] = {"generate"};
 		output_lui_chart(words);
 	}*/
-	if(lui_mode)
-		output_lui_trees(cells, "Generation Results", best_only, mrs);
-
-	clear_mrs();
-	clear_slab();
 
 	return count;
 }

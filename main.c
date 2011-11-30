@@ -31,6 +31,7 @@ int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 int	dont_unspecialize = 0;
 
 int	output_edge_vectors = 0;
+char	*generation_server_lang = NULL;
 
 int	preprocess_only = 0;
 extern char mrs_line_breaks;
@@ -106,6 +107,8 @@ void	parse_args(int	argc, char	*argv[])
 		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},
 #define	MAX_CHART_MEGABYTES_OPTION	1001
 		{"max-chart-megabytes", 1, NULL, MAX_CHART_MEGABYTES_OPTION},
+#define GENERATION_SERVER_OPTION	1002
+		{"generation-server", 1, NULL, GENERATION_SERVER_OPTION},
 		{NULL,0,NULL,0}
 		};
 
@@ -148,12 +151,15 @@ void	parse_args(int	argc, char	*argv[])
 
 		case	MAX_UNPACK_MEGABYTES_OPTION:	max_unpack_megabytes = atoi(optarg);	break;
 		case	MAX_CHART_MEGABYTES_OPTION:		max_chart_megabytes = atoi(optarg);		break;
+		case	GENERATION_SERVER_OPTION:	generation_server_lang = optarg;	break;
 		case	0:	continue;	// auto-handled long option
 	} }
 	if(optind<argc-1)goto usage;
 	if(!load_grammar_path)goto usage;
 	if(optind<argc)sentence_path = argv[optind];
 	else if(!save_grammar_path)sentence_path = "-";
+	if(generation_server_lang)
+		g_mode = GENERATING;
 }
 
 struct job_stats
@@ -236,6 +242,8 @@ struct job_stats	main_input_loop(FILE	*fin)
 		}
 		else
 		{
+			clear_mrs();
+			clear_slab();
 			if(fin==stdin)timer();
 			struct mrs	*mrs = read_mrs(fin);
 			if(fin==stdin)stdin_time += timer();
@@ -343,6 +351,37 @@ void	report_stats(struct job_stats	stats)
 	//show_me();
 }
 
+void	logon_generation_server(char	*langcode)
+{
+	int	done = 0;
+	void quitme(int sig) { done = 1; }
+	char	path[10240];
+	// LKB pretty much explicitly uses ~/tmp/
+	sprintf(path, "%s/tmp/.transfer.%s.%s", getenv("HOME"), getlogin(), langcode);
+	fprintf(stderr, "NOTE: generation server watching path: %s\n", path);
+	signal(SIGINT, quitme);
+	while(!done)
+	{
+		// this "protocol" is pretty hokey...
+		FILE	*f = fopen(path, "r");
+		if(!f) { usleep(100000); continue; }
+		clear_mrs();
+		clear_slab();
+		struct mrs	*m = read_mrs(f);
+		if(m)
+		{
+			int	nresults = generate(m);
+		}
+		else
+		{
+			fprintf(stderr, "NOTE: ignoring unreadable MRS\n");
+		}
+		fclose(f);
+		unlink(path);
+	}
+	exit(0);
+}
+
 int	main(int	argc, char	*argv[])
 {
 	struct job_stats	stats;
@@ -368,7 +407,9 @@ int	main(int	argc, char	*argv[])
 
 	//treebank_control(); return 0;
 
-	stats = main_input_loop(open_sentence_source());
+	if(!generation_server_lang)
+		stats = main_input_loop(open_sentence_source());
+	else logon_generation_server(generation_server_lang);
 
 	shutdown_net();
 	report_stats(stats);
