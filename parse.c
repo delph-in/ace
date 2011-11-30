@@ -15,6 +15,8 @@
 #include	"lexical-parse.h"
 #include	"timer.h"
 
+struct lattice	*last_token_chart;
+
 extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trace, used_total, pused_total;
 extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only;
 extern float timer();
@@ -401,6 +403,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	struct edge	*edge;
 
 	apply_token_mapping(token_chart);
+	sort_lattice(token_chart);
 
 	if(trace)print_token_chart(token_chart);
 
@@ -425,7 +428,8 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	if(!reduce_chart_before_lexical_parsing)
 	{
 		// do lexical parsing
-		lexical_parse_lattice(lexical_chart);
+		int rv = lexical_parse_lattice(lexical_chart);
+		if(rv == -1)return -1;	// ran out of memory in lexical parsing!
 	}
 
 	if(reduce_lexical_lattice(lexical_chart))
@@ -528,6 +532,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	{
 		num_parses = output_lui_trees(cells+chart_size-1, current_sentence, best_only, 0);
 		if(!num_parses){}//output_lui_chart(words);
+		last_token_chart = token_chart;
 	}
 
 //	extern int	output_edge_vectors;
@@ -563,6 +568,8 @@ int	parse_line(char	*line)
 	int		*cfrom, *cto;
 	char	**words, *p, *q;
 	extern int preprocess_only;
+
+	last_token_chart = NULL;
 
 	if(yy_mode)
 	{
@@ -636,4 +643,11 @@ finished:
 	free(cfrom);
 	free(cto);
 	return nparse;
+}
+
+show_last_parse_chart()
+{
+	if(!last_token_chart)
+		fprintf(stderr, "no chart to display.\n");
+	else output_lui_chart(last_token_chart);
 }

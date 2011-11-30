@@ -10,6 +10,8 @@
 #include	"lexicon.h"
 #include	"mrs.h"
 #include	"unpack.h"
+#include	"lattice-mapping.h"
+#include	"token.h"
 
 static int lui_rfd = -1, lui_wfd;
 FILE		*lui_write, *lui_read;
@@ -17,9 +19,11 @@ static int chart_id = 0;
 
 void	browse_lui(int eid, char *what);
 
+int waiting_for_lui = 0;
+
 void	*lui_listener(void *foo)
 {
-	while(!ferror(lui_read))
+	while(!ferror(lui_read) && !feof(lui_read))
 	{
 		char	line[1024], *lp;
 		if(fgets(line, 1023, lui_read))
@@ -38,15 +42,28 @@ void	*lui_listener(void *foo)
 					fprintf(stderr, "LUI: out-of-date chart %d requested\n", cid);
 				else browse_lui(eid, what);
 			}
+			else if(!strncmp(lp, "version ", 8)) {}
+			else if(strstr(lp, " forget")) {}
+			else if(!strcmp(lp, "")) {}
 			else fprintf(stderr, "LUI: unknown `%s'\n", lp);
 		}
 	}
-	fprintf(stderr, "LUI: exited\n");
+	if(!waiting_for_lui)
+		fprintf(stderr, "LUI: exited\n");
 	lui_rfd = -1;
 	return 0;
 }
 
-void wait_for_lui() { while(lui_rfd != -1)usleep(200000); }
+void wait_for_lui()
+{
+	if(lui_write)
+	{
+		waiting_for_lui = 1;
+		fprintf(lui_write, "quit 0\n");
+		fclose(lui_write);
+		while(lui_rfd != -1)usleep(200000);
+	}
+}
 
 int lui_initialize()
 {
@@ -77,7 +94,7 @@ int lui_initialize()
 	}
 }
 
-void	output_lui_chart(char	*words[])
+void	output_lui_chart(struct lattice	*token_lattice)
 {
 	int	i, j, k, l;
 	struct edge	*e, *esave;
@@ -88,8 +105,23 @@ void	output_lui_chart(char	*words[])
 	if(g_mode == GENERATING)
 		chart_size++;
 	fprintf(lui_write, "chart %d %d \"%s\"", ++chart_id, chart_size-1, current_sentence);
-	for(i=0;i<chart_size-1;i++)
-		fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -i-1, -i-1, i, i+1, words[i]);
+	char	covermap[chart_size];
+	bzero(covermap, chart_size);
+	int	leid = -1;
+	for(j=0;j<chart_size;j++)
+	{
+		if(covermap[j])continue;
+		for(i=0;i<token_lattice->nedges;i++)
+		{
+			struct lattice_edge	*e = token_lattice->edges[i];
+			if(e->from->id != j)continue;
+			fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", leid, leid, e->from->id, e->to->id, e->token->string);
+			leid--;
+			break;
+		}
+	}
+	//for(i=0;i<chart_size-1;i++)
+		//fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -i-1, -i-1, i, i+1, words[i]);
 	if(g_mode == GENERATING)
 		chart_size--;
 
@@ -135,7 +167,7 @@ void	output_lui_dg(struct dg	*dg, char *wtitle)
 	dup2(tmp, 1);
 	close(tmp);
 
-	fprintf(stderr, "LUI: wrote out a dag `%p'\n", dg);
+	//fprintf(stderr, "LUI: wrote out a dag `%p'\n", dg);
 }
 
 void	browse_lui(int eid, char *what)
@@ -143,7 +175,7 @@ void	browse_lui(int eid, char *what)
 	int i, j, k, l;
 	struct edge *e, *E;
 
-	fprintf(stderr, "LUI: browse edge %d's %s\n", eid, what);
+	//fprintf(stderr, "LUI: browse edge %d's %s\n", eid, what);
 	for(i=0;i<chart_size;i++)
 		for(j=0;j<chart_size;j++)
 			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
@@ -154,7 +186,7 @@ void	browse_lui(int eid, char *what)
 					e = (l==-1)?E:E->pack[l];
 					if(e->id != eid)continue;
 					if(!strcmp(what, "avm"))output_lui_dg(e->dg, "edge");
-					else fprintf(stderr, "LUI: don't understand `%s'\n", what);
+					else fprintf(stderr, "LUI: don't know how to browse edge %d's `%s'\n", eid, what);
 				}
 			}
 }
@@ -203,11 +235,11 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 
 			if(!surf && e->lex)surf = h->string;
 			if(!arity)
-				fprintf(lui_write, " #T[%d %s \"%s\" %d %s",
+				fprintf(lui_write, " #T[%d \"%s\" \"%s\" %d %s",
 					e->id, label, surf, e->id, sign);
 			else
 			{
-				fprintf(lui_write, " #T[%d %s %s %d %s",
+				fprintf(lui_write, " #T[%d \"%s\" %s %d %s",
 					e->id, label, "nil", e->id, sign);
 				for(i=0;i<arity;i++)
 					rtree(h->rhslist[i], surf);
@@ -218,7 +250,7 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 		fprintf(lui_write, "tree %d", chart_id);
 		rtree(hyp, 0);
 		fprintf(lui_write, " \"%s\"\n", sent);
-		printf("lui wrote a tree\n");
+		//printf("lui wrote a tree\n");
 		return 1;
 	}
 
