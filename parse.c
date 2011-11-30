@@ -355,11 +355,12 @@ int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs)
 		{
 			mrs_end = " ; ";
 			print_mrs(mrs);
-			char	*dstr = hypothesis_to_dstring(hyp);
+			extern int report_labels;
+			char	*dstr = report_labels?hypothesis_to_labelled_tree_string(hyp):hypothesis_to_dstring(hyp);
 			puts(dstr);
 			free(dstr);
 			mrs_end = "\n";
-			//print_hypothesis(hyp, printf);
+			//print_hypothesis(hyp, printf, 0);
 			//printf((mrs_end = "\n"));
 		}
 		else print_mrs(mrs);

@@ -62,6 +62,7 @@ questions:
 
 void tsdb_report_derivation(struct hypothesis	*hyp);
 void tsdb_report_mrs(struct mrs	*mrs);
+void tsdb_report_labels(struct hypothesis	*hyp);
 
 extern int inhibit_results;
 
@@ -89,6 +90,7 @@ static int create_test_run(const char *data, int run_id, const char *comment,
 extern int exhaustive, inhibit_pack;
 extern long top_unifies, top_unifies_wellform, top_copies;
 
+extern int report_labels;
 extern int best_only;
 
 int	tsdb_i_id = -1;
@@ -206,13 +208,6 @@ itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 	tsdb_nderivations++;
 
 	capi_printf("((:result-id . %d)", id++);
-	
-//#ifndef capi_printf
-/*	capi_printf("(:derivation . \"");
-	print_hypothesis(hyp, capi_printf);
-	capi_printf("\") ");*/
-//#endif
-
 
 	for(q=esc,p=hyp->string;*p;p++)
 	{
@@ -221,13 +216,15 @@ itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 	}
 	*q=0;
 	capi_printf("(:surface . \"%s\") ", esc);
-	capi_printf("(:tree . \"%s\") ", esc);
+	//capi_printf("(:tree . \"%s\") ", esc);
 	//fprintf(stderr, "ITSDB output '%s'\n", esc);
 
 	// report the derivation and the MRS as well
 	tsdb_report_derivation(hyp);
 	if(itsdb_wants_mrs)
 		tsdb_report_mrs(mrs);
+	if(report_labels)
+		tsdb_report_labels(hyp);
 
 	free(esc);
 	capi_printf("(:score . %f)) ", hyp->score);
@@ -280,6 +277,15 @@ void tsdb_report_derivation(struct hypothesis	*hyp)
 	capi_printf("\")");
 }
 
+void tsdb_report_labels(struct hypothesis	*hyp)
+{
+	capi_printf(" (:tree .\"");
+	char	*derivation = hypothesis_to_labelled_tree_string(hyp);
+	capi_escape_and_print_long_string(derivation);
+	free(derivation);
+	capi_printf("\")");
+}
+
 void tsdb_report_mrs(struct mrs	*mrs)
 {
 	capi_printf(" (:mrs .\"");
@@ -315,6 +321,8 @@ int	capi_print_derivations()
 
 		if(itsdb_wants_mrs)
 			tsdb_report_mrs(mrs);
+		if(report_labels)
+			tsdb_report_labels(hyp);
 
 		capi_printf(" (:score .%f))", hyp->score);
 #ifndef TSDB

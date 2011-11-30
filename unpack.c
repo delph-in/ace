@@ -875,7 +875,7 @@ struct token	*gen_extract_one_token(struct hypothesis	*h, int	k, char	*inflected
 	return t;
 }
 
-void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
+void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...), int	labelled)
 {
 	void	print_tree0(struct hypothesis *hyp, int from, char	**genwordforms)
 	{
@@ -910,7 +910,9 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 			sign = e->lex->word;
 			//sign = e->dg->type->name;
 		}
-		print(" (%d %s %f %d %d", e->id, sign, hyp->score, from, from+hyp->toklen);
+		if(!labelled)
+			print(" (%d %s %f %d %d", e->id, sign, hyp->score, from, from+hyp->toklen);
+		else print(" (\"%s\"", label_dag(hyp->dg, "?"));
 		if(e->have)
 		{
 			for(i=0;i<e->have;i++)
@@ -942,23 +944,26 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...))
 				}
 				print("\"");
 
-				for(i=0;i<ntokens;i++)
+				if(!labelled)
 				{
-					struct token	*tok = tokens[i];
-					int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
-					char	*tokstr = dstr_lookup((void*)tok, from);
-					if(!tokstr)
+					for(i=0;i<ntokens;i++)
 					{
-						char	token_str[10240];
-						extern int dag_print_style;
-						dag_print_style = 1;
-						snprint_dg(token_str, 10239, tok->dg);
-						// *token_str = 0;
-						dag_print_style = 0;
-						tokstr = slab_escape(token_str);
-						dstr_save((void*)tok, from, tokstr);
+						struct token	*tok = tokens[i];
+						int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
+						char	*tokstr = dstr_lookup((void*)tok, from);
+						if(!tokstr)
+						{
+							char	token_str[10240];
+							extern int dag_print_style;
+							dag_print_style = 1;
+							snprint_dg(token_str, 10239, tok->dg);
+							// *token_str = 0;
+							dag_print_style = 0;
+							tokstr = slab_escape(token_str);
+							dstr_save((void*)tok, from, tokstr);
+						}
+						print(" %d \"%s\"", id, tokstr);
 					}
-					print(" %d \"%s\"", id, tokstr);
 				}
 				print(")");
 			}
@@ -1003,8 +1008,35 @@ char	*hypothesis_to_dstring(struct hypothesis	*h)
 		dlen += l;
 		return l;
 	}
-	print_hypothesis(h, dprintf);
+	print_hypothesis(h, dprintf, 0);
 	return derivation;
+}
+
+char	*hypothesis_to_labelled_tree_string(struct hypothesis	*h)
+{
+	char	*lt = malloc(10240);
+	int		dalen = 10240, dlen = 0;
+	*lt = 0;
+	int	dprintf(const char	*fmt, ...)
+	{
+		va_list	v;
+		va_start(v, fmt);
+		int	l = vsnprintf(lt+dlen, dalen-dlen, fmt, v);
+		va_end(v);
+		if(l >= dalen-dlen)
+		{
+			va_list v2;
+			va_start(v2, fmt);
+			dalen += l + 10240 ;
+			lt = realloc(lt, dalen);
+			l = vsnprintf(lt+dlen, dalen-dlen, fmt, v2);
+			va_end(v2);
+		}
+		dlen += l;
+		return l;
+	}
+	print_hypothesis(h, dprintf, 1);
+	return lt;
 }
 
 void	install_orth(struct dg	*dg, int	nforms, char	**forms)
@@ -1287,7 +1319,7 @@ extern int do_itsdb;
 				if(idiomatic || (g_mode == GENERATING))
 				{
 					//printf("hyp = %p\n", hyp);
-					//printf("\n"); print_hypothesis(h, printf); printf("\n");
+					//printf("\n"); print_hypothesis(h, printf, 0); printf("\n");
 					if(g_mode == GENERATING)
 						fixup_generator_string(hyp);
 					count += process(hyp, m);

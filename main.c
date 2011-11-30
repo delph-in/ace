@@ -49,6 +49,7 @@ float	stdin_time = 0;
 int	form_to_relation = 0;
 int	show_realization_trees = 0;
 int	show_realization_mrses = 0;
+int report_labels = 0;
 
 int	max_chart_megabytes = 1200, max_unpack_megabytes = 1500;
 
@@ -100,6 +101,7 @@ void	parse_args(int	argc, char	*argv[])
 	struct option long_options[] = {
 		{"show-realization-trees", 0, &show_realization_trees, 1},
 		{"show-realization-mrses", 0, &show_realization_mrses, 1},
+		{"report-labels", 0, &report_labels, 1},
 #define	MAX_UNPACK_MEGABYTES_OPTION	1000
 		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},
 #define	MAX_CHART_MEGABYTES_OPTION	1001
