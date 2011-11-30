@@ -46,6 +46,8 @@ extern int invent_ltop;
 struct path	label_path;
 int			freezer_megabytes = 256;
 
+struct path	recursive_label_path_in_sign, recursive_label_path_in_label;
+
 struct dg	*dg_path(struct dg	*dg, struct path	p)
 {
 	int i;
@@ -201,6 +203,8 @@ struct conf
 
 	struct path	rels_list_path, hcons_list_path;
 	int		enable_post_generation_mapping;
+	struct path	recursive_label_path_in_sign,
+				recursive_label_path_in_label;
 };
 
 struct path	freeze_path(struct path	p)
@@ -280,6 +284,8 @@ void	*freeze_conf()
 
 		c->ortho_max_rules = ortho_max_rules;
 		c->ortho_warn_max_rules = ortho_warn_max_rules;
+		c->recursive_label_path_in_label = freeze_path(recursive_label_path_in_label);
+		c->recursive_label_path_in_sign = freeze_path(recursive_label_path_in_sign);
 	}
 	else
 	{
@@ -353,6 +359,8 @@ void	recover_conf(void	*vc)
 
 		ortho_max_rules = c->ortho_max_rules;
 		ortho_warn_max_rules = c->ortho_warn_max_rules;
+		recursive_label_path_in_label = c->recursive_label_path_in_label;
+		recursive_label_path_in_sign = c->recursive_label_path_in_sign;
 	}
 	else
 	{
@@ -391,6 +399,8 @@ load_syntax_conf()
 	rule_rels_path = get_conf_path("rule-rels-path");
 	extract_mrs_path = get_conf_path("semantics-path");
 	label_path = try_get_conf_path("label-path", "LNAME");
+	recursive_label_path_in_label = try_get_conf_path("recursive-label-path-in-label", "SYNSEM LOCAL");
+	recursive_label_path_in_sign = try_get_conf_path("recursive-label-path-in-label", "SYNSEM NONLOC SLASH LIST FIRST");
 
 	load_chart_dependencies(get_conf("chart-dependencies"));
 	reduce_chart_before_lexical_parsing = get_conf_bool("process-chart-dependencies-before-lexical-parsing", 0);

@@ -45,6 +45,8 @@ Paths within AVMs
 || rule-rels-path || path to list of EPs supplied by a rule ||
 || semantics-path || path to the MRS structure of a sign ||
 || label-path || path to the label string on a parse-node instance ||
+|| recursive-label-path-in-label || path within a parse-node instance which recursive labeling should match against ||
+|| recursive-label-path-in-sign || path within a sign that recursive labeling should match against ||
 || chart-dependencies || a (flat) list of pairs of quoted paths used for removing unwanted lexemes from the chart before parsing.  a lexeme with a non-*top* value for the first path in a pair will only survive if there is another lexeme with a compatible value at the second path in the pair. ||
 
 Token Mapping

@@ -25,6 +25,8 @@ extern char	**rf_tc, **rl_tc;
 extern struct path	label_path;
 extern int g_transfer;
 
+char	*type_to_string(struct type*);
+
 void	build_rif()
 {
 	int	i, j, ryes=0, yes, tyes=0, nroot=0;
@@ -214,6 +216,7 @@ struct label
 {
 	char 		*name;
 	struct dg	*dg;
+	int				is_meta;
 };
 
 static struct label_set
@@ -234,6 +237,7 @@ void	*freeze_labels()
 	{
 		ls->labels[i].name = freeze_string(lset->labels[i].name);
 		ls->labels[i].dg = freeze_dg(lset->labels[i].dg);
+		ls->labels[i].is_meta = lset->labels[i].is_meta;
 	}
 	return ls;
 }
@@ -242,6 +246,26 @@ void	recover_labels(void	*ls)
 {
 	lset = ls;
 	//printf("recover labelset %p\n", ls);
+}
+
+char	*recursive_label_dag(struct dg	*dg)
+{
+	assert(lset != NULL);
+	dg = dg_path(dg, recursive_label_path_in_sign);
+	if(!dg)return NULL;
+	int i;
+	//printf("trying to label:\n");
+	//print_dg(dg);printf("\n");
+	for(i=0;i<lset->nlabels;i++)
+		if(!lset->labels[i].is_meta)
+		{
+			struct dg	*ldg = dg_path(lset->labels[i].dg, recursive_label_path_in_label);
+			if(!ldg)continue;
+			int res = unify_dg_tmp(dg, ldg, -1);
+			forget_tmp();
+			if(!res)return lset->labels[i].name;
+		}
+	return "?";
 }
 
 char	*label_dag(struct dg	*dg, char *fallback)
@@ -254,15 +278,39 @@ char	*label_dag(struct dg	*dg, char *fallback)
 		return fallback;
 	}
 
+	char	*meta = NULL;
+	char	metalabel[128];
+	for(i=0;i<lset->nlabels;i++)
+		if(lset->labels[i].is_meta)
+		{
+			int res = unify_dg_tmp(dg, lset->labels[i].dg, -1);
+			forget_tmp();
+			if(!res)
+			{
+				char	*meta_type = recursive_label_dag(dg);
+				if(!meta_type)continue;
+				struct dg	*meta_suffix = dg_hop(lset->labels[i].dg, lookup_fname("META-SUFFIX"));
+				struct dg	*meta_prefix = dg_hop(lset->labels[i].dg, lookup_fname("META-PREFIX"));
+				sprintf(metalabel, "%s%s%s", ((meta_prefix!=NULL)?type_to_string(meta_prefix->xtype):""), meta_type, ((meta_suffix!=NULL)?type_to_string(meta_suffix->xtype):""));
+				meta = metalabel;
+				//printf("meta = %s\n", meta);
+				break;
+			}
+		}
+
 	for(i=0;i<lset->nlabels;i++)
 	{
-		lset->labels[i].dg->xtype = lset->labels[i].dg->type = get_top();
+		if(lset->labels[i].is_meta)continue;
 		int res = unify_dg_tmp(dg, lset->labels[i].dg, -1);
 		forget_tmp();
 		if(!res)
 		{
 			//printf("label %s\n", lset->labels[i].name);
-			return lset->labels[i].name;
+			if(!meta)return lset->labels[i].name;
+			char	label[256];
+			sprintf(label, "%s%s", lset->labels[i].name, meta);
+			//printf("returning label = %s    of which meta = %s\n", label, meta);
+			return freeze_string(label);
 		}
 	}
 
@@ -272,21 +320,33 @@ char	*label_dag(struct dg	*dg, char *fallback)
 
 int	study_label(char	*lhs, struct dg	*dg)
 {
+	int	is_meta = 0;
 	char	*name;
-	//struct dg *lname = dg_hop(dg, lookup_fname("LNAME"));
-	struct dg *lname = dg_path(dg, label_path);
-	if(!lname)
+	lookup_fname("META-SUFFIX");	// just to make sure that feature exists at runtime...
+	if(dg_hop(dg, lookup_fname("META-PREFIX")))
 	{
-		fprintf(stderr, "label `%s': no label found at expected path!\n", lhs);
-		return 0;
+		is_meta = 1;
+		name = strdup(lhs);
 	}
-	name = lname->xtype->name;
+	else
+	{
+		//struct dg *lname = dg_hop(dg, lookup_fname("LNAME"));
+		struct dg *lname = dg_path(dg, label_path);
+		if(!lname)
+		{
+			fprintf(stderr, "label `%s': no label found at expected path!\n", lhs);
+			return 0;
+		}
+		name = type_to_string(lname->xtype);
+	}
 
+	dg->xtype = dg->type = get_top();
 	if(!lset)lset = calloc(sizeof(struct label_set), 1);
 	lset->nlabels++;
 	lset->labels = realloc(lset->labels, sizeof(struct label) * lset->nlabels);
 	lset->labels[lset->nlabels-1].name = name;
 	lset->labels[lset->nlabels-1].dg = dg;
+	lset->labels[lset->nlabels-1].is_meta = is_meta;
 	//printf("study label %s\n", name);
 	return 0;
 }
