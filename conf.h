@@ -44,6 +44,7 @@ extern struct path	lex_tokens_list_path, lex_tokens_last_path;
 extern struct path	lattice_mapping_input_path, lattice_mapping_output_path, lattice_mapping_context_path, lattice_mapping_position_path;
 
 extern struct path	rels_list_path, hcons_list_path;
+struct path	recursive_label_path_in_sign, recursive_label_path_in_label;
 
 struct dg	*dg_path(struct dg	*dg, struct path	p);
 struct dg	*dg_path_add(struct dg	*dg, struct path	p, struct dg	*add);

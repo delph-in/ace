@@ -81,7 +81,7 @@ int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence);
 int parse_with_token_chart(struct lattice	*token_chart, clock_t	start);
 
 // display
-void	output_lui_chart(char	*words[]);
+void	output_lui_chart(struct lattice	*token_lattice);
 void	output_lui_dg(struct dg	*dg, char *wtitle);
 struct mrs;
 int		output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs);

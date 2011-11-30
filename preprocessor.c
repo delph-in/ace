@@ -35,6 +35,12 @@ void	recover_repp(void	*ptr)
 
 void	preprocess_line(char	*mbstring, int	*Nwords, char	***Words, int	**CFrom, int	**CTo)
 {
+	if(!repp)
+	{
+		fprintf(stderr, "This grammar was compiled with no REPP preprocessor.\n");
+		fprintf(stderr, "Either add a REPP preprocessor or provide input pre-tokenized in YY format (-y).\n");
+		exit(-1);
+	}
 	int	result = repp_preprocess(repp, mbstring, Nwords, Words, CFrom, CTo);
 	assert(result == 0);
 }

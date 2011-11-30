@@ -37,13 +37,13 @@ berthold wants
 	- *updating* an ace tsdb profile -- doesn't work, apparently?
 	- LUI support
 		-generator trees
-		-full chart
+		+full chart
 		-partial chart
 		-simple MRS
 
 ideas:
 	- mode to output labeled trees to ITSDB
-	- mode to make output more script-friendly
+	- [mode to?] make output more script-friendly
 	- automatic time profile of a grammar
 		parsing: pretty good, but add
 			- orthographemic analysis
@@ -70,6 +70,10 @@ unreleased
 	- derivation trees from generation have proper token structures and orthographies
 	- new option --show-realization-trees, which prints derivation trees for generation results
 	- new option --show-realization-mrses, which prints MRSes for generation results
+	- support for labeling SLASHes, with configuration options recursive-label-path-in-label and recursive-label-path-in-sign
+	- support for special :c command to show last parse chart in LUI
+	- slightly better communication with LUI (e.g. actually notice when LUI exits, suppress some needless noise)
+	- report an error when attempting to parse and no REPP is loaded, unless in YY mode
 0.9.4pre3
 	- YY mode
 	- don't output a properties clause for MRS variables that have no properties

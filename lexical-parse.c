@@ -81,7 +81,7 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 			int	res = unify_and_build1(epsila[i], le->edge, &e, 1);
 			if(res == -1)
 			{
-				fprintf(stderr, "unify_and_build1 got mad\n");
+				//fprintf(stderr, "unify_and_build1 got mad\n");
 				return -1;
 			}
 			if(res == 1 && e != NULL)
@@ -147,6 +147,7 @@ int	lexical_parse_lattice(struct lattice	*lc)
 			i--;
 		}
 	}
+	return 0;
 }
 
 void	print_lexical_chart(struct lattice	*tc)
