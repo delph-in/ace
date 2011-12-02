@@ -5,6 +5,7 @@
 #include	<stdarg.h>
 #include	<wchar.h>
 #include	<wctype.h>
+#include	<setjmp.h>
 
 #include "dag.h"
 #include "chart.h"
@@ -30,6 +31,8 @@ extern int noldslabs;
 extern int debug_level, inhibit_pack;
 
 unsigned long long	ndecomposed;
+
+static jmp_buf	out_of_memory_jump;
 
 int	max_grandparenting = 3;
 
@@ -531,6 +534,9 @@ struct hypothesis *process_hypagenda(struct hypagenda_item **A)
 	struct hypothesis	*hyp;
 	struct hypagenda_item	**W, *l, *r;
 	int					arity, i, j;
+
+	if(noldslabs >= max_unpack_megabytes)
+		longjmp(out_of_memory_jump, 2);
 
 	//printf("agenda:\n");
 	//print_heap(*A, 1);
@@ -1251,6 +1257,12 @@ extern int do_itsdb;
 
 	dstr_cache_gen++;
 
+	if(setjmp(out_of_memory_jump) != 0)
+	{
+		printf("NOTE: hit RAM limit while unpacking\n");
+		goto resume_after_oom;
+	}
+
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		edge = cell->p_edges[i];
@@ -1329,11 +1341,9 @@ extern int do_itsdb;
 		}
 		else g_checkup++;	// mark that we need to look for subfailures before hypothesizing
 		if(noldslabs >= max_unpack_megabytes)
-		{
-			printf("NOTE: hit RAM limit while unpacking\n");
-			break;
-		}
+			longjmp(out_of_memory_jump, 1);
 	}
+resume_after_oom:
 	if(debug_level)
 	{
 		printf("%d hyps / %d reconstructed / %d readings\n", nhyp, ninsthyps, count);
