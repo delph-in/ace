@@ -94,6 +94,11 @@ int	compile_qc(char	*qccode_path)
 				fprintf(gcc, "	--sp;\n");
 			else if(1 == sscanf(tok, "REC(%d)", &x))
 			{
+				if(x<0 || x>=qc_size)
+				{
+					fprintf(stderr, "QUICKCHECK: code indicates to record element %d, in vector of length %d (max index %d)\n", x, qc_size, qc_size-1);
+					exit(-1);
+				}
 				fprintf(gcc, "	if(stack[sp]) entries[%d] = dg_type(stack[sp]);\n", x);
 				fprintf(gcc, "	else entries[%d] = NULL;\n", x);
 				n_record++;
