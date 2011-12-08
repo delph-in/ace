@@ -491,7 +491,8 @@ struct dg	*copy_dg(struct dg	*d)
 int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 {
 	int	i, j, k;
-	unsigned char	news[256], nn=0;
+	unsigned char	news[256];
+	int	nn=0;
 	struct type	*t, *t1, *t2;
 	struct dg	*extra=0;
 	struct dg	**arcs1, **arcs2;
@@ -628,7 +629,8 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 int		unify_dg_defaults(struct dg	*dg1, struct dg	*dg2)
 {
 	int	i, j, k;
-	unsigned char	news[256], nn=0;
+	unsigned char	news[256];
+	int	nn=0;
 	struct type	*t, *t1, *t2;
 	struct dg	*extra=0;
 	struct dg	**arcs1, **arcs2;
@@ -807,8 +809,6 @@ int	allow_unify_swapping = 1;
 int	unify1(struct dg	*dg1, struct dg	*dg2)
 {
 	int	i, j, k;
-	unsigned char	news[32], nn=0;
-	unsigned char	newcs[32], nc=0;
 	struct type	*t, *t1, *t2;
 	struct dg	*extra=0;
 	struct dg	**arcs1, **arcs2;
@@ -877,6 +877,9 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	//fprintf(stderr, "type `%s' at ", t->name); unify_backtrace();
 
 	forward_dg(dg2, dg1);
+
+	unsigned char	news[dg2->narcs], newcs[dg2->ncarcs];
+	int	nn=0, nc=0;
 
 	arcs1 = DARCS(dg1);
 	arcs2 = DARCS(dg2);
