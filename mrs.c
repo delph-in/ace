@@ -317,9 +317,9 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		ep = eps+nrels-1;
 		bzero(ep,sizeof(*ep));
 		ep->pred = (word=parse_word(P,1))?preddup(word):0;
-		if(word && strchr(word, '<'))
+		if(word && *word && word[strlen(word)-1]=='>' && strrchr(word, '<'))
 		{
-			char	*characterization = strchr(word, '<');
+			char	*characterization = strrchr(word, '<');
 			if(2 != sscanf(characterization, "<%d:%d>", &ep->cfrom, &ep->cto))
 				FAIL("unparseable characterization");
 		}
@@ -429,7 +429,12 @@ struct mrs	*read_mrs(FILE	*f)
 
 	if(balance || !lbuf)
 	{
-		if(balance)fprintf(stderr, "NOTE: couldn't read a complete mrs\n");
+		if(balance)
+		{
+			fprintf(stderr, "NOTE: couldn't read a complete mrs\n");
+			buffer[lbuf] = 0;
+			fprintf(stderr, "%s\n", buffer);
+		}
 		free(buffer);
 		return 0;
 	}
@@ -851,6 +856,8 @@ struct mrs	*copy_mrs(struct mrs	*min)
 			vout->props[j].name = strdup(vin->props[j].name);
 			vout->props[j].value = strdup(vin->props[j].value);
 		}
+		vout->dg = vin->dg;
+		vout->semi_dg = vin->semi_dg;
 	}
 
 	mout->nhcons = min->nhcons;
