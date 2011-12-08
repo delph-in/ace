@@ -646,8 +646,7 @@ void	set_lgroup(int	group, wchar_t	*letters)
 	//printf("letter group %c = {%S}\n", group, letters);
 	if(lgroups[group])
 	{
-		fprintf(stderr, "morpho: redefining letter group `%c' not allowed\n", group);
-		exit(-1);
+		fprintf(stderr, "WARNING: redefining letter group `%c' (overwriting previous definition)\n", group);
 	}
 	lgroups[group] = calloc(256, sizeof(char));
 	while(*letters)	// XXX taking the low 8 bits of a wchar_t is *not* the right way of storing the letter set :-P
@@ -689,7 +688,8 @@ void	setup_morpho(char	*line)
 
 	line = trim_string(line);
 	end = line + strlen(line)-1;
-	if(*end != ')' || *line != '(')
+	while(end > line && *end!=')')end--;
+	if(end<=line || *line != '(')
 	{
 		fprintf(stderr, "morpho: setup command `%s' malformed\n", line);
 		exit(-1);
@@ -960,7 +960,7 @@ void	setup_orule(struct orule	*or, char	*def)
 
 		wdef = trim_wcs(next);
 	}
-	if(*wdef)
+	if(*wdef && *wdef != ';')
 	{
 		fprintf(stderr, "morpho: syntax for orthographemic patterns is %%type (pat rep) (pat rep) ...\n");
 		fprintf(stderr, "   trailing garbage `%S' after subrules\n", wdef);
@@ -1018,6 +1018,7 @@ int	load_irregulars(char	*path)
 
 		if(!*line)continue;
 		if(*line=='"')continue;	// silly ERG .tab files have "'s at the beginning and ends
+		if(*line==';')continue;	// full-line comment
 		strcpy(copy, line);
 		form = strtok(line, " \t");
 		if(form)rule = strtok(0, " \t");
