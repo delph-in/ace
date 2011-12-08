@@ -859,26 +859,60 @@ void	dstr_save(struct hypothesis	*h, int	o, char	*str)
 struct token	*gen_extract_one_token(struct hypothesis	*h, int	k, char	*inflected_form)
 {
 	assert(h->edge->lex && !h->edge->rule);
+	struct token	*t = slab_alloc(sizeof(*t));
+	bzero(t, sizeof(*t));
 	struct dg	*toklist = dg_path(h->dg, lex_tokens_list_path);
-	assert(toklist != NULL);
+	if(toklist == NULL)goto missing_token;
 	int	kk = k;
 	while(kk>0)
 	{
 		toklist = dg_hop(toklist, 2);	// REST
-		assert(toklist != NULL);
+		if(toklist == NULL)goto missing_token;
 		kk--;
 	}
 	struct dg	*tokdg = dg_hop(toklist, 1);
-	assert(tokdg != NULL);
+	if(!tokdg)goto missing_token;
 
-	struct token	*t = slab_alloc(sizeof(*t));
-	bzero(t, sizeof(*t));
 	struct dg	*form_dg = dg_path(tokdg, token_form_path);
-	if(form_dg->xtype->name[0]=='"')
+	if(form_dg && form_dg->xtype->name[0]=='"')
 		t->string = type_to_string(form_dg->xtype);
 	else t->string = inflected_form;//type_to_string(h->edge->lex->stem[k]);
 	t->dg = tokdg;
 	return t;
+missing_token:
+	// we get here if the grammar left some information unspecified in the tokens list.
+	// ... happens for MWEs especially.
+	t->string = inflected_form;
+	t->dg = type_dg(token_type);
+	return t;
+}
+
+inflect_mwe_chain(int	ntoks, char	**forms, struct hypothesis	*h)
+{
+	if(h->edge->rule)
+	{
+		assert(h->arity == 1);	// lexical rules are unary.
+		inflect_mwe_chain(ntoks, forms, h->rhslist[0]);
+		if(h->edge->rule->orth)
+		{
+			struct orule	*o = h->edge->rule->orth;
+			int	k = 0;
+			if(o->type == or_suffix)
+				k = ntoks-1;
+			forms[k] = inflect(o, forms[k]);
+		}
+	}
+}
+
+struct lexeme	*get_leaf_lex(struct hypothesis	*hyp)
+{
+	// why we need to do this:
+	// with packing (enabled even on lexical edges for generation),
+	//  the hyp->edge->lex field might not match the lexeme at the bottom of the tree.
+	// we care when generating the surface forms.
+	assert(hyp->edge->lex);
+	while(hyp->edge->rule)hyp = hyp->rhslist[0];
+	return hyp->edge->lex;
 }
 
 void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...), int	labelled)
@@ -892,19 +926,14 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...),
 		{
 			if(!genwordforms)
 			{
-				struct lexeme	*l = e->lex;
+				struct lexeme	*l = get_leaf_lex(hyp);
 				int				nforms = l->stemlen;
 				char	*forms[nforms];
 				for(i=0;i<nforms;i++)
 					forms[i] = type_to_string(l->stem[i]);
+				inflect_mwe_chain(nforms, forms, hyp);
 				print_tree0(hyp, from, forms);
 				return;
-			}
-			else if(e->rule && e->rule->orth)
-			{
-				struct orule	*or = e->rule->orth;
-				int k = (or->type == or_suffix)?(e->lex->stemlen-1):0;
-				genwordforms[k] = inflect(or, genwordforms[k]);
 			}
 		}
 
@@ -1063,23 +1092,6 @@ void	install_orth(struct dg	*dg, int	nforms, char	**forms)
 	}
 	assert(stem_list);
 	stem_list->xtype = lookup_type(g_null_type);
-}
-
-inflect_mwe_chain(int	ntoks, char	**forms, struct hypothesis	*h)
-{
-	if(h->edge->rule)
-	{
-		assert(h->arity == 1);	// lexical rules are unary.
-		inflect_mwe_chain(ntoks, forms, h->rhslist[0]);
-		if(h->edge->rule->orth)
-		{
-			struct orule	*o = h->edge->rule->orth;
-			int	k = 0;
-			if(o->type == or_suffix)
-				k = ntoks-1;
-			forms[k] = inflect(o, forms[k]);
-		}
-	}
 }
 
 int	gen_extract_lexemes(struct hypothesis	*h, int	k, struct edge	**L)
