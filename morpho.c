@@ -48,7 +48,7 @@ struct ochart
 	}	**edges;
 };
 
-void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule);
+void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule, int	depth);
 void	unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int routelen, int *rnums);
 
 int	check_mbs(char	*mbs);
@@ -180,7 +180,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		// compute a lowercase version of t->string
 		char	*low = mbsdowncase(t->string);
 		// compute all possible stems, with dynamic programming
-		add_ochart_edge(0, t->oc, low, 0);
+		add_ochart_edge(0, t->oc, low, 0, 0);
 		free(low);
 		// enumerate all possible ways of reaching each possible stem
 		for(j=0;j<t->oc->nedges;j++)
@@ -560,12 +560,13 @@ void add_oparent(struct ochart_edge *daughter, struct ochart_edge *parent, struc
  * note: we work in wchar_t's much of the time...
  * note: 'parent' and 'rule' are either both NULL or both not NULL
  */
-void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule)
+void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule, int	depth)
 {
 	int	i;
 	struct ochart_edge *edge = 0;
 
 	assert( (parent==NULL && rule==NULL) || (parent!=NULL && rule!=NULL) );
+	if(depth > ortho_max_rules)return;
 
 	// check for a compatible edge already in the chart
 	for(i=0;i<chart->nedges;i++)
@@ -601,7 +602,7 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 		char	*irreg_stem = hash_find(or->irregs_form_to_stem, form);
 		if(irreg_stem)
 		{
-			add_ochart_edge(edge, chart, irreg_stem, or);
+			add_ochart_edge(edge, chart, irreg_stem, or, depth+1);
 			// NOTE: we do NOT want to cut the search here, actually.
 			// in the case of FORWARD morphology,
 			// we would want to; i.e. an irregular spelling supresses regular rules
@@ -629,7 +630,7 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 
 				//fprintf(stderr, "form `%S' = stem `%s' under rule `%s'[%d], i.e. `%S' replaced by `%S'\n",
 				//		wform, stem, or->rule->name, j, sub->pat, sub->rep);
-				add_ochart_edge(edge, chart, stem, or);
+				add_ochart_edge(edge, chart, stem, or, depth+1);
 			}
 		}
 	}
@@ -831,7 +832,7 @@ int	invert_ipat_suffix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 	wchar_t	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
 
 	if(repl==1 && rep[0]=='*')len2--;	// trivially match
-	else do
+	else if(len>=0 && len2>=0) do
 	{
 		let = form[len--];
 		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
