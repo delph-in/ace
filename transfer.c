@@ -1090,24 +1090,29 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct
 		return vin;
 	}
 
-	// no support for deleting or creating HCONS just now
+	// no support for creating HCONS just now
 	assert(tr->output.nhcons == 0);
-	assert(tr->input.nhcons == 0);
 
 	//printf("activated rule '%s' to ditch %d EPs\n", tr->name, tr->input.neps);
 
 	struct mrs	*mout = slab_alloc(sizeof(*mout));
 	bzero(mout, sizeof(*mout));
-	mout->nhcons = min->nhcons;
+	mout->nhcons = min->nhcons - tr->input.nhcons;
 	mout->hcons = slab_alloc(sizeof(struct mrs_hcons) * mout->nhcons);
-	for(i=0;i<min->nhcons;i++)
-	{
-		struct mrs_hcons	*hcin = min->hcons+i;
-		struct mrs_hcons	*hcout = mout->hcons+i;
-		hcout->type = hcin->type;
-		hcout->hi = map_variable(hcin->hi);
-		hcout->lo = map_variable(hcin->lo);
-	}
+	char	hc_ditch[min->nhcons];
+	bzero(hc_ditch, sizeof(hc_ditch));
+	for(i=0;i<tr->input.nhcons;i++)
+		hc_ditch[alignment[i]] = 1;
+	for(i=j=0;i<min->nhcons;i++)
+		if(!hc_ditch[i])
+		{
+			struct mrs_hcons	*hcin = min->hcons+i;
+			struct mrs_hcons	*hcout = mout->hcons+j;
+			hcout->type = hcin->type;
+			hcout->hi = map_variable(hcin->hi);
+			hcout->lo = map_variable(hcin->lo);
+			j++;
+		}
 	mout->ltop = map_variable(min->ltop);
 	mout->index = map_variable(min->index);
 	mout->xarg = map_variable(min->xarg);
