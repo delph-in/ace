@@ -47,7 +47,7 @@ ${PICOBJS} : pic/%.o: %.c
 
 libace.so: pic/libace.o ${PICOBJS} post/post.o
 	rm -f libace.so
-	gcc -shared ${PICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS}
+	gcc -shared ${PICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS} -ldl
 
 libace.a: libace.o ${OBJ}
 	rm -f libace.a

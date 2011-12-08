@@ -1,21 +1,6 @@
 TODO:
 
 fully automated regression testing
-	two cases:
-		1. changes to ACE
-			compare ACE results before to ACE results after
-			profile for before
-			profile for after
-			expect no diffs, except when changes dictate
-			should be able to automatically run for all kinds of test suites
-		2. changes to a grammar
-			in general, not expected to turn up any new ACE bugs.
-			but might turn up an old ACE bug.
-			finding that is hard.
-			compare ACE to PET and ACE to LKB before, write down diffs
-			compare ACE to PET and ACE to LKB *after*, write down diffs
-			compare the "before" diffs to the "after" diffs
-	case 1 above we should be able to fully automate. may as well look at:
 		both parsing and generation
 		ERG: mrs, csli, hike, maybe something else too
 		HaG: hausa.items
@@ -41,6 +26,12 @@ berthold wants
 		-simple MRS
 
 ideas:
+	- case insensitive :+ operator
+	- comments in irregs.tab
+	- comments in %letterset (and %suffix etc?)
+	- properly support lettersets with nonascii characters
+	- quickcheck compiler needs to complain if we try to REC(x) with an x that is out of bounds
+	- fix recursive labeling to check for cycles or empty SLASH difflists
 	- [mode to?] make output more script-friendly
 	- automatic time profile of a grammar
 		parsing: pretty good, but add
@@ -63,6 +54,8 @@ ideas:
 DONE:
 
 unreleased
+	- bug fix: generation derivation trees were inflecting token strings in the wrong order
+	- bug fix: copy_mrs() wasn't copying the ->dg field
 	- new --generation-server=LANG option (watches ~/tmp/.transfer.USER.LANG and generates from it)
 	- LUI support for displaying realizations (click for tree, with active nodes)
 0.9.4pre4
