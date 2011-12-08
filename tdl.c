@@ -4,6 +4,7 @@
 #include	<stdlib.h>
 #include	<sys/time.h>
 #include	<assert.h>
+#include	<wctype.h>
 
 #include	"tdl.h"
 #include	"preprocessor.h"
@@ -14,6 +15,7 @@
 #include	"transfer.h"
 #include	"hash.h"
 #include	"conf.h"
+#include	"unicode.h"
 
 int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
@@ -120,7 +122,11 @@ void	add_tdlline(char	*lhs, char	operation, char	*rhs, char	*odef, int	lnum, cha
 
 	char	key[256];
 	sprintf(key, "%s %s", tdlstatus?:"instance", lhs);
-	long	had = (long)hash_find(tdl_hash, key);
+	wchar_t	*widekey = towide(key);
+	wchar_t	*wkp = widekey;
+	while(*wkp) { *wkp = towlower(*wkp); wkp++; }
+	char	*mbskey = tombs(widekey);
+	long	had = (long)hash_find(tdl_hash, mbskey);
 	struct tdl_line	*tdl;
 
 
@@ -148,7 +154,7 @@ void	add_tdlline(char	*lhs, char	operation, char	*rhs, char	*odef, int	lnum, cha
 		tdllines = realloc(tdllines, sizeof(struct tdl_line)*ntdllines);
 		tdl = tdllines + ntdllines-1;
 		tdl->lhs = strdup(lhs);
-		hash_add(tdl_hash, strdup(key), (void*)ntdllines);
+		hash_add(tdl_hash, mbskey, (void*)ntdllines);
 	}
 	tdl->processed = 0;
 	tdl->rhs = strdup(rhs);
