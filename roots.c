@@ -248,10 +248,15 @@ void	recover_labels(void	*ls)
 	//printf("recover labelset %p\n", ls);
 }
 
-char	*recursive_label_dag(struct dg	*dg)
+char	*recursive_label_dag(struct dg	*indg)
 {
+	// XXX this may need to check that the diff-list is not empty explicitly.
+	// this would ideally (?) cause unification to fail, but
+	// I guess it results in a cycle, which we don't detect until we try to copy,
+	// and we aren't going to try to copy here.
+	// see LKB's diff-list-strangeness() check.
 	assert(lset != NULL);
-	dg = dg_path(dg, recursive_label_path_in_sign);
+	struct dg	*dg = dg_path(indg, recursive_label_path_in_sign);
 	if(!dg)return NULL;
 	int i;
 	//printf("trying to label:\n");
@@ -262,8 +267,24 @@ char	*recursive_label_dag(struct dg	*dg)
 			struct dg	*ldg = dg_path(lset->labels[i].dg, recursive_label_path_in_label);
 			if(!ldg)continue;
 			int res = unify_dg_tmp(dg, ldg, -1);
+			/*if(!res)
+			{
+				// see if there is a cycle
+				struct dg	*rdg = copy_dg_with_comp_arcs(ldg);
+				if(!rdg)
+				{
+					printf("FOUND A CYCLE when labeling\n");
+					res = -1;
+				}
+			}*/
 			forget_tmp();
-			if(!res)return lset->labels[i].name;
+			if(!res)
+			{
+				/*printf("recursive label %s\n", lset->labels[i].name);
+				print_dg(dg);
+				printf("\n");*/
+				return lset->labels[i].name;
+			}
 		}
 	return "?";
 }
@@ -284,6 +305,15 @@ char	*label_dag(struct dg	*dg, char *fallback)
 		if(lset->labels[i].is_meta)
 		{
 			int res = unify_dg_tmp(dg, lset->labels[i].dg, -1);
+			/*if(!res)
+			{
+				struct dg	*rdg = copy_dg_with_comp_arcs(dg);
+				if(!rdg)
+				{
+					printf("META didn't actually apply; CYCLE.\n");
+					res = -1;
+				}
+			}*/
 			forget_tmp();
 			if(!res)
 			{
