@@ -111,21 +111,19 @@ void	augment_definition(struct tdl_line	*tdl, char	*rhs, int	lnum, char	*path)
 	//fprintf(stderr, "  new definition: %s\n", new);
 }
 
-void	add_tdlline(char	*lhs, char	operation, char	*rhs, char	*odef, int	lnum, char	*path)
+char	*key_for_status_and_lhs(char	*status, char	*lhs)
 {
-	/*if(!tdlstatus)
-	{
-		fprintf(stderr, "error at %s:%d\n", path, lnum);
-		fprintf(stderr, "tdlstatus must be set before definitions\n");
-		exit(-1);
-	}*/
-
-	char	key[256];
-	sprintf(key, "%s %s", tdlstatus?:"instance", lhs);
+	char	key[512];
+	sprintf(key, "%s %s", status, lhs);
 	wchar_t	*widekey = towide(key);
 	wchar_t	*wkp = widekey;
 	while(*wkp) { *wkp = towlower(*wkp); wkp++; }
-	char	*mbskey = tombs(widekey);
+	return tombs(widekey);
+}
+
+void	add_tdlline(char	*lhs, char	operation, char	*rhs, char	*odef, int	lnum, char	*path)
+{
+	char	*mbskey = key_for_status_and_lhs(tdlstatus?:"instance", lhs);
 	long	had = (long)hash_find(tdl_hash, mbskey);
 	struct tdl_line	*tdl;
 
@@ -500,11 +498,16 @@ struct type	*find_type(char	*name, int	constrain)
 			type = 0;
 			goto notype;
 		}
-		for(i=0;i<ntdllines;i++)
-			if(!strcmp("type", tdllines[i].status) && !strcmp(name, tdllines[i].lhs))break;
-		if(i<ntdllines)
+		char	*key = key_for_status_and_lhs("type", name);
+		long	had = (long)hash_find(tdl_hash, key);
+		struct tdl_line	*tdl = NULL;
+		if(had != 0)tdl = tdllines + had-1;
+		
+		//for(i=0;i<ntdllines;i++)
+		//	if(!strcmp("type", tdllines[i].status) && !strcmp(name, tdllines[i].lhs))break;
+		if(tdl)
 		{
-			if(tdllines[i].processed)
+			if(tdl->processed)
 			{
 				fprintf(stderr, "tdl: cycle detected! type `%s' needed before completely defined.\n", name);
 				return 0;
@@ -514,18 +517,18 @@ struct type	*find_type(char	*name, int	constrain)
 				if(enable_out_of_order)
 				{
 					//printf(" -- found `%s' later in .tdl file\n", name);
-					tdllines[i].processed = 1;
+					tdl->processed = 1;
 					if(constrain)
 					{
-						if(dagify_tdl_line(tdllines[i].lhs, tdllines[i].rhs, constrain_type))
+						if(dagify_tdl_line(tdl->lhs, tdl->rhs, constrain_type))
 						{
-							fprintf(stderr, "tdl: error constraining occured near line %d\n", tdllines[i].lnum);
+							fprintf(stderr, "tdl: error constraining occured near line %d\n", tdl->lnum);
 							return 0;
 						}
 					}
-					else if(typify_tdl_line(tdllines[i].lhs, tdllines[i].rhs, 0))
+					else if(typify_tdl_line(tdl->lhs, tdl->rhs, 0))
 					{
-						fprintf(stderr, "tdl: error typing occured near line %d\n", tdllines[i].lnum);
+						fprintf(stderr, "tdl: error typing occured near line %d\n", tdl->lnum);
 						return 0;
 					}
 					type = lookup_type(name);
@@ -1254,6 +1257,17 @@ void run_task(char *task, int (*worker)())
 
 void	load_version(char *path)
 {
+	load_lisp(path);
+	char	*v = get_lisp_parameter("*grammar-version*");
+	if(!v)grammar_version = "unknown";
+	else
+	{
+		grammar_version = v;
+		show_task_name("grammar version");
+		printf("%s\n", grammar_version);
+	}
+
+	/*
 	FILE	*f = fopen(path, "r");
 	char	record[1024], *p = record, in = 0;
 
@@ -1277,6 +1291,7 @@ void	load_version(char *path)
 		show_task_name("grammar version");
 		printf("%s\n", grammar_version);
 	}
+	*/
 }
 
 void	load_triggers(char	*path)
