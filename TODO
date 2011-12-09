@@ -47,6 +47,9 @@ ideas:
 DONE:
 
 unreleased
+0.9.5
+	- one more TDL case sensitivity...
+	- Version.lsp reading is more robust
 0.9.4
 	- TDL operators are now case insensitive in their LHS
 	- bug fix: generation derivation trees were inflecting token strings in the wrong order
