@@ -7,17 +7,8 @@ fully automated regression testing
 		GG: mrs, babel
 
 berthold wants
-	- possibly commandline access to ACE QC generator
-	+ add post-generation token mapping phase (and presumably an inverse REPP phase)
-		+ started playing with this with ERG.  I can extract a lattice of lexemes from a generation result, and apply a suite of lattice-mapping rules to it (my test case was affixing possessive markers:
-			John 's -> John's
-		+ should also be able to do a rule to uppercase the first word in a sentence...
-		+ and a rule to join words when the first ends in a hyphen
-		- how about changing underscores to spaces? best done in a REPP phase?
-			- we could do it with token mapping easily enough; i can't find a case where this actually applies?
+	- support for more than one POS tag in YY mode
 	- add post-parsing and post-generation transfer phase (like fixup)
-	+ ace parses 34 readings vs pet/lkb 20 for GG mrs item 95
-		a MWE aligned two different ways... second token generic vs second token native (not blocked by grammar)
 	- *updating* an ace tsdb profile -- doesn't work, apparently?
 	- LUI support
 		-generator trees
@@ -26,11 +17,13 @@ berthold wants
 		-simple MRS
 
 ideas:
-	- case insensitive :+ operator
-	- comments in irregs.tab
-	- comments in %letterset (and %suffix etc?)
+	- if the config.tdl file doesn't exist, we print some silly errors
+	- if the user swaps the -G and -g options, we overwrite their config.tdl file...
+		 we shouldn't do that.
+	- Version.lsp:
+		- be smart about parsing it?
+		- or at least: ignore lines starting with semicolon
 	- properly support lettersets with nonascii characters
-	- quickcheck compiler needs to complain if we try to REC(x) with an x that is out of bounds
 	- fix recursive labeling to check for cycles or empty SLASH difflists
 	- [mode to?] make output more script-friendly
 	- automatic time profile of a grammar
@@ -54,6 +47,8 @@ ideas:
 DONE:
 
 unreleased
+0.9.4
+	- TDL operators are now case insensitive in their LHS
 	- bug fix: generation derivation trees were inflecting token strings in the wrong order
 	- bug fix: copy_mrs() wasn't copying the ->dg field
 	- new --generation-server=LANG option (watches ~/tmp/.transfer.USER.LANG and generates from it)
