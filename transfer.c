@@ -7,7 +7,8 @@
 
 #define	MAX_TRANSFER_CHUNKS	2560
 
-#define	FIXUP_FIRST_ROUTE_ONLY	1
+#define	FIXUP_FIRST_ROUTE_ONLY		1
+#define	CLEANUP_FIRST_ROUTE_ONLY	1
 
 #undef	NO_FIXUP
 //#define	NO_FIXUP
@@ -213,6 +214,9 @@ int						ntrigger_rules;
 struct transfer_rule	**fixup_rules;
 int						nfixup_rules;
 
+struct transfer_rule	**cleanup_rules;
+int						ncleanup_rules;
+
 int	study_trigger_rule(char	*name, struct dg	*dg)
 {
 	//printf("loading trigger rule '%s'\n", name);
@@ -234,6 +238,18 @@ int	study_fixup_rule(char	*name, struct dg	*dg)
 	if(!tr)return -1;
 	fixup_rules = realloc(fixup_rules, sizeof(struct transfer_rule*)*(nfixup_rules+1));
 	fixup_rules[nfixup_rules++] = tr;
+	return 0;
+}
+
+int	study_cleanup_rule(char	*name, struct dg	*dg)
+{
+	//printf("loading cleanup rule '%s'\n", name);
+	//printf("	dg type '%s'\n", dg->xtype->name);
+	wellform(dg, "transfer rule");
+	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
+	if(!tr)return -1;
+	cleanup_rules = realloc(cleanup_rules, sizeof(struct transfer_rule*)*(ncleanup_rules+1));
+	cleanup_rules[ncleanup_rules++] = tr;
 	return 0;
 }
 
@@ -266,6 +282,8 @@ struct transfer_freezer
 	int						ntrigger_rules;
 	struct transfer_rule	**fixup_rules;
 	int						nfixup_rules;
+	struct transfer_rule	**cleanup_rules;
+	int						ncleanup_rules;
 	struct transfer_rule	**idiom_rules;
 	int						nidiom_rules;
 	char					*non_idiom_root;
@@ -301,6 +319,11 @@ void	*freeze_transfer()
 	for(i=0;i<nfixup_rules;i++)
 		fz->fixup_rules[i] = freeze_transfer_rule(fixup_rules[i]);
 	fz->nfixup_rules = nfixup_rules;
+
+	fz->cleanup_rules = slab_alloc(sizeof(struct transfer_rule*)*ncleanup_rules);
+	for(i=0;i<ncleanup_rules;i++)
+		fz->cleanup_rules[i] = freeze_transfer_rule(cleanup_rules[i]);
+	fz->ncleanup_rules = ncleanup_rules;
 
 	fz->idiom_rules = slab_alloc(sizeof(struct transfer_rule*)*nidiom_rules);
 	for(i=0;i<nidiom_rules;i++)
@@ -393,6 +416,10 @@ void	recover_transfer(void	*transfer)
 	for(i=0;i<nidiom_rules;i++)
 		thaw_transfer_rule(idiom_rules[i]);
 	non_idiom_root = fz->non_idiom_root;
+	cleanup_rules = fz->cleanup_rules;
+	ncleanup_rules = fz->ncleanup_rules;
+	for(i=0;i<ncleanup_rules;i++)
+		thaw_transfer_rule(cleanup_rules[i]);
 	clear_slab();
 	//printf("recover: %s\n", non_idiom_root);
 }
@@ -1454,6 +1481,21 @@ struct mrs	*fixup_mrs(struct mrs	*m)
 		fprintf(stderr, "WARNING: ambiguity in generator fixup rules; using first result.\n");
 	return results[0];
 #endif
+}
+
+struct mrs	*cleanup_mrs(struct mrs	*m)
+{
+	if(!ncleanup_rules)return m;
+	// we shouldn't have to reformat() m; it should have come straight off of a DAG.
+	//m = reformat_mrs_for_transfer(m);
+	//printf("reformatted mrs:\n");
+	//print_mrs(m);
+	struct mrs	**results = NULL;
+	int	n = transfer_mrs(ncleanup_rules, cleanup_rules, m, &results, CLEANUP_FIRST_ROUTE_ONLY);
+	assert(n >= 0);
+	if(n > 1)
+		fprintf(stderr, "WARNING: ambiguity in generator cleanup rules; using first result.\n");
+	return results[0];
 }
 
 int	transfer(struct mrs	*m)

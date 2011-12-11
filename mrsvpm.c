@@ -504,3 +504,55 @@ struct mrs	*external_to_internal_mrs(struct mrs	*min)
 
 	return mout;
 }
+
+// produce a copy of 'min' on the slab, with external MRS variables
+struct mrs	*internal_to_external_mrs(struct mrs	*min)
+{
+	struct mrs	*mout = slab_calloc(sizeof(*mout),1);
+	bzero(mout, sizeof(*mout));
+	int	i, j;
+
+	make_reliable_vnums(min);
+
+	mout->vlist.nvars = min->vlist.nvars;
+	mout->vlist.vars = slab_malloc(sizeof(struct mrs_var*) * mout->vlist.nvars);
+	for(i=0;i<mout->vlist.nvars;i++)
+		mout->vlist.vars[i] = internal_to_external_mrs_var(min->vlist.vars[i]);
+
+	mout->nhcons = min->nhcons;
+	mout->hcons = slab_malloc(sizeof(struct mrs_hcons) * mout->nhcons);
+	for(i=0;i<mout->nhcons;i++)
+	{
+		struct mrs_hcons	*hin = min->hcons+i;
+		struct mrs_hcons	*hout = mout->hcons+i;
+		hout->type = hin->type;
+		hout->hi = mout->vlist.vars[hin->hi->vnum];
+		hout->lo = mout->vlist.vars[hin->lo->vnum];
+	}
+
+	if(min->ltop)mout->ltop = mout->vlist.vars[min->ltop->vnum];
+	if(min->index)mout->index = mout->vlist.vars[min->index->vnum];
+	if(min->xarg)mout->xarg = mout->vlist.vars[min->xarg->vnum];
+
+	mout->nrels = min->nrels;
+	mout->rels = slab_calloc(sizeof(struct mrs_ep), mout->nrels);
+	for(i=0;i<mout->nrels;i++)
+	{
+		struct mrs_ep	*ein = min->rels+i;
+		struct mrs_ep	*eout = mout->rels+i;
+		eout->pred = freeze_string(ein->pred);
+		eout->lbl = mout->vlist.vars[ein->lbl->vnum];
+		eout->epnum = ein->epnum;
+		eout->cfrom = ein->cfrom;
+		eout->cto = ein->cto;
+		eout->nargs = ein->nargs;
+		eout->args = slab_malloc(sizeof(struct mrs_ep_role) * eout->nargs);
+		for(j=0;j<eout->nargs;j++)
+		{
+			eout->args[j].name = freeze_string(ein->args[j].name);
+			eout->args[j].value = mout->vlist.vars[ein->args[j].value->vnum];
+		}
+	}
+
+	return mout;
+}

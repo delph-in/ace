@@ -421,7 +421,11 @@ int	main(int	argc, char	*argv[])
 			report_profiler(transfer_profiler);
 	}
 	if(debug_level)freport_timers(stderr);
-	wait_for_lui();
+	if(lui_mode)
+	{
+		quit_lui();
+		wait_for_lui();
+	}
 
 	if(stats.success<=0 && stats.count>0)return -1;
 	else return 0;

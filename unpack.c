@@ -1327,9 +1327,17 @@ extern int do_itsdb;
 				struct mrs	*m = NULL;
 				if(want_mrs)
 				{
+					extern int ncleanup_rules, inhibit_vpm;
+					if(ncleanup_rules > 0)inhibit_vpm++;
 					start_timer(mrs_timer);
 					m = extract_mrs(hyp->dg);
 					stop_timer(mrs_timer, 1);
+					if(ncleanup_rules > 0)
+					{
+						inhibit_vpm--;
+						m = cleanup_mrs(m);	// both for parsing and generation
+						m = internal_to_external_mrs(m);
+					}
 				}
 				int idiomatic = check_idioms(hyp->dg, m);
 				if(!idiomatic && (g_mode == GENERATING))

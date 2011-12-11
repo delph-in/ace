@@ -94,9 +94,12 @@ char		*external_to_internal_var_type(char	*in);
 struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist);
 void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep);
 
+// MRS copiers
 struct mrs	*copy_mrs(struct mrs	*m);
 struct mrs	*slab_copy_mrs(struct mrs	*min, int share_strings);
 struct mrs	*external_to_internal_mrs(struct mrs	*min);
+struct mrs	*internal_to_external_mrs(struct mrs	*min);
+
 struct mrs	*ace_surface_to_mrs(char	*line);
 
 void	mrs_crange_for_x(struct mrs	*m, struct mrs_var	*x, int	quantified, int	*From, int	*To);

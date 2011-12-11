@@ -54,13 +54,20 @@ void	*lui_listener(void *foo)
 	return 0;
 }
 
+void quit_lui()
+{
+	if(lui_write)
+	{
+		fprintf(lui_write, "quit 0\n");
+		fclose(lui_write);
+	}
+}
+
 void wait_for_lui()
 {
 	if(lui_write)
 	{
 		waiting_for_lui = 1;
-		fprintf(lui_write, "quit 0\n");
-		fclose(lui_write);
 		while(lui_rfd != -1)usleep(200000);
 	}
 }

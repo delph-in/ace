@@ -59,6 +59,8 @@ int	study_idiom_rule(char	*name, struct dg	*dg);
 int	check_idioms(struct dg	*dg, struct mrs	*m);
 
 int	study_fixup_rule(char	*name, struct dg	*dg);
+int	study_cleanup_rule(char	*name, struct dg	*dg);
 struct mrs	*fixup_mrs(struct mrs	*m);
+struct mrs	*cleanup_mrs(struct mrs	*m);
 
 int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct mrs	***Results, int first_route_only);

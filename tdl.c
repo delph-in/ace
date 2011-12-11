@@ -1327,6 +1327,17 @@ void	load_fixup_rules(char	*path)
 	g_transfer = 0;
 }
 
+void	load_cleanup_rules(char	*path)
+{
+	if(!path)return;
+	tdl_push_status("cleanup-rule");
+	load_tdl(path);
+	tdl_pop_status();
+	g_transfer = 1;
+	process_tdl_dgs_status("cleanup-rule", study_cleanup_rule);
+	g_transfer = 0;
+}
+
 char	*grammar_dir;
 char	*confdir;
 
@@ -1601,6 +1612,7 @@ int load_grammar(char	*path)
 	{
 		load_triggers(get_conf_file_path(confdir, "generation-trigger-rules"));
 		load_fixup_rules(get_conf_file_path(confdir, "generation-fixup-rules"));
+		load_cleanup_rules(get_conf_file_path(confdir, "cleanup-rules"));
 		load_idioms(get_conf_file_path(confdir, "idiom-rules"));
 
 		load_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
