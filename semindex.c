@@ -588,7 +588,7 @@ int	semindex_try_generics(struct mrs_ep	*ep, struct ep_alignment	**Rest, char	*e
 	}
 }
 
-int evacuate(int nvaclex, char **vaclex)
+int evacuate(int ntriggers, char **triggers, struct dg	**trigcons)
 {
 	struct semindex_pred_node	*vac = lookup_semindex(VACUOUS, 0);
 	struct grammar_entity		*e;
@@ -605,12 +605,26 @@ int evacuate(int nvaclex, char **vaclex)
 		if(e->what == LEXEME)
 		{
 			int j;
-			for(j=0;j<nvaclex;j++)
-				if(!strcmp(vaclex[j], e->lex->word))break;
-			if(j==nvaclex)continue;
-			//printf("trying to add vacuous lexeme '%s'\n", e->lex->word);
-			add_agenda(lexical_edge(e->lex, 0, 0, 0));
-			count++;
+			for(j=0;j<ntriggers;j++)
+				if(!strcmp(triggers[j], e->lex->word))
+				{
+					// we may have to instantiate this vacuous lexeme several times, with different constraints.
+					//printf("trying to add vacuous lexeme '%s'\n", e->lex->word);
+					struct edge	*edge = lexical_edge(e->lex, 0, 0, 0);
+					if(trigcons[j])
+					{
+						//printf("applying trigger constraint to %s\n", e->lex->word);
+						//print_dg(trigcons[j]);printf("\n");
+						if(0 != unify_dg_infrom(edge->dg, trigcons[j]))
+						{
+							fprintf(stderr, "TRIGGER CONSTRAINT on '%s' failed\n", triggers[j]);
+							unify_backtrace();
+							continue;
+						}
+					}
+					add_agenda(edge);
+					count++;
+				}
 		}
 	}
 	return count;
@@ -696,21 +710,56 @@ void semantic_lookup(struct mrs	*mrs)
 	// finally, add vacuous entities
 	int	ntriggers = 0;
 	char	**triggers = NULL;
-	void	add_vac(char	*lexid)
+	struct dg	**trigcons = NULL;
+	void	add_vac(char	*lexid, struct dg	*cons)
 	{
-		int	i;
+		//printf("trigger %s %p\n", lexid, cons);
+		int	i, packed = 0;
 		for(i=0;i<ntriggers;i++)
-			if(!strcmp(lexid, triggers[i]))break;
-		if(i<ntriggers)return;
+			if(!strcmp(lexid, triggers[i]))
+			{
+				if(!cons)
+				{
+					// specificied with no constraint
+					// automatically subsumes all other triggerings of this lexid
+					trigcons[i] = NULL;
+					packed = 1;
+					continue;
+				}
+				if(!trigcons[i])
+				{
+					// a previous rule triggered this same lexid with no constraint;
+					// we don't need a constrained version.
+					return;
+				}
+				int res = equivalent_dg(trigcons[i], cons,1,1);
+				if(res == 2 || res == 1)
+				{
+					// a previous rule triggered a more general constraint.
+					return;
+				}
+				if(res == -1)
+				{
+					// a previous rule triggered a less general constraint
+					if(!packed)
+						trigcons[i] = cons;
+					else trigcons[i] = NULL;
+					packed = 1;
+					continue;
+				}
+			}
+		if(packed)return;
 		ntriggers++;
 		triggers = realloc(triggers, sizeof(char*)*ntriggers);
 		triggers[ntriggers-1] = strdup(lexid);
-		//printf("trigger %s\n", lexid);
+		trigcons = realloc(trigcons, sizeof(struct dg*)*ntriggers);
+		trigcons[ntriggers-1] = cons;
+		//printf("trigger %s with constraint %p\n", lexid, cons);
 	}
 	activate_trigger_rules(mrs, add_vac);
 	//printf("triggered %d vacuous lexemes\n", ntriggers);
 	//check_triggers(ntriggers, triggers, mrs->ntriggers, mrs->triggers);
-	count += evacuate(ntriggers, triggers);
+	count += evacuate(ntriggers, triggers, trigcons);
 	//count += evacuate(mrs->ntriggers, mrs->triggers);
 	if(0)
 	{

@@ -511,7 +511,14 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 	// destructively unify
 
 	t = glb(t1, t2);
-	if(!t)return -1;
+	if(!t)
+	{
+#ifdef	UNIFY_PATHS
+		ut1 = t1;
+		ut2 = t2;
+#endif
+		return -1;
+	}
 
 	if(t != t1 && t!= t2)
 	{
@@ -1218,6 +1225,8 @@ static void flat_print_dg(struct dg	*d)
 		printf("]");
 	}
 }
+
+print_within_generation(struct dg	*d) { flat_print_dg(d); }
 
 int	dag_print_style = 0;
 

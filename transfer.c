@@ -575,7 +575,7 @@ int satisfiable_hconses(struct transfer_rule	*tr, int idx, int	need, struct mrs	
 	return 0;
 }
 
-int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total, int is_filter)
+int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total, int	hccount, int	*hcalignment, int	hctotal, int is_filter)
 {
 	int	i;
 	for(i=0;i<count;i++)
@@ -683,7 +683,14 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	if(unify_vars(mrs->index, tr->context.mrs->index))return -1;
 	allow_unify_swapping = 1;
 
-	if(count == total)
+	for(i=0;i<hccount;i++)
+	{
+		struct mrs_hcons	hrule = find_hc(tr, i);
+		struct mrs_hcons	hin = mrs->hcons[hcalignment[i]];
+		if(!unifiable_hcons(hrule, hin))return -1;
+	}
+
+	if(count == total && hccount == hctotal)
 	{
 		// unification is complete; test the EQUAL and SUBSUME conditions
 		extern unsigned int	generation;
@@ -747,6 +754,7 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 				return -1;
 			}
 		}
+		/*
 		// ensure that CONTEXT and FILTER HCONS specifications are satisfiable.
 		char	used_hcons[mrs->nhcons];
 		bzero(used_hcons, sizeof(used_hcons));
@@ -758,6 +766,7 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 			forget_tmp();
 			return -1;
 		}
+		*/
 		
 		// don't forget_tmp() if we succeeded with the match and it was a complete match.
 		return 0;
@@ -767,10 +776,10 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	return 0;
 }
 
-int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, int	total, int	*alignment, int	(*callback)(int	*alignment), int	is_filter)
+int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, int	total, int	*alignment, int	hcplace, int	hctotal, int	*hcalignment, int	(*callback)(int	*alignment, int	*hcalignment), int	is_filter)
 {
 	int	i;
-	if(place == total && !is_filter)
+	if(place == total && hcplace == hctotal && !is_filter)
 	{
 		/*printf("produced a complete alignment for rule '%s' [%d input, %d ctx]: ", tr->name, tr->input.neps, tr->context.neps);
 		print_dg(tr->dg);
@@ -782,8 +791,8 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 			// see if we can match the filter portion... uh oh!
 			forget_tmp();
 			int	did_filter = 0;
-			int	filtercb(int	*filtalign) { did_filter = 1; return 1; }	// return of 1 indicates we don't care about more alignments; one is enough to say it was filtered.
-			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, filtercb, 1);
+			int	filtercb(int	*filtalign, int *filthcalign) { did_filter = 1; return 1; }	// return of 1 indicates we don't care about more alignments; one is enough to say it was filtered.
+			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, hcplace, tr->input.nhcons + tr->context.nhcons + tr->filter.nhcons, hcalignment, filtercb, 1);
 			if(did_filter)
 			{
 				//printf("FILTER fired for rule '%s'.\n", tr->name);
@@ -791,50 +800,75 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 			}
 			// if the rule has output, we need to reconstruct the temporary unifications, now that we've verified there were no filter firings :-/
 			if(tr->output.neps)
-				assert(0 == test_transfer_alignment(tr, mrs, place, alignment, total, is_filter));
+				assert(0 == test_transfer_alignment(tr, mrs, place, alignment, total, hcplace, hcalignment, hctotal, is_filter));
 		}
-		int rv = callback(alignment);
+		int rv = callback(alignment, hcalignment);
 		forget_tmp();
 		return rv;
 	}
-	else if(place == total)
+	else if(place == total && hcplace == hctotal)
 	{
 		// FILTER callback
-		int rv = callback(alignment);
+		int rv = callback(alignment, hcalignment);
 		forget_tmp();
 		return rv;
 	}
 
-	// try to align 'place' to an unused EP in 'mrs'
-	for(i=0;i<mrs->nrels;i++)
+	if(place < total)
 	{
-		if(mrs->rels[i].active)continue;
-		alignment[place] = i;
-		DEBUG("how about rule %s spot %d for '%s'?\n", tr->name, place, mrs->rels[i].pred);
-		if(0 != test_transfer_alignment(tr, mrs, place+1, alignment, tr->input.neps + tr->context.neps, is_filter))
-			continue;
-		DEBUG("passed test.\n");
-		mrs->rels[i].active = 1;
-		int rv = align_transfer_rule0(tr, mrs, place+1, total, alignment, callback, is_filter);
-		mrs->rels[i].active = 0;
-		if(rv != 0)return rv;
+		// try to align 'place' to an unused EP in 'mrs'
+		for(i=0;i<mrs->nrels;i++)
+		{
+			if(mrs->rels[i].active)continue;
+			alignment[place] = i;
+			DEBUG("how about rule %s spot %d for '%s'?\n", tr->name, place, mrs->rels[i].pred);
+			if(0 != test_transfer_alignment(tr, mrs, place+1, alignment, total/*tr->input.neps + tr->context.neps*/, hcplace, hcalignment, hctotal, is_filter))
+				continue;
+			DEBUG("passed test.\n");
+			mrs->rels[i].active = 1;
+			int rv = align_transfer_rule0(tr, mrs, place+1, total, alignment, hcplace, hctotal, hcalignment, callback, is_filter);
+			mrs->rels[i].active = 0;
+			if(rv != 0)return rv;
+		}
+		return 0;
 	}
-	return 0;
+	else
+	{
+		// try to align 'hcplace' to an unused HC in 'mrs'
+		for(i=0;i<mrs->nhcons;i++)
+		{
+			if(mrs->hcons[i].active)continue;
+			hcalignment[hcplace] = i;
+			DEBUG("how about rule %s spot %d for HC %d?\n", tr->name, hcplace, i);
+			if(0 != test_transfer_alignment(tr, mrs, place, alignment, total/*tr->input.neps + tr->context.neps*/, hcplace+1, hcalignment, hctotal, is_filter))
+				continue;
+			DEBUG("passed test.\n");
+			mrs->hcons[i].active = 1;
+			int rv = align_transfer_rule0(tr, mrs, place, total, alignment, hcplace+1, hctotal, hcalignment, callback, is_filter);
+			mrs->hcons[i].active = 0;
+			if(rv != 0)return rv;
+		}
+		return 0;
+	}
 }
 
-int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callback)(int	*alignment))
+int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callback)(int	*alignment, int	*hcalignment))
 {
 	int	i;
 	for(i=0;i<mrs->nrels;i++)
 		mrs->rels[i].active = 0;
+	for(i=0;i<mrs->nhcons;i++)
+		mrs->hcons[i].active = 0;
 
 	DEBUG("trying to align %s\n", tr->name);
 	int	nplaces = tr->input.neps + tr->context.neps + tr->filter.neps;
 	int	alignment[nplaces];
-	return align_transfer_rule0(tr, mrs, 0, tr->input.neps + tr->context.neps, alignment, callback, 0);
+	int	nhcplaces = tr->input.nhcons + tr->context.nhcons + tr->filter.nhcons;
+	int	hcalignment[nhcplaces];
+	return align_transfer_rule0(tr, mrs, 0, tr->input.neps + tr->context.neps, alignment, 0, tr->input.nhcons + tr->context.nhcons, hcalignment, callback, 0);
 }
 
-void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
+void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct dg	*cons))
 {
 	int	i;
 	/*printf("input MRS var DGs:\n");
@@ -853,10 +887,15 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 
 	for(i=0;i<ntrigger_rules;i++)
 	{
-		int	found_alignment(int	*alignment)
+		int	found_alignment(int	*alignment, int	*hcalignment)
 		{
 			struct dg	*flags = dg_hop(trigger_rules[i]->dg, lookup_fname("FLAGS"));
 			struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
+#ifdef	TRIGGER_CONSTRAINT
+			struct dg	*trigcons = dg_hop(flags, lookup_fname("TRIGGER-CONSTRAINT"));
+#else
+			struct dg	*trigcons = NULL;
+#endif
 			char	lexid[256];
 			sprintf(lexid, "%.*s", (int)strlen(trig->xtype->name)-2, trig->xtype->name+1);
 			if(temporary_expedient(lexid))
@@ -867,7 +906,15 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid))
 			else
 			{
 				//printf("triggering '%s' via '%s', aligned on %s\n", lexid, trigger_rules[i]->name, mrsin->rels[alignment[0]].pred);
-				trigger(lexid);
+				if(trigcons)
+				{
+					struct dg	*dg = copy_dg_with_comp_arcs(trigcons);
+					setup_tmp();	// prevent it from being forgotten when we return
+					trigcons = dg;
+					//printf("triggering '%s' via '%s', and TRIGGER-CONSTRAINT is:\n", lexid, trigger_rules[i]->name);
+					//print_dg(dg);printf("\n");
+				}
+				trigger(lexid, trigcons);
 			}
 			return 1;	// don't care to hear about more alignments; it's triggered.
 		}
@@ -987,7 +1034,7 @@ check_all_mrs_vars_are_on_vlist(struct mrs	*m)
 // use the new variables' INSTLOC to see what old variable they correspond to,
 // and in the result MRS, update all obsoleted old variables to their new counterparts.
 
-struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct mrs	*min)
+struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*hcalignment, struct mrs	*min)
 {
 	struct mrs_vlist	new_vars;
 	bzero(&new_vars, sizeof(new_vars));
@@ -1099,13 +1146,15 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct
 	}*/
 
 	int ncarried_input_variables = 0;
-	char	input_variable_is_carried[min->vlist.nvars];
+	//char	input_variable_is_carried[min->vlist.nvars];
+	char	input_variable_is_carried[1024];//min->vlist.nvars];
 	bzero(input_variable_is_carried, sizeof(input_variable_is_carried));
 	make_reliable_vnums(min);
 	struct mrs_var	*map_variable(struct mrs_var	*vin)
 	{
 		if(!vin)return NULL;
 		assert(vin->vnum >= 0 && vin->vnum < min->vlist.nvars);
+		assert(min->vlist.vars[vin->vnum] == vin);
 		struct mrs_var	*corresponding_new_var = new_var_map[vin->vnum];
 		if(corresponding_new_var)
 			return corresponding_new_var;
@@ -1129,7 +1178,7 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, struct
 	char	hc_ditch[min->nhcons];
 	bzero(hc_ditch, sizeof(hc_ditch));
 	for(i=0;i<tr->input.nhcons;i++)
-		hc_ditch[alignment[i]] = 1;
+		hc_ditch[hcalignment[i]] = 1;
 	for(i=j=0;i<min->nhcons;i++)
 		if(!hc_ditch[i])
 		{
@@ -1272,9 +1321,9 @@ struct transfer_mrs_set
 	struct mrs	**mrs;
 };
 
-int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, struct mrs	*min, struct transfer_mrs_set	*ts, int	pack_start)
+int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, int	*hcalignment, struct mrs	*min, struct transfer_mrs_set	*ts, int	pack_start)
 {
-	struct mrs	*mout = transfer_mrs_result(tr, alignment, min);
+	struct mrs	*mout = transfer_mrs_result(tr, alignment, hcalignment, min);
 	if(!mout)return -1;	// latent cycle check failed
 
 	// make a copy of 'mout', so we don't have to worry about structure sharing in subsumption tests
@@ -1319,9 +1368,9 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 		}
 
 		int	nalignments = 0;
-		int	found_alignment(int	*alignment)
+		int	found_alignment(int	*alignment, int *hcalignment)
 		{
-			if(0 != process_one_transfer_result(tr, alignment, min, ts, pack_start))
+			if(0 != process_one_transfer_result(tr, alignment, hcalignment, min, ts, pack_start))
 				return 0;
 
 			nalignments++;
@@ -1358,7 +1407,9 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 		if(debug_level)
 		{
 			printf("transfer rule %s fired %d times; %d intermediates; %d results to pass on\n", tr->name, nfires, ts->n, nresult);
-			//for(i=0;i<nresult;i++)print_mrs(result[i]);
+			extern int trace;
+			if(trace)
+				for(i=0;i<nresult;i++)print_mrs(result[i]);
 		}
 	}
 	ts->n = nresult;

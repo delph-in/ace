@@ -43,6 +43,8 @@ ideas:
 DONE:
 
 unreleased
+	- trigger rule DAG specialization mechanism
+	- rebuilt HCONS matching in transfer rules
 0.9.6pre1
 	- "cleanup" transfer rules, which apply right after unpack() calls extract_mrs()
 0.9.5

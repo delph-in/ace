@@ -48,11 +48,11 @@ struct tcopy
 extern int saved_ntcopies;
 extern struct tcopy	*saved_tcopies;
 
-int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callback)(int	*alignment));
+int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callback)(int	*alignment, int	*hcalignment));
 struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg);
 
 int	study_trigger_rule(char	*name, struct dg	*dg);
-void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid));
+void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct dg	*cons));
 
 extern char	*non_idiom_root;
 int	study_idiom_rule(char	*name, struct dg	*dg);

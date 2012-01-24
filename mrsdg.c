@@ -305,6 +305,8 @@ void	dg_to_mrs_hc(struct dg *dg, struct mrs_vlist *vlist, struct mrs_hcons	*hc)
 
 #define	DO_DIFFLIST(dlist, args, code) do { void lambda(args) {code} do_difflist(dlist, lambda); } while(0)
 
+#define	DO_LIST(dlist, args, code) do { void lambda(args) {code} do_list(dlist, lambda); } while(0)
+
 void do_list(struct dg *list, void (*process)(struct dg *item))
 {
 	struct dg *item;
@@ -356,8 +358,10 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 
 	load_ep_drop();
 	hook = dg_hop(cont, hookf);
-	rels = dg_hop(cont, relsf);
-	hcons = dg_hop(cont, hconsf);
+	rels = dg_path(cont, rels_list_path);
+	hcons = dg_path(cont, hcons_list_path);
+	//rels = dg_hop(cont, relsf);
+	//hcons = dg_hop(cont, hconsf);
 	if(hook)
 	{
 		if(invent_ltop)
@@ -373,9 +377,9 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 //	if(rel_timer == -1)rel_timer = new_timer("extract EPs");
 //	start_timer(rel_timer);
 	int	nrels = 0;
-	DO_DIFFLIST(rels, struct dg *rel, nrels++; );
+	DO_LIST(rels, struct dg *rel, nrels++; );
 	mrs->rels = slab_alloc(sizeof(struct mrs_ep) * nrels);
-	DO_DIFFLIST(rels, struct dg *rel,
+	DO_LIST(rels, struct dg *rel,
 		mrs->nrels++;
 		dg_to_mrs_ep(rel, &mrs->vlist, mrs->rels+mrs->nrels-1);
 		mrs->rels[mrs->nrels-1].epnum = mrs->nrels-1;
@@ -385,9 +389,9 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 //	if(hc_timer == -1)hc_timer = new_timer("extract HCs");
 //	start_timer(hc_timer);
 	int	nhc = 0;
-	DO_DIFFLIST(hcons, struct dg *hc, nhc++; );
+	DO_LIST(hcons, struct dg *hc, nhc++; );
 	mrs->hcons = slab_alloc(sizeof(struct mrs_hcons) * nhc);
-	DO_DIFFLIST(hcons, struct dg *hc,
+	DO_LIST(hcons, struct dg *hc,
 		mrs->nhcons++;
 		dg_to_mrs_hc(hc, &mrs->vlist, mrs->hcons+mrs->nhcons-1);
 	);

@@ -47,7 +47,8 @@ struct mrs_hcons
 		hcons_qeq,
 		hcons_leq,
 		hcons_geq
-	}	type;
+	}	type:31;
+	int active:1;
 };
 
 struct mrs_vlist
