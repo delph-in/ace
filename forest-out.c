@@ -18,7 +18,7 @@ void output_packed_tree(struct edge	*e)
 	e->unpack = (void*)1;
 	char	*sign = e->rule?e->rule->name:e->lex->word;
 	int	i;
-	printf("(%d %s [", e->id, sign);
+	printf("(%d %s %d %d [", e->id, sign, e->from, e->to);
 	for(i=0;i<e->npack;i++)
 	{
 		if(i)printf(",");
