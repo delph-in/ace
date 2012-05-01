@@ -20,17 +20,18 @@ struct edge
 	int			id:29;
 	unsigned	built_on:1, frozen:1, frosted:1;
 
+	unsigned	rtl:1,used:1;	// right-to-left instantiation? active been used?
+	unsigned	prio:14;
+
+	unsigned	ha_use:4;	// how many times have we been summoned?
+	// what dg to unify in to reconstruct this edge's dg
+	char		ha_arg:4;
+
 	struct lexeme	*lex;		// non-null if this is a lexical edge
 
 	struct qc	*qc;	// for passive edges, qc vector for whole edge;
 				// for active edges, qc vector for next daughter
 
-	unsigned	rtl:1,used:1;	// right-to-left instantiation? active been used?
-	unsigned	prio:6;
-
-	unsigned	ha_use:4;	// how many times have we been summoned?
-	// what dg to unify in to reconstruct this edge's dg
-	char		ha_arg:4;
 	struct dg	*ha_dg, *ha_par;
 	struct edge	*hex;	// what edge did we try to combine with on hyperactive excursion?
 

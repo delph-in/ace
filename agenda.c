@@ -17,8 +17,7 @@ struct task
 	struct edge	*edge;
 };
 
-// WARNING: only 6 bits are currently allocated to ->prio in chart.h
-#define	NPRIO	64	//11
+#define	NPRIO	256
 
 #define	EPSILON_PRIORITY(rule)	(NPRIO-1)
 #define	EDGE_PRIORITY(edge)		(NPRIO-1 - (edge->to-edge->from))
@@ -50,6 +49,8 @@ void	clear_agenda()
 void	add_agenda(struct edge	*e)
 {
 	struct task	*t = slab_alloc(sizeof(struct task));
+
+	assert(e->to >= e->from);
 
 	if(trace && e->lex && e->have==e->need)
 	{
