@@ -577,7 +577,9 @@ int	snprint_mrs(char	*str, int	len, struct mrs	*mrs)
 		switch(hc->type) {
 			case hcons_qeq: l += safe_snprintf(str+l, len-l, " qeq "); break;
 			case hcons_leq: l += safe_snprintf(str+l, len-l, " leq "); break;
-			case hcons_geq: l += safe_snprintf(str+l, len-l, " geq "); break; }
+			case hcons_geq: l += safe_snprintf(str+l, len-l, " geq "); break;
+			default:	restore_stderr(); fprintf(stderr, "ERROR: unknown HCONS type %d\n", hc->type); exit(-1);
+		}
 		l += snprint_mrs_var_marked(str+l, len-l, hc->lo, marked);
 	}
 	l += safe_snprintf(str+l, len-l, " > ]%s", mrs_end);
