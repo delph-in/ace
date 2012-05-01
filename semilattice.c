@@ -416,12 +416,15 @@ void	count_nonleaf_nodes(struct type_hierarchy	*th)
 	printf("%d non-leaf types\n", n);
 }
 
+static struct profiler	*code_profiler, *insert_profiler, *partition_profiler, *rebuild_profiler;
+
 int	make_glbs()
 {
 	int	i, j;
 
 	struct type_hierarchy	*th = default_type_hierarchy();
 
+	start_and_alloc_profiler(&partition_profiler, "partitioning the hierarchy", NULL, NULL);
 	char	*vmap = calloc(1, th->ntypes), *cmap = calloc(1, th->ntypes);
 	parts = NULL;
 	nparts = 0;
@@ -430,6 +433,7 @@ int	make_glbs()
 	compute_partitions(th, th->top, vmap, cmap);
 	//printf("%d partitions ; biggest was %d types\n", npartitions, biggest_partition);
 	free(vmap); free(cmap);
+	stop_profiler(partition_profiler, 1);
 
 	for(i=0;i<nparts;i++)
 	{
@@ -439,7 +443,14 @@ int	make_glbs()
 	}
 	free(parts);
 
+	start_and_alloc_profiler(&rebuild_profiler, "rebuilding the hierarchy", NULL, NULL);
 	rebuild_heirarchy(0, th);
+	stop_profiler(rebuild_profiler, 1);
+
+	/*report_profiler(partition_profiler);
+	report_profiler(code_profiler);
+	report_profiler(insert_profiler);
+	report_profiler(rebuild_profiler);*/
 
 	return 0;
 }
@@ -706,6 +717,7 @@ sanity_check_bitvectors(struct partition	*part, unsigned long long	**vectors)
 
 int make_glbs_part(struct type_hierarchy	*th, struct partition	*part)
 {
+	start_and_alloc_profiler(&code_profiler, "bitcode creation and finding new glbs", NULL, NULL);
 	int		bcsize = (part->psize + 63) / 64;
 	unsigned long long	**vectors = calloc(sizeof(unsigned long long*), part->psize);
 	int		i, j, k;
@@ -767,6 +779,7 @@ int make_glbs_part(struct type_hierarchy	*th, struct partition	*part)
 			check_pair(glbtypes[i]->code, glbtypes[j]->code, result, bcsize);
 	}
 
+	start_and_alloc_profiler(&insert_profiler, "building the new glb types", NULL, code_profiler);
 	if(nglbtypes)
 	{
 		//printf("discovered %d new GLB types that we need.\n", nglbtypes);
@@ -775,6 +788,7 @@ int make_glbs_part(struct type_hierarchy	*th, struct partition	*part)
 		for(i=0;i<nglbtypes;i++)
 			insert_glb_type(part, vectors, glbtypes[i], bcsize);
 	}
+	stop_profiler(insert_profiler, nglbtypes);
 
 	hash_free(bchash);	// also frees vectors[] contents
 	free(vectors);
