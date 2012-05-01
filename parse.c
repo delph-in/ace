@@ -433,7 +433,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 		if(rv == -1)return -1;	// ran out of memory in lexical parsing!
 	}
 
-	if(reduce_lexical_lattice(lexical_chart))
+	if(reduce_lexical_lattice(lexical_chart, token_chart))
 	{
 		fprintf(stderr, "NOTE: post reduction gap\n");
 		stop_timer(chart_setup_timer, 1);
@@ -509,7 +509,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 
 	if(do_forest)
 	{
-		output_forest(&cells[chart_size-1]);
+		output_forest(&cells[chart_size-1], token_chart);
 		num_parses = 1;
 	}
 	else if(!do_itsdb && !lui_mode)

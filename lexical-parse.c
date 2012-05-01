@@ -14,6 +14,7 @@
 #include	"freeze.h"
 #include	"lexical-parse.h"
 #include	"lattice-mapping.h"
+#include	"token.h"
 
 extern int inhibit_pack;
 
@@ -162,7 +163,7 @@ void	print_lexical_chart(struct lattice	*tc)
 	}
 }
 
-int	reduce_lexical_lattice(struct lattice	*lat)
+int	reduce_lexical_lattice(struct lattice	*lat, struct lattice	*toklat)
 {
 	extern int debug_level;
 	char		cover[1024];
@@ -227,7 +228,21 @@ int	reduce_lexical_lattice(struct lattice	*lat)
 		if(!cover[i])
 		{
 			//if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d `%s'!\n", i, words[i]);
-			if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d!\n", i);
+			if(1)//if(debug_level)
+			{
+				char	*word = NULL;
+				int k;
+				for(k=0;k<toklat->nedges;k++)
+				{
+					struct lattice_edge	*te = toklat->edges[k];
+					if(te->from->id == i)
+					{
+						if(!word || strlen(word)>strlen(te->token->string))
+							word = te->token->string;
+					}
+				}
+				fprintf(stderr, "NOTE: lexemes do not span position %d `%s'!\n", i, word?:"?");
+			}
 			return -1;
 		}
 
