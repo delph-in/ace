@@ -22,6 +22,8 @@
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
 
+extern int enable_token_avms;
+
 extern int max_unpack_megabytes;
 //#define	MAX_UNPACK_CHUNKS	70000
 //#define	MAX_UNPACK_CHUNKS	7000
@@ -74,8 +76,7 @@ void score_hypothesis(struct hypothesis *h)
 		// 'h' is a leaf/lexeme node
 		// construct the cannonical surface form
 		if(g_mode == GENERATING)return;	// FIXME: realization ranking doesn't have access to surface forms because we have no tokens...
-		extern int enable_token_avms;
-		if(!enable_token_avms)return;
+		//if(!enable_token_avms)return;
 		extern char	*current_sentence;
 		char	surface[1024], *sp = surface;
 		int	i;
@@ -861,6 +862,7 @@ struct token	*gen_extract_one_token(struct hypothesis	*h, int	k, char	*inflected
 	assert(h->edge->lex && !h->edge->rule);
 	struct token	*t = slab_alloc(sizeof(*t));
 	bzero(t, sizeof(*t));
+	if(!enable_token_avms)goto missing_token;
 	struct dg	*toklist = dg_path(h->dg, lex_tokens_list_path);
 	if(toklist == NULL)goto missing_token;
 	int	kk = k;
@@ -958,27 +960,26 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...),
 		}
 		else if(e->lex)
 		{
-			extern int enable_token_avms;
+			int	ntokens = e->lex->stemlen;
+			struct token	*tokens[ntokens];
+			for(i=0;i<ntokens;i++)
+			{
+				if(g_mode == PARSING)
+					tokens[i] = (struct token*)e->daughters[i];
+				else tokens[i] = gen_extract_one_token(hyp, i, genwordforms[i]);
+			}
+			print(" (\"");
+			for(i=0;i<ntokens;i++)
+			{
+				struct token	*tok = tokens[i];
+				char	*form = tok->string;
+				if(i>0)print(" ");
+				print("%s", slab_escape(form));
+			}
+			print("\"");
+
 			if(enable_token_avms)
 			{
-				int	ntokens = e->lex->stemlen;
-				struct token	*tokens[ntokens];
-				for(i=0;i<ntokens;i++)
-				{
-					if(g_mode == PARSING)
-						tokens[i] = (struct token*)e->daughters[i];
-					else tokens[i] = gen_extract_one_token(hyp, i, genwordforms[i]);
-				}
-				print(" (\"");
-				for(i=0;i<ntokens;i++)
-				{
-					struct token	*tok = tokens[i];
-					char	*form = tok->string;
-					if(i>0)print(" ");
-					print("%s", slab_escape(form));
-				}
-				print("\"");
-
 				if(!labelled)
 				{
 					for(i=0;i<ntokens;i++)
@@ -1000,12 +1001,8 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...),
 						print(" %d \"%s\"", id, tokstr);
 					}
 				}
-				print(")");
 			}
-			else
-			{
-				print(" (\"?\")");
-			}
+			print(")");
 		}
 		print(")");
 	}

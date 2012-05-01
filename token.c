@@ -133,20 +133,6 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 	return tc;
 }
 
-/*
-int	lattice_vertex_follows(struct lattice	*lat, struct lattice_vertex	*a, struct lattice_vertex	*b)
-{
-	int i;
-	for(i=0;i<b->nfollowers;i++)
-	{
-		struct lattice_edge	*f = b->followers[i];
-		if(a == f->to)return 1;
-		if(lattice_vertex_follows(lat, a, f->to))return 1;
-	}
-	return 0;
-}
-*/
-
 static void _mark_followers(struct lattice_vertex	*v)
 {
 	int i;
@@ -172,28 +158,26 @@ void	sort_lattice(struct lattice	*tc)
 	 * these become the numbered vertices of the parse chart...
 	 */
 
-	/* we do this by inventing a total ordering:
-	 *  - if the edges imply an order, use that;
-	 *  - otherwise, use the original numeric order of the vertex ids
-	 */
-	int	vertex_compare(struct lattice_vertex	**va, struct lattice_vertex	**vb)
-	{
-		// return 1 if va should come after vb; -1 if va should come before vb
-		if(*va == *vb)return 0;
-		if(lattice_vertex_follows(tc, *va, *vb))return 1;
-		if(lattice_vertex_follows(tc, *vb, *va))return -1;
-		if((*va)->id > (*vb)->id)return 1;
-		if((*va)->id < (*vb)->id)return -1;
-		return 0;
-	}
-	qsort(tc->vertices, tc->nvertices, sizeof(struct lattice_vertex*), (int(*)(const void*,const void*))vertex_compare);
-
-	/* tc->vertices is now ordered according to the new order;
-	 * go through and set new ->id values. */
-	int i;
-	tc->lattice_vertex_id_gen = 0;
+	// traverse the lattice, assigning IDs in reverse order as we leave
+	int i, id = tc->nvertices - 1;
 	for(i=0;i<tc->nvertices;i++)
-		tc->vertices[i]->id = tc->lattice_vertex_id_gen++;
+		tc->vertices[i]->mark = 0;
+	// the idea is that once we can guarantee that everything following 'v' already has a number > 'id', it is safe to assign 'id' to 'v'.
+	void traverse(struct lattice_vertex	*v)
+	{
+		int j;
+		if(v->mark)return;	// already got an id.
+		for(j=0;j<v->nfollowers;j++)
+			traverse(v->followers[j]->to);
+		v->id = id--;
+		v->mark = 1;
+	}
+	for(i=0;i<tc->nvertices;i++)
+		traverse(tc->vertices[i]);
+	assert(id == -1);
+
+	// to determine: do we need to sort the vertex array on the new IDs?
+	tc->lattice_vertex_id_gen = tc->nvertices;
 }
 
 void	print_token_chart(struct lattice	*tc)
@@ -294,6 +278,12 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 	}
 */
 
+	assert(le->daughters == NULL);
+	le->daughters = slab_alloc(sizeof(struct token*) * le->lex->stemlen);
+	int	i;
+	for(i=0;i<le->lex->stemlen;i++)
+		le->daughters[i] = (struct edge*)tokens[i];
+
 	if(!enable_token_avms)return 0;
 
 	struct dg	*le_toklist = dg_path(le->dg, lex_tokens_list_path);
@@ -318,12 +308,6 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 		if(trace) { fprintf(stderr, "failed to unify tokens LAST\n"); unify_backtrace(); }
 		return -1;
 	}
-
-	assert(le->daughters == NULL);
-	le->daughters = slab_alloc(sizeof(struct token*) * le->lex->stemlen);
-	int	i;
-	for(i=0;i<le->lex->stemlen;i++)
-		le->daughters[i] = (struct edge*)tokens[i];
 
 	//printf("after unify, le_toklast:\n");print_dg(le_toklast);printf("\n");
 	//printf("after unify, in_toklast:\n");print_dg(in_toklast);printf("\n");
