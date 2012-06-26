@@ -57,6 +57,8 @@ questions:
 #include	"lexicon.h"
 #include	"mrs.h"
 #include	"unpack.h"
+#include	"lattice-mapping.h"
+#include	"token.h"
 
 //#define	capi_printf(fmt...)	fprintf(stderr, fmt)
 
@@ -65,6 +67,7 @@ void tsdb_report_mrs(struct mrs	*mrs);
 void tsdb_report_labels(struct hypothesis	*hyp);
 
 extern int inhibit_results;
+int itsdb_dump_chart = 0;
 
 const int itsdb_wants_mrs = 1;
 
@@ -152,10 +155,10 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	capi_printf(" (:total . %d) (:treal . %d)", cpuclock_msec, wallclock_msec);
 	capi_printf(" (:tcpu . %d)", cpuclock_msec);
 
-	if(error)capi_printf(" (:error \"%s\")", error);
+	if(error)capi_printf(" (:error . \"%s\")", error);
 }
 
-itsdb_report(int	status, int	tforest)
+itsdb_report(struct lattice	*tokens, int	status, int	tforest)
 {
 	extern int total_edges, real_edges, passive_edges, slab_usage();
 
@@ -165,6 +168,8 @@ itsdb_report(int	status, int	tforest)
 		//capi_printf("(:tcpu . %d) ", tforest);
 
 		int	readings = capi_print_derivations();
+
+		if(itsdb_dump_chart)capi_print_chart(tokens);
 
 		capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
 //			readings,
@@ -302,6 +307,115 @@ void tsdb_report_mrs(struct mrs	*mrs)
 		free(tmp);
 	}
 	capi_printf("\")");
+}
+
+int this_edge_is_root(struct edge	*edge)
+{
+	if(edge->from != 0)return 0;
+	if(edge->to != chart_size-1)return 0;
+	if( (g_mode!=GENERATING || edge->neps == require_neps) && is_root(edge->dg) && !edge->frozen )
+		return 1;
+	return 0;
+}
+
+void	reset_unpacking_e(struct edge	*e)
+{
+	e->unpack = NULL;
+	if(!e->lex)return;
+	if(e->have)reset_unpacking_e(e->daughters[0]);
+	int i;
+	for(i=0;i<e->npack;i++)reset_unpacking_e(e->pack[i]);
+}
+
+void	reset_unpacking()
+{
+	int i, j, k, l;
+	for(i=0;i<chart_size;i++)
+		for(j=0;j<chart_size;j++)
+			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
+			{
+				struct edge	*e = cells[j*chart_size + i].p_edges[k];
+				e->unpack = NULL;
+				if(e->lex)	// lexical edges can contain daughters that are not in the chart. recurse.
+					reset_unpacking_e(e);
+				for(l=0;l<e->npack;l++)
+				{
+					struct edge	*E = e->pack[l];
+					E->unpack = NULL;
+					if(E->lex)reset_unpacking_e(E);
+				}
+			}
+}
+
+int	find_token_id(struct token	*t, struct lattice	*l)
+{
+	int i;
+	for(i=0;i<l->nedges;i++)
+		if(l->edges[i]->token == t)return -(i+1);
+	return 0;
+}
+
+void	capi_print_chart_edge(struct edge	*e, struct lattice	*tokens)
+{
+	if(e->unpack)return;
+	e->unpack = (void*)0x1;
+	char	*sign = e->rule?e->rule->name:e->lex->word;
+	int	i;
+	capi_printf(" ((:id . %d) (:label . \"%s\") (:start . %d) (:end . %d) (:status . %d)", e->id, sign, e->from, e->to, this_edge_is_root(e));
+	if(!e->rule)
+	{
+		// lexeme edge
+		capi_printf(" (:daughters . (");
+		for(i=0;i<e->lex->stemlen;i++)capi_printf(" %d", find_token_id((struct token*)e->daughters[i], tokens));
+	}
+	else
+	{
+		// rule edge
+		capi_printf(" (:daughters . (");
+		for(i=0;i<e->have;i++)capi_printf(" %d", e->daughters[i]->id);
+	}
+	capi_printf(")) (:alternates . (");
+	for(i=0;i<e->npack;i++)capi_printf(" %d", e->pack[i]->id);
+	capi_printf(")))");
+	for(i=0;i<e->npack;i++)
+		capi_print_chart_edge(e->pack[i], tokens);
+	for(i=0;i<e->have;i++)
+		capi_print_chart_edge(e->daughters[i], tokens);
+}
+
+int capi_print_chart(struct lattice	*tokens)
+{
+	capi_printf("(:chart . (");
+	struct chart_cell	*root_cell = &cells[chart_size-1];
+	int i;
+	reset_unpacking();
+	for(i=0;i<root_cell->p_nedges;i++)
+	{
+		struct edge	*edge = root_cell->p_edges[i];
+		if(this_edge_is_root(edge))
+			capi_print_chart_edge(edge, tokens);
+	}
+	reset_unpacking();
+
+	// output pseudo-edges for the token chart
+	improve_token_lattice_characterization(tokens);
+	for(i=0;i<tokens->nedges;i++)
+	{
+		struct lattice_edge	*le = tokens->edges[i];
+		struct token	*t = le->token;
+		capi_printf(" ((:id . %d) (:start . %d) (:end . %d)", -(i+1), le->from->id, le->to->id);
+		char	token_str[10240];
+		extern int dag_print_style;
+		dag_print_style = 1;
+		snprint_dg(token_str, 10239, t->dg);
+		dag_print_style = 0;
+		char	*labelesc = heap_escape(token_str);
+		capi_printf(" (:status . 0) (:label . \"%s\") (:daughters . ()) (:alternates . ()))",
+			labelesc);
+		free(labelesc);
+	}
+
+	capi_printf("))");
 }
 
 int	capi_print_derivations()
