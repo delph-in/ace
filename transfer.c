@@ -88,11 +88,49 @@ patch_variable_types(struct mrs	*m)
 	}
 }
 
+struct dg	*new_instloc(int onslab)
+{
+	struct type_hierarchy	*th = (semi_th && ALLOW_SEMI_MODE)?semi_th:main_th;
+	if(onslab)
+		return copy_dg(th->strtype->dg);
+	else
+	{
+		struct dg	*d = calloc(sizeof(struct dg),1);
+		d->xtype = d->type = th->strtype;
+		return d;
+	}
+}
+
+erase_instlocs(struct mrs	*m)
+{
+	int i;
+	for(i=0;i<m->vlist.nvars;i++)
+	{
+		struct mrs_var	*v = m->vlist.vars[i];
+		if(v->is_const)continue;
+		if(v->dg)
+		{
+			struct dg	*il = dg_hop(v->dg, instloc_feature);
+			if(il)
+			{
+				// INSTLOC was present.
+				// replace it with a brand-new *string* dg.
+				// the following will not relocate/forward/etc v->dg,
+				// because the instloc feature slot is already there by precondition
+				add_dg_hop(v->dg, instloc_feature, new_instloc(0));
+			}
+		}
+	}
+}
+
 int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, char	*feature)
 {
 	struct dg	*dg = dg_hop(tr->dg, lookup_fname(feature));
 	if(!dg) { fprintf(stderr, "transfer rule '%s': no '%s' feature.\n", tr->name, feature); return -1; }
 	desc->dg = dg;
+
+	//printf("before processing rule '%s' part '%s' we have:\n", tr->name, feature);
+	//print_dg(dg); printf("\n");
 
 	if(semi_th && ALLOW_SEMI_MODE)
 	{
@@ -110,6 +148,10 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 		patch_variable_types(desc->mrs);
 		inhibit_vpm--;
 	}
+	erase_instlocs(desc->mrs);	// kill off all reentrancies between INSTLOCs.
+	// we assume rule writers won't try to make these. the 'qeq' grammar type
+	// identifiers the hi INSTLOC with the lo INSTLOC as part of a conspiracy to make generation faster.
+	// the INSTLOC hack field is reused in a different way in ACE's transfer rule implementation, and it is incompatible with that identification.
 
 	// count and save pointers to the EPs
 	struct dg	*list = dg_path(dg, rels_list_path);
@@ -135,9 +177,11 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 
 	// count the HCONS
 	list = dg_path(dg, hcons_list_path);
-	//struct dg	*hcons = dg_hop(dg, lookup_fname("HCONS"));
-	//list = dg_hop(hcons, lookup_fname("LIST"));
 	while(list) { if(dg_hop(list, lookup_fname("FIRST")))desc->nhcons++; list = dg_hop(list, lookup_fname("REST")); }
+
+	//printf("after processing rule '%s' part '%s' we have:\n", tr->name, feature);
+	//print_dg(dg); printf("\n");
+
 	return 0;
 }
 
@@ -202,6 +246,8 @@ struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg)
 		free(saved_tcopies[i].path);
 		saved_ntcopies = 0;
 	}
+	//printf("processing transfer rule '%s',  have:\n", name);
+	//print_dg(dg);
 	return tr;
 }
 
@@ -654,6 +700,7 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 		{
 			//printf("TRANSFER: ");
 			//unify_backtrace();
+
 			forget_tmp();
 			//printf("rule ep:\n");
 			//print_dg(de.dg);printf("\n");
@@ -681,14 +728,17 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	if(unify_vars(mrs->ltop, tr->context.mrs->ltop))return -1;
 	if(unify_vars(mrs->index, tr->input.mrs->index))return -1;
 	if(unify_vars(mrs->index, tr->context.mrs->index))return -1;
-	allow_unify_swapping = 1;
 
 	for(i=0;i<hccount;i++)
 	{
 		struct mrs_hcons	hrule = find_hc(tr, i);
 		struct mrs_hcons	hin = mrs->hcons[hcalignment[i]];
-		if(!unifiable_hcons(hrule, hin))return -1;
+		//if(!unifiable_hcons(hrule, hin))return -1;
+		if(hrule.type != hin.type)return -1;
+		if(unify_vars(hin.hi, hrule.hi))return -1;
+		if(unify_vars(hin.lo, hrule.lo))return -1;
 	}
+	allow_unify_swapping = 1;
 
 	if(count == total && hccount == hctotal)
 	{
@@ -786,7 +836,7 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 		for(i=0;i<total;i++)
 			printf(" %d [%s]", alignment[i], mrs->rels[alignment[i]].pred);
 		printf("\n");*/
-		if(tr->filter.neps)
+		if(tr->filter.neps || tr->filter.nhcons)
 		{
 			// see if we can match the filter portion... uh oh!
 			forget_tmp();
@@ -799,8 +849,15 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 				return 0;
 			}
 			// if the rule has output, we need to reconstruct the temporary unifications, now that we've verified there were no filter firings :-/
-			if(tr->output.neps)
-				assert(0 == test_transfer_alignment(tr, mrs, place, alignment, total, hcplace, hcalignment, hctotal, is_filter));
+
+			/*
+				// it is tempting to add an 'if' clause here to avoid having to replay these unifications when there appears to be no output (e.g. just deleting an EP, or triggering a vacuous lexeme, etc).
+				// but...
+				// trigger rules with specialization constraints can rely on unifications to be present, and...
+				// transfer rules even with no EP or HCONS output can (in theory ... we don't implement it, do we? maybe.) change the HOOK-level features of the output mrs.
+			if(tr->output.neps || tr->output.nhcons)
+			*/
+			assert(0 == test_transfer_alignment(tr, mrs, place, alignment, total, hcplace, hcalignment, hctotal, is_filter));
 		}
 		int rv = callback(alignment, hcalignment);
 		forget_tmp();
@@ -1047,8 +1104,14 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	struct mrs_ep	new_eps[tr->output.neps];
 	int i, j;
 
+	//struct dg	*full_tr_copy = copy_dg_with_comp_arcs(tr->dg);
+
 	struct dg	*copy_ep_out_dgs[tr->output.neps];
 	struct dg	*copy_ep_in_dgs[tr->input.neps];
+	struct dg	*copy_hc_hi[tr->output.nhcons];
+	struct dg	*copy_hc_lo[tr->output.nhcons];
+	struct mrs_var	*copy_hc_hi_v[tr->output.nhcons];
+	struct mrs_var	*copy_hc_lo_v[tr->output.nhcons];
 	for(i=0;i<tr->output.neps;i++)
 	{
 		copy_ep_out_dgs[i] = copy_dg_with_comp_arcs(tr->output.eps[i].dg);
@@ -1063,7 +1126,44 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 				return NULL;	// cycle detected; the unification really failed but we didn't notice until now.
 		}
 	}
+	for(i=0;i<tr->output.nhcons;i++)
+	{
+		copy_hc_hi[i] = copy_dg_with_comp_arcs(tr->output.mrs->hcons[i].hi->dg);
+		copy_hc_lo[i] = copy_dg_with_comp_arcs(tr->output.mrs->hcons[i].lo->dg);
+	}
+
+	// before applying +copy+ defaults, brand new variables need to get INSTLOCs assigned to them, so that they can't be smushed into old variables by the unifier.
+
+	int	nov = tr->output.mrs->vlist.nvars, ninstlocs_to_fix = 0;
+	struct dg	*instlocs_to_fix[nov];
+	for(i=0;i<tr->output.mrs->vlist.nvars;i++)
+	{
+		struct mrs_var	*v = tr->output.mrs->vlist.vars[i];
+		if(!v->dg)continue;	// sometimes there are fake variables... e.g. invented LTOPs
+		struct dg	*rule_vdg = dereference_dg(v->dg);
+		extern unsigned int generation;
+		if(rule_vdg->gen == generation && rule_vdg->copy)
+		{
+			// look at every variable that was copied out of the output section
+			struct dg	*copy_vdg = rule_vdg->copy;
+			struct dg	*copy_il = dg_hop(copy_vdg, instloc_feature);
+			if(!copy_il || copy_il->xtype->name[0]!='"')
+			{
+				// this copy_vdg does not have a grounded INSTLOC.
+				instlocs_to_fix[ninstlocs_to_fix++] = copy_vdg;
+			}
+		}
+	}
+
 	bump_generation();
+	for(i=0;i<ninstlocs_to_fix;i++)
+	{
+		struct dg	*new_il = new_instloc(1);
+		new_il->type = new_il->xtype = transfer_next_skolem_constant();
+		add_dg_hop(instlocs_to_fix[i], instloc_feature, new_il);
+		//printf("fixing instloc for new variable dg %p\n", instlocs_to_fix[i]);
+	}
+
 	for(i=0;i<tr->output.neps;i++)
 		if(tr->output_copy_map[i])	// copy whatever we can from input[i]
 		{
@@ -1075,6 +1175,8 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 			/*printf("applying +copy+; revised output dag is:\n");
 			print_dg(copy_ep_out_dgs[i]);printf("\n");*/
 		}
+
+	//printf("for result (after applying +copy+), tr dg is:\n");print_dg(full_tr_copy);printf("\n");
 
 	inhibit_vpm = 1;	// in SEMI-mode, the variables are already external.  in non-SEMI-mode, we want to keep variables internal.
 	clear_mrs();	// we don't want spurious reentrancies with variables read off of previous invocations of this rule
@@ -1090,6 +1192,11 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 			print_mrs_var(new_eps[i].args[j].value);
 		}
 		printf(" ]\n");*/
+	}
+	for(i=0;i<tr->output.nhcons;i++)
+	{
+		copy_hc_hi_v[i] = dg_to_mrs_var(copy_hc_hi[i], &new_vars);
+		copy_hc_lo_v[i] = dg_to_mrs_var(copy_hc_lo[i], &new_vars);
 	}
 	for(i=0;i<new_vars.nvars;i++)
 		new_vars.vars[i]->dg->copy = NULL;	// make sure dg_to_mrs_var in future passes doesn't return this by mistake
@@ -1110,8 +1217,8 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		char	*ilt = iloc->xtype->name;
 		if(*ilt == '"')
 		{
-			// INSTLOC was set; this variable exists in the input MRS. find it.
-			//printf("new var %d was really old; has instloc type %s\n", i, ilt);
+			// INSTLOC was set; this variable may exist in the input MRS. find it.
+			//printf("new var %d has instloc type %s\n", i, ilt);
 			for(j=0;j<min->vlist.nvars;j++)
 			{
 				struct mrs_var	*ivar = min->vlist.vars[j];
@@ -1123,18 +1230,32 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 			}
 			if(j == min->vlist.nvars)
 			{
-				printf("ERROR: found INSTLOC %s in output Ep variable, but that is not a variable in the input MRS\n", ilt);
-				assert(j < min->vlist.nvars);
+				// make sure this was one of the variables we gave a brand new instloc to.
+				for(j=0;j<ninstlocs_to_fix;j++)
+					if(dereference_dg(instlocs_to_fix[j]) == vdg)break;
+				if(j==ninstlocs_to_fix)
+				{
+					printf("ERROR: found INSTLOC %s in output Ep variable, but that is not a variable in the input MRS and is not a variable we assigned a new INSTLOC to.\n", ilt);
+					assert(!"not reached");
+				}
 			}
-			//printf(" ... was actually old variable %s%d\n", min->vlist.vars[j]->type, j);
-			new_var_map[j] = v;
+			else
+			{
+				//printf(" ... was actually old variable %s%d\n", min->vlist.vars[j]->type, j);
+				new_var_map[j] = v;
+			}
 		}
 		else
 		{
+			assert(!"not reached");
+			// should have already allocated instlocs to all new variables... code higher up.
+
+/*
 			// INSTLOC was not set; this variable is being invented brand new by this rule.
 			// give it an INSTLOC for future use.
 			iloc->xtype = iloc->type = transfer_next_skolem_constant();
 			//printf("new var %d was really new\n", i);
+*/
 		}
 	}
 
@@ -1166,14 +1287,11 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		return vin;
 	}
 
-	// no support for creating HCONS just now
-	assert(tr->output.nhcons == 0);
-
 	//printf("activated rule '%s' to ditch %d EPs\n", tr->name, tr->input.neps);
 
 	struct mrs	*mout = slab_alloc(sizeof(*mout));
 	bzero(mout, sizeof(*mout));
-	mout->nhcons = min->nhcons - tr->input.nhcons;
+	mout->nhcons = min->nhcons - tr->input.nhcons + tr->output.nhcons;
 	mout->hcons = slab_alloc(sizeof(struct mrs_hcons) * mout->nhcons);
 	char	hc_ditch[min->nhcons];
 	bzero(hc_ditch, sizeof(hc_ditch));
@@ -1189,6 +1307,16 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 			hcout->lo = map_variable(hcin->lo);
 			j++;
 		}
+	for(i=0;i<tr->output.nhcons;i++)
+	{
+		struct mrs_hcons	*hcnew = tr->output.mrs->hcons+i;
+		struct mrs_hcons	*hcout = mout->hcons + j;
+		hcout->type = hcnew->type;
+		hcout->hi = copy_hc_hi_v[i];
+		hcout->lo = copy_hc_lo_v[i];
+		j++;
+	}
+	assert(mout->nhcons == j);
 	mout->ltop = map_variable(min->ltop);
 	mout->index = map_variable(min->index);
 	mout->xarg = map_variable(min->xarg);
@@ -1525,6 +1653,8 @@ struct mrs	*fixup_mrs(struct mrs	*m)
 	m = reformat_mrs_for_transfer(m);
 	//printf("reformatted mrs:\n");
 	//print_mrs(m);
+	//printf("there are %d fixup rules\n", nfixup_rules);
+
 	struct mrs	**results = NULL;
 	int	n = transfer_mrs(nfixup_rules, fixup_rules, m, &results, FIXUP_FIRST_ROUTE_ONLY);
 	assert(n >= 0);
