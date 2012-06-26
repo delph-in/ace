@@ -1,1 +1,1 @@
-#define	ACE_VERSION	"0.9.6"
+#define	ACE_VERSION	"0.9.7"
