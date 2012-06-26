@@ -378,6 +378,19 @@ int	generate(struct mrs	*mrs)
 	struct realization	*realizations=NULL;
 	int	nrealizations=0, arealizations = 0;
 
+#define SEMI_SIDE_SUBSUMPTION_TEST
+//#define POST_FIXUP_SUBSUMPTION_TEST
+
+#ifndef	SEMI_SIDE_SUBSUMPTION_TEST
+	// map back and forth, since that will happen to the results...
+	current_internal_input_mrs = external_to_internal_mrs(internal_to_external_mrs(current_internal_input_mrs));
+#endif
+
+#ifdef	POST_FIXUP_SUBSUMPTION_TEST
+	// map back and forth, since that will happen to the results...
+	current_input_mrs = internal_to_external_mrs(current_internal_input_mrs);
+#endif
+
 	int show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
 	{
 		// LKB compares *internal* MRSes, by going through the VPM *twice* "to get defaults".
@@ -390,16 +403,23 @@ int	generate(struct mrs	*mrs)
 		// *stricter* than testing whether (ivpm(input) subsumes ivpm(vpm(result))).
 		// ACE is going to try doing that stricter test and see what happens...
 		// Note that other processors may not have this option, due to not loading the SEMI signature.
-//		struct mrs	*hax_res = external_to_internal_mrs(mrs_res);
 		//if(!mrs_subsumes(mrs, mrs_res))
 		//if(!mrs_subsumes(hax_ref, hax_res))
+#ifdef	SEMI_SIDE_SUBSUMPTION_TEST
 		if(!mrs_subsumes(current_input_mrs, mrs_res))	// totally SEMI-side comparison
+#else
+		struct mrs	*hax_res = external_to_internal_mrs(mrs_res);
+		if(!mrs_subsumes(current_internal_input_mrs, hax_res))	// grammar-side comparison
+#endif
 		{
 			if(trace)
 			{
 				printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
-				//print_mrs(hax_res); printf("\n");
+#ifdef	SEMI_SIDE_SUBSUMPTION_TEST
 				print_mrs(mrs_res); printf("\n");
+#else
+				print_mrs(hax_res); printf("\n");
+#endif
 			}
 			//print_mrs(mrs_res); printf("\n");
 			free_mrs(mrs_res);

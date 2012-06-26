@@ -23,6 +23,7 @@
 #include	"timer.h"
 
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
+extern int itsdb_dump_chart;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
@@ -51,6 +52,7 @@ int	form_to_relation = 0;
 int	show_realization_trees = 0;
 int	show_realization_mrses = 0;
 int report_labels = 0;
+extern int equivalence_packing_only;
 
 int	max_chart_megabytes = 1200, max_unpack_megabytes = 1500;
 
@@ -102,6 +104,8 @@ void	parse_args(int	argc, char	*argv[])
 	struct option long_options[] = {
 		{"show-realization-trees", 0, &show_realization_trees, 1},
 		{"show-realization-mrses", 0, &show_realization_mrses, 1},
+		{"equivalence-packing", 0, &equivalence_packing_only, 1},
+		{"itsdb-forest", 0, &itsdb_dump_chart, 1},
 		{"report-labels", 0, &report_labels, 1},
 #define	MAX_UNPACK_MEGABYTES_OPTION	1000
 		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},

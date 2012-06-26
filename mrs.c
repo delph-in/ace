@@ -638,12 +638,15 @@ int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 		if(in->nrels > out->nrels)return 0;
 		if(in->nhcons > out->nhcons)return 0;
 	}
+	DEBUG("mrs subsumption passed numerical checks\n");
 	for(i=0;i<in->vlist.nvars;i++)vmap[i] = -1;
 	bzero(used, out->nrels);
 	if(in->ltop && out->ltop && !var_subsume(in->ltop, out->ltop, vmap, in->vlist.nvars))return 0;
+	DEBUG("mrs subsumption passed ltop checks\n");
 	if(in->index && out->index && !var_subsume(in->index, out->index, vmap, in->vlist.nvars))return 0;
+	DEBUG("mrs subsumption passed index checks\n");
 	if(in->xarg && out->xarg && !var_subsume(in->xarg, out->xarg, vmap, in->vlist.nvars))return 0;
-	DEBUG("mrs subsumption passed top-level checks\n");
+	DEBUG("mrs subsumption passed xarg checks\n");
 	return mrs_subsumes0(in, out, 0, vmap, used);
 }
 
@@ -713,6 +716,8 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 	//   (e.g. the grammar didn't do its job right with packing turned on)
 	for(i=0;i<nv;i++) if(vmap[i] == out->vnum)return 0;
 
+	DEBUG("passed pre-hierarchical var subsume test [ '%s' vs '%s' ]\n", in->type, out->type);
+
 	// make sure variable type is subsumed
 	if(!pred_subsumes(in->type, out->type))return 0;
 	/*switch(in->type[0])
@@ -721,6 +726,8 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 		case	'i':	if(out->type[0]=='h' || out->type[0]=='u')return 0;	break;
 		default:		if(out->type[0]!=in->type[0])return 0;	break;
 	}*/
+
+	DEBUG("passed type var subsume test\n");
 
 	// make sure variable properties are subsumed
 	for(i=0;i<in->nprops;i++)

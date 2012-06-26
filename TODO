@@ -1,5 +1,7 @@
 TODO:
 
+- bug(?): when a rule is promoted from regular lexical to orthographemic by finding an entry in the irregulars table, we should also add a free "pass-through" regular orthographemic pattern, so that the rule will still match things that aren't in the irregulars table
+
 fully automated regression testing
 		both parsing and generation
 		ERG: mrs, csli, hike, maybe something else too

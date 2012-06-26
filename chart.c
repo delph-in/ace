@@ -594,7 +594,11 @@ int	check_lexical_rule_constraints(struct rule	*rule, struct edge	*b)
 				if(r->len && r->rules[0] == rule->rnum)
 					break;
 			}
-			if(i==b->north_routes)return -1;
+			if(i==b->north_routes)
+			{
+				//printf(" #%d rejects rule %s as a next orthographemic\n", b->id, rule->name);
+				return -1;
+			}
 			//printf(" #%d admits rule %s as a next orthographemic\n", b->id, rule->name);
 		}
 		else if(!rule->orth && g_mode == PARSING && b->north_routes != -1)

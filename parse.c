@@ -527,7 +527,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	}
 	else if(do_itsdb)
 	{
-		num_parses = itsdb_report(0, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
+		num_parses = itsdb_report(token_chart, 0, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
 	}
 	else if(lui_mode)
 	{
@@ -608,7 +608,10 @@ int	check_mbs(char	*mbs);
 		if(!inhibit_results)
 		{
 			for(i=0;i<nwords;i++)
+			{
 				printf("%s%s", i?" ":"", words[i]);
+				if(debug_level)printf("<%d:%d>", cfrom[i], cto[i]);
+			}
 			printf("\n");
 		}
 		goto finished;
@@ -633,7 +636,7 @@ int	check_mbs(char	*mbs);
 #endif
 
 	if(nparse==-1)fprintf(stderr, "NOTE: ignoring `%s'\n", current_sentence);
-	if(do_itsdb && nparse==-1)itsdb_report(-1, 0);
+	if(do_itsdb && nparse==-1)itsdb_report(NULL, -1, 0);
 
 finished:
 	if(g_profiling)stop_profilers_recursively(parse_profiler);

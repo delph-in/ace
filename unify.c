@@ -653,6 +653,17 @@ int		unify_dg_defaults(struct dg	*dg1, struct dg	*dg2)
 	if(dg2->copy)dg2->copy = 0;
 	if(dg1 == dg2)return 0;
 
+	// hack to avoid doing any default unifications between two MRS variables whose INSTLOCs are incompatible
+	extern int instloc_feature;
+	struct dg	*il1 = dg_hop(dg1, instloc_feature);
+	struct dg	*il2 = dg_hop(dg2, instloc_feature);
+	if(il1 && il2)
+	{
+		struct type	*il1t = (il1->gen==generation)?il1->type:il1->xtype;
+		struct type	*il2t = (il2->gen==generation)?il2->type:il2->xtype;
+		if(!glb(il1t,il2t))return -1;
+	}
+
 	// destructively unify
 
 	t = glb(t1, t2);
@@ -855,6 +866,8 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 
 	t1 = (dg1->gen==generation)?dg1->type:dg1->xtype;
 	t2 = (dg2->gen==generation)?dg2->type:dg2->xtype;
+	if(!t1) { printf("unify found a NULL type on dg1. gen = %d, generation = %d, xtype = %p, type = %p\n", dg1->gen, generation, dg1->xtype, dg1->type); unify_backtrace(); }
+	if(!t2) { printf("unify found a NULL type on dg2. gen = %d, generation = %d, xtype = %p, type = %p\n", dg2->gen, generation, dg2->xtype, dg2->type); unify_backtrace(); }
 
 	// quasi-destructively unify the four sets of arcs together!
 

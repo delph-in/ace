@@ -13,6 +13,8 @@ extern unsigned int	generation;
 
 extern int *nptries;
 
+int equivalence_packing_only = 0;
+
 // to determine whether the active edge component of a task is built out of frozen goods
 int	contains_frozen(struct edge	*e)
 {
@@ -312,6 +314,7 @@ int	pack_edge(struct edge	*edge)
 #endif
 
 			ssd = equivalent_dg(h->dg, edge->dg, fw, bk);
+			if(equivalence_packing_only && ssd != 2)ssd = 0;
 			if(ssd)packss++;
 			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
 			PACKBUG("ssd = %d ; h->frozen = %d\n", ssd, h->frozen);
