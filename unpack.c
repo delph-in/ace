@@ -797,7 +797,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 			if(!h->dg)	// cycle failure can occur
 			{
 				h->dg = (void*)1;
-				//printf("cycle\n");
+				//printf("when combining edges #%d and #%d under rule %s, cycle\n", h->edge->id, h->rhslist[i]->edge->id, h->edge->rule->name);
 				return -1;
 			}
 		}
@@ -885,7 +885,9 @@ missing_token:
 	// we get here if the grammar left some information unspecified in the tokens list.
 	// ... happens for MWEs especially.
 	t->string = inflected_form;
-	t->dg = type_dg(token_type);
+	if(enable_token_avms)
+		t->dg = type_dg(token_type);
+	else t->dg = type_dg(top_type);
 	return t;
 }
 
@@ -985,7 +987,7 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...),
 					for(i=0;i<ntokens;i++)
 					{
 						struct token	*tok = tokens[i];
-						int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway?
+						int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway? (answer: treebanker)
 						char	*tokstr = dstr_lookup((void*)tok, from);
 						if(!tokstr)
 						{
@@ -1252,10 +1254,14 @@ int want_mrs = 1;
 
 int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest)
 {
-	int	i, j, count = 0, nhyp = 0;
+	int	i, j;
+	volatile int count = 0, nhyp = 0, ninsthyps = 0;	// volatile so that they are usable after longjmp()'ing out of an OOM condition
 	struct hypagenda_item	*agenda = NULL;
 	struct hypothesis		*hyp;
 	struct edge			*edge;
+
+	int	complained_about_unidiomatic_input = 0;
+	static int	hyp_timer = -1, inst_timer = -1, mrs_timer = -1;
 
 extern int do_itsdb;
 	// exhaustive_unpack() is maybe a bit faster, but it doesn't do ranking,
@@ -1294,9 +1300,6 @@ extern int do_itsdb;
 		}
 	}
 
-	int	complained_about_unidiomatic_input = 0;
-	static int	hyp_timer = -1, inst_timer = -1, mrs_timer = -1;
-	int	ninsthyps = 0;
 	if(hyp_timer==-1)hyp_timer = new_timer("hypothesize");
 	if(inst_timer==-1)inst_timer = new_timer("instantiate");
 	if(mrs_timer==-1)mrs_timer = new_timer("mrs");
