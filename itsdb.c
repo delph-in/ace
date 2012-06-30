@@ -405,10 +405,20 @@ int capi_print_chart(struct lattice	*tokens)
 		struct token	*t = le->token;
 		capi_printf(" ((:id . %d) (:start . %d) (:end . %d)", -(i+1), le->from->id, le->to->id);
 		char	token_str[10240];
-		extern int dag_print_style;
-		dag_print_style = 1;
-		snprint_dg(token_str, 10239, t->dg);
-		dag_print_style = 0;
+		if(enable_token_avms)
+		{
+			extern int dag_print_style;
+			dag_print_style = 1;
+			snprint_dg(token_str, 10239, t->dg);
+			dag_print_style = 0;
+		}
+		else
+		{
+			//sprintf(token_str, "%s", t->string);
+			char	*formesc = heap_escape(t->string);
+			sprintf(token_str, "token [ +FROM \"%d\" +TO \"%d\" +FORM \"%s\" ]", t->cfrom, t->cto, formesc);
+			free(formesc);
+		}
 		char	*labelesc = heap_escape(token_str);
 		capi_printf(" (:status . 0) (:label . \"%s\") (:daughters . ()) (:alternates . ()))",
 			labelesc);
