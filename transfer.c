@@ -525,17 +525,20 @@ int subsume_semarg_types(struct type	*x, struct type	*y)
 		char	*semi_x = internal_to_external_var_type(x->name);
 		char	*semi_y = internal_to_external_var_type(y->name);
 
-		// method 1
-		struct type	*sx = semi_find_type(semi_x);
-		struct type	*sy = semi_find_type(semi_y);
 		int r1;
-		if(!(sx && sy))
+		if(semi_th)
 		{
-			//fprintf(stderr, "ERROR: checking whether '%s' subsumes '%s', but one of those didn't exist in the SEMI\n", semi_x, semi_y);
-			//exit(-1);
-			r1 = -1;
+			// method 1
+			struct type	*sx = semi_find_type(semi_x);
+			struct type	*sy = semi_find_type(semi_y);
+			if(!(sx && sy))
+			{
+				//fprintf(stderr, "ERROR: checking whether '%s' subsumes '%s', but one of those didn't exist in the SEMI\n", semi_x, semi_y);
+				//exit(-1);
+				r1 = -1;
+			}
+			else r1 = descendent_of(sy->tnum, sx)?1:0;
 		}
-		else r1 = descendent_of(sy->tnum, sx)?1:0;
 
 		// method 2
 		char	*local_x = external_to_internal_var_type(semi_x);
@@ -548,7 +551,7 @@ int subsume_semarg_types(struct type	*x, struct type	*y)
 		int	r2 = descendent_of(ty->tnum, tx)?1:0;
 		if(r1 == -1)r2 = r1;
 
-		assert(r1 == r2);
+		if(semi_th)assert(r1 == r2);
 		//printf("methods agree for '%s >? %s'\n", x->name, y->name);
 		return r2;
 	}
