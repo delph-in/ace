@@ -33,11 +33,14 @@ int enable_post = 0;
 int instloc_feature = -1;
 int			enable_post_generation_mapping = 0;
 
+int	mrs_enable_icons = 0;
+int	icons_left_feature = -1, icons_right_feature = -1;
+
 struct path	token_form_path, token_from_path, token_to_path, token_id_path, token_postags_path, token_posprobs_path;
 struct path	lex_tokens_list_path, lex_tokens_last_path;
 struct path	lattice_mapping_input_path, lattice_mapping_output_path, lattice_mapping_context_path, lattice_mapping_position_path;
 
-struct path	rels_list_path, hcons_list_path, hook_path;
+struct path	rels_list_path, hcons_list_path, icons_list_path, hook_path;
 
 char		*token_type;
 
@@ -204,7 +207,8 @@ struct conf
 
 	int		ortho_max_rules, ortho_warn_max_rules;
 
-	struct path	rels_list_path, hcons_list_path, hook_path;
+	int	mrs_enable_icons, icons_left_feature, icons_right_feature;
+	struct path	rels_list_path, hcons_list_path, icons_list_path, hook_path;
 	int		enable_post_generation_mapping;
 	struct path	recursive_label_path_in_sign,
 				recursive_label_path_in_label;
@@ -239,6 +243,10 @@ void	*freeze_conf()
 	c->hook_path = freeze_path(hook_path);
 	c->rels_list_path = freeze_path(rels_list_path);
 	c->hcons_list_path = freeze_path(hcons_list_path);
+	c->icons_list_path = freeze_path(icons_list_path);
+	c->icons_left_feature = icons_left_feature;
+	c->icons_right_feature = icons_right_feature;
+	c->mrs_enable_icons = mrs_enable_icons;
 
 	if(!g_transfer)
 	{
@@ -319,6 +327,10 @@ void	recover_conf(void	*vc)
 	hook_path = c->hook_path;
 	rels_list_path = c->rels_list_path;
 	hcons_list_path = c->hcons_list_path;
+	icons_list_path = c->icons_list_path;
+	icons_left_feature = c->icons_left_feature;
+	icons_right_feature = c->icons_right_feature;
+	mrs_enable_icons = c->mrs_enable_icons;
 
 	if(!g_transfer)
 	{
@@ -466,6 +478,14 @@ int	load_conf()
 	hook_path = try_get_conf_path("hook-path", "HOOK");
 	rels_list_path = try_get_conf_path("mrs-rels-list", "RELS LIST");
 	hcons_list_path = try_get_conf_path("mrs-hcons-list", "HCONS LIST");
+
+	mrs_enable_icons = get_conf_bool("enable-icons", 0);
+	if(mrs_enable_icons)
+	{
+		icons_list_path = try_get_conf_path("mrs-icons-list", "ICONS LIST");
+		icons_left_feature = lookup_fname(get_conf("icons-left")?:"IC-LEFT");
+		icons_right_feature = lookup_fname(get_conf("icons-right")?:"IC-RIGHT");
+	}
 
 	recover_conf(freeze_conf());
 }

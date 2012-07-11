@@ -24,6 +24,8 @@ extern char mrs_line_breaks;
 
 int g_mode = PARSING, print_trees = 1;
 int	die = 0;
+int input_from_lui = 0;
+int preexisting_lui_fd = -1;
 
 extern int	g_loaded, inhibit_results, trace;
 

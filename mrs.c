@@ -8,6 +8,7 @@
 #include	"dag.h"
 #include	"chart.h"
 #include	"freeze.h"
+#include	"conf.h"
 #endif
 
 #include	"mrs.h"
@@ -16,6 +17,7 @@
 #define slab_alloc(len)	malloc(len)
 #define	slab_realloc(ptr,olen,len) realloc(ptr,len)
 #define	slab_free(ptr)	free(ptr)
+int mrs_enable_icons = 0;
 #else
 #define	slab_free(ptr)
 #endif
@@ -62,6 +64,13 @@ void	free_mrs_hcons(struct mrs_hcons	*hc)
 	free_mrs_var(hc->lo);
 }
 
+void	free_mrs_icons(struct mrs_icons	*ic)
+{
+	free_mrs_var(ic->left);
+	free_mrs_var(ic->right);
+	free(ic->type);
+}
+
 void	free_mrs(struct mrs	*m)
 {
 #ifdef NODAG
@@ -77,6 +86,9 @@ void	free_mrs(struct mrs	*m)
 	for(i=0;i<m->nhcons;i++)
 		free_mrs_hcons(m->hcons+i);
 	if(m->hcons)free(m->hcons);
+	for(i=0;i<m->nicons;i++)
+		free_mrs_icons(m->icons+i);
+	if(m->icons)free(m->icons);
 	free(m);
 #endif
 }
@@ -285,6 +297,31 @@ struct mrs_hcons	*parse_mrs_hcons(struct mrs_vlist	*vlist, char **P, int	*Nhcons
 	return hcons;
 }
 
+struct mrs_icons	*parse_mrs_icons(struct mrs_vlist	*vlist, char **P, int	*Nicons)
+{
+	int					nicons = 0;
+	struct mrs_icons	*icons = 0;
+	char				*word;
+
+	*Nicons = 0;
+	if(!(word=parse_word(P,1)) || strcmp(word, "<"))FAIL("icons list lacks initial '<'");
+	while((word=parse_word(P,0)) && strcmp(word, ">"))
+	{
+		struct mrs_icons	*ic;
+		nicons++;
+		icons = slab_realloc(icons, sizeof(struct mrs_icons)*(nicons-1), sizeof(struct mrs_icons)*nicons);
+		ic = icons+nicons-1;
+		ic->left = parse_mrs_var(vlist, P);
+		word = parse_word(P, 1);
+		if(!word)FAIL("icons lacks type");
+		ic->type = freeze_string(word);
+		ic->right = parse_mrs_var(vlist, P);
+	}
+	if(!(word=parse_word(P,1)) || strcmp(word, ">"))FAIL("icons list lacks closing '>'");
+	*Nicons = nicons;
+	return icons;
+}
+
 char	*preddup(char	*pred)
 {
 	char	*b = strchr(pred, '<');
@@ -395,6 +432,8 @@ struct mrs	*parse_mrs(char	*buffer)
 			mrs.rels = parse_mrs_rels(&vlist, &p, &mrs.nrels);
 		if(!strcasecmp(fname, "HCONS:"))
 			mrs.hcons = parse_mrs_hcons(&vlist, &p, &mrs.nhcons);
+		if(!strcasecmp(fname, "ICONS:"))
+			mrs.icons = parse_mrs_icons(&vlist, &p, &mrs.nicons);
 		if(!strcasecmp(fname, "TRIGGER:") || !strcasecmp(fname, "VCS:"))
 			mrs.triggers = parse_mrs_trigger(&p, &mrs.ntriggers);
 	}
@@ -547,7 +586,7 @@ int	snprint_mrs(char	*str, int	len, struct mrs	*mrs)
 	l += safe_snprintf(str+l, len-l, "[ LTOP: ");
 	l += snprint_mrs_var_marked(str+l, len-l, mrs->ltop, marked);
 	l += safe_snprintf(str+l, len-l, "%cINDEX: ", mrs_line_breaks);
-	l += snprint_mrs_var(str+l, len-l, mrs->index);
+	l += snprint_mrs_var_marked(str+l, len-l, mrs->index, marked);
 
 	l += safe_snprintf(str+l, len-l, "%cRELS: <", mrs_line_breaks);
 	for(i=0;i<mrs->nrels;i++)
@@ -581,6 +620,19 @@ int	snprint_mrs(char	*str, int	len, struct mrs	*mrs)
 			default:	restore_stderr(); fprintf(stderr, "ERROR: unknown HCONS type %d\n", hc->type); exit(-1);
 		}
 		l += snprint_mrs_var_marked(str+l, len-l, hc->lo, marked);
+	}
+	if(mrs_enable_icons)
+	{
+		l += safe_snprintf(str+l, len-l, " >");
+		l += safe_snprintf(str+l, len-l, "%cICONS: <", mrs_line_breaks);
+		for(i=0;i<mrs->nicons;i++)
+		{
+			struct mrs_icons	*ic = mrs->icons+i;
+			l += safe_snprintf(str+l, len-l, " ");
+			l += snprint_mrs_var_marked(str+l, len-l, ic->left, marked);
+			l += safe_snprintf(str+l, len-l, " %s ", ic->type);
+			l += snprint_mrs_var_marked(str+l, len-l, ic->right, marked);
+		}
 	}
 	l += safe_snprintf(str+l, len-l, " > ]%s", mrs_end);
 
@@ -688,6 +740,33 @@ int pred_subsumes(char *in, char *out)
 		exit(-1);
 	}
 	return descendent_of(tout->tnum, tin);
+}
+
+int pred_compatible(char *in, char *out)
+{
+	struct type_hierarchy	*th = default_type_hierarchy();
+	struct type *tin, *tout;
+	if(!strcasecmp(in, out))return 1;
+	tin = lookup_type(in);
+	if(!tin)
+	{
+		// XXX ignoring this is wrong; find out where these types are coming from.
+		// the VPM can introduce some types that aren't in the heirarchy;
+		// apparently the correct behavior is to treat them as having no inheritance
+		//fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", in, in, out);
+		return 0;
+		exit(-1);
+	}
+	tout = lookup_type(out);
+	if(!tout)
+	{
+		// XXX where are these coming from?
+		//fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", out, in, out);
+		return 0;
+		exit(-1);
+	}
+	if(glb(tin,tout))return 1;
+	else return 0;
 }
 
 int prop_subsumes(char *in, char *out)
@@ -814,7 +893,17 @@ int mrs_subsumes1(struct mrs *in, struct mrs *out, int hci, int *vmap, char *use
 	int				vm[in->vlist.nvars], i;
 
 	if(hci == in->nhcons)
-		return 1;
+	{
+		if(mrs_enable_icons)
+		{
+			char	iused[in->nicons];
+			bzero(iused, in->nicons);
+			//printf("checking ICONS subsumption\n");
+			DEBUG("mrs subsumption passed HCONS checks\n");
+			return mrs_subsumes2(in, out, 0, vmap, iused);
+		}
+		else return 1;
+	}
 
 	for(i=0;i<out->nhcons;i++) if(!used[i])
 	{
@@ -828,6 +917,47 @@ int mrs_subsumes1(struct mrs *in, struct mrs *out, int hci, int *vmap, char *use
 		// we found an alignment for hci; recurse.
 		used[i] = 1;
 		if(mrs_subsumes1(in, out, hci+1, vm, used))
+		{
+			used[i] = 0;
+			return 1;
+		}
+		used[i] = 0;
+	}
+	return 0;
+}
+
+int	icons_type_compatible(char	*icsuper, char	*icsub)
+{
+	return pred_compatible(icsuper, icsub);
+}
+
+// icons subsumption test; following the hcons test, i.e. everything in the input must be realized.
+// this is not quite what Emily asked for; waiting for confirmation from her that she really wanted that other thing.
+int mrs_subsumes2(struct mrs *in, struct mrs *out, int ici, int *vmap, char *used)
+{
+	// try to match ici of in with some ic in out, and recurse
+	struct mrs_icons	*ic = in->icons+ici, *oic;
+	int				vm[in->vlist.nvars], i;
+
+	if(ici == in->nicons)
+	{
+		DEBUG("mrs subsumption passed ICONS checks\n");
+		return 1;
+	}
+
+	for(i=0;i<out->nicons;i++) if(!used[i])
+	{
+		oic = out->icons+i;
+		//printf("seeing if '%s' subsumes '%s'\n", ic->type, oic->type);
+		if(!icons_type_compatible(ic->type, oic->type))return 0;
+		memcpy(vm, vmap, sizeof(int)*in->vlist.nvars);
+		if(!var_subsume(ic->left, oic->left, vm, in->vlist.nvars))continue;
+		if(!var_subsume(ic->right, oic->right, vm, in->vlist.nvars))continue;
+
+		//printf("in ic %d <=> out ic %d\n", ici, i);
+		// we found an alignment for ici; recurse.
+		used[i] = 1;
+		if(mrs_subsumes2(in, out, ici+1, vm, used))
 		{
 			used[i] = 0;
 			return 1;
@@ -878,6 +1008,17 @@ struct mrs	*copy_mrs(struct mrs	*min)
 		hout->type = hin->type;
 		hout->hi = mout->vlist.vars[hin->hi->vnum];
 		hout->lo = mout->vlist.vars[hin->lo->vnum];
+	}
+
+	mout->nicons = min->nicons;
+	mout->icons = malloc(sizeof(struct mrs_icons) * mout->nicons);
+	for(i=0;i<mout->nicons;i++)
+	{
+		struct mrs_icons	*iin = min->icons+i;
+		struct mrs_icons	*iout = mout->icons+i;
+		iout->type = strdup(iin->type);
+		iout->left = mout->vlist.vars[iin->left->vnum];
+		iout->right = mout->vlist.vars[iin->right->vnum];
 	}
 
 	if(min->ltop)mout->ltop = mout->vlist.vars[min->ltop->vnum];
@@ -947,6 +1088,17 @@ struct mrs	*slab_copy_mrs(struct mrs	*min, int share_strings)
 		hout->type = hin->type;
 		hout->hi = mout->vlist.vars[hin->hi->vnum];
 		hout->lo = mout->vlist.vars[hin->lo->vnum];
+	}
+
+	mout->nicons = min->nicons;
+	mout->icons = slab_malloc(sizeof(struct mrs_icons) * mout->nicons);
+	for(i=0;i<mout->nicons;i++)
+	{
+		struct mrs_icons	*iin = min->icons+i;
+		struct mrs_icons	*iout = mout->icons+i;
+		iout->type = share_strings?iin->type:freeze_string(iin->type);
+		iout->left = mout->vlist.vars[iin->left->vnum];
+		iout->right = mout->vlist.vars[iin->right->vnum];
 	}
 
 	if(min->ltop)mout->ltop = mout->vlist.vars[min->ltop->vnum];

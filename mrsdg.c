@@ -303,6 +303,15 @@ void	dg_to_mrs_hc(struct dg *dg, struct mrs_vlist *vlist, struct mrs_hcons	*hc)
 	hc->lo = dg_to_mrs_var(dg_hop(dg, largf), vlist);
 }
 
+void	dg_to_mrs_ic(struct dg *dg, struct mrs_vlist *vlist, struct mrs_icons	*ic)
+{
+	struct dg		*left, *right;
+
+	ic->type = dg->type->name;
+	ic->left = dg_to_mrs_var(dg_hop(dg, icons_left_feature), vlist);
+	ic->right = dg_to_mrs_var(dg_hop(dg, icons_right_feature), vlist);
+}
+
 #define	DO_DIFFLIST(dlist, args, code) do { void lambda(args) {code} do_difflist(dlist, lambda); } while(0)
 
 #define	DO_LIST(dlist, args, code) do { void lambda(args) {code} do_list(dlist, lambda); } while(0)
@@ -324,7 +333,7 @@ void do_difflist(struct dg *dlist, void (*process)(struct dg *item))
 struct mrs	*cont_to_mrs(struct dg	*cont)
 {
 	static int	ltopf = -1, indexf, xargf, relsf, hconsf;
-	struct dg	*hook, *rels, *hcons;
+	struct dg	*hook, *rels, *hcons, *icons;
 	struct mrs	*mrs = slab_calloc(sizeof(struct mrs), 1);
 
 	if(!cont)return mrs;
@@ -359,6 +368,8 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	hook = dg_path(cont, hook_path);
 	rels = dg_path(cont, rels_list_path);
 	hcons = dg_path(cont, hcons_list_path);
+	if(mrs_enable_icons)
+		icons = dg_path(cont, icons_list_path);
 	if(hook)
 	{
 		if(invent_ltop)
@@ -392,6 +403,16 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		mrs->nhcons++;
 		dg_to_mrs_hc(hc, &mrs->vlist, mrs->hcons+mrs->nhcons-1);
 	);
+	if(mrs_enable_icons)
+	{
+		int	nic = 0;
+		DO_LIST(icons, struct dg *ic, nic++; );
+		mrs->icons = slab_alloc(sizeof(struct mrs_icons) * nic);
+		DO_LIST(icons, struct dg *ic,
+			mrs->nicons++;
+			dg_to_mrs_ic(ic, &mrs->vlist, mrs->icons+mrs->nicons-1);
+		);
+	}
 //	stop_timer(hc_timer, nhc);
 	// give ``mrs'' its own slab allocated vlist
 	mrs->vlist.vars = slab_alloc(sizeof(struct mrs_var*) * mrs->vlist.nvars);

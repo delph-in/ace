@@ -593,6 +593,17 @@ struct mrs	*convert_mrs_with_vpm(struct mrs	*min, struct vpm	*vpm)
 		hout->lo = mout->vlist.vars[hin->lo->vnum];
 	}
 
+	mout->nicons = min->nicons;
+	mout->icons = slab_malloc(sizeof(struct mrs_icons) * mout->nicons);
+	for(i=0;i<mout->nicons;i++)
+	{
+		struct mrs_icons	*iin = min->icons+i;
+		struct mrs_icons	*iout = mout->icons+i;
+		iout->type = iin->type;
+		iout->left = mout->vlist.vars[iin->left->vnum];
+		iout->right = mout->vlist.vars[iin->right->vnum];
+	}
+
 	if(min->ltop)mout->ltop = mout->vlist.vars[min->ltop->vnum];
 	if(min->index)mout->index = mout->vlist.vars[min->index->vnum];
 	if(min->xarg)mout->xarg = mout->vlist.vars[min->xarg->vnum];

@@ -51,6 +51,12 @@ struct mrs_hcons
 	int active:1;
 };
 
+struct mrs_icons
+{
+	struct mrs_var	*left, *right;
+	char	*type;
+};
+
 struct mrs_vlist
 {
 	int				nvars;
@@ -65,6 +71,8 @@ struct mrs
 	struct mrs_hcons *hcons;
 	int				nhcons;
 	struct mrs_vlist vlist;
+	int				nicons;
+	struct mrs_icons *icons;
 	char			**triggers;
 	int				ntriggers;
 };
