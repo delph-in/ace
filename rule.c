@@ -339,12 +339,14 @@ struct rule	*get_rule_by_name(char	*name)
 void	lui_rule(char	*name)
 {
 	struct rule	*r = get_rule_by_name(name);
+	if(!r) { fprintf(stderr, "no such rule '%s'\n", name); return; }
 	output_lui_dg(r->dg, name);
 }
 
 void	print_rule(char	*name)
 {
 	struct rule	*r = get_rule_by_name(name);
+	if(!r) { fprintf(stderr, "no such rule '%s'\n", name); return; }
 	printf("rule `%s':\n", name);
 	print_dg(r->dg);printf("\n");
 }

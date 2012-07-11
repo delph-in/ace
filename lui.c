@@ -152,7 +152,7 @@ void	output_lui_chart(struct lattice	*token_lattice)
 	fprintf(lui_write, "chart %d %d \"%s\"", ++chart_id, chart_size-1, current_sentence);
 	char	covermap[chart_size];
 	bzero(covermap, chart_size);
-	int	leid = -1;
+	//int	leid = -1;
 	for(j=0;j<chart_size;j++)
 	{
 		if(covermap[j])continue;
@@ -160,8 +160,8 @@ void	output_lui_chart(struct lattice	*token_lattice)
 		{
 			struct lattice_edge	*e = token_lattice->edges[i];
 			if(e->from->id != j)continue;
-			fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", leid, leid, e->from->id, e->to->id, e->token->string);
-			leid--;
+			fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -(i+1), -(i+1), e->from->id, e->to->id, e->token->string);
+			//leid--;
 			break;
 		}
 	}
@@ -170,6 +170,58 @@ void	output_lui_chart(struct lattice	*token_lattice)
 	if(g_mode == GENERATING)
 		chart_size--;
 
+	void	lui_print_chart_edge(struct edge	*e)
+	{
+		if(e->unpack)return;
+		e->unpack = (void*)0x1;
+		if(e->rule)
+		{
+			struct dg *rn = dg_hop(e->rule->dg, lookup_fname("RNAME"));
+			char *symb = rn?strdup(rn->xtype->name):e->rule->name;
+			if(rn) { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
+			fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, e->from, e->to, symb, e->rule->name);
+			for(l=0;l<e->have;l++)
+				fprintf(lui_write, " %d", e->daughters[l]->id);
+			fprintf(lui_write, "]");
+		}
+		else if(e->lex)
+		{
+			fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, e->from, e->to, e->lex->word, e->lex->word);
+			int k;
+			for(k=0;k<e->lex->stemlen;k++)
+			{
+				struct token	*t = (struct token*)e->daughters[k];
+				int j;
+				for(j=0;j<token_lattice->nedges;j++)
+					if(token_lattice->edges[j]->token == t)
+						break;
+				assert(j < token_lattice->nedges);
+				fprintf(lui_write, " %d", -(j+1));
+			}
+			fprintf(lui_write, "]");
+		}
+		int i;
+		for(i=0;i<e->have;i++)
+			lui_print_chart_edge(e->daughters[i]);
+		if(e->lex)
+		{
+			// show all lexical edges, including packed ones
+			for(i=0;i<e->npack;i++)
+				lui_print_chart_edge(e->pack[i]);
+		}
+	}
+
+	reset_unpacking();
+	for(i=0;i<chart_size;i++)
+		for(j=0;j<chart_size;j++)
+			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
+			{
+				e = cells[j*chart_size + i].p_edges[k];
+				lui_print_chart_edge(e);
+			}
+	reset_unpacking();
+
+/*
 	for(i=0;i<chart_size;i++)
 		for(j=0;j<chart_size;j++)
 			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
@@ -191,6 +243,7 @@ void	output_lui_chart(struct lattice	*token_lattice)
 					fprintf(lui_write, " #E[%d %d %d %d %s %s [] %d]", e->id, e->id, j, j, e->lex->word, e->lex->word, -1-j);
 				}
 			}
+			*/
 	fprintf(lui_write, "\n");
 	fflush(lui_write);
 	//print_dg(esave->dg); printf("\n\n");
