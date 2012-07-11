@@ -697,6 +697,7 @@ int	filter(struct edge	*a, struct edge	*b)
 	}*/
 
 	unify_attempts_total++;
+	if(trace>2)return 1;	// no filtering
 	if(rf)return 0;
 
 	unify_attempts_pass_rf++;
@@ -734,7 +735,7 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 	if(!a->dg)
 	{
 		// hyperactive parsing: we don't save active edges' dg's until they're actually used
-		//printf("reconstructing hyperactive #%d [%d]\n", a->id, a->ha_use);
+		if(trace>1)printf("reconstructing hyperactive #%d [%d]\n", a->id, a->ha_use);
 		if(a->ha_use > 200 || !b->dg)
 		{
 			if(recall_hyper(a))return 0;
@@ -765,6 +766,7 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 	if(!b->dg)
 	{
 		// hyperpassive parsing: we don't save passive edges' dg's until they're actually used
+		if(trace>1)printf("reconstructing hyperpassive edge #%d\n", b->id);
 		if(b->ha_use > 200 || 1)
 		{
 			if(recall_hyper(b))return 0;
@@ -850,12 +852,12 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 		if(build_edge_result == -2)
 		{
 			// found a root analysis in first-only mode
-			//printf("build_edge failed\n");
+			if(trace>1)printf("build_edge failed\n");
 			return -1;
 		}
 		if(build_edge_result == -1)
 		{
-			//printf("build_edge found a cycle\n");
+			if(trace>1)printf("build_edge found a cycle\n");
 			return 0;
 		}
 		if(noldslabs >= max_chart_megabytes)

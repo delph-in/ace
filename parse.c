@@ -315,6 +315,10 @@ int	prepare_parse_chart(struct lattice	*lexical_chart)
 
 	// put lexical edges into agenda
 	int i;
+	// note: edges need to be process_edge()'d into the chart in the same order they were discovered in lexical parsing,
+	// which should be the same order they appear in the lexical_chart->edges list.
+	// if we dont do it in the right order, we can violate some assumptions of the retroactive packing system
+	// and end up with spurious readings.
 	for(i=0;i<lexical_chart->nedges;i++)
 	{
 		struct lattice_edge	*le = lexical_chart->edges[i];
@@ -479,8 +483,6 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	static int chart_parsing_timer = -1;
 	if(chart_parsing_timer == -1)chart_parsing_timer = new_timer("chart parsing");
 	start_timer(chart_parsing_timer);
-
-	if(trace)printf("finished packing\n");
 
 	t_setup = timer();
 

@@ -70,7 +70,7 @@ void	add_agenda(struct edge	*e)
 		//printf("gen edge with %d eps; prio = %d\n", e->neps, e->prio);
 	}
 	else if(e->from==e->to)e->prio = EPSILON_PRIORITY(e->rule);
-	else if(e->lex)e->prio = LEX_PRIO;
+	else if(e->lex)e->prio = LEX_PRIO;	// note: lexical edges must be returned from the agenda in FIFO order
 	else e->prio = EDGE_PRIORITY(e);
 
 	if(e->prio < 0 || e->prio >= NPRIO)
@@ -132,7 +132,7 @@ struct edge	*next_agenda(int	from_start)
 
 	for(i=highest;i>=0;i--) if(agenda[i].start)
 	{
-		if(from_start)
+		if(from_start || i==LEX_PRIO)	// always return LEX_PRIO items in FIFO order; otherwise retroactive packing can break (since we didn't give them a chance to pack in lexical_parse() before building on top of them)
 		{
 			// pop least recent edge from this queue
 			best = agenda[i].start;

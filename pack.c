@@ -350,6 +350,11 @@ int	pack_edge(struct edge	*edge)
 					PACKBUG("blocked same-cell-daughter packing\n");
 					continue;
 				}
+				// mark the subsumed edge as frosted so that we refuse to build anything on it that may be lurking in the agenda.
+				// this can't happen normally, since `edge' just came off the agenda itself and hasn't been given a chance to combine.
+				// it *can* happen when `edge' is a result from lexical parsing that we are just now putting in the chart
+				// note: it must be frosted rather than frozen, since it is still *valid*
+				edge->frozen = 1; edge->frosted = 1;
 				PACKBUG("packed #%d `%s' in #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
 				//printf("host: "); print_dg(h->dg); printf("\n");
 				//printf("pack: "); print_dg(edge->dg); printf("\n");
