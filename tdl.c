@@ -415,7 +415,7 @@ int	load_tdl(char	*path)
 		rhs = end+2;
 		lhs = trim_string(lhs);
 		rhs = trim_string(rhs);
-		if(*lhs==0 || *rhs==0)
+		if(*lhs==0)// || *rhs==0)
 		{
 			fprintf(stderr, "tdl: `%s :%c %s' malformed input string, degenerate statement\n", lhs, operation, rhs);
 			*buffer = *odef = 0;
@@ -1615,7 +1615,7 @@ int load_grammar(char	*path)
 		load_cleanup_rules(get_conf_file_path(confdir, "cleanup-rules"));
 		load_idioms(get_conf_file_path(confdir, "idiom-rules"));
 
-		load_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
+		load_parser_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
 
 		int do_load_mem() { load_mem(get_conf_file_path(confdir, "maxent-model")); return 0; }
 		run_task("loading maxent model", do_load_mem);
@@ -1633,6 +1633,11 @@ int load_grammar(char	*path)
 		setup_rule_filter();
 		// make sure we have complete restrictor sets in case recent activity has added new features...
 		load_restrictors();
+	}
+	else
+	{
+		load_transfer_input_vpm(get_conf_file_path(confdir, "input-vpm"));
+		load_transfer_output_vpm(get_conf_file_path(confdir, "output-vpm"));
 	}
 
 	// make sure none of the grammar is auto-freed when the first parse is over

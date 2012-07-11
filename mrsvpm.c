@@ -21,17 +21,21 @@ struct vpm
 			#define	VPM_INPUT_TO_OUTPUT	0x1
 			#define	VPM_OUTPUT_TO_INPUT	0x2
 			#define	VPM_BIDIRECTIONAL	(VPM_INPUT_TO_OUTPUT | VPM_OUTPUT_TO_INPUT)
-			unsigned		direction;
+			unsigned		direction:2;
+			unsigned		require_equality:1;
 		}	*rules;
 		int	nrules;
 	}		*contexts;
 	int		ncontexts;
 };
 
-static struct vpm *v, *vinv;
+static struct vpm *parser_v, *parser_vinv;
+static struct vpm *transfer_input_v;
+static struct vpm *transfer_output_v;
 
 struct vpm	*invert_vpm(struct vpm	*v)
 {
+	if(!v)return NULL;
 	struct vpm	*vpm = malloc(sizeof(*v));
 	struct vpm_context *ctx, *fctx;
 	struct vpm_rule	*r, *fr;
@@ -57,6 +61,7 @@ struct vpm	*invert_vpm(struct vpm	*v)
 			r = ctx->rules+j;
 			fr = fctx->rules+j;
 			fr->direction = (r->direction==VPM_BIDIRECTIONAL)?r->direction:(r->direction^VPM_BIDIRECTIONAL);
+			fr->require_equality = r->require_equality;
 			fr->output = r->input;
 			fr->input = r->output;
 		}
@@ -73,7 +78,7 @@ char	*type_for_empty_if_rule(char	*token)
 	return token;
 }
 
-int	load_vpm(char	*path)
+struct vpm	*load_vpm(char	*path)
 {
 	FILE	*f;
 	char	line[1024], *args[32], *p;
@@ -81,12 +86,12 @@ int	load_vpm(char	*path)
 	struct vpm_context *ctx;
 	struct vpm			vpm = {.inputh = 0, .outputh = 0, .ncontexts = 0, .contexts = 0};
 
-	if(!path)return 0;
+	if(!path)return NULL;
 	f = fopen(path, "r");
 	if(!f)
 	{
 		perror(path);
-		return -1;
+		return NULL;
 	}
 	vpm.filename = freeze_string(path);
 	vpm.ncontexts++;
@@ -113,11 +118,11 @@ int	load_vpm(char	*path)
 		{
 			syntax:
 			fprintf(stderr, "vpm: syntax error on line %d, LHS op RHS expected\n", lnum);
-			return -1;
+			return NULL;
 		}
 
 		for(iop=1;iop<nargs-1;iop++)
-			if(!strcmp(args[iop], "<>") || !strcmp(args[iop], "<<") || !strcmp(args[iop], ">>") || !strcmp(args[iop], ":"))break;
+			if(!strcmp(args[iop], "<>") || !strcmp(args[iop], "<<") || !strcmp(args[iop], ">>") || !strcmp(args[iop], ":") || !strcmp(args[iop], "==") || !strcmp(args[iop], "<=") || !strcmp(args[iop], "=>"))break;
 		if(iop==nargs-1)goto syntax;
 
 		if(args[iop][0]==':')
@@ -144,17 +149,34 @@ int	load_vpm(char	*path)
 
 			bzero(&r,sizeof(r));
 			// check for directionality
+			int	require_equality = 0;
 			if(!strcmp(args[iop], "<<"))
 				directionality = VPM_OUTPUT_TO_INPUT;
 			if(!strcmp(args[iop], ">>"))
 				directionality = VPM_INPUT_TO_OUTPUT;
+			if(!strcmp(args[iop], "=="))
+			{
+				directionality = VPM_BIDIRECTIONAL;
+				require_equality = 1;
+			}
+			if(!strcmp(args[iop], "=>"))
+			{
+				directionality = VPM_INPUT_TO_OUTPUT;
+				require_equality = 1;
+			}
+			if(!strcmp(args[iop], "<="))
+			{
+				directionality = VPM_INPUT_TO_OUTPUT;
+				require_equality = 1;
+			}
 			if(ninput != ctx->ninput || noutput != ctx->noutput)
 			{
 				fprintf(stderr, "vpm: syntax error on line %d, %d/%d context but %d/%d rule\n",
 					lnum, ctx->ninput, ctx->noutput, iop, nargs-iop-1);
-				return -1;
+				return NULL;
 			}
 			r.direction = directionality;
+			r.require_equality = require_equality;
 			r.input = slab_alloc(sizeof(char*)*ctx->ninput);
 			for(i=0;i<ctx->ninput;i++)
 			{
@@ -176,14 +198,35 @@ int	load_vpm(char	*path)
 			ctx->rules[ctx->nrules-1] = r;
 		}
 	}
+	struct vpm	*v;
 	v = slab_alloc(sizeof(vpm));
 	*v = vpm;
+	return v;
+}
 
-	/*printf("vpm [%s # %s] has %d contexts:\n", v->inputh, v->outputh, v->ncontexts);
+int	load_parser_vpm(char	*path)
+{
+	parser_v = load_vpm(path);
+}
+
+int	load_transfer_input_vpm(char	*path)
+{
+	transfer_input_v = load_vpm(path);
+}
+
+int	load_transfer_output_vpm(char	*path)
+{
+	transfer_output_v = load_vpm(path);
+}
+
+void	print_vpm(struct vpm	*v)
+{
+	int i;
+	printf("vpm [%s # %s] has %d contexts:\n", v->inputh, v->outputh, v->ncontexts);
 	for(i=0;i<v->ncontexts;i++)
 	{
 		int j;
-		ctx = v->contexts+i;
+		struct vpm_context	*ctx = v->contexts+i;
 		printf("input context:"); for(j=0;j<ctx->ninput;j++)printf("	%s", ctx->input[j]); printf("\n");
 		printf("output context:"); for(j=0;j<ctx->noutput;j++)printf("	%s", ctx->output[j]); printf("\n");
 		for(j=0;j<ctx->nrules;j++)
@@ -205,13 +248,19 @@ int	load_vpm(char	*path)
 				printf("	%s", r->output[k]);
 			printf("\n");
 		}
-	}*/
-	return 0;
+	}
 }
 
-void	*freeze_vpm()
+struct vpm_freezer
 {
-	if(!v)return 0;
+	struct vpm	*parser_v;
+	struct vpm	*transfer_input_v;
+	struct vpm	*transfer_output_v;
+};
+
+void	*freeze_one_vpm(struct vpm	*v)
+{
+	if(!v)return NULL;
 	struct vpm	*vpm = freeze_block(v, sizeof(*v));
 	struct vpm_context *ctx, *fctx;
 	struct vpm_rule	*r, *fr;
@@ -239,6 +288,7 @@ void	*freeze_vpm()
 			r = ctx->rules+j;
 			fr = fctx->rules+j;
 			fr->direction = r->direction;
+			fr->require_equality = r->require_equality;
 			fr->input = slab_alloc(sizeof(char*)*ctx->ninput);
 			fr->output = slab_alloc(sizeof(char*)*ctx->noutput);
 			for(k=0;k<ctx->ninput;k++)
@@ -250,15 +300,27 @@ void	*freeze_vpm()
 	return vpm;
 }
 
-void recover_vpm(void *vpm)
+void	*freeze_vpm()
 {
-	v = vpm;
+	struct vpm_freezer	*frz = slab_alloc(sizeof(*frz));
+	frz->parser_v = freeze_one_vpm(parser_v);
+	frz->transfer_input_v = freeze_one_vpm(transfer_input_v);
+	frz->transfer_output_v = freeze_one_vpm(transfer_output_v);
+	return frz;
+}
+
+void recover_vpm(void *frzer)
+{
+	struct vpm_freezer	*frz = frzer;
+	parser_v = frz->parser_v;
+	transfer_input_v = frz->transfer_input_v;
+	transfer_output_v = frz->transfer_output_v;
 }
 
 extern int prop_subsumes(char*,char*);
 
 // return 0 if value matches rule, else return nonzero
-int vpm_test(char	*vartype, char *value, char *rule)
+int vpm_test(char	*vartype, char *value, char *rule, int require_equality)
 {
 	int res;
 	if(!strcmp(rule, "*"))
@@ -282,7 +344,8 @@ int vpm_test(char	*vartype, char *value, char *rule)
 	if(!value)return -1;
 	//printf("compare `%s' vs `%s' flags %d\n", rule, value, flags);
 	//if(flags & VPM_TYPE_EQUALITY)return strcasecmp(rule, value);
-	res = !prop_subsumes(rule, value);
+	if(require_equality)res = strcasecmp(rule, value);
+	else res = !prop_subsumes(rule, value);
 	return res;
 }
 
@@ -306,7 +369,7 @@ char	*vpm_map(char	*vartype, char	**input, struct vpm_context	*ctx, int	output_s
 			continue;	// only consider rules working forward
 		//printf(" ... check rule '%s' => '%s'\n", r->input[0], r->output[0]);
 		for(j=0;j<ctx->ninput;j++)
-			if(vpm_test(vartype, input[j], r->input[j]) != 0)
+			if(vpm_test(vartype, input[j], r->input[j], r->require_equality) != 0)
 				break;
 		if(j<ctx->ninput)continue;
 		// else the rule applies.
@@ -328,6 +391,7 @@ char	*vpm_map(char	*vartype, char	**input, struct vpm_context	*ctx, int	output_s
 
 char	*convert_mrs_var_type(struct vpm	*v, char	*type)
 {
+	if(!v)return type;
 	int	i;
 	for(i=0;i<v->ncontexts;i++)
 	{
@@ -345,6 +409,8 @@ char	*convert_mrs_var_type(struct vpm	*v, char	*type)
 
 struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 {
+	if(!v) { vin->refs++; return vin; }
+
 	struct mrs_var	*vout = slab_malloc(sizeof(*vout));
 	int				i, j, k;
 
@@ -421,28 +487,24 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 
 struct mrs_var	*internal_to_external_mrs_var(struct mrs_var	*vin)
 {
-	if(!v) { vin->refs++; return vin; }
-	return convert_mrs_var(v, vin);
+	convert_mrs_var(parser_v, vin);
 }
 
 struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin)
 {
-	if(!v) { vin->refs++; return vin; }
-	if(!vinv)vinv = invert_vpm(v);
-	return convert_mrs_var(vinv, vin);
+	if(!parser_vinv)parser_vinv = invert_vpm(parser_v);
+	return convert_mrs_var(parser_vinv, vin);
 }
 
 char		*internal_to_external_var_type(char	*in)
 {
-	if(!v)return in;
-	return convert_mrs_var_type(v, in);
+	return convert_mrs_var_type(parser_v, in);
 }
 
 char		*external_to_internal_var_type(char	*ex)
 {
-	if(!v)return ex;
-	if(!vinv)vinv = invert_vpm(v);
-	return convert_mrs_var_type(vinv, ex);
+	if(!parser_vinv)parser_vinv = invert_vpm(parser_v);
+	return convert_mrs_var_type(parser_vinv, ex);
 }
 
 make_reliable_vnums(struct mrs	*m)
@@ -453,6 +515,7 @@ make_reliable_vnums(struct mrs	*m)
 		m->vlist.vars[i]->vnum = i;
 }
 
+/*
 // produce a copy of 'min' on the slab, with internal MRS variables
 struct mrs	*external_to_internal_mrs(struct mrs	*min)
 {
@@ -503,10 +566,10 @@ struct mrs	*external_to_internal_mrs(struct mrs	*min)
 	}
 
 	return mout;
-}
+}*/
 
-// produce a copy of 'min' on the slab, with external MRS variables
-struct mrs	*internal_to_external_mrs(struct mrs	*min)
+// produce a copy of 'min' on the slab, with converted MRS variables
+struct mrs	*convert_mrs_with_vpm(struct mrs	*min, struct vpm	*vpm)
 {
 	struct mrs	*mout = slab_calloc(sizeof(*mout),1);
 	bzero(mout, sizeof(*mout));
@@ -517,7 +580,7 @@ struct mrs	*internal_to_external_mrs(struct mrs	*min)
 	mout->vlist.nvars = min->vlist.nvars;
 	mout->vlist.vars = slab_malloc(sizeof(struct mrs_var*) * mout->vlist.nvars);
 	for(i=0;i<mout->vlist.nvars;i++)
-		mout->vlist.vars[i] = internal_to_external_mrs_var(min->vlist.vars[i]);
+		mout->vlist.vars[i] = convert_mrs_var(vpm, min->vlist.vars[i]);
 
 	mout->nhcons = min->nhcons;
 	mout->hcons = slab_malloc(sizeof(struct mrs_hcons) * mout->nhcons);
@@ -555,4 +618,25 @@ struct mrs	*internal_to_external_mrs(struct mrs	*min)
 	}
 
 	return mout;
+}
+
+struct mrs	*internal_to_external_mrs(struct mrs	*min)
+{
+	return convert_mrs_with_vpm(min, parser_v);
+}
+
+struct mrs	*external_to_internal_mrs(struct mrs	*min)
+{
+	if(!parser_vinv)parser_vinv = invert_vpm(parser_v);
+	return convert_mrs_with_vpm(min, parser_vinv);
+}
+
+struct mrs	*apply_transfer_input_vpm(struct mrs	*min)
+{
+	return convert_mrs_with_vpm(min, transfer_input_v);
+}
+
+struct mrs	*apply_transfer_output_vpm(struct mrs	*min)
+{
+	return convert_mrs_with_vpm(min, transfer_output_v);
 }

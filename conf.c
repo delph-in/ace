@@ -8,6 +8,7 @@
 #include	"rule.h"
 #include	"chart.h"
 #include	"freeze.h"
+#include	"tdl.h"
 
 int	g_transfer = 0;
 
@@ -22,6 +23,8 @@ char		*g_diff_list_type;
 char	*top_type;
 char	*semi_top_type;
 
+char	*transfer_input_relation_prefix;
+
 struct path	*chart_dependencies_from, *chart_dependencies_to;
 int			nchart_dependencies;
 int			reduce_chart_before_lexical_parsing;
@@ -34,7 +37,7 @@ struct path	token_form_path, token_from_path, token_to_path, token_id_path, toke
 struct path	lex_tokens_list_path, lex_tokens_last_path;
 struct path	lattice_mapping_input_path, lattice_mapping_output_path, lattice_mapping_context_path, lattice_mapping_position_path;
 
-struct path	rels_list_path, hcons_list_path;
+struct path	rels_list_path, hcons_list_path, hook_path;
 
 char		*token_type;
 
@@ -201,10 +204,12 @@ struct conf
 
 	int		ortho_max_rules, ortho_warn_max_rules;
 
-	struct path	rels_list_path, hcons_list_path;
+	struct path	rels_list_path, hcons_list_path, hook_path;
 	int		enable_post_generation_mapping;
 	struct path	recursive_label_path_in_sign,
 				recursive_label_path_in_label;
+
+	char	*transfer_input_relation_prefix;
 };
 
 struct path	freeze_path(struct path	p)
@@ -231,6 +236,7 @@ void	*freeze_conf()
 	c->diff_list_type = freeze_string(g_diff_list_type);
 	c->invent_ltop = invent_ltop;
 
+	c->hook_path = freeze_path(hook_path);
 	c->rels_list_path = freeze_path(rels_list_path);
 	c->hcons_list_path = freeze_path(hcons_list_path);
 
@@ -289,7 +295,7 @@ void	*freeze_conf()
 	}
 	else
 	{
-		
+		c->transfer_input_relation_prefix = freeze_string(transfer_input_relation_prefix);
 	}
 
 	return c;
@@ -310,6 +316,7 @@ void	recover_conf(void	*vc)
 	g_diff_list_type = c->diff_list_type;
 	invent_ltop = c->invent_ltop;
 
+	hook_path = c->hook_path;
 	rels_list_path = c->rels_list_path;
 	hcons_list_path = c->hcons_list_path;
 
@@ -364,6 +371,7 @@ void	recover_conf(void	*vc)
 	}
 	else
 	{
+		transfer_input_relation_prefix = c->transfer_input_relation_prefix;
 	}
 }
 
@@ -388,6 +396,7 @@ int	get_conf_bool(char	*name, int dflt)
 
 load_transfer_conf()
 {
+	transfer_input_relation_prefix = get_conf_unq("input-relation-prefix");
 }
 
 load_syntax_conf()
@@ -454,6 +463,7 @@ int	load_conf()
 
 	invent_ltop = get_conf_bool("invent-ltop", 1);	// msg-less grammars tend to want their LTOP to be floating
 
+	hook_path = try_get_conf_path("hook-path", "HOOK");
 	rels_list_path = try_get_conf_path("mrs-rels-list", "RELS LIST");
 	hcons_list_path = try_get_conf_path("mrs-hcons-list", "HCONS LIST");
 

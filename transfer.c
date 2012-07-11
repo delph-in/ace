@@ -644,6 +644,7 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 			struct type	*ep_pred = ep_p->xtype;
 			if(!glb(ep_pred, de_pred))
 			{
+				DEBUG("wrong pred: %s vs %s\n", de_pred->name, ep_pred->name);
 				// most common failure path
 				return -1;
 			}
@@ -727,17 +728,25 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 		}
 		return 0;
 	}
+	/*printf("trying to unify hooks\n");
+	printf("input ltop = ");if(mrs->ltop)print_within_generation(mrs->ltop->dg);printf("\n");
+	printf("rule input ltop = ");if(tr->input.mrs->ltop)print_within_generation(tr->input.mrs->ltop->dg);printf("\n");
+	printf("rule context ltop = ");if(tr->context.mrs->ltop)print_within_generation(tr->context.mrs->ltop->dg);printf("\n");*/
 	if(unify_vars(mrs->ltop, tr->input.mrs->ltop))return -1;
 	if(unify_vars(mrs->ltop, tr->context.mrs->ltop))return -1;
 	if(unify_vars(mrs->index, tr->input.mrs->index))return -1;
 	if(unify_vars(mrs->index, tr->context.mrs->index))return -1;
+	/*printf("after unifying hooks:\n");
+	printf("input ltop = ");if(mrs->ltop)print_within_generation(mrs->ltop->dg);printf("\n");
+	printf("rule input ltop = ");if(tr->input.mrs->ltop)print_within_generation(tr->input.mrs->ltop->dg);printf("\n");
+	printf("rule context ltop = ");if(tr->context.mrs->ltop)print_within_generation(tr->context.mrs->ltop->dg);printf("\n");*/
 
 	for(i=0;i<hccount;i++)
 	{
 		struct mrs_hcons	hrule = find_hc(tr, i);
 		struct mrs_hcons	hin = mrs->hcons[hcalignment[i]];
 		//if(!unifiable_hcons(hrule, hin))return -1;
-		if(hrule.type != hin.type)return -1;
+		if(hrule.type != hin.type) { allow_unify_swapping = 1; return -1; }
 		if(unify_vars(hin.hi, hrule.hi))return -1;
 		if(unify_vars(hin.lo, hrule.lo))return -1;
 	}
@@ -1684,6 +1693,25 @@ struct mrs	*cleanup_mrs(struct mrs	*m)
 
 int	transfer(struct mrs	*m)
 {
+	extern char	*transfer_input_relation_prefix;
+	if(transfer_input_relation_prefix)
+	{
+		int i, pl = strlen(transfer_input_relation_prefix);
+		for(i=0;i<m->nrels;i++)
+		{
+			// the input MRS is stored on the heap...
+			char	*pred = m->rels[i].pred;
+			int		len = strlen(pred);
+			char	*revised = malloc(len + pl + 1 + 3);
+			// all predication names become quoted in this operation.
+			if(pred[0]=='"')
+				sprintf(revised, "\"%s%s", transfer_input_relation_prefix, pred+1);
+			else sprintf(revised, "\"%s%s\"", transfer_input_relation_prefix, pred);
+			free(m->rels[i].pred);
+			m->rels[i].pred = revised;
+		}
+	}
+	m = apply_transfer_input_vpm(m);
 	m = reformat_mrs_for_transfer(m);
 	//printf("reformatted mrs:\n");
 	//print_mrs(m);
@@ -1691,7 +1719,10 @@ int	transfer(struct mrs	*m)
 	int	n = transfer_mrs(ntransfer_rules, transfer_rules, m, &results, 0);
 	int i;
 	for(i=0;i<n;i++)
-		print_mrs(results[i]);
+	{
+		struct mrs	*out = apply_transfer_output_vpm(results[i]);
+		print_mrs(out);
+	}
 	fprintf(stderr, "NOTE: %d transfer results\t", n);
 	print_slab_stats();
 	clear_mrs();
