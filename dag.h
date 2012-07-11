@@ -6,7 +6,8 @@
 #include	"type.h"
 
 //#define COPY_COUNTS
-//#define COPY_PATHS
+
+#define COPY_PATHS
 #define	UNIFY_PATHS
 
 // tomabechi dgs
