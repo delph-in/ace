@@ -65,6 +65,7 @@ static inline void	forward_dg(struct dg	*from, struct dg	*to)
 	}
 }
 
+#define	HAVE_CHECK_CYCLES	1
 #ifdef	HAVE_CHECK_CYCLES
 int	check_cycles(struct dg	*dg)
 {
@@ -154,10 +155,10 @@ static void print_copy_path(char	*name)
 {
 	int	i;
 
-	fprintf(stderr, "%s", name);
+	printf("%s", name);
 	for(i=0;i<copypathp;i++)
-		fprintf(stderr, " %s.%d", fnames[copypath[i]], copypath[i]);
-	fprintf(stderr, "\n");
+		printf(" %s.%d", fnames[copypath[i]], copypath[i]);
+	printf("\n");
 }
 
 static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
@@ -198,7 +199,8 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 
 		if((unsigned long long)dg->copy == 3)	// cycle marker
 		{
-			//print_copy_path("CYCLE ending at");
+		extern int trace;
+			if(trace > 1)print_copy_path("CYCLE ending at");
 			return NULL;
 		}
 		if((unsigned long long)dg->copy == 5)	// sharable marker
@@ -259,7 +261,6 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 			//		fnames[aptr->label], newcopy->type->name, optr->dest);
 			ch = 0;
 
-//#define	COPY_PATHS
 #ifdef	COPY_PATHS
 			copypath[copypathp++] = *olptr;
 #endif
@@ -1090,13 +1091,31 @@ void bump_generation()
 	}
 }
 
+int	trimmed_portion_is_cyclic(struct dg	*d)
+{
+#ifdef	HAVE_CHECK_CYCLES
+	int	i;
+	d = dereference_dg(d);
+	struct dg	**arcs = DARCS(d);
+	for(i=0;i<d->narcs;i++)
+		if(SHOULD_TRIM(d->label[i]))
+			if(check_cycles(arcs[i]))return 1;
+	for(i=0;i<d->ncarcs;i++)
+		if(SHOULD_TRIM(d->carcs[i].label))
+			if(check_cycles(d->carcs[i].dest))return 1;
+#endif
+	return 0;
+}
+
 struct dg	*finalize_tmp(struct dg	*d, int trim)
 {
 	char		ch = 0;
 	struct dg	*res;
 
 	enable_trim(trim);
-	res = copy_dg_with_comp_arcs_ss(d, &ch);
+	if(trim && trimmed_portion_is_cyclic(d))
+		res = NULL;
+	else res = copy_dg_with_comp_arcs_ss(d, &ch);
 
 	if(!res)set_slabstate(&tmpstate);
 	bump_generation();
@@ -1111,7 +1130,9 @@ struct dg	*finalize_tmp_noss(struct dg	*d, int trim)
 
 	enable_trim(trim);
 	cdwca_should_trim = 1;
-	res = copy_dg_with_comp_arcs(d);
+	if(trim && trimmed_portion_is_cyclic(d))
+		res = NULL;
+	else res = copy_dg_with_comp_arcs(d);
 	cdwca_should_trim = 0;
 	if(!res)set_slabstate(&tmpstate);
 	generation++;
