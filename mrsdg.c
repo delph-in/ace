@@ -323,7 +323,7 @@ void do_difflist(struct dg *dlist, void (*process)(struct dg *item))
 
 struct mrs	*cont_to_mrs(struct dg	*cont)
 {
-	static int	hookf = -1, ltopf, indexf, xargf, relsf, hconsf;
+	static int	ltopf = -1, indexf, xargf, relsf, hconsf;
 	struct dg	*hook, *rels, *hcons;
 	struct mrs	*mrs = slab_calloc(sizeof(struct mrs), 1);
 
@@ -337,9 +337,8 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	mrs->vlist.vars = tmp_vlist;
 
 	name = 0;
-	if(hookf==-1)
+	if(ltopf==-1)
 	{
-		hookf = lookup_fname("HOOK");
 		ltopf = lookup_fname("LTOP");
 		indexf = lookup_fname("INDEX");
 		xargf = lookup_fname("XARG");
@@ -357,11 +356,9 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	nvars_extracted = 0;
 
 	load_ep_drop();
-	hook = dg_hop(cont, hookf);
+	hook = dg_path(cont, hook_path);
 	rels = dg_path(cont, rels_list_path);
 	hcons = dg_path(cont, hcons_list_path);
-	//rels = dg_hop(cont, relsf);
-	//hcons = dg_hop(cont, hconsf);
 	if(hook)
 	{
 		if(invent_ltop)
