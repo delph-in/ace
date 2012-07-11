@@ -13,6 +13,9 @@
 #include	"lattice-mapping.h"
 #include	"token.h"
 
+extern int preexisting_lui_fd;
+extern int input_from_lui;
+
 static int lui_rfd = -1, lui_wfd;
 FILE		*lui_write, *lui_read;
 static int chart_id = 0;
@@ -20,6 +23,32 @@ static int chart_id = 0;
 void	browse_lui(int eid, char *what);
 
 int waiting_for_lui = 0;
+char	*sentence_to_parse_from_lui = NULL;
+
+input_from_lui_mode()
+{
+	printf("ACE: reading input from LUI\n");
+	waiting_for_lui = 1;
+	while(lui_rfd != -1)
+	{
+		usleep(200000);
+		if(sentence_to_parse_from_lui)
+		{
+			char	*sent = sentence_to_parse_from_lui;
+			sentence_to_parse_from_lui = NULL;
+			clear_slab();
+			parse_line(sent);
+		}
+	}
+	printf("ACE: exiting after LUI closed our connection\n");
+	return 0;
+}
+
+void	parse_from_lui(char	*input)
+{
+	if(!input_from_lui)return;
+	sentence_to_parse_from_lui = strdup(input);
+}
 
 void	*lui_listener(void *foo)
 {
@@ -44,6 +73,7 @@ void	*lui_listener(void *foo)
 			}
 			else if(!strncmp(lp, "version ", 8)) {}
 			else if(strstr(lp, " forget")) {}
+			else if(!strncmp(lp, "parse ", 6))parse_from_lui(lp+6);
 			else if(!strcmp(lp, "")) {}
 			else fprintf(stderr, "LUI: unknown `%s'\n", lp);
 		}
@@ -77,6 +107,13 @@ int lui_initialize()
 	int rfd[2], wfd[2];
 	if(lui_rfd != -1)return 0;
 
+	if(preexisting_lui_fd != -1)
+	{
+		lui_wfd = preexisting_lui_fd;
+		lui_rfd = preexisting_lui_fd;
+		goto make_listener_thread;
+	}
+
 	int	pr1 = pipe(rfd);
 	int	pr2 = pipe(wfd);
 	assert((pr1 == 0 && pr2 == 0) || !"failed to create a pipe to talk to LUI");
@@ -85,6 +122,7 @@ int lui_initialize()
 		static pthread_t	pth;
 		lui_wfd = wfd[1]; close(wfd[0]);
 		lui_rfd = rfd[0]; close(rfd[1]);
+		make_listener_thread:
 		lui_write = fdopen(lui_wfd, "w");
 		lui_read = fdopen(lui_rfd, "r");
 		pthread_create(&pth, 0, lui_listener, 0);

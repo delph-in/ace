@@ -55,6 +55,8 @@ int report_labels = 0;
 extern int equivalence_packing_only;
 
 int	max_chart_megabytes = 1200, max_unpack_megabytes = 1500;
+int preexisting_lui_fd = -1;
+int input_from_lui = 0;
 
 extern float timer();
 
@@ -107,12 +109,15 @@ void	parse_args(int	argc, char	*argv[])
 		{"equivalence-packing", 0, &equivalence_packing_only, 1},
 		{"itsdb-forest", 0, &itsdb_dump_chart, 1},
 		{"report-labels", 0, &report_labels, 1},
+		{"input-from-lui", 0, &input_from_lui, 1},
 #define	MAX_UNPACK_MEGABYTES_OPTION	1000
 		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},
 #define	MAX_CHART_MEGABYTES_OPTION	1001
 		{"max-chart-megabytes", 1, NULL, MAX_CHART_MEGABYTES_OPTION},
 #define GENERATION_SERVER_OPTION	1002
 		{"generation-server", 1, NULL, GENERATION_SERVER_OPTION},
+#define LUI_FD_OPTION			1003
+		{"lui-fd", 1, NULL, LUI_FD_OPTION},
 		{NULL,0,NULL,0}
 		};
 
@@ -156,6 +161,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	MAX_UNPACK_MEGABYTES_OPTION:	max_unpack_megabytes = atoi(optarg);	break;
 		case	MAX_CHART_MEGABYTES_OPTION:		max_chart_megabytes = atoi(optarg);		break;
 		case	GENERATION_SERVER_OPTION:	generation_server_lang = optarg;	break;
+		case	LUI_FD_OPTION:	preexisting_lui_fd = atoi(optarg);	break;
 		case	0:	continue;	// auto-handled long option
 	} }
 	if(optind<argc-1)goto usage;
@@ -391,11 +397,22 @@ int	main(int	argc, char	*argv[])
 	struct job_stats	stats;
 
 	setlocale(LC_ALL, "");
+	setlocale(LC_NUMERIC, "POSIX");
+
 	parse_args(argc, argv);
 	initialize_engine();
 
 	if(do_itsdb) itsdb_mode();
 	setup_signal_handlers();
+	if(preexisting_lui_fd != -1)
+	{
+		lui_initialize();
+		if(input_from_lui)
+		{
+			input_from_lui_mode();
+			return;
+		}
+	}
 
 	//generalization_experiments();
 	/*extern int nstrings;

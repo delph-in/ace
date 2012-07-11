@@ -139,8 +139,13 @@ int load_mem(char *fname)
 
 	DEBUG("loading maxent file from '%s'\n", fname);
 
+struct timeval tv, tv2;
+gettimeofday(&tv, NULL);
+double tfgets = 0;
 	while(fgets(line, 1024, f))
 	{
+		gettimeofday(&tv2, NULL);
+		tfgets += (double)(tv2.tv_sec - tv.tv_sec + 0.000001 * (tv2.tv_usec - tv.tv_usec));
 		int llen = strlen(line), tint, i = 0;
 		float sfloat;
 		char *p, *type, *grandparents_count, *head, *rhs[2], *score;
@@ -179,6 +184,7 @@ int load_mem(char *fname)
 		rhs[1] = p;
 		record_maxent_feature(head, rhs, sfloat, ngrandparents, grandparents);
 	}
+	//printf("maxent loading fgets took %.2fs\n", tfgets);
 
 	fclose(f);
 	return 0;
