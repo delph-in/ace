@@ -596,7 +596,10 @@ struct token	*extract_token_from_dg(struct dg	*dg)
 	assert(cto_dg != NULL);
 	t->cfrom = atoi(cfrom_dg->xtype->name+1);
 	t->cto = atoi(cto_dg->xtype->name+1);
-	struct dg	*taglist_dg = dg_path(dg, token_postags_path);
+	// don't bother extracting the postags list
+	t->npostags = 0;
+	t->postags = NULL;
+	/*struct dg	*taglist_dg = dg_path(dg, token_postags_path);
 	assert(taglist_dg != NULL);
 	struct dg	*tagfirst_dg = dg_hop(taglist_dg, 1);	// FIRST
 	if(tagfirst_dg)
@@ -606,7 +609,7 @@ struct token	*extract_token_from_dg(struct dg	*dg)
 		assert(sl>0 && t->postag[sl-1]=='"');
 		t->postag[sl-1] = 0;
 	}
-	else t->postag = NULL;
+	else t->postag = NULL;*/
 	t->oc = NULL;
 	return t;
 }

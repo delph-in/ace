@@ -112,8 +112,12 @@ struct token	yy_read_token(char	**yy, int	*vfrom, int	*vto)
 	while(peek(yy) == '"')
 	{
 		char	*tag = read_string(yy);
-		if(!T.postag)T.postag = tag;
-		read_double(yy);	// probability
+		double	prob = read_double(yy);	// probability
+		T.npostags++;
+		T.postags = slab_realloc(T.postags, sizeof(struct postag)*(T.npostags-1), sizeof(struct postag)*T.npostags);
+		T.postags[T.npostags-1].tag = tag;
+		char	str[64]; sprintf(str, "%f", prob);
+		T.postags[T.npostags-1].prob = freeze_string(str);
 	}
 	expect(yy, ')');
 	build_token_dag(&T);

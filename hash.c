@@ -161,6 +161,22 @@ void	hash_free(struct hash	*ht)
 	free(ht);
 }
 
+void	hash_free_nokeys(struct hash	*ht)
+{
+	int	i;
+	for(i=0;i<ht->size;i++)
+	{
+		while(ht->buckets[i])
+		{
+			struct hash_bucket	*b = ht->buckets[i];
+			ht->buckets[i] = b->next;
+			free(b);
+		}
+	}
+	free(ht->buckets);
+	free(ht);
+}
+
 size_t	hash_memory_usage(struct hash	*ht)
 {
 	size_t	len = sizeof(*ht);

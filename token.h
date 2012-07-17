@@ -6,7 +6,12 @@
 struct token
 {
 	char	*string;
-	char	*postag;
+	int	npostags;
+	struct postag
+	{
+		char	*tag;
+		char	*prob;
+	}	*postags;
 	int		cfrom, cto;
 	struct dg	*dg;
 

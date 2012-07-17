@@ -17,8 +17,11 @@
 #endif
 #include	"token.h"
 #include	"type.h"
+#include	"tnt.h"
 
 extern int trace;
+
+int enable_tnt = 0;
 
 int	enable_token_avms = 0;
 
@@ -43,18 +46,33 @@ struct dg	*new_dag_for_unfrozen_string(char	*str)
 	return dg;
 }
 
-struct dg	*build_pos_tags_list(char	*tag)
+struct dg	*build_one_pos_tags_list(char	*tag, struct dg	*rest)
 {
 	char	tag_str[32];
 	sprintf(tag_str, "\"%s\"", tag);
-	struct dg	*list = atomic_dg("*cons*");
-	/*struct type	*tagtype = add_string(freeze_string(tag_str));
-	struct dg	*tagdg = tagtype->dg?:atomic_dg(top_type);
-	tagdg->xtype=tagdg->type=tagtype;*/
+	struct dg	*list = atomic_dg(g_cons_type);
 	struct dg	*tagdg = new_dag_for_unfrozen_string(tag_str);
 	list = add_dg_hop(list, 1, tagdg);	// FIRST
-	list = add_dg_hop(list, 2, type_dg("*null*"));	// REST
+	list = add_dg_hop(list, 2, rest?:type_dg(g_null_type));	// REST
 	return list;
+}
+
+struct dg	*build_pos_tags_list(int	ntags, struct postag	*tags)
+{
+	int i;
+	struct dg	*rest = type_dg(g_null_type);
+	for(i=ntags-1;i>=0;i--)
+		rest = build_one_pos_tags_list(tags[i].tag, rest);
+	return rest;
+}
+
+struct dg	*build_pos_prbs_list(int	ntags, struct postag	*tags)
+{
+	int i;
+	struct dg	*rest = type_dg(g_null_type);
+	for(i=ntags-1;i>=0;i--)
+		rest = build_one_pos_tags_list(tags[i].prob, rest);
+	return rest;
 }
 
 void	build_token_dag(struct token	*t)
@@ -70,7 +88,8 @@ void	build_token_dag(struct token	*t)
 	dg = dg_path_add(dg, token_form_path, new_dag_for_unfrozen_string(bigger_string));//temporary_string_type(freeze_string(bigger_string))->dg);
 	dg = dg_path_add(dg, token_from_path, new_dag_for_unfrozen_string(c_from_str));//temporary_string_type(freeze_string(c_from_str))->dg);
 	dg = dg_path_add(dg, token_to_path, new_dag_for_unfrozen_string(c_to_str));//temporary_string_type(freeze_string(c_to_str))->dg);
-	if(t->postag)dg = dg_path_add(dg, token_postags_path, build_pos_tags_list(t->postag));
+	dg = dg_path_add(dg, token_postags_path, build_pos_tags_list(t->npostags, t->postags));
+	dg = dg_path_add(dg, token_posprobs_path, build_pos_prbs_list(t->npostags, t->postags));
 	dg = wellform_dg(dg);
 	t->dg = dg;
 	//printf("token '%s' pos '%s'\n", t->string, t->postag);
@@ -81,15 +100,51 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 	struct lattice	*tc = slab_alloc(sizeof(*tc));
 	int	i;
 
-	char	**tags;
-	int		*unk;
+	int		*ntags = calloc(sizeof(int),nwords);
+	char	***tags = calloc(sizeof(char**),nwords);
+	char	***probs = calloc(sizeof(char**),nwords);
+	int		*unk = malloc(sizeof(int)*nwords);
 
-	tags = malloc(sizeof(char*) * nwords);
-	unk = malloc(sizeof(int) * nwords);
-	if(enable_post)
+	if(enable_tnt)
+	{
+		struct tnt_result	results[nwords];
+		int res = tnt_tag_sequence(nwords, words, results);
+		if(res == 0)
+		{
+			// TODO complete filling in ntags, tags, probs properly
+			// also write build_pos_tags_list() with new fingerprint...
+			// also see what other parts of the code used to refer to token->postag and now need to be changed
+			for(i=0;i<nwords;i++)
+			{
+				ntags[i] = results[i].ntags;
+				tags[i] = malloc(sizeof(char*) * ntags[i]);
+				probs[i] = malloc(sizeof(char*) * ntags[i]);
+				int j;
+				for(j=0;j<ntags[i];j++)
+				{
+					tags[i][j] = results[i].tags[j].tag;
+					char	p[64];
+					sprintf(p, "%f", results[i].tags[j].prob);
+					probs[i][j] = freeze_string(p);
+				}
+				unk[i] = 0;
+			}
+		}
+	}
+	else if(enable_post)
 	{
 #ifdef	POST
-		post_tag_sequence(nwords, words, tags, unk);
+		char	*tags1[nwords];
+		char	*one = freeze_string("1.0");
+		post_tag_sequence(nwords, words, tags1, unk);
+		for(i=0;i<nwords;i++)
+		{
+			ntags[i] = 1;
+			tags[i] = malloc(sizeof(char*));
+			tags[i][0] = tags1[i];
+			probs[i] = malloc(sizeof(char*));
+			probs[i][0] = one;
+		}
 #else
 		assert(!"grammar built for POS tagging, but ACE built without tagger.");
 #endif
@@ -101,7 +156,7 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 	}
 	if(trace)
 	{
-		for(i=0;i<nwords;i++)fprintf(stderr, "%s/%s%s ", words[i], tags[i], unk[i]?"?":"");
+		for(i=0;i<nwords;i++)fprintf(stderr, "%s/%s%s ", words[i], tags[i]?tags[i][0]:NULL, unk[i]?"?":"");
 		fprintf(stderr, "\n");
 	}
 
@@ -119,13 +174,22 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 		e->token = slab_alloc(sizeof(struct token));
 		tc->edges[i] = e;
 		add_lattice_vertex_follower(vfrom, e);
-		e->token->postag = tags[i];
+		e->token->npostags = ntags[i];
+		e->token->postags = slab_alloc(sizeof(struct postag)*ntags[i]);
+		int j;
+		for(j=0;j<ntags[i];j++)
+		{
+			e->token->postags[j].tag = tags[i][j];
+			e->token->postags[j].prob = probs[i][j];
+		}
 		e->token->string = words[i];
 		e->token->cfrom = cfrom[i];
 		e->token->cto = cto[i];
 		if(enable_token_avms)
 			build_token_dag(e->token);
 		e->token->oc = NULL;
+		free(tags[i]);
+		free(probs[i]);
 	}
 	free(tags);
 	free(unk);

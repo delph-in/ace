@@ -19,6 +19,7 @@
 #include	"post.h"
 #endif
 #include	"version.h"
+#include	"tnt.h"
 
 #include	"timer.h"
 
@@ -39,6 +40,10 @@ extern char mrs_line_breaks;
 
 int g_mode = PARSING, print_trees = 1;
 int	die = 0;
+
+extern int enable_tnt;
+char	*tnt_model_path = NULL;
+int		tnt_max_tags = 2;
 
 extern int	g_loaded, inhibit_results, trace;
 extern int yy_mode;
@@ -118,6 +123,10 @@ void	parse_args(int	argc, char	*argv[])
 		{"generation-server", 1, NULL, GENERATION_SERVER_OPTION},
 #define LUI_FD_OPTION			1003
 		{"lui-fd", 1, NULL, LUI_FD_OPTION},
+#define	TNT_MODEL_OPTION		1004
+#define	TNT_MAX_TAGS_OPTION		1005
+		{"tnt-model", 1, NULL, TNT_MODEL_OPTION},
+		{"tnt-max-tags", 1, NULL, TNT_MAX_TAGS_OPTION},
 		{NULL,0,NULL,0}
 		};
 
@@ -162,6 +171,8 @@ void	parse_args(int	argc, char	*argv[])
 		case	MAX_CHART_MEGABYTES_OPTION:		max_chart_megabytes = atoi(optarg);		break;
 		case	GENERATION_SERVER_OPTION:	generation_server_lang = optarg;	break;
 		case	LUI_FD_OPTION:	preexisting_lui_fd = atoi(optarg);	break;
+		case	TNT_MODEL_OPTION:	enable_tnt = 1; tnt_model_path = optarg; break;
+		case	TNT_MAX_TAGS_OPTION: tnt_max_tags = atoi(optarg); break;
 		case	0:	continue;	// auto-handled long option
 	} }
 	if(optind<argc-1)goto usage;
@@ -170,6 +181,7 @@ void	parse_args(int	argc, char	*argv[])
 	else if(!save_grammar_path)sentence_path = "-";
 	if(generation_server_lang)
 		g_mode = GENERATING;
+	if(enable_tnt)assert(0 == tnt_init(tnt_model_path, tnt_max_tags));
 }
 
 struct job_stats
@@ -447,6 +459,7 @@ int	main(int	argc, char	*argv[])
 		quit_lui();
 		wait_for_lui();
 	}
+	if(enable_tnt)tnt_kill();
 
 	if(stats.success<=0 && stats.count>0)return -1;
 	else return 0;

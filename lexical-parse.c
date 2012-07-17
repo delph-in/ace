@@ -52,7 +52,8 @@ struct lattice	*lexical_lookup_into_chart(struct lattice	*token_chart)
 
 	void	edge_handler(struct edge	*le, struct token	**tokens)
 	{
-		//printf(" lexical lookup found lexeme '%s'\n", le->lex->word);
+		extern int debug_level;
+		if(debug_level)printf(" lexical lookup found lexeme '%s'\n", le->lex->word);
 		add_new_lexical_edge(lc, le);
 	}
 
@@ -66,7 +67,7 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 	struct edge	*e = le->edge;
 	int	i;
 
-	//printf("lexparsing edge #%d\n", le->edge->id);
+	//printf("lexparsing edge #%d '%s'\n", le->edge->id, e->lex->word);
 	//for(i=0;i<le->edge->north_routes;i++)
 	//	printf("oroute %d: next rule %s\n", i, (le->edge->orth_routes[i].len>0)?(rules[le->edge->orth_routes[i].rules[0]]->name):"none");
 	for(i=0;i<nrules;i++)

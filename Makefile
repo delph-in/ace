@@ -5,6 +5,7 @@ DELPHIN_CFLAGS=-isystem ${LOGONROOT}/lingo/lkb/include -DTSDB
 DELPHIN_LIBS=-L ${LOGONROOT}/lingo/lkb/lib/linux.x86.64 -Wl,-Bstatic -litsdb -lpvm3 -Wl,-Bdynamic
 
 POST_CFLAGS=-I post/ -DPOST
+POST_LIBS=-Wl,-Bstatic -lutil -Wl,-Bdynamic	# for openpty for calling out to tnt (which uses fully buffered stdio)
 
 REPP_LIBS=-Wl,-Bstatic -lrepp -Wl,-Bdynamic
 #REPP_CFLAGS=-I ${REPP_DIR}/include/
@@ -28,7 +29,7 @@ TIMER_LIB=timer.o
 
 CFLAGS+=${DELPHIN_CFLAGS} ${POST_CFLAGS} ${REPP_CFLAGS}
 
-OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o treebank-control.o token.o lattice-mapping.o lexical-parse.o generalize.o transfer.o edge-vectors.o forest-out.o exunpack.o semilattice.o rebuild-th.o compile-qc.o idiom.o yy.o lisp.o
+OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o treebank-control.o token.o lattice-mapping.o lexical-parse.o generalize.o transfer.o edge-vectors.o forest-out.o exunpack.o semilattice.o rebuild-th.o compile-qc.o idiom.o yy.o lisp.o tnt.o
 
 PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o) pic/timer.o
 APPOBJ=${OBJ} main.o post/post.o
@@ -47,7 +48,8 @@ ${PICOBJS} : pic/%.o: %.c
 
 libace.so: pic/libace.o ${PICOBJS} post/post.o
 	rm -f libace.so
-	gcc -shared ${PICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS} -ldl
+	gcc -shared ${PICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS} -ldl -lutil
+# note: -lutil cannot be compiled statically into a shared library, because the bozos that built it didn't use -fPIC...
 
 libace.a: libace.o ${OBJ}
 	rm -f libace.a
