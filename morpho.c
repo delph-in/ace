@@ -732,6 +732,9 @@ void	setup_morpho(char	*line)
 
 int	appropriate_letter(int	let, int	group)
 {
+	// new move jul-15-2012: case insensitive matching
+	let =towlower(let);
+
 	let = ((unsigned int)let) & 255;	// XXX for now we're only looking about 8 bits of wchar_t for letter groups
 	if(group>255 || group<0)return 0;
 	if(!lgroups[group])
