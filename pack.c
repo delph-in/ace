@@ -241,7 +241,20 @@ block(struct edge	*e, int	freeze)
 			for(j=0;j<p->have;j++)
 				if(p->daughters[j] == e)
 				{
-					block(p, 1);
+					if(l == -1)
+						block(p, 1);
+					else
+					{
+						// trying to FREEZE an edge that is already on a packing list.
+						// the only reason we keep FROZEN edges around in the main chart
+						// is so they can save us work by subsuming other edges that come along
+						// until they are gobbled up by the new subsuming edge we know is coming.
+						// packed edges aren't eligible to subsume other edges,
+						// so the best thing to do is just delete this edge now.
+						P->npack--;
+						PACKBUG("EXPUNGING edge #%d\n", p->id);
+						memmove(P->pack+l, P->pack+l+1, sizeof(struct edge*)*(P->npack-l));
+					}
 					break;
 				}
 		}
