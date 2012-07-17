@@ -6,6 +6,7 @@
 #include	<wchar.h>
 #include	<wctype.h>
 #include	<setjmp.h>
+#include	<math.h>
 
 #include "dag.h"
 #include "chart.h"
@@ -41,6 +42,7 @@ int	max_grandparenting = 3;
 int	total_hyps;
 
 struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry	ancestry);
+struct scoring_ancestry	compute_sub_ancestry(struct scoring_ancestry	panc, struct edge	*edge);
 struct hypothesis	*get_cui_hypothesis(struct context_unpack_info	*cui, int	rank);
 void	set_cui_hypothesis(struct context_unpack_info	*cui, int	rank, struct hypothesis	*h);
 int	cui_has_hypothesis(struct context_unpack_info	*cui, struct hypothesis	*hyp);
@@ -68,8 +70,41 @@ void score_hypothesis(struct hypothesis *h)
 		float	score = maxent_score(lhs_sign, rhs0_sign, rhs1_sign, key_arg, &h->ancestry);
 		h->score += score;
 
+		float	lexical_daughter_scores = 0;
+
 		for(i=0;i<h->arity;i++)
+		{
 			h->score += h->rhslist[i]->score;
+			if(h->rhslist[i]->arity == 0)
+				lexical_daughter_scores += h->rhslist[i]->score;
+		}
+
+		if(!h->dec->is_scored)
+		{
+			h->dec->is_scored = 1;
+			h->dec->local_score = score + lexical_daughter_scores;
+			h->dec->all_unpackings_z = exp((double)h->dec->local_score);
+			//fprintf(stderr, "local Z at #%d dec %p = %f\n", h->edge->id, h->dec, h->dec->all_unpackings_z);
+			struct scoring_ancestry	sub_ancestry = compute_sub_ancestry(h->ancestry, h->edge);
+			for(i=0;i<h->arity;i++)
+			{
+				double	sub_z = 0;
+				struct hypothesis	*sub_h = h->rhslist[i];
+				struct edge	*sub_e = sub_h->edge;
+				if(sub_h->arity == 0)continue;	// we already collected a score for lexical daughters
+				struct context_unpack_info	*subcui = get_edge_cui(sub_e, sub_ancestry);
+				int j;
+				for(j=0;j<subcui->ndecs;j++)
+				{
+					assert(subcui->decs[j].is_scored);
+					//fprintf(stderr, "read dec %p Z %f\n", subcui->decs+j, subcui->decs[j].all_unpackings_z);
+					sub_z += subcui->decs[j].all_unpackings_z;
+				}
+				//fprintf(stderr, " sub_z for dtr %d = %f\n", i, sub_z);
+				h->dec->all_unpackings_z *= sub_z;
+			}
+			//fprintf(stderr, "final Z for dec %p = %f\n", h->dec, h->dec->all_unpackings_z);
+		}
 	}
 	else
 	{
@@ -149,6 +184,7 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 		dec[i].seen_indices = NULL;
 		dec[i].nsi = 0;
 		dec[i].asi = 0;
+		dec[i].is_scored = 0;
 	}
 
 	n = 0;
@@ -704,6 +740,8 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 		// initialize agenda with (0,...,0) index vector for each decomposition
 		decs = decompose_edge(e, &ndecs);
 		if(!decs)return NULL;
+		cui->decs = decs;
+		cui->ndecs = ndecs;
 		indent++;
 
 		struct scoring_ancestry	sub_ancestry;
@@ -1252,7 +1290,7 @@ void	fixup_generator_string(struct hypothesis	*h)
 
 int want_mrs = 1;
 
-int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest)
+int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs, double	probability), int nbest)
 {
 	int	i, j;
 	volatile int count = 0, nhyp = 0, ninsthyps = 0;	// volatile so that they are usable after longjmp()'ing out of an OOM condition
@@ -1299,6 +1337,35 @@ extern int do_itsdb;
 			}
 		}
 	}
+
+	// should have decomposed every edge in every context
+	// and scored every local context by now
+	// ... go get the normalization factor
+	double	Z = 0;
+	for(i=0;i<cell->p_nedges;i++)
+	{
+		edge = cell->p_edges[i];
+		if( (g_mode!=GENERATING || ep_span_is_root(edge->ep_span_bv, edge->neps)) && is_root(edge->dg) )
+		{
+			for(j=-1;j<edge->npack;j++)
+			{
+				// for each potentially root packed edge...
+				struct edge *e = (j==-1)?edge:edge->pack[j];
+				if(e->frozen && !e->frosted)continue;
+				if(!is_root(e->dg))continue;
+				struct context_unpack_info	*cui = get_edge_cui(e, root_ancestry);
+				int k;
+				for(k=0;k<cui->ndecs;k++)
+				{
+					assert(cui->decs[k].is_scored);
+					Z += cui->decs[k].all_unpackings_z;
+					//fprintf(stderr, "root edge #%d dec %p %d / %d score %f\n",
+					//	e->id, cui->decs+k, k+1, cui->ndecs, cui->decs[k].all_unpackings_z);
+				}
+			}
+		}
+	}
+	//fprintf(stderr, "MaxEnt normalization factor = %f\n", Z);
 
 	if(hyp_timer==-1)hyp_timer = new_timer("hypothesize");
 	if(inst_timer==-1)inst_timer = new_timer("instantiate");
@@ -1354,7 +1421,8 @@ extern int do_itsdb;
 					//printf("\n"); print_hypothesis(h, printf, 0); printf("\n");
 					if(g_mode == GENERATING)
 						fixup_generator_string(hyp);
-					count += process(hyp, m);
+					double	probability = exp((double)hyp->score) / Z;
+					count += process(hyp, m, probability);
 				}
 			}
 			else DEBUG("... wasn't root after unpacking\n");

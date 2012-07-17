@@ -344,11 +344,12 @@ int didsent;
 void	(*parse_callback)(struct hypothesis	*hyp, struct mrs	*mrs) = NULL;
 
 // show analyses
-int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs)
+int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
 {
 	struct dg	*root = hyp->dg, *sem;
 	extern char	*mrs_end;
 	extern int print_trees;
+	if(debug_level)printf("probability = %f:\n", prob);
 	if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->edge->id);
 	if(trace>1){print_dg(hyp->dg); printf("\n");}
 	if(!inhibit_results)
@@ -441,7 +442,8 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	{
 		fprintf(stderr, "NOTE: post reduction gap\n");
 		stop_timer(chart_setup_timer, 1);
-		return -1;
+		itsdb_report(token_chart, -2, 0);
+		return -2;
 	}
 
 	if(reduce_chart_before_lexical_parsing)
@@ -463,15 +465,24 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	if(nwords < 0)
 	{
 		fprintf(stderr, "NOTE: negative lexical chart length\n");
+		itsdb_report(token_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
-		return -1;
+		return -2;
 	}
 	assert(nwords >= 0);
 	if(!nwords)
 	{
 		fprintf(stderr, "NOTE: nothing to parse\n");
+		itsdb_report(token_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
-		return -1;
+		return -2;
+	}
+	if(nwords>70)
+	{
+		fprintf(stderr, "NOTE: giving up, too many words (70+)\n");
+		itsdb_report(token_chart, -2, 0);
+		stop_timer(chart_setup_timer, 1);
+		return -2;
 	}
 
 	cancel_parse = 0;
@@ -619,9 +630,9 @@ int	check_mbs(char	*mbs);
 		goto finished;
 	}
 
-	if(nwords>70)
+	if(nwords>1000)
 	{
-		fprintf(stderr, "NOTE: 0 readings, too many words (70+)\n");
+		fprintf(stderr, "NOTE: 0 readings, too many words (1000+)\n");
 		if(!inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
 		goto finished;
 	}
@@ -637,7 +648,7 @@ int	check_mbs(char	*mbs);
 	for(i=1;i<=nwords;i++)printf(" level %d: %f\n", i, level_times[i]);
 #endif
 
-	if(nparse==-1)fprintf(stderr, "NOTE: ignoring `%s'\n", current_sentence);
+	if(nparse<-1)fprintf(stderr, "NOTE: ignoring `%s'\n", current_sentence);
 	if(do_itsdb && nparse==-1)itsdb_report(NULL, -1, 0);
 
 finished:

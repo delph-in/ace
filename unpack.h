@@ -7,6 +7,10 @@ struct decomposition
 
 	int	*seen_indices;
 	int	nsi, asi;
+
+	float	local_score;
+	double	all_unpackings_z;
+	int		is_scored;
 };
 
 struct hypothesis
@@ -46,6 +50,8 @@ struct unpack_info	// used by hypothesize_edge() to keep track of what hypothesi
 		struct hypagenda_item *agenda;
 		struct hypothesis **hypotheses;
 		int	nhb, nhypotheses, ahypotheses;
+		int	ndecs;
+		struct decomposition	*decs;
 
 		struct scoring_ancestry	ancestry;
 	}	**cuis;
@@ -54,7 +60,7 @@ struct unpack_info	// used by hypothesize_edge() to keep track of what hypothesi
 };
 
 struct mrs;
-int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs), int nbest);
+int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs, double	probability), int nbest);
 struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_ancestry	ancestry, struct hypagenda_item	**customAgenda);
 char	*hypothesis_to_dstring(struct hypothesis	*h);
 char	*hypothesis_to_labelled_tree_string(struct hypothesis	*h);

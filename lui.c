@@ -348,7 +348,7 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 	int	count = 0;
 
 	lui_initialize();
-	int iter(struct hypothesis	*hyp, struct mrs	*mrs)
+	int iter(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
 	{
 		if(!require_mrs || mrs_subsumes(require_mrs, mrs))
 		{

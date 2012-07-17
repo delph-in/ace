@@ -391,7 +391,7 @@ int	generate(struct mrs	*mrs)
 	current_input_mrs = internal_to_external_mrs(current_internal_input_mrs);
 #endif
 
-	int show_result(struct hypothesis	*hyp, struct mrs	*mrs_res)
+	int show_result(struct hypothesis	*hyp, struct mrs	*mrs_res, double	prob)
 	{
 		// LKB compares *internal* MRSes, by going through the VPM *twice* "to get defaults".
 		// see comment in lkb/mrs/generate.lisp near line 765.
@@ -434,6 +434,7 @@ int	generate(struct mrs	*mrs)
 		R->surface = hyp->string;
 		R->hyp = hyp;
 		R->mrs = mrs_res;
+		if(debug_level)printf("probability = %f:\n", prob);
 		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
 		if(!inhibit_results)printf("%s\n", hyp->string);
