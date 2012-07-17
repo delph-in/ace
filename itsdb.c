@@ -60,6 +60,10 @@ questions:
 #include	"lattice-mapping.h"
 #include	"token.h"
 
+#define	TOKEN_EDGE_STATUS	(8)
+#define	ROOT_EDGE_STATUS	(1|2)
+#define	NONROOT_EDGE_STATUS	(2)
+
 //#define	capi_printf(fmt...)	fprintf(stderr, fmt)
 
 void tsdb_report_derivation(struct hypothesis	*hyp);
@@ -162,19 +166,27 @@ itsdb_report(struct lattice	*tokens, int	status, int	tforest)
 {
 	extern int total_edges, real_edges, passive_edges, slab_usage();
 
-	if(status == 0)
+	if(status == 0 || status == -2)
 	{
 		capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
 		//capi_printf("(:tcpu . %d) ", tforest);
 
-		int	readings = capi_print_derivations();
+		int readings;
+		if(itsdb_dump_chart)capi_print_chart(tokens, status);
+		if(status == 0)
+		{
+			readings = capi_print_derivations();
 
-		if(itsdb_dump_chart)capi_print_chart(tokens);
-
-		capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
-//			readings,
-			tsdb_nanalyses,
-			passive_edges, real_edges - passive_edges);
+			capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
+	//			readings,
+				tsdb_nanalyses,
+				passive_edges, real_edges - passive_edges);
+		}
+		else
+		{
+			capi_printf("(:readings . 0) (:pedges . 0) (:aedges . 0) ");
+			readings = -2;
+		}
 
 		capi_printf("(:others . %d) ", slab_usage());
 		return readings;
@@ -361,7 +373,7 @@ void	capi_print_chart_edge(struct edge	*e, struct lattice	*tokens)
 	e->unpack = (void*)0x1;
 	char	*sign = e->rule?e->rule->name:e->lex->word;
 	int	i;
-	capi_printf(" ((:id . %d) (:label . \"%s\") (:start . %d) (:end . %d) (:status . %d)", e->id, sign, e->from, e->to, this_edge_is_root(e));
+	capi_printf(" ((:id . %d) (:label . \"%s\") (:start . %d) (:end . %d) (:status . %d)", e->id, sign, e->from, e->to, this_edge_is_root(e)?ROOT_EDGE_STATUS:NONROOT_EDGE_STATUS);
 	if(!e->rule)
 	{
 		// lexeme edge
@@ -383,19 +395,23 @@ void	capi_print_chart_edge(struct edge	*e, struct lattice	*tokens)
 		capi_print_chart_edge(e->daughters[i], tokens);
 }
 
-int capi_print_chart(struct lattice	*tokens)
+int capi_print_chart(struct lattice	*tokens, int	status)
 {
 	capi_printf("(:chart . (");
-	struct chart_cell	*root_cell = &cells[chart_size-1];
 	int i;
-	reset_unpacking();
-	for(i=0;i<root_cell->p_nedges;i++)
+
+	if(status == 0)
 	{
-		struct edge	*edge = root_cell->p_edges[i];
-		if(this_edge_is_root(edge))
-			capi_print_chart_edge(edge, tokens);
+		struct chart_cell	*root_cell = &cells[chart_size-1];
+		reset_unpacking();
+		for(i=0;i<root_cell->p_nedges;i++)
+		{
+			struct edge	*edge = root_cell->p_edges[i];
+			if(this_edge_is_root(edge))
+				capi_print_chart_edge(edge, tokens);
+		}
+		reset_unpacking();
 	}
-	reset_unpacking();
 
 	// output pseudo-edges for the token chart
 	improve_token_lattice_characterization(tokens);
@@ -420,8 +436,8 @@ int capi_print_chart(struct lattice	*tokens)
 			free(formesc);
 		}
 		char	*labelesc = heap_escape(token_str);
-		capi_printf(" (:status . 0) (:label . \"%s\") (:daughters . ()) (:alternates . ()))",
-			labelesc);
+		capi_printf(" (:status . %d) (:label . \"%s\") (:daughters . ()) (:alternates . ()))",
+			TOKEN_EDGE_STATUS, labelesc);
 		free(labelesc);
 	}
 
@@ -433,7 +449,7 @@ int	capi_print_derivations()
 	int id;
 
 	id = 0;
-	int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs)
+	int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
 	{
 		tsdb_nanalyses++;
 		if(tsdb_nderivations >= tsdb_maxderivations)return 1;
