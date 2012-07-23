@@ -138,7 +138,6 @@ void	add_edge_to_chart(struct edge	*edge)
 
 int	trace = 0, gen_qc = 0;
 
-//#define TIM
 double base_unify_time = 0, base_finalize_time = 0;
 long long nbase_unify = 0, nbase_finalize = 0;
 
@@ -247,7 +246,22 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 //start_timer(pft);
 			if(g_mode == GENERATING)
 			{
-				u = finalize_tmp_noss(dg, 1);
+				// in principal, the same phrase could appear multiple times in
+				// a realization.
+				// I believe this should only happen when the phrase is semantically vacuous.
+				// XXX Is there a reason not to allow subgraph sharing
+				// when none of the immediate daughters is semantically vacuous?
+
+				//u = finalize_tmp_noss(dg, 1);
+
+				int cant_share = 0;
+				if(b->neps == 0)cant_share = 1;
+				int k;
+				for(k=0;k<a->have;k++)
+					if(a->daughters[k]->neps == 0)cant_share = 1;
+				if(cant_share)
+					u = finalize_tmp_noss(dg, 1);
+				else u = finalize_tmp(dg, 1);
 			}
 			else u = finalize_tmp(dg, 1);
 			//u = copy_dg(u);
@@ -309,11 +323,11 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 //static int	aft = -1;
 //if(aft==-1)aft = new_timer("active copy");
 //start_timer(aft);
-			if(g_mode == GENERATING)
+			/*if(g_mode == GENERATING)
 			{
 				u = finalize_tmp_noss(dg, 0);
 			}
-			else u = finalize_tmp(dg, 0);
+			else */u = finalize_tmp(dg, 0);
 //stop_timer(aft, 1);
 #ifdef	TIM
 			gettimeofday(&tv2, 0);
@@ -549,7 +563,8 @@ int	recall_hyper(struct edge	*b)
 	//printf("hyper reconstruct #%d from %p[%d] <- %p\n", b->id, b->ha_dg, b->ha_arg, b->ha_par);
 	if(unify_dg_tmp(b->ha_dg, b->ha_par, b->ha_arg))
 		hyperfailure(b);
-	if(g_mode == GENERATING)// && b->have==b->need)
+	//if(g_mode == GENERATING)// && b->have==b->need)
+	if(g_mode == GENERATING && b->have==b->need)
 	{
 		b->dg = finalize_tmp_noss(b->ha_par, (b->have==b->need)?1:0);
 	}
@@ -964,8 +979,8 @@ void	final_chart_stats()
 		fprintf(stderr, "NOTE: %lld / %lld (%.1f%%) passive edges were connected to roots\n", ndecomposed, total_passives, 100*(double)ndecomposed / total_passives);
 	}
 #ifdef TIM
-	fprintf(stderr, "NOTE: unify was %.4fs for %d ops = %gs\n", base_unify_time, nbase_unify, base_unify_time / nbase_unify);
-	fprintf(stderr, "NOTE: finalize was %.4fs for %d ops = %gs\n", base_finalize_time, nbase_finalize, base_finalize_time / nbase_finalize);
+	fprintf(stderr, "NOTE: unify was %.4fs for %lld ops = %gs\n", base_unify_time, nbase_unify, base_unify_time / nbase_unify);
+	fprintf(stderr, "NOTE: finalize was %.4fs for %lld ops = %gs\n", base_finalize_time, nbase_finalize, base_finalize_time / nbase_finalize);
 	base_unify_time = 0;
 	base_finalize_time = 0;
 #endif

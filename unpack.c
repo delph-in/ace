@@ -831,7 +831,17 @@ int instantiate_hypothesis(struct hypothesis *h)
 					h->dg = (void*)1;
 					return -1;
 				}
-			h->dg = finalize_tmp(rdg, 1);
+			if(g_mode == GENERATING)
+			{
+				int cant_share = 0;
+				for(i=0;i<arity;i++)
+					if(h->rhslist[i]->edge->neps == 0)
+						cant_share = 1;
+				if(cant_share)
+					h->dg = finalize_tmp_noss(rdg, 1);
+				else h->dg = finalize_tmp(rdg, 1);
+			}
+			else h->dg = finalize_tmp(rdg, 1);
 			if(!h->dg)	// cycle failure can occur
 			{
 				h->dg = (void*)1;
