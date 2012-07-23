@@ -199,15 +199,6 @@ int	reduce_chart(int	length)//, char **words)
 
 	if(length<=0)return 0;
 
-	/*if(!dep_init)
-	{
-		dep_init = 1;
-		comp_head_path = make_path(3, "SYNSEM", "LKEYS", "--COMPHD");
-		head_path = make_path(4, "SYNSEM", "LOCAL", "CAT", "HEAD");
-		subj_ind_path = make_path(3, "SYNSEM", "LOCAL", "--+ARGIND");
-		sind_path = make_path(2, "SYNSEM", "--SIND");
-	}*/
-
 	//sanity_check_agenda(length);
 	bzero(cover, length);
 	for(t1=lag->start;t1;t1=t1->next)
@@ -223,7 +214,8 @@ int	reduce_chart(int	length)//, char **words)
 				{
 					assert(t2->edge->lex);
 					struct dg	*to = dg_path(t2->edge->dg, chart_dependencies_to[i]);
-					if(descendent_of(to->xtype->tnum, from->xtype)) {
+					if(to && descendent_of(to->xtype->tnum, from->xtype)) {
+						// XXX shouldn't that be glb() rather than descendent_of()?
 						//printf(" satisfied by %s\n", t2->edge->lex->word);
 						break; }
 				}
@@ -234,30 +226,6 @@ int	reduce_chart(int	length)//, char **words)
 				}
 			}
 		}
-		/*struct dg	*subjind = dg_path(t1->edge->dg, subj_ind_path);
-		if(subjind)
-		{
-			//printf("%s selects subjind %s\n", t1->edge->lex->word, subjind->xtype->name);
-			for(t2=lag->start;t2;t2=t2->next)
-			{
-				assert(t2->edge->lex);
-				struct dg	*si = dg_path(t2->edge->dg, sind_path);
-				if(descendent_of(si->xtype->tnum, subjind->xtype) && abs(t2->edge->from - t1->edge->from) <= 2) {
-					//printf(" satisfied by %s\n", t2->edge->lex->word);
-					break; }
-			}
-			//if(!t2)printf(" .. reduce\n");
-		}*/
-		/*if(t1->edge->lex->select)
-		{
-			//printf("%s selects %s\n", t1->edge->lex->word, t1->edge->lex->select->name);
-			for(t2=lag->start;t2;t2=t2->next)
-			{
-				assert(t2->edge->lex);
-				if(!t2->edge->lex->pred)continue;
-				if(glb(t2->edge->lex->pred, t1->edge->lex->select))break;
-			}
-		}*/
 		if(!t2)
 		{
 			//printf("edge %d, lexeme %s dropped by reducer\n", t1->edge->id, t1->edge->lex->word);
