@@ -26,6 +26,12 @@
 
 #include	"unicode.h"
 
+struct re_match_set;
+
+void	update_possible_map_add(struct lattice	*lat, int	id, struct lattice_edge	*e, struct lattice_rule	*r, struct re_match_set	*mats);
+void	update_possible_map_remove(struct lattice	*lat, int	id, struct lattice_rule	*r);
+int	initialize_possible_map(struct lattice	*lat, struct lattice_rule	*r);
+
 int			ntmrules = 0;
 struct lattice_rule	**tmrules = NULL;
 
@@ -407,6 +413,7 @@ void	add_lattice_edge(struct lattice	*lat, struct lattice_edge	*e)
 {
 	lat->nedges++;
 	lat->edges = slab_realloc(lat->edges, sizeof(struct lattice_edge*)*(lat->nedges-1), sizeof(struct lattice_edge*)*(lat->nedges));
+	// code calling update_possible_map_add relies on the new edge going in slot lat->nedges-1
 	lat->edges[lat->nedges-1] = e;
 	add_lattice_vertex_follower(e->from, e);
 }
@@ -614,7 +621,9 @@ struct token	*extract_token_from_dg(struct dg	*dg)
 	return t;
 }
 
-int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, struct lattice_edge	**inputs, struct re_match_set	*mats, struct dg	**out_dg)
+static char	*possible_map;
+
+int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, struct lattice_edge	**inputs, int	*input_ids, struct re_match_set	*mats, struct dg	**out_dg)
 {
 	int	did_add = 0, did_remove = 0;
 
@@ -624,130 +633,6 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 		replace_backrefs(out_dg[i], r, mats);
 	// second step: build and insert edge structures for the new tokens
 	// determining the from/to vertices for each output edge is a bit tricky
-
-/*
-	// if we are splitting an edge into several consecutive ones,
-	// the POSITION constraints *must* define '<' constraints on each side of each output token except the outside ones
-	// and this determines a total order, so let's find the order
-	int	follower[r->noutput], preceder[r->noutput];
-	int	nips = 0;
-	for(i=0;i<r->noutput;i++)follower[i] = preceder[i] = -1;
-	for(i=0;i<r->nposition_constraints;i++) if(r->position_constraints[i].type==lpcImmediatelyPreceeds)
-	{
-		struct lattice_position_constraint	*lpc = r->position_constraints+i;
-		if(lpc->lhs_what!='O' || lpc->rhs_what!='O')continue;
-		nips++;
-		follower[lpc->lhs_which] = lpc->rhs_which;
-		preceder[lpc->rhs_which] = lpc->lhs_which;
-		//DEBUG_VERBOSE(" ... O%d preceeds O%d\n", lpc->lhs_which, lpc->rhs_which);
-	}
-	int	ordered[r->noutput], oord[r->noutput], n=0;
-	bzero(ordered, sizeof(ordered));
-	if(nips)
-	{
-		int	first = -1, last = -1;
-		for(i=0;i<r->noutput;i++)
-		{
-			if(follower[i]==-1)
-			{
-				if(last==-1)last = i;
-				else { fprintf(stderr, "lattice-mapping rule '%s' doesn't specify valid ordering on outputs.\n", r->name); exit(-1); }
-			}
-			if(preceder[i]==-1)
-			{
-				if(first==-1)first = i;
-				else { fprintf(stderr, "lattice-mapping rule '%s' doesn't specify valid ordering on outputs.\n", r->name); exit(-1); }
-			}
-		}
-		for(i=first;i!=-1;i=follower[i])
-		{
-			if(!ordered[i])
-			{
-				ordered[i] = 1;
-				oord[i] = n++;
-			}
-			else { fprintf(stderr, "lattice-mapping rule '%s' doesn't specify valid ordering on outputs.\n", r->name); exit(-1); }
-		}
-		if(n!=r->noutput) { fprintf(stderr, "lattice-mapping rule '%s' doesn't specify valid ordering on outputs.\n", r->name); exit(-1); }
-	}
-	// next, find the min and max vertices indicated by the "Covers" constraint
-	struct lattice_vertex	*min=NULL, *max=NULL;
-	for(i=0;i<r->nposition_constraints;i++) if(r->position_constraints[i].type==lpcCovers)
-	{
-		struct lattice_position_constraint	*lpc = r->position_constraints+i;
-		if(lpc->lhs_what=='O')
-		{
-			// On spans rhs
-			int	ow = lpc->lhs_which;
-			int	which = lpc->rhs_which;
-			if(lpc->rhs_what == 'C')which += r->ninput;
-			struct lattice_edge	*e = inputs[which];
-			if(!min)min = e->from;
-			else if(lattice_vertex_follows(lat, min, e->from))min = e->from;
-			if(!max)max = e->to;
-			else if(lattice_vertex_follows(lat, e->to, max))max = e->to;
-		}
-		else if(lpc->rhs_what=='O')
-		{
-			// lhs spans On
-			int	ow = lpc->rhs_which;
-			int	which = lpc->lhs_which;
-			if(lpc->lhs_which == 'C')which += r->ninput;
-			struct lattice_edge	*e = inputs[which];
-			if(!min)min = e->from;
-			else if(lattice_vertex_follows(lat, min, e->from))min = e->from;
-			if(!max)max = e->to;
-			else if(lattice_vertex_follows(lat, e->to, max))max = e->to;
-		}
-	}
-	// we may need some new vertices
-	struct lattice_vertex	*verts[r->noutput+1];
-	if(nips)
-	{
-		verts[0] = min;
-		verts[r->noutput] = max;
-		for(i=1;i<r->noutput;i++)verts[i] = new_lattice_vertex(lat);
-	}
-	// finally, go ahead and make the new tokens
-	for(i=0;i<r->noutput;i++)
-	{
-		struct lattice_vertex	*from,*to;
-		if(nips)
-		{
-			from = verts[oord[i]];
-			to = verts[oord[i]+1];
-		}
-		else
-		{
-			from = min;
-			to = max;
-		}
-		assert(from && to);
-#ifdef	SHOW_OUTPUT_TOKENS
-		printf("want to add token dag [%d -> %d]: \n", from->id, to->id); print_dg(out_dg[i]); printf("\n");
-#endif
-		for(j=0;j<from->nfollowers;j++)
-		{
-			struct lattice_edge	*le = from->followers[j];
-			if(le->to != to)continue;
-			if(equivalent_dg(out_dg[i], lattice_dg(le), 1, 1) == 2)break;
-		}
-		if(j<from->nfollowers)
-		{
-			DEBUG("... not adding that edge, since we had an identical one already.\n");
-			continue;
-		}
-		struct lattice_edge	*le = slab_alloc(sizeof(*le));
-		bzero(le, sizeof(*le));
-		le->from = from;
-		le->to = to;
-		// NOTE: all lexical filtering rules have no output, so we only reach here for token mapping
-		le->token = extract_token_from_dg(out_dg[i]);
-		DEBUG("O%d = `%s'\n", i+1, le->token->string);
-		add_lattice_edge(lat, le);
-		did_add++;
-	}
-	*/
 
 	// allocate blank output edges
 	struct lattice_edge	*le = slab_alloc(sizeof(*le) * r->noutput);
@@ -860,6 +745,7 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 			le[i].edge = new_edge(out_dg[i]);
 			le[i].edge->lex = inlex;
 		}
+		update_possible_map_add(lat, lat->nedges, &le[i], r, mats);	// this bumps generation and clobbers `mats'; fortunately, we've already gotten what we need.
 		add_lattice_edge(lat, &le[i]);
 		did_add++;
 	}
@@ -871,6 +757,7 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 			if(save_le[j] == inputs[i])
 				break;
 		if(j<r->noutput)continue;
+		update_possible_map_remove(lat, input_ids[i], r);
 		remove_lattice_edge(lat, inputs[i]);
 		did_remove++;
 	}
@@ -1066,7 +953,9 @@ int	lattice_rule_matches(struct lattice	*lat, struct lattice_rule	*r, struct lat
 		if(unify_dg_tmp(lattice_dg(inputs[i]), lattice_rule_spot(r, i), -1) != 0)
 		{
 			forget_tmp();
-			DEBUG_VERBOSE(" ... didn't unify\n"); //unify_backtrace(); print_dg(lattice_rule_spot(r,i));printf("\n");
+			DEBUG_VERBOSE(" ... didn't unify\n");
+			//printf("lattice-mapping-failure-path "); unify_backtrace();
+			//print_dg(lattice_rule_spot(r,i));printf("\n");
 			record_failed(inputs, from, to);
 			return 0;
 		}
@@ -1077,7 +966,7 @@ int	lattice_rule_matches(struct lattice	*lat, struct lattice_rule	*r, struct lat
 // TODO find a more efficient algorithm for finding application sites
 // TODO keep a cache of what rule already failed to unify with what edge... a *lot* of wasted unification attempts
 // TODO   -- or use quickcheck?
-int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct lattice_edge	**inputs, int	have, char	*possible_map, struct re_match_set	*mats)
+int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct lattice_edge	**inputs, int	*input_ids, int	have, struct re_match_set	*mats)
 {
 	int i, j;
 	if(have>0)
@@ -1119,7 +1008,7 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 		}
 		bump_generation();
 
-		return lattice_mapping_rule_output(lat, r, inputs, mats, out_dg);
+		return lattice_mapping_rule_output(lat, r, inputs, input_ids, mats, out_dg);
 	}
 	else
 	{
@@ -1135,7 +1024,7 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 				struct lattice_edge	*e = lat->edges[i];
 
 				// make sure we haven't already ruled out this input
-				if(possible_map && !possible_map[have*lat->nedges + i])
+				if(possible_map && !possible_map[have + (r->ninput + r->ncontext)*i])
 					continue;
 				// make sure we don't already have 'e' in inputs[]
 				int k;
@@ -1143,24 +1032,57 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 					if(inputs[k] == e)break;
 				if(k<have)continue;
 				inputs[have] = e;
+				input_ids[have] = i;
 				if(e->token)
 					DEBUG_VERBOSE(".. considering '%s' as inputs[%d] for rule %s\n", e->token->string, have, r->name);
 				else 
 					DEBUG_VERBOSE(".. considering '#%d' as inputs[%d] for rule %s\n", e->edge->id, have, r->name);
-				int	result = apply_lattice_rule1(lat, r, inputs, have+1, possible_map, mats);
+				int	result = apply_lattice_rule1(lat, r, inputs, input_ids, have+1, mats);
 				if(result)return result;
 			}
 		return 0;
 	}
 }
 
-int	apply_lattice_rule(struct lattice	*lat, struct lattice_rule	*r)
+struct profiler	**tmr_profilers = NULL, *tmr_poss_prof = NULL;
+struct profiler	**lfr_profilers = NULL, *lfr_poss_prof = NULL;
+struct profiler	*lattice_mapping_profiler = NULL;
+struct profiler	**lattice_mapping_poss_profiler = NULL;
+extern int g_profiling;
+
+void	update_possible_map_add(struct lattice	*lat, int	id, struct lattice_edge	*e, struct lattice_rule	*r, struct re_match_set	*mats)
 {
-	DEBUG("trying to apply '%s'...\n", r->name);
+	if(!possible_map)return;
+	assert(id == lat->nedges);
 	struct lattice_edge	*inputs[r->ninput + r->ncontext];
+	int	rowsize = (r->ninput + r->ncontext);
+	possible_map = realloc(possible_map, rowsize * (lat->nedges+1));
+	int i;
+	for(i=0;i<rowsize;i++)
+	{
+		inputs[i] = e;
+		bump_generation();
+		int pos = lattice_rule_matches(lat, r, inputs, i, i+1, mats);
+		possible_map[id*rowsize + i] = pos;
+	}
+}
+
+void	update_possible_map_remove(struct lattice	*lat, int	id, struct lattice_rule	*r)
+{
+	if(!possible_map)return;
+	int	rowsize = (r->ninput + r->ncontext);
+	char	*dead_row = &possible_map[0 + rowsize*id];
+	int		rows_after_dead_row = lat->nedges - (id+1);
+	memmove(dead_row, dead_row + rowsize, rowsize * rows_after_dead_row);
+}
+
+int	initialize_possible_map(struct lattice	*lat, struct lattice_rule	*r)
+{
+	int	result = 1, nspots = 0;
 	struct re_match_set	*mats = malloc(sizeof(struct re_match_set)*(r->ninput+r->ncontext));
-	char	*possible_map = NULL;
-	int result = 0;
+	struct lattice_edge	*inputs[r->ninput + r->ncontext];
+	possible_map = NULL;
+	if(g_profiling && lattice_mapping_poss_profiler)start_and_alloc_profiler(lattice_mapping_poss_profiler, "latmap possible", lattice_mapping_profiler, NULL);
 	if(r->ninput + r->ncontext > 1)
 	{
 		possible_map = malloc((r->ninput+r->ncontext) * lat->nedges);
@@ -1173,29 +1095,48 @@ int	apply_lattice_rule(struct lattice	*lat, struct lattice_rule	*r)
 				inputs[i] = lat->edges[j];
 				bump_generation();
 				int pos = lattice_rule_matches(lat, r, inputs, i, i+1, mats);
-				possible_map[i*lat->nedges + j] = pos;
+				possible_map[j*(r->ninput+r->ncontext) + i] = pos;
 				if(pos)count++;
 			}
-			if(!count)goto skip;	// no possible matches for this rule position.
+			if(!count)
+			{
+				// no possible matches for this rule position.
+				result = 0;
+				break;
+			}
+			nspots++;
 		}
 	}
-	result = apply_lattice_rule1(lat, r, inputs, 0, possible_map, mats);
-skip:
-	if(possible_map)free(possible_map);
 	free(mats);
+	if(g_profiling && lattice_mapping_poss_profiler)stop_profiler(*lattice_mapping_poss_profiler, nspots*(lat->nedges));
 	return result;
 }
 
-struct profiler	**tmr_profilers = NULL;
-struct profiler	**lfr_profilers = NULL;
-struct profiler	*lattice_mapping_profiler = NULL;
-extern int g_profiling;
+// this function gets called over and over again for the *same lattice rule r*,
+// when it applies to multiple places in the lattice.
+// we are recomputing the `possible_map' every time,
+// whereas in practice there will only be a couple of edges that have changed.
+// (typically 0-2 deletions and 0-2 insertions, out of dozens of edges)
+// we need to figure out how to reuse the still-valid parts of the possible_map;
+// computing the possible_map is eating up most of the time spent here.
+int	apply_lattice_rule(struct lattice	*lat, struct lattice_rule	*r)
+{
+	DEBUG("trying to apply '%s'...\n", r->name);
+	struct lattice_edge	*inputs[r->ninput + r->ncontext];
+	int	input_ids[r->ninput + r->ncontext];
+	struct re_match_set	*mats = malloc(sizeof(struct re_match_set)*(r->ninput+r->ncontext));
+	int result = 0;
+	result = apply_lattice_rule1(lat, r, inputs, input_ids, 0, mats);
+	free(mats);
+	return result;
+}
 
 struct profiler	*start_lmr_profiler(struct lattice_rule_set	*rs, int	ri)
 {
 	struct profiler	***lmr_profilers = ((rs==token_mapping_rules)?(&tmr_profilers):((rs==lexical_filtering_rules)?(&lfr_profilers):NULL));
 	if(!lmr_profilers)return NULL;
 	if(!lattice_mapping_profiler)return NULL;
+	lattice_mapping_poss_profiler = ((rs==token_mapping_rules)?(&tmr_poss_prof):((rs==lexical_filtering_rules)?(&lfr_poss_prof):NULL));
 
 	lattice_mapping_profiler->sortable = 5;
 	if(!*lmr_profilers)*lmr_profilers = calloc(sizeof(**lmr_profilers), rs->nrules);
@@ -1206,22 +1147,31 @@ struct profiler	*start_lmr_profiler(struct lattice_rule_set	*rs, int	ri)
 void	apply_lattice_mapping(struct lattice	*lat, struct lattice_rule_set	*rs)
 {
 	int	pc = 0;
+	int possible = 1;
 
 	while(pc < rs->nrules)
 	{
 		clear_failed();
 		struct profiler	*prof = NULL;
 		if(g_profiling)prof = start_lmr_profiler(rs, pc);
-		int result = apply_lattice_rule(lat, rs->rules[pc]);
+		if(!possible_map)possible = initialize_possible_map(lat, rs->rules[pc]);
+		int result = possible?apply_lattice_rule(lat, rs->rules[pc]):0;
 		if(result != 0)
 		{
 			// found and applied a match.
-			pc = rs->rules[pc]->jump_on_match;
+			if(pc != rs->rules[pc]->jump_on_match)
+			{
+				pc = rs->rules[pc]->jump_on_match;
+				if(possible_map)free(possible_map);
+				possible_map = NULL;
+			}
 		}
 		else
 		{
 			// no more matches for this rule.
 			pc++;
+			if(possible_map)free(possible_map);
+			possible_map = NULL;
 		}
 		if(prof)stop_profiler(prof, 1);
 	}
