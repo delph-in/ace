@@ -2,7 +2,9 @@
 #include	<string.h>
 #include	<stdlib.h>
 #include	<sys/time.h>
+#include	<wctype.h>
 
+#include	"unicode.h"
 #include	"hash.h"
 #include	"tdl.h"
 #include	"type.h"
@@ -113,7 +115,31 @@ struct type	*lookup_type(char	*name)
 	{
 		if(!strcmp(name, "\"\\\"\""))strcpy(name, "\"\"\"");
 
-		name[0]='"';	// elsewhere in the code we assume strings start with ".
+		// elsewhere in the code we assume strings start with ".
+		// the type 'foobar should be interpreted as identical to "FOOBAR"
+		// (determined in 'mrs comparison' session of delphin 2012)
+		if(name[0]=='\'')
+		{
+			wchar_t	*wname = towide(name);
+			int	l = wcslen(wname);
+			wchar_t	*wnewname = malloc(sizeof(wchar_t)*(l+2));
+			int	i;
+			wnewname[0] = '\"';
+			for(i=1;wname[i];i++)
+				wnewname[i] = towupper(wname[i]);
+			wnewname[i] = '\"';
+			wnewname[i+1] = 0;
+			char	*newname = freeze_tombs(wnewname);
+			free(wnewname); free(wname);
+			fprintf(stderr, "NOTE: WARNING: deprecated type name |%s| being interpreted as |%s|\n", name, newname);
+			name = newname;
+			// if 'newname' is a pre-existing string type, then the memory for 'newname' will be leaked... acceptable since it's a deprecated usage and we warn them, but also not a huge problem since it probably only happens during grammar loading.  at run time, this could be reached when dagify()ing an MRS EP with a 'neg_rel, for example.  but in that situation, the slab-allocated leak will disappear when that item is done being processed.
+		}
+		else if(name[0]=='^')
+		{
+			// regex string type... make it look like a string to make the rest of the code happy.  we only actually interpret these in lattice-mapping.c
+			name[0]='"';
+		}
 		// auto-add strings. this does a lookup too.
 		return add_string(name);
 	}
@@ -555,5 +581,6 @@ struct type	*lub(struct type	*a, struct type	*b)
 				return default_th->types[tn];
 		tn--;
 	}
+	fprintf(stderr, "no upper bound for '%s' and '%s'\n", a->name, b->name);
 	assert(!"no upper bound found");
 }
