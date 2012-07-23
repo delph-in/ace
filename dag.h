@@ -24,10 +24,11 @@ struct darc
 	struct dg	*dest;
 };
 
+// note: this tries to align to a 32-bit boundary.
+// shouldn't we be trying to align to 64-bit boundaries these days?
 #define	DAG_EXTRA_LABELS_SIZE_FOR_COUNT(n)	(((n-1)*2+3)/4 * 4)
 #define	DAG_EXTRA_LABELS_SIZE(dg1)	DAG_EXTRA_LABELS_SIZE_FOR_COUNT(dg1->narcs)
 
-// 32-byte dg structure fits exactly in one standard cacheline
 struct dg
 {
 	struct type	*type;
@@ -66,6 +67,7 @@ struct dg	*wellform_dg(struct dg	*dg);
 struct dg	*walk_dg(struct dg	*dg, int *save, ...);
 void		output_lui_dg(struct dg	*dg, char *wtitle);
 
+void	unfill1(struct dg	*d);
 struct dg	*generalize(struct dg	*a, struct dg	*b);
 
 // internal operations
@@ -118,6 +120,7 @@ static inline void	set_slabstate(struct slab_state	*s)
 
 static inline	void	*slab_alloc(int	len) __attribute__ ((malloc));
 
+#define	DAG_ALIGNMENT	48
 static inline	void	*slab_alloc(int	len)
 {
 	extern void	*last, *slab;
@@ -128,12 +131,13 @@ static inline	void	*slab_alloc(int	len)
 	assert((len%4)==0);
 
 	// align these special cases
-	if(len==48)
+	//if(len>=48 && len <=64)
+	if(len == 48)	// dag node with no arcs
 	{
-		if((unsigned long)last % 48)
+		if((unsigned long)last % DAG_ALIGNMENT)
 		{
-			slabu += 48 - ((unsigned long)last % 48);
-			last += 48 - ((unsigned long)last % 48);
+			slabu += DAG_ALIGNMENT - ((unsigned long)last % DAG_ALIGNMENT);
+			last += DAG_ALIGNMENT - ((unsigned long)last % DAG_ALIGNMENT);
 		}
 	}
 	/*else if(!(len&7))
@@ -162,6 +166,7 @@ static inline struct dg	*p_dereference_dg(struct dg	*dg)
 	return dg;
 }
 
+#ifdef	DEREFERENCE_CHECK_CYCLES
 static inline struct dg	*dereference_dg(struct dg	*dg)
 {
 	struct dg	*fw = dg;
@@ -186,6 +191,14 @@ static inline struct dg	*dereference_dg(struct dg	*dg)
 		}
 	}
 }
+#else
+static inline struct dg	*dereference_dg(struct dg	*dg)
+{
+	extern unsigned int	generation;
+	while(dg && (dg->gen==9 || dg->gen==generation) && dg->forward)dg = dg->forward;
+	return dg;
+}
+#endif
 
 static inline struct dg	*dg_hop(struct dg	*d, int	label)
 {
