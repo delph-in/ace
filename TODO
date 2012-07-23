@@ -45,6 +45,47 @@ ideas:
 				- MRS extraction
 				- subsumption checking
 				- idiom checking?
+	- unifying and copying:
+		- unifying: Glenn shows a way to completely avoid the ->carcs list, which sounds nice.
+			- unfortunately, it requires us to choose a particular order in unification, so we don't get to try not to forward into frozen dags necessarily -- that means less structure sharing is possible and memory usage goes up.
+			- but if we can ditch ->carcs, memory usage would go *down* too, and throughput might go up?
+			- currently glenn's scheme doesn't work for ACE, because:
+				unifying a passive edge (some subtype of `sign') (with no ARCS feature present due to deleted-daughters) with a daughter position in a rule (type `sign' typically, with an ARCS feature intact): the passive edge's root dag node is technically not wellformed.  it has the more specific type, so it should be the forwarding target, but there's nowhere to store the ARGS feature
+					- actually, comparing numbers of arcs shows identical arities so we try forwarding to the rule position, which has ARGS, but doesn't have C-CONT, a feature introduced on the passive edge.
+				- possible solution: when trimming ARGS, leave a *top* node placeholder.  that would preserve the appropriateness of features to a type, but would violate the appropriateness off types to a feature.
+				- other possible solution: implement Glenn's fallback search
+		- copying: to determine that a node X is shareable, we need to determine that X has not been changed, and that everything reachable from X has not been changed.
+			- in principal this could involve traversing a large section of the graph just to decide not to copy it
+			- idea: what if nodes X had a flag indicating whether it was the case that all access routes to all nodes under X go through X?  maintaining such a flag would be potentially difficult.
+				- but if we had it, then when we come across an X with that flag set, and we see that X has not been recursed into by the unifier, we know X (and its associated subgraph) is shareable, without looking at the whole subgraph under X.
+				- one thing to worry about: if X is shared between two AVMs, it's possible that there is a reentrancy to below X in one of the AVMS and not in the other. I guess we need to be conservative and not flag X as safe in that case.
+					- more complicated: if something below X is shared between two AVMs, then down the road someone else could get a reference into something below X... but I guess the flag is only relevant w.r.t. the top level AVM being copied.
+				- naive algorithm to create the flags:
+					whenever you add an arc A -> B, recursively walk up (other) parents of B until you reach the root or A, and mark them as not self-contained
+					- snag: we don't have parent link lists in dags (there could be lots of parents of any given node... and in this usage we really only want parents from the same top-level AVM... ugh).
+					- also sounds very slow -- but maybe only applicable for manual arc additions that create reentrancies?
+					- for the unifier, there's a quicker algorithm:
+						when unifying two nodes, the result is self-contained if both inputs are.
+							- note that this is not a *necessary* condition:
+								[ X #1, Y #1 ] & [ X [ A #2 ], Y [ A #2 ] ]
+								= [ X #1 [ A top ], Y #1 ]
+								in the right-hand input dag, the path X is not self-contained 
+									(since X.A = Y.A),
+								but in the result dag the reentrancy from Y.A evaporates because X=Y.
+							- but it is a sufficient condition.
+					- how about a naive algorithm to build the flags during a (non-structure-sharing) copy, e.g. the freeze() operation that saves the grammar to disk?
+						- not sure how that would work.
+					- let's get an estimate for how many copy() calls end up sharing instead of copying...
+						answer: 65.9% of nodes get shared instead of copied
+							about half of which are atomic
+						what proportion of these would we be able to *detect* 
+		- should we be doing unfilling?
+
+
+things to undo from current experiments:
+	COPY_COUNTS
+	prints in unify1()
+	enable_generalize_edge_top_types disabler hack in config.tdl
 
 DONE:
 
