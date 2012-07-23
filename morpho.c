@@ -13,7 +13,6 @@
 //#define	SHOW_ORTH_ROUTES
 
 static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, char	*stem, int type);
-struct lexeme	*proper_noun_lex(char	*name);
 
 //extern int	wcap[1024];
 
@@ -356,42 +355,6 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		}
 #endif
 	}
-
-/*
-#ifdef	UNKNOWN
-	for(i=0;i<nwords;i++)
-	{
-		if(cover[i] == 0)
-		{
-			char	*stem = freeze_string(words[i]);
-			int		l;
-			struct edge *le;
-			while(stem[0]=='"' || stem[0]=='\'' || stem[0]=='[' || stem[0]=='(')stem++;
-			l = strlen(stem)-1;
-			while(l>=0 && (stem[l]=='"' || stem[l]=='\'' || stem[l]==']' || stem[l]==')' || stem[l]=='?' || stem[l]=='!' || stem[l]==',' || stem[l]=='.'))
-				l--;
-			stem[l+1] = 0;
-			//printf("NOTE: suffix removal from `%s' produced `%s'\n", words[i], stem);
-			//for(j=0;j<charts[i].nedges;j++) printf(" choice `%s'\n", charts[i].edges[j]->form);
-			if(stem[0])
-			{
-				for(j=0;j<charts[i].nedges;j++)
-					if(!strcasecmp(charts[i].edges[j]->form, stem))
-						break;
-				if(j<charts[i].nedges)
-				{
-					struct ochart_edge	*e = charts[i].edges[j];
-					le = unknown_lexical_edge(i, stem, tags[i], unk[i]);
-					le->north_routes = e->north_routes;
-					le->orth_routes = e->orth_routes;
-					edge_handler(le);
-				}
-			}
-		}
-	}
-#endif
-	free(tags);
-	free(unk);*/
 
 	return 0;
 }

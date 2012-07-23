@@ -85,9 +85,9 @@ void	build_token_dag(struct token	*t)
 	sprintf(c_from_str, "\"%d\"", t->cfrom);
 	sprintf(c_to_str, "\"%d\"", t->cto);
 	//print_dg(dg);
-	dg = dg_path_add(dg, token_form_path, new_dag_for_unfrozen_string(bigger_string));//temporary_string_type(freeze_string(bigger_string))->dg);
-	dg = dg_path_add(dg, token_from_path, new_dag_for_unfrozen_string(c_from_str));//temporary_string_type(freeze_string(c_from_str))->dg);
-	dg = dg_path_add(dg, token_to_path, new_dag_for_unfrozen_string(c_to_str));//temporary_string_type(freeze_string(c_to_str))->dg);
+	dg = dg_path_add(dg, token_form_path, new_dag_for_unfrozen_string(bigger_string));
+	dg = dg_path_add(dg, token_from_path, new_dag_for_unfrozen_string(c_from_str));
+	dg = dg_path_add(dg, token_to_path, new_dag_for_unfrozen_string(c_to_str));
 	dg = dg_path_add(dg, token_postags_path, build_pos_tags_list(t->npostags, t->postags));
 	dg = dg_path_add(dg, token_posprobs_path, build_pos_prbs_list(t->npostags, t->postags));
 	dg = wellform_dg(dg);

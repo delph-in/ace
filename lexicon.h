@@ -14,7 +14,6 @@ struct lexeme
 	struct type	**stem;
 	struct type	*lextype;
 
-	struct type	*select;	// this lexeme selects a required complement
 	struct type	*pred;		// this lexeme provides relation 'pred'
 };
 
@@ -30,8 +29,6 @@ int		load_lexicon();
 struct dg	*expand_lexeme(struct lexeme	*l);
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels);
 struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels);
-struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk);
-void		record_carg(struct edge	*le, char	*carg_str);
 struct lexeme	*get_lex_by_name(char *name);
 
 extern int		ngeneric_les;

@@ -143,7 +143,6 @@ struct lexeme	*freeze_lexeme(struct lexeme	*lin)
 	lout->stemlen = lin->stemlen;
 	lout->stem = slab_alloc(sizeof(struct type*) * lout->stemlen);
 	lout->lextype = FT(lin->lextype);
-	lout->select = FT(lin->select);
 	lout->pred = FT(lin->pred);
 	lout->onset = lin->onset;
 	memcpy(lout->stem, lin->stem, sizeof(struct type*) * lout->stemlen);

@@ -62,7 +62,7 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 		exit(-1);
 	}
 	wellform(dg, lex->word);
-	//return wellform_dg(dg);
+
 	return dg;
 }
 
@@ -105,153 +105,6 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 
 	return edge;
 }
-
-struct lexeme	*proper_noun_lex(char	*name)
-{
-	char			*p = name;
-	struct lexeme	*lex;
-	struct dg		*extra, *stem, *ss, *lk, *kr;
-	struct type	*ty = temporary_string_type(name);
-	char			*ncopy;
-	int				nlen;
-
-	/* prototype:
-	 * 	george_n1 := n_proper_le &
-	 * 	 [ STEM < "george" >,
-	 * 	    SYNSEM.LKEYS.KEYREL.CARG "george" ].
-	 */
-
-	// make a safe copy of 'name'
-	nlen = strlen(name);
-	nlen += 32;
-	nlen -= (nlen % 32);
-	ncopy = slab_alloc(nlen);
-	strcpy(ncopy, name);
-	name = ncopy;
-
-	// make a skeletal dag for our lexeme
-	stem = atomic_dg(g_cons_type);
-	stem = add_dg_feature(stem, "FIRST", ty->dg);
-	stem = add_dg_feature(stem, "REST", atomic_dg(g_null_type));
-
-	kr = add_dg_feature(atomic_dg(top_type), "CARG", ty->dg);
-	lk = add_dg_feature(atomic_dg(top_type), "KEYREL", kr);
-	ss = add_dg_feature(atomic_dg(top_type), "LKEYS", lk);
-
-	extra = atomic_dg("n_proper_le");
-	assert(extra);
-	extra = add_dg_feature(extra, "STEM", stem);
-	extra = add_dg_feature(extra, "SYNSEM", ss);
-
-	// define the lexeme
-	lex = slab_alloc(sizeof(struct lexeme));
-	bzero(lex, sizeof(*lex));
-	lex->word = name;
-	lex->stemlen = 1;
-	lex->stem = slab_alloc(sizeof(struct type*)*1);
-	lex->stem[0] = ty;
-	lex->lextype = extra->type;
-	lex->dg = extra;
-
-	return lex;
-}
-
-void	record_pred(struct edge	*le, char	*word, char	*tag)
-{
-	char	*ncopy = malloc(strlen(word)+30);
-	struct type	*pred_type;
-	struct dg	*pred = calloc(sizeof(struct dg), 1);
-	char	tagc = '?';
-	switch(tag[0]) {	case 'N': tagc='n'; break;
-						case 'V': tagc='v'; break;
-						case 'J': tagc='a'; break;
-						case 'R': tagc='a'; break;	}
-	int		len = strlen(word);
-	if(len>2 && word[len-2]=='e' && word[len-1]=='d' && (!strcmp(tag, "VBD") || !strcmp(tag, "VBN")))len-=2;
-	else if(len>3 && word[len-3]=='i' && word[len-2]=='n' && word[len-1]=='g' && !strcmp(tag,"VBG"))len-=3;
-	else if(len>1 && word[len-1]=='s' && (!strcmp(tag,"VBZ") || !strcmp(tag,"NNS")))len-=1;
-	sprintf(ncopy, "\"_%.*s_%c_1_rel\"", len, word, tagc);
-	pred_type = temporary_string_type(ncopy);
-	pred->xtype = pred->type = pred_type;
-	le->dg = dg_path_add(le->dg, lex_pred_path, pred);
-}
-
-void	record_carg(struct edge	*le, char	*carg_str)
-{
-	char	*ncopy = malloc(strlen(carg_str)+3);
-	struct type	*carg_type;
-	struct dg	*carg = calloc(sizeof(struct dg), 1);
-	sprintf(ncopy, "\"%s\"", carg_str);
-	carg_type = temporary_string_type(ncopy);
-	carg->xtype = carg->type = carg_type;
-	le->dg = dg_path_add(le->dg, lex_carg_path, carg);
-}
-
-#ifdef UNKNOWN
-struct lexeme	*unknown_lexeme(char	*name, char	*type)
-{
-	struct lexeme	*lex;
-	struct dg		*extra, *stem, *ss, *lk, *kr;
-	char			*ncopy = malloc(strlen(name)+3);
-	int				nlen;
-	extern struct type	**strings;
-
-	// make a skeletal dag for our lexeme
-	extra = atomic_dg(type);
-	assert(extra);
-
-	sprintf(ncopy, "\"%s\"", name);
-
-	// define the lexeme
-	lex = slab_alloc(sizeof(struct lexeme));
-	bzero(lex, sizeof(*lex));
-	lex->word = name;
-	lex->stemlen = 1;
-	lex->stem = slab_alloc(sizeof(struct type*)*1);
-	lex->stem[0] = temporary_string_type(ncopy);
-	lex->lextype = extra->type;
-	lex->dg = extra;
-
-	return lex;
-}
-
-struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk)
-{
-	char	*type = UNKNOWN;
-	struct lexeme *l;
-	struct edge *e;
-
-	// map 'tag' to unknown lexeme type
-		if(!strcmp(tag, "NNP"))type = "n_proper_le";
-	else if(!strcmp(tag, "JJ"))type = "adj_intrans_le";
-	else if(!strcmp(tag, "JJS"))type = "adj_intrans_superl_nale";
-	else if(!strcmp(tag, "JJR"))type = "adj_intrans_compar_nale";
-	else if(!strcmp(tag, "RB"))type = "adv_int_vp_le";//"adv_word_nale";
-	else if(!strcmp(tag, "NNPS"))type = "n_proper_le";
-	else if(!strcmp(tag, "NNS"))type = "n_intr_pl_nale";
-	else if(!strcmp(tag, "NN"))type = "n_mass_count_le";
-	else if(!strcmp(tag, "VB"))type = "v_np*_trans_bse_nale";
-	else if(!strcmp(tag, "VBG"))type = "v_np*_trans_prp_nale";
-	else if(!strcmp(tag, "VBD"))type = "v_np*_trans_past_nale";
-	else if(!strcmp(tag, "VBN"))type = "v_np*_trans_psp_nale";
-	else if(!strcmp(tag, "VBP"))type = "v_np*_trans_presn3sg_nale";
-	else if(!strcmp(tag, "VBZ"))type = "v_np*_trans_pres3sg_nale";
-
-	fprintf(stderr, "NOTE: guessing `%s' is a `%s' (POS %s%s)\n", word, type, tag, tagunk?"?":"");
-
-	l = unknown_lexeme(word, type);
-	e = lexical_edge(l, i, 1, 0);
-	e->north_routes = -1;
-	e->orth_routes = 0;
-
-	if(type == "n_proper_le")record_carg(e, word);
-	else record_pred(e, word, tag);
-
-	return e;
-}
-#else
-struct edge	*unknown_lexical_edge(int	i, char	*word, char *tag, int tagunk) { return 0; }
-#endif
 
 int	lex_strcmp(char	*a, char	*b)
 {
@@ -343,7 +196,7 @@ void	dump_parts_of_speech()
 }
 
 static int	orthfeat = -1, rfeat = 2, ffeat = 1, synsemfeat = -1, lkeysfeat, keyrelfeat,
-			predfeat, compkeyfeat, ocompkeyfeat, phonfeat, onsetfeat, listfeat, __tlfeat;
+			predfeat, phonfeat, onsetfeat, listfeat, __tlfeat;
 static struct type	*predsort, *con, *voc, *native_token_list;
 
 int	nsimpleform = 0;
@@ -359,8 +212,6 @@ void	init_fnums()
 	lkeysfeat = lookup_fname("LKEYS");
 	keyrelfeat = lookup_fname("KEYREL");
 	predfeat = lookup_fname("PRED");
-	compkeyfeat = lookup_fname("--+COMPKEY");
-	ocompkeyfeat = lookup_fname("--+OCOMPKEY");
 	phonfeat = lookup_fname("PHON");
 	onsetfeat = lookup_fname("ONSET");
 	listfeat = lookup_fname("LIST");
@@ -504,7 +355,7 @@ void print_lexeme(char *name)
 struct lexeme	*make_lexeme(char	*word, struct dg	*dg, struct type	*type, struct dg	*fulldg)
 {
 	struct lexeme	*l = malloc(sizeof(struct lexeme));
-	struct dg	*stem, *str, *synsem, *lkeys, *keyrel, *pred, *compkey, *ocompkey;
+	struct dg	*stem, *str, *synsem, *lkeys, *keyrel, *pred;
 	int			print = 0;
 
 	// XXX hack!
@@ -518,12 +369,9 @@ struct lexeme	*make_lexeme(char	*word, struct dg	*dg, struct type	*type, struct 
 	l->stem = 0;
 	l->lextype = type;
 	l->pred = 0;
-	l->select = 0;
 
 	// look up a few interesting ERG-specific paths in lexemes:
-	// SYNSEM.LKEYS.COMPKEY is a predsort that the lexeme requires to be present elsewhere
-	// SYNSEM.LKEYS.OCOMPKEY is a predsort that the lexeme requires to be present elsewhere
-	// SYNSEM.LKEYS.KEYREL.PRED is a predsort that the lexeme provides to satisfy another
+	// SYNSEM.LKEYS.KEYREL.PRED is a predsort that the lexeme provides
 
 	synsem = dg_hop(fulldg, synsemfeat);
 	if(synsem)
@@ -531,21 +379,6 @@ struct lexeme	*make_lexeme(char	*word, struct dg	*dg, struct type	*type, struct 
 		lkeys = dg_hop(synsem, lkeysfeat);
 		if(lkeys)
 		{
-			compkey = dg_hop(lkeys, compkeyfeat);
-			if(compkey && compkey->xtype != predsort)
-			{
-				l->select = compkey->xtype;
-				//printf("lex `%s' selects for `%s'\n", word, l->select->name);
-			}
-			else
-			{
-				ocompkey = dg_hop(lkeys, ocompkeyfeat);
-				if(ocompkey && ocompkey->xtype != predsort)
-				{
-					l->select = ocompkey->xtype;
-					//printf("lex `%s' oselects for `%s'\n", word, l->select->name);
-				}
-			}
 			keyrel = dg_hop(lkeys, keyrelfeat);
 			if(keyrel)
 			{
@@ -766,7 +599,6 @@ struct lexeme	*instantiate_gle(struct lexeme	*gle, char	*surface, char	*carg)
 	l->onset = gle->onset;
 	l->stem = slab_alloc(sizeof(struct type*));
 	l->lextype = gle->lextype;
-	l->select = gle->select;
 	l->pred = gle->pred;
 
 	// set the orthography value
