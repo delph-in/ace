@@ -4,6 +4,7 @@
 #include	<stdlib.h>
 #include	<string.h>
 #include	<assert.h>
+#include	"chart.h"
 #include	"dag.h"
 #include	"freeze.h"
 
@@ -33,7 +34,7 @@ extern struct type	*ut1, *ut2;
 #endif
 
 #ifdef	COPY_COUNTS
-long long copycount, copytraverse;
+long long copycount, copytraverse, copysharecount, copyreentcount;
 #endif
 
 long top_copies, top_unifies;
@@ -67,6 +68,12 @@ static inline void	forward_dg(struct dg	*from, struct dg	*to)
 
 #define	HAVE_CHECK_CYCLES	1
 #ifdef	HAVE_CHECK_CYCLES
+// this is called from trimmed_portion_is_cyclic(),
+// right after we copy_dg_with_comp_arcs_ss() some other portions of the dag.
+// if we enter into a part that has been copied, that portion has already
+// been shown to be cycle free, so skip out.
+// the marker is that ->copy is a pointer and ->copy->gen is current
+// also, if ->copy is 0x5, then copy() decided to share the node, and it is also known to be cycle-free.
 int	check_cycles(struct dg	*dg)
 {
 	int	i;
@@ -89,6 +96,9 @@ int	check_cycles(struct dg	*dg)
 	}
 	else if(dg->copy == (void*)1)return -1;
 	else if(dg->copy == (void*)2)return 0;
+	else if(dg->copy == (void*)5)return 0;	// copy() has been here (and shared)
+	else if((void*)dg->copy > (void*)10 && dg->copy->gen == generation)
+		return 0;	// copy() has been here and copied()
 	dg->copy = (void*)1;
 
 	arcs = DARCS(dg);
@@ -161,6 +171,11 @@ static void print_copy_path(char	*name)
 	printf("\n");
 }
 
+// we don't share FROZEN dags because we make epsilon edges that directly reference the rule in the frozen grammar, without copying.
+// note that *lexical* edges do get copied before entering the chart.
+
+#define	FROZENLY_UNSHARABLE(x)	FROZEN(x)
+
 static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 {
 	struct dg	*dg, **aptr, **optr;
@@ -188,7 +203,13 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 		dg->carcs = 0;
 		dg->type = dg->xtype;
 		dg->gen = generation;
-		if(!dg->narcs && !FROZEN(dg))goto share;
+		if(!dg->narcs && !FROZENLY_UNSHARABLE(dg))
+		{
+#ifdef	COPY_COUNTS
+			copysharecount++;
+#endif
+			goto share;
+		}
 	}
 	else
 	{
@@ -204,16 +225,30 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 			return NULL;
 		}
 		if((unsigned long long)dg->copy == 5)	// sharable marker
+		{
+#ifdef	COPY_COUNTS
+			copyreentcount++;
+#endif
 			goto share;
+		}
 
 		if(dg->copy && dg->copy->gen == generation)
 		{
 			*chret = 1;	// if 'copy' is set, a copy was made... so changed.
+#ifdef	COPY_COUNTS
+			copyreentcount++;
+#endif
 			return dg->copy;
 		}
 	}
 
-	if(!dg->narcs && dg->type==dg->xtype && !FROZEN(dg) && !dg->ncarcs)goto share;
+	if(!dg->narcs && dg->type==dg->xtype && !FROZENLY_UNSHARABLE(dg) && !dg->ncarcs)
+	{
+#ifdef	COPY_COUNTS
+		copysharecount++;
+#endif
+		goto share;
+	}
 
 	// leaf-types can be shared nomatter what
 	//if(dg->xtype->ndescendents==0)goto share;
@@ -337,7 +372,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	printf("\n");
 #endif
 
-	if(dg->ncarcs || dg->type!=dg->xtype || st || FROZEN(dg))
+	if(dg->ncarcs || dg->type!=dg->xtype || st || FROZENLY_UNSHARABLE(dg))
 	{
 		*chret = 1;
 #ifdef	COPY_COUNTS
@@ -350,7 +385,10 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	}
 	else
 	{
-		// slab-free the node we just built, it's guarranteed to be on top
+#ifdef	COPY_COUNTS
+		copysharecount++;
+#endif
+		// slab-free the node we just built, it's guaranteed to be on top
 		set_slabstate(&state);
 		share:
 		// mark this node as sharable in case someone reenters into it
@@ -841,36 +879,10 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	if(dg1->copy)dg1->copy = 0;
 	if(dg2->copy)dg2->copy = 0;
 
-	__builtin_prefetch(dg1->label);
-	__builtin_prefetch(dg2->label);
-
-	if(!FROZEN(dg2) && allow_unify_swapping)
-	{
-		register int balance = 0;
-		if(FROZEN(dg1))goto swap;
-		if(dg2->gen==generation && (dg2->ncarcs || dg2->type!=dg2->xtype))balance += 5;
-		if(dg1->gen==generation && (dg1->ncarcs || dg1->type!=dg1->xtype))balance -= 5;
-		balance += (7*dg2->narcs)/5;
-		balance -= 1*dg1->narcs;
-		if(balance>0)
-		{
-			swap:
-			// trick: swap to make dg1 non-frozen if possible
-			// otherwise try to make the more specific dag dg1
-			// to avoid copying info
-			extra = dg1;
-			dg1 = dg2;
-			dg2 = extra;
-			extra = 0;
-		}
-	}
-
 	t1 = (dg1->gen==generation)?dg1->type:dg1->xtype;
 	t2 = (dg2->gen==generation)?dg2->type:dg2->xtype;
-	if(!t1) { printf("unify found a NULL type on dg1. gen = %d, generation = %d, xtype = %p, type = %p\n", dg1->gen, generation, dg1->xtype, dg1->type); unify_backtrace(); }
-	if(!t2) { printf("unify found a NULL type on dg2. gen = %d, generation = %d, xtype = %p, type = %p\n", dg2->gen, generation, dg2->xtype, dg2->type); unify_backtrace(); }
-
-	// quasi-destructively unify the four sets of arcs together!
+//	if(!t1) { printf("unify found a NULL type on dg1. gen = %d, generation = %d, xtype = %p, type = %p\n", dg1->gen, generation, dg1->xtype, dg1->type); unify_backtrace(); }
+//	if(!t2) { printf("unify found a NULL type on dg2. gen = %d, generation = %d, xtype = %p, type = %p\n", dg2->gen, generation, dg2->xtype, dg2->type); unify_backtrace(); }
 
 	if(t1 == t2)t = t1;
 	else
@@ -887,6 +899,87 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 		}
 	}
 
+	// apply GLB constraint if necessary
+	if(t != t1 && t!= t2 && t->dg && t->dg->narcs
+		&& !(0
+		|| (t->name[0]=='g' && t->name[1]=='(')
+		))
+	{
+//		if(t->name[0]=='g' && t->name[1]=='(')
+//			printf("reached glbtype '%s' and will waste time unifying...\n", t->name);
+		if(t->dg->gen != generation)
+		{
+			extra = t->dg;
+			extra->gen = generation;
+			extra->type = extra->xtype;
+			extra->ncarcs = 0;
+			extra->carcs = 0;
+			extra->forward = 0;
+			extra->copy = 0;
+		}
+		else
+		{
+			// it's REALLY obnoxious that we have to do this
+			extra = get_extra_type_dg(t);
+		}
+#ifdef	UNIFY_PATHS
+		uglb = extra->xtype;
+		//printf("applying glb constraint `%s'\n", uglb->name);
+		upathgl = upathl;
+#endif
+		if(unify1(dg1, extra))
+		{
+			if(!g_loaded)
+			{
+				fprintf(stderr, "UNIFY: failed additional constraints from glb-type `%s'\n", t->name);
+				print_dg(extra); printf("\n");
+			}
+			return -1;
+		}
+#ifdef	UNIFY_PATHS
+		uglb = 0;
+#endif
+		dg1 = dereference_dg(dg1);
+		// don't bother getting new value of t1, since nobody will look at it
+	}
+
+	__builtin_prefetch(dg1->label);
+	__builtin_prefetch(dg2->label);
+
+	if(!FROZEN(dg2) && allow_unify_swapping)
+	{
+		if(FROZEN(dg1))goto swap;
+		//register int balance = 0;
+		//if(dg2->gen==generation && (dg2->ncarcs || dg2->type!=dg2->xtype))balance += 25;
+		//if(dg1->gen==generation && (dg1->ncarcs || dg1->type!=dg1->xtype))balance -= 25;
+		//balance += 7*dg2->narcs;
+		//balance -= 5*dg1->narcs;
+		//if(balance>0)
+		if(dg2->narcs > dg1->narcs)
+		{
+			swap:
+			// strategy: swap to make dg1 non-frozen if possible
+			// rationale: we can never substructure-share a frozen dag (why not?).
+			// if we forward to a frozen dag, we are guaranteed to have to copy it.
+			// so, if we have the choice, forward to the non-frozen dag.
+			// if frozenness is not a choice, try to forward to the dag with more arcs, to avoid using ->carcs and increase chances of already having the right type (-> more sharing)
+			extra = dg1;
+			dg1 = dg2;
+			dg2 = extra;
+			extra = 0;
+		}
+	}
+
+/*
+	if(allow_unify_swapping && dg2->narcs > dg1->narcs)
+	{
+		extra = dg1;
+		dg1 = dg2;
+		dg2 = extra;
+		extra = 0;
+	}
+*/
+
 	if(dg1->gen != generation)
 	{
 		dg1->ncarcs = 0;
@@ -898,6 +991,8 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	//fprintf(stderr, "type `%s' at ", t->name); unify_backtrace();
 
 	forward_dg(dg2, dg1);
+
+	// quasi-destructively unify the four sets of arcs together!
 
 	unsigned char	news[dg2->narcs], newcs[dg2->ncarcs];
 	int	nn=0, nc=0;
@@ -961,6 +1056,10 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	// add remaining dg2 arcs and comps arcs to dg1's comps arcs
 	if(nn+nc > 0)
 	{
+		/*printf("dg1 type %s ; dg2 type %s\n", dg1->xtype->name, dg2->xtype->name);
+		for(j=0;j<dg1->narcs;j++)printf("dg1 %s\n", fnames[dg1->label[j]]);
+		for(j=0;j<dg2->narcs;j++)printf("dg2 %s\n", fnames[dg2->label[j]]);
+		printf("dg1 had %d carcs; adding %d + %d\n", dg1->ncarcs, nn, nc);*/
 		dg1->carcs = realloc_carcs(dg1->carcs, dg1->ncarcs, dg1->ncarcs + nn + nc);
 
 		// merge-sort
@@ -980,56 +1079,20 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 		}*/
 		while(j<nn)
 		{
+			//printf("from dg2 arc %s\n", fnames[dg2->label[news[j]]]);
 			dg1->carcs[dg1->ncarcs].label = dg2->label[news[j]];
 			dg1->carcs[dg1->ncarcs++].dest = arcs2[news[j++]];
 		}
-		while(k<nc) dg1->carcs[dg1->ncarcs++] = dg2->carcs[newcs[k++]];
+		while(k<nc)
+		{
+			//printf("from dg2 carc %s\n", fnames[dg2->carcs[newcs[k]].label]);
+			dg1->carcs[dg1->ncarcs++] = dg2->carcs[newcs[k++]];
+		}
 		if(nn+nc < dg1->ncarcs || (nc&&nn))
 		{
 			//fprintf(stderr, "NOTE: had to sort %d carcs\n", dg1->ncarcs);
 			qsort(dg1->carcs, dg1->ncarcs, sizeof(struct darc), darc_cmp);
 		}
-	}
-
-	if(t != t1 && t!= t2 && t->dg && t->dg->narcs
-		&& !(0
-		|| (t->name[0]=='g' && t->name[1]=='(')
-		))
-	{
-//		if(t->name[0]=='g' && t->name[1]=='(')
-//			printf("reached glbtype '%s' and will waste time unifying...\n", t->name);
-		if(t->dg->gen != generation)
-		{
-			extra = t->dg;
-			extra->gen = generation;
-			extra->type = extra->xtype;
-			extra->ncarcs = 0;
-			extra->carcs = 0;
-			extra->forward = 0;
-			extra->copy = 0;
-		}
-		else
-		{
-			// it's REALLY obnoxious that we have to do this
-			extra = get_extra_type_dg(t);
-		}
-#ifdef	UNIFY_PATHS
-		uglb = extra->xtype;
-		//printf("applying glb constraint `%s'\n", uglb->name);
-		upathgl = upathl;
-#endif
-		if(unify1(dg1, extra))
-		{
-			if(!g_loaded)
-			{
-				fprintf(stderr, "UNIFY: failed additional constraints from glb-type `%s'\n", t->name);
-				print_dg(extra); printf("\n");
-			}
-			return -1;
-		}
-#ifdef	UNIFY_PATHS
-		uglb = 0;
-#endif
 	}
 
 	return 0;
@@ -1042,6 +1105,11 @@ void	setup_tmp()
 	get_slabstate(&tmpstate);
 }
 
+#ifdef	TIM_IN
+long long base_unify_dg_tmp_succ_count, base_unify_dg_tmp_fail_count, base_finalize_tmp_count;
+double	base_unify_dg_tmp_succ_time, base_unify_dg_tmp_fail_time, base_finalize_tmp_time;
+#endif
+
 int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 {
 	struct dg	*to;
@@ -1049,6 +1117,11 @@ int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 
 	top_unifies++;
 	get_slabstate(&tmpstate);
+
+#ifdef	TIM_IN
+struct timeval	tv1, tv2;
+gettimeofday(&tv1,NULL);
+#endif
 
 	if(arg>=0)
 	{
@@ -1071,7 +1144,22 @@ int	unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg)
 	upathl = 0;
 	uglb = 0;
 #endif
-	return unify1(to, dg1);
+
+	int	res = unify1(to, dg1);
+#ifdef	TIM_IN
+gettimeofday(&tv2,NULL);
+if(res)
+{
+	base_unify_dg_tmp_fail_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+	base_unify_dg_tmp_fail_count += 1;
+}
+else
+{
+	base_unify_dg_tmp_succ_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+	base_unify_dg_tmp_succ_count += 1;
+}
+#endif
+	return res;
 }
 
 struct dg	*trim_copy(struct dg	*d)
@@ -1112,17 +1200,46 @@ struct dg	*finalize_tmp(struct dg	*d, int trim)
 	char		ch = 0;
 	struct dg	*res;
 
+#ifdef	TIM_IN
+struct timeval	tv1, tv2;
+gettimeofday(&tv1, NULL);
+#endif
+
 	enable_trim(trim);
-	if(trim && trimmed_portion_is_cyclic(d))
+	/*if(trim && trimmed_portion_is_cyclic(d))
 		res = NULL;
-	else res = copy_dg_with_comp_arcs_ss(d, &ch);
+	else res = copy_dg_with_comp_arcs_ss(d, &ch);*/
+	res = copy_dg_with_comp_arcs_ss(d, &ch);
+	if(res && trim && trimmed_portion_is_cyclic(d))
+		res = NULL;
 
 	if(!res)set_slabstate(&tmpstate);
 	bump_generation();
 
+#ifdef	TIM_IN
+gettimeofday(&tv2, NULL);
+base_finalize_tmp_time += tv2.tv_sec - tv1.tv_sec + 0.000001 * (tv2.tv_usec - tv1.tv_usec);
+base_finalize_tmp_count += 1;
+#endif
+
 	top_copies++;
 	return res;
 }
+
+#ifdef TIM_IN
+__attribute__((destructor)) report_TIM_IN()
+{
+	fprintf(stderr, "unify_dg_tmp() successes: %.3fs in %lld calls = %gs\n",
+		base_unify_dg_tmp_succ_time, base_unify_dg_tmp_succ_count,
+		base_unify_dg_tmp_succ_time / base_unify_dg_tmp_succ_count);
+	fprintf(stderr, "unify_dg_tmp() failures:  %.3fs in %lld calls = %gs\n",
+		base_unify_dg_tmp_fail_time, base_unify_dg_tmp_fail_count,
+		base_unify_dg_tmp_fail_time / base_unify_dg_tmp_fail_count);
+	fprintf(stderr, "finalize_tmp():  %.3fs in %lld calls = %gs\n",
+		base_finalize_tmp_time, base_finalize_tmp_count,
+		base_finalize_tmp_time / base_finalize_tmp_count);
+}
+#endif
 
 struct dg	*finalize_tmp_noss(struct dg	*d, int trim)
 {

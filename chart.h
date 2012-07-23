@@ -8,8 +8,24 @@
 //#define	RULE_STATS
 #define	ENABLE_HYPERACTIVE	1
 
+// three different ways of timing the core unifier/copier operations:
+
+// CLOCKCOUNT times the unify_dg_tmp() call with clock(),
+// and used to time quickcheck extraction and quickcheck glb,
+// but no longer times those due to intervening code changes
 #undef	CLOCKCOUNT
+
+// IFCLOCK times the unify_dg_tmp() call, the build_edge() call, the pack_edge() call, and the qc_extractor() call using the liba timer system
+// overhead: measurable but small (1% or so)
 #define	IFCLOCK(code)
+//#define	IFCLOCK(code)	code
+
+// TIM times outside of the unify_dg_tmp() call, including recalling hyperactive/hyperpassive edges, and the finalize_tmp() calls for active and passive edges.  it tries to exclusively measure the unifier and copier.
+// overhead: small enough to be negligible
+//#define TIM
+
+// TIM_IN times *inside* the unify_dg_tmp() call and *inside* the finalize_tmp() call
+//#define TIM_IN
 
 struct edge
 {
