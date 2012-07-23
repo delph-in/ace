@@ -73,7 +73,9 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 	for(i=0;i<nrules;i++)
 	{
 		if(!rules[i]->lexical)continue;
-		if(check_lexical_rule_constraints(rules[i], le->edge))continue;
+
+		// check_lexical_rule_constraints is part of filter()... why were we doing this twice?
+		//if(check_lexical_rule_constraints(rules[i], le->edge))continue;
 		//printf("should I try lexrule '%s'?\n", rules[i]->name);
 		epsila[i]->from = epsila[i]->to = le->edge->from;
 		if(filter(epsila[i], le->edge))
@@ -140,9 +142,7 @@ int	lexical_parse_lattice(struct lattice	*lc)
 	for(i=0;i<lc->nedges;i++)
 	{
 		struct edge	*e = lc->edges[i]->edge;
-		for(j=0;j<e->north_routes;j++)
-			if(e->orth_routes[j].len == 0)break;
-		if(j==e->north_routes)
+		if(!edge_is_ready_for_syntax(e))
 		{
 			// this edge cannot play in syntax, since it has not completely inflected
 			remove_lattice_edge(lc, lc->edges[i]);
