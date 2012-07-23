@@ -79,7 +79,7 @@ static void record_packing(struct edge *host, struct edge *e)
 
 static long long packcount = 0, packtry = 0, packqc = 0, packss = 0;
 #ifdef	COPY_COUNTS
-extern long long copycount, copytraverse;
+extern long long copycount, copytraverse, copysharecount, copyreentcount;
 #endif
 
 extern int gen_qc;
@@ -166,7 +166,7 @@ int	upward_kill(struct edge	*edge, struct edge	*save)
 	return killed;
 }*/
 
-/*int	generalize_pack_edge(struct edge	*edge)
+int	generalize_pack_edge(struct edge	*edge)
 {
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	printf("thinking about how to pack #%d [%d passives in cell]\n", edge->id, c->p_nedges);
@@ -176,14 +176,14 @@ int	upward_kill(struct edge	*edge, struct edge	*save)
 
 	int	ssd, fw=1, bk=1;
 	ssd = equivalent_dg(existing->dg, edge->dg, fw, bk);
-	if(ssd == 1 || ssd == 3)
+	if(ssd == 1 || ssd == 2)
 	{
 		// existing susumes new edge
 		record_packing(existing, edge);
 		printf("#%d packs INTO existing #%d\n", edge->id, existing->id);
 		return 1;
 	}
-	if(ssd == 2)
+	if(ssd == -1)
 	{
 		// new edge subsumes existing edge
 		assert(!existing->frozen);
@@ -211,13 +211,15 @@ int	upward_kill(struct edge	*edge, struct edge	*save)
 	invent->qc = extract_qc(invent->dg);
 
 	printf("invented a new generalized edge #%d [ subsumes #%d and #%d ]\n", invent->id, existing->id, edge->id);
+	print_dg(invent->dg);
+	printf("\n");
 
 	record_packing(invent, edge);
 	record_packing(invent, existing);
 	c->p_nedges = 0;
 	add_agenda(invent);
 	return 1;
-}*/
+}
 
 block(struct edge	*e, int	freeze)
 {
@@ -263,6 +265,10 @@ block(struct edge	*e, int	freeze)
 
 int	pack_edge(struct edge	*edge)
 {
+/*	if(edge->to > edge->from + 1)	// pack under generalization for non lexical spans
+		// the generalization system doesn't deal with lexical rule chain requirements yet
+		return generalize_pack_edge(edge);*/
+
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	struct edge			*h, **candidates;
 	int			i, ssd, ncandidates;
@@ -443,8 +449,8 @@ int	pack_edge(struct edge	*edge)
 void packing_report()
 {
 #ifdef	COPY_COUNTS
-	fprintf(stderr, "NOTE: %lld packings (%.1f%% success), %lld / %lld = %.1f%% copies\n", packcount, 100*(float)packcount / packtry,
-		copycount, copytraverse, 100*(float)copycount / copytraverse);
+	fprintf(stderr, "NOTE: %lld packings (%.1f%% success), %lld copy() calls, %lld copy() reentrancies, %lld copy() allocations, %lld copy() shares = %.1f%%\n", packcount, 100*(float)packcount / packtry,
+		copytraverse, copyreentcount, copycount, copysharecount, 100*(float)copysharecount / (copycount+copysharecount));
 #endif
 	if(debug_level)
 	{

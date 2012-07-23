@@ -45,7 +45,7 @@ struct dg	*intersect_copy_lists(struct copy_list	*a, struct copy_list	*b)
 	return NULL;
 }
 
-// returns a dg that subsumes both 'a' and 'b', possibly with structure sharing
+// returns a dg that subsumes both 'a' and 'b', possibly with reentrancies
 // hopefully returns the most specific such dg?
 struct dg	*generalize(struct dg	*a, struct dg	*b)
 {
@@ -72,7 +72,7 @@ struct dg	*generalize(struct dg	*a, struct dg	*b)
 			if(!PACKING_RESTRICTOR(t->dg->label[i]) && !SHOULD_TRIM(t->dg->label[i]))
 				narcs++;
 	}
-	int	ab = (narcs-2+3)/4 * 4;
+	int ab = DAG_EXTRA_LABELS_SIZE_FOR_COUNT(narcs);
 	struct dg	*g = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*narcs), *aa, *bb;
 
 	g->type = g->xtype = t;
@@ -93,14 +93,21 @@ struct dg	*generalize(struct dg	*a, struct dg	*b)
 			if(SHOULD_TRIM(t->dg->label[i]))continue;
 			aa = dg_hop(a, t->dg->label[i]);
 			bb = dg_hop(b, t->dg->label[i]);
-			if(!(aa&&bb))
+			struct dg	*G = NULL;
+			struct dg	*atomic_top();
+			if(aa&&bb)G = generalize(aa,bb);
+			else if(aa)G = generalize(aa,aa);
+			else if(bb)G = generalize(bb,bb);
+			else G = generalize(atomic_top(), atomic_top());
+			/*if(!(aa&&bb))
 			{
+				if(aa)
 				fprintf(stderr, "ERROR: feature '%s' missing from types '%s' and '%s' inheriting from '%s'\n",
 					fnames[t->dg->label[i]], t1->name, t2->name, t->name);
 				assert(aa && bb);
-			}
+			}*/
 			g->label[narcs] = t->dg->label[i];
-			(DARCS(g))[narcs] = generalize(aa, bb);
+			(DARCS(g))[narcs] = G;//generalize(aa, bb);
 			narcs++;
 		}
 	}
