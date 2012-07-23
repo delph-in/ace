@@ -10,7 +10,7 @@ int	glb_ncollis, glb_nhit, glb_nmiss;
 #define	ROLLOVER	6
 
 extern int	glb_ncollis, glb_nhit, glb_nmiss;
-struct type	*calc_glb(struct type	*a, struct type	*b);
+static struct type	*calc_glb(struct type	*a, struct type	*b);
 
 static struct glb_hashent
 {
@@ -88,7 +88,9 @@ grab:
 	assert(!"no such type hierarchy");
 }*/
 
-struct type	*calc_glb(struct type	*a, struct type	*b)
+// static because it doesn't work when a==b, and we don't want someone
+// calling it from outside without realizing that...
+static struct type	*calc_glb(struct type	*a, struct type	*b)
 {
 	struct type_hierarchy	*th = default_type_hierarchy();
 	int	ia, ib;
@@ -97,8 +99,13 @@ struct type	*calc_glb(struct type	*a, struct type	*b)
 	{
 		if(b->name[0]=='"')
 		{
+			// both string types.
+			// if they are both *temporary* string types,
+			// then they could be distinct pointers and still equivalent.
 			if(a->tnum==-1 && b->tnum==-1 && !strcmp(a->name, b->name))
 				return a;
+			// otherwise, they have to be identical pointers to be equivalent,
+			// and that case has already been tested beefore calc_glb() is called.
 			return 0;
 		}
 		else if(th->strtype && descendent_of(th->strtype->tnum, b))return a;
