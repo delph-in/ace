@@ -1,8 +1,6 @@
 TODO:
 
-- single quoted strings, Ann and Stephan and some others say, should be treated as:
-	1. a WARNING to the authors
-	2. uppercased and treated as if they were double-quoted
+- transfer: what is the correct interpretation of the logical identity of variables attached to a +copy+'d EP?
 
 - bug(?): when a rule is promoted from regular lexical to orthographemic by finding an entry in the irregulars table, we should also add a free "pass-through" regular orthographemic pattern, so that the rule will still match things that aren't in the irregulars table
 
@@ -13,7 +11,7 @@ fully automated regression testing
 		GG: mrs, babel
 
 berthold wants
-	- support for more than one POS tag in YY mode
+	+ support for more than one POS tag in YY mode
 	- *updating* an ace tsdb profile -- doesn't work, apparently?
 	- LUI support
 		-generator trees
@@ -82,14 +80,26 @@ ideas:
 		- should we be doing unfilling?
 
 
-things to undo from current experiments:
-	COPY_COUNTS
-	prints in unify1()
-	enable_generalize_edge_top_types disabler hack in config.tdl
-
 DONE:
 
 unreleased
+	- single quoted 'strings are now warnings and are converted to "STRINGS"
+	- TNT callout
+	- multiple POS tags per word (from TNT or from YY)
+	- lattice mapping is much faster in some circumstances
+	- ??? what else
+0.9.9
+	- something for Francis when getting transfer grammars to work?
+	- ??? what
+0.9.8
+	- something for Francis when getting JaCY to work
+	- ??? what
+0.9.7
+	- transfer rules can output new HCONS elements
+	- transfer +copy+ can invent new variables
+	- ??? what else
+0.9.6
+	- ??? what else
 	- trigger rule DAG specialization mechanism
 	- rebuilt HCONS matching in transfer rules
 0.9.6pre1

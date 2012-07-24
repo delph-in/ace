@@ -7,6 +7,9 @@
 
 #define	MAX_TRANSFER_CHUNKS	2560
 
+//#define	COPIED_VARIABLES_NEED_REENTRANCIES
+#undef	COPIED_VARIABLES_NEED_REENTRANCIES
+
 #define	FIXUP_FIRST_ROUTE_ONLY		1
 #define	CLEANUP_FIRST_ROUTE_ONLY	1
 
@@ -1146,6 +1149,7 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 
 	// before applying +copy+ defaults, brand new variables need to get INSTLOCs assigned to them, so that they can't be smushed into old variables by the unifier.
 
+#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
 	int	nov = tr->output.mrs->vlist.nvars, ninstlocs_to_fix = 0;
 	struct dg	*instlocs_to_fix[nov];
 	for(i=0;i<tr->output.mrs->vlist.nvars;i++)
@@ -1166,15 +1170,19 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 			}
 		}
 	}
+#endif
 
 	bump_generation();
+
+#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
 	for(i=0;i<ninstlocs_to_fix;i++)
 	{
 		struct dg	*new_il = new_instloc(1);
 		new_il->type = new_il->xtype = transfer_next_skolem_constant();
 		add_dg_hop(instlocs_to_fix[i], instloc_feature, new_il);
-		//printf("fixing instloc for new variable dg %p\n", instlocs_to_fix[i]);
+		//printf("fixing instloc for new variable dg %p to %s\n", instlocs_to_fix[i], new_il->type->name);
 	}
+#endif
 
 	for(i=0;i<tr->output.neps;i++)
 		if(tr->output_copy_map[i])	// copy whatever we can from input[i]
@@ -1223,7 +1231,8 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		if(v->is_const)continue;	// don't try to align new constants to old constants; they aren't skolemized anyway.
 		struct dg	*vdg = v->dg;
 		if(ALLOW_SEMI_MODE)
-			v->semi_dg = vdg;
+			v->semi_dg = vdg;	// ?? or should it be vdg = v->semi_dg?
+		vdg = dereference_dg(vdg);
 		struct dg	*iloc = dg_hop(vdg, instloc_feature);
 		assert(iloc != NULL);
 		char	*ilt = iloc->xtype->name;
@@ -1242,12 +1251,14 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 			}
 			if(j == min->vlist.nvars)
 			{
+#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
 				// make sure this was one of the variables we gave a brand new instloc to.
 				for(j=0;j<ninstlocs_to_fix;j++)
 					if(dereference_dg(instlocs_to_fix[j]) == vdg)break;
 				if(j==ninstlocs_to_fix)
+#endif
 				{
-					printf("ERROR: found INSTLOC %s in output Ep variable, but that is not a variable in the input MRS and is not a variable we assigned a new INSTLOC to.\n", ilt);
+					printf("ERROR: found INSTLOC %s in output Ep variable dg %p, but that is not a variable in the input MRS and is not a variable we assigned a new INSTLOC to.\n", ilt, vdg);
 					assert(!"not reached");
 				}
 			}
@@ -1259,15 +1270,16 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		}
 		else
 		{
-			assert(!"not reached");
+#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
 			// should have already allocated instlocs to all new variables... code higher up.
+			assert(!"not reached");
+#else
 
-/*
 			// INSTLOC was not set; this variable is being invented brand new by this rule.
 			// give it an INSTLOC for future use.
 			iloc->xtype = iloc->type = transfer_next_skolem_constant();
 			//printf("new var %d was really new\n", i);
-*/
+#endif
 		}
 	}
 
