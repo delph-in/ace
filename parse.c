@@ -441,7 +441,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	{
 		fprintf(stderr, "NOTE: post reduction gap\n");
 		stop_timer(chart_setup_timer, 1);
-		itsdb_report(token_chart, -2, 0);
+		if(do_itsdb)itsdb_report(token_chart, -2, 0);
 		return -2;
 	}
 
@@ -464,7 +464,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	if(nwords < 0)
 	{
 		fprintf(stderr, "NOTE: negative lexical chart length\n");
-		itsdb_report(token_chart, -2, 0);
+		if(do_itsdb)itsdb_report(token_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
 	}
@@ -472,14 +472,14 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	if(!nwords)
 	{
 		fprintf(stderr, "NOTE: nothing to parse\n");
-		itsdb_report(token_chart, -2, 0);
+		if(do_itsdb)itsdb_report(token_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
 	}
 	if(nwords>70)
 	{
 		fprintf(stderr, "NOTE: giving up, too many words (70+)\n");
-		itsdb_report(token_chart, -2, 0);
+		if(do_itsdb)itsdb_report(token_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
 	}
@@ -663,6 +663,10 @@ finished:
 
 show_last_parse_chart()
 {
+	// ... the slab has been clear_slab()'d, but
+	// we likely still own the memory and it likely hasn't been trampled yet.
+	// hehe... if we start having strange issues here,
+	// we should just not clear the slab until next parse when in LUI mode.
 	if(!last_token_chart)
 		fprintf(stderr, "no chart to display.\n");
 	else output_lui_chart(last_token_chart);
