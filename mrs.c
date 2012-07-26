@@ -358,7 +358,12 @@ struct mrs_ep	*parse_mrs_rels(struct mrs_vlist	*vlist, char **P, int	*Nrels)
 		{
 			char	*characterization = strrchr(word, '<');
 			if(2 != sscanf(characterization, "<%d:%d>", &ep->cfrom, &ep->cto))
-				FAIL("unparseable characterization");
+			{
+				// there are a lot of unorthodox characterization/link formats out there,
+				// see lkb/src/mrs/lnk.lisp for several.
+				//FAIL("unparseable characterization");
+				ep->cfrom = ep->cto = -1;
+			}
 		}
 		ep->epnum = nrels-1;
 		struct mrs_ep_role	args[20];
