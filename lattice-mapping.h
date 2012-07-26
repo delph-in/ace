@@ -30,6 +30,7 @@ struct lattice
 	struct lattice_edge		**edges;
 	int				nvertices;
 	struct lattice_vertex	**vertices;
+	struct lattice_vertex	*start, *end;
 };
 
 struct lattice_rule

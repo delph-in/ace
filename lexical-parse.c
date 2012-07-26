@@ -49,6 +49,9 @@ struct lattice	*lexical_lookup_into_chart(struct lattice	*token_chart)
 		bzero(lc->vertices[i], sizeof(struct lattice_vertex));
 		lc->vertices[i]->id = token_chart->vertices[i]->id;
 	}
+	assert(token_chart->start && token_chart->end);
+	lc->start = lc->vertices[token_chart->start->id];
+	lc->end = lc->vertices[token_chart->end->id];
 
 	void	edge_handler(struct edge	*le, struct token	**tokens)
 	{

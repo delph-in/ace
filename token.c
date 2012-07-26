@@ -162,6 +162,8 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 
 	bzero(tc, sizeof(*tc));
 	for(i=0;i<=nwords;i++)new_lattice_vertex(tc);
+	tc->start = tc->vertices[0];
+	tc->end = tc->vertices[nwords];
 	tc->nedges = nwords;
 	tc->edges = slab_alloc(sizeof(struct lattice_edge*)*tc->nedges);
 	for(i=0;i<tc->nedges;i++)
@@ -182,7 +184,7 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 			e->token->postags[j].tag = tags[i][j];
 			e->token->postags[j].prob = probs[i][j];
 		}
-		e->token->string = words[i];
+		e->token->string = freeze_string(words[i]);
 		e->token->cfrom = cfrom[i];
 		e->token->cto = cto[i];
 		if(enable_token_avms)
@@ -222,6 +224,8 @@ void	sort_lattice(struct lattice	*tc)
 	 * these become the numbered vertices of the parse chart...
 	 */
 
+	assert(tc->start && tc->end);
+
 	// traverse the lattice, assigning IDs in reverse order as we leave
 	int i, id = tc->nvertices - 1;
 	for(i=0;i<tc->nvertices;i++)
@@ -236,8 +240,11 @@ void	sort_lattice(struct lattice	*tc)
 		v->id = id--;
 		v->mark = 1;
 	}
+	traverse(tc->end);	// make sure tc->end gets the highest id
 	for(i=0;i<tc->nvertices;i++)
-		traverse(tc->vertices[i]);
+		if(tc->vertices[i] != tc->start)
+			traverse(tc->vertices[i]);
+	traverse(tc->start);	// make sure tc->start gets the lowest id
 	assert(id == -1);
 
 	// to determine: do we need to sort the vertex array on the new IDs?

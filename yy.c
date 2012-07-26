@@ -146,5 +146,27 @@ int	parse_yy(char	*yy)
 		e->to = get_vtx(vto);
 		add_lattice_edge(tc, e);
 	}
+	int i, j;
+	char	notstart[tc->nvertices];
+	bzero(notstart, sizeof(notstart));
+	tc->start = tc->end = NULL;
+	for(i=0;i<tc->nvertices;i++)
+	{
+		if(tc->vertices[i]->nfollowers == 0)
+		{
+			if(tc->end == NULL)
+				tc->end = tc->vertices[i];
+			else assert(!"YY mode: input token lattice had non-unique end vertex");
+		}
+		else for(j=0;j<tc->vertices[i]->nfollowers;j++)
+			notstart[tc->vertices[i]->followers[j]->to->id] = 1;
+	}
+	for(i=0;i<tc->nvertices;i++)
+		if(!notstart[i])
+		{
+			if(tc->start == NULL)
+				tc->start = tc->vertices[i];
+			else assert(!"YY mode: input token lattice had non-unique start vertex");
+		}
 	return parse_with_token_chart(tc, start);
 }

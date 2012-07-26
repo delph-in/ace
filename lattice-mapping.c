@@ -411,6 +411,8 @@ void	remove_lattice_vertex_follower(struct lattice_vertex	*v, struct lattice_edg
 
 void	add_lattice_edge(struct lattice	*lat, struct lattice_edge	*e)
 {
+	assert(lat->start != e->to);
+	assert(lat->end != e->from);
 	lat->nedges++;
 	lat->edges = slab_realloc(lat->edges, sizeof(struct lattice_edge*)*(lat->nedges-1), sizeof(struct lattice_edge*)*(lat->nedges));
 	// code calling update_possible_map_add relies on the new edge going in slot lat->nedges-1
@@ -426,6 +428,8 @@ void	maybe_dead_lattice_vertex(struct lattice	*lat, struct lattice_vertex	*v)
 		if(lat->edges[i]->to == v)return;
 		if(lat->edges[i]->from == v)return;
 	}
+	if(lat->start == v)return;
+	if(lat->end == v)return;
 	assert(v->nfollowers == 0);
 	// v is dead, remove it
 	for(i=0;i<lat->nvertices;i++)
@@ -809,6 +813,7 @@ static void clear_failed()
 	nfailed_unify_inputs = 0;
 }
 
+/*
 int	lattice_vertex_is_initial(struct lattice	*lat, struct lattice_vertex	*v)
 {
 	int i;
@@ -822,6 +827,7 @@ int lattice_vertex_is_final(struct lattice	*lat, struct lattice_vertex	*v)
 	if(v->nfollowers == 0)return 1;
 	return 0;
 }
+*/
 
 int	lattice_rule_matches(struct lattice	*lat, struct lattice_rule	*r, struct lattice_edge	**inputs, int	from, int	to, struct re_match_set	*mats)
 {
@@ -860,7 +866,8 @@ int	lattice_rule_matches(struct lattice	*lat, struct lattice_rule	*r, struct lat
 				assert(pc->lhs_what != '$' && pc->rhs_what != '^');
 				if(pc->lhs_what == '^')
 				{
-					if(!lattice_vertex_is_initial(lat, rhs_start))
+					//if(!lattice_vertex_is_initial(lat, rhs_start))
+					if(lat->start != rhs_start)
 					{
 						DEBUG_VERBOSE("failed ^< test\n");
 						return 0;
@@ -868,7 +875,8 @@ int	lattice_rule_matches(struct lattice	*lat, struct lattice_rule	*r, struct lat
 				}
 				else if(pc->rhs_what == '$')
 				{
-					if(!lattice_vertex_is_final(lat, lhs_end))
+					//if(!lattice_vertex_is_final(lat, lhs_end))
+					if(lat->end != lhs_end)
 					{
 						DEBUG_VERBOSE("failed <$ test\n");
 						return 0;
@@ -1228,6 +1236,8 @@ struct lattice	*edge_list_to_lattice(int	n, void	**list)
 	bzero(l, sizeof(*l));
 	int k;
 	for(k=0;k<=n;k++)new_lattice_vertex(l);
+	l->start = l->vertices[0];
+	l->end = l->vertices[n];
 	for(k=0;k<n;k++)
 	{
 		struct lattice_edge	*e = slab_alloc(sizeof(*e));
