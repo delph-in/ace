@@ -42,9 +42,6 @@ berthold wants
 		-simple MRS
 
 ideas:
-	- if the config.tdl file doesn't exist, we print some silly errors
-	- if the user swaps the -G and -g options, we overwrite their config.tdl file...
-		 we shouldn't do that.
 	- properly support lettersets with nonascii characters
 	- fix recursive labeling to check for cycles or empty SLASH difflists
 	- [mode to?] make output more script-friendly
@@ -105,8 +102,11 @@ ideas:
 DONE:
 
 unreleased
+0.9.10pre4
+	- don't overwrite user's config file if they swap -G and -g by mistake
 	- keep track of start/end vertices in lattice mapping
 	- add a free pass-through when a non-spelling-change-rule becomes a spelling-change-rule by way of the irregs table
+	- be a bit more generous about irregs.tab syntax
 0.9.10pre3
 	- roll back (by default) to original +copy+ variable semantics
 	- single quoted 'strings are now warnings and are converted to "STRINGS"

@@ -1589,7 +1589,8 @@ int load_grammar(char	*path)
 	tdl_hash = hash_new("tdl type definitions");
 
 	tdl_push_status("config");
-	load_tdl(path);
+	int result = load_tdl(path);
+	if(result == -1)exit(-1);
 	tdl_pop_status();
 
 	init_fnames();

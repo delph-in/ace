@@ -306,6 +306,11 @@ void	initialize_engine()
 		if(!load_grammar_path)
 			load_grammar_path = "../erg/ace/config.tdl";
 
+		if(strstr(save_grammar_path, ".tdl"))
+		{
+			fprintf(stderr, "CAUTION: refusing to write grammar file to a pathname containing `.tdl'.\nDid you swap the -G and -g options?\n");
+			exit(-1);
+		}
 		int fd = open(save_grammar_path, O_CREAT | O_TRUNC | O_RDWR, 0600);
 		if(fd == -1)
 		{
