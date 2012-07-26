@@ -962,7 +962,8 @@ struct orule	*lookup_orule(char	*rule)
 
 struct orule	*make_identity_orule_for_rule(struct rule	*r)
 {
-	add_orule(r, NULL);
+	char	*def = freeze_string("suffix (* *)");
+	add_orule(r, def);
 	return orules[norules-1];
 }
 
@@ -985,14 +986,17 @@ int	load_irregulars(char	*path)
 		if(!*line)continue;
 		if(*line=='"')continue;	// silly ERG .tab files have "'s at the beginning and ends
 		if(*line==';')continue;	// full-line comment
+		char	*start = line;
+		while(*start == ' ' || *start == '\t')start++;
+		if(*start == 0)continue;	// blank line
 		strcpy(copy, line);
-		form = strtok(line, " \t");
+		form = strtok(copy, " \t");
 		if(form)rule = strtok(0, " \t");
 		if(rule)stem = strtok(0, " \t");
 		if(!form || !rule || !stem || !*form || !*rule || !*stem)
 		{
 			fprintf(stderr, "orth: invalid irregular form `%s'\n", copy);
-			return -1;
+			continue;
 		}
 		if(rule_suffix)
 			asprintf(&rule, "%s%s", rule, rule_suffix);

@@ -1,14 +1,37 @@
 TODO:
 
+- PET cheats and has an explicit mapping from POS type to generic lexeme... which it may or may not actually use?  ACE actually unifies every token into every generic lexeme.
+
+- release.sh:
+	- should look at version.h *in the checked-out copy* and make sure it matches the commandline
+- auto regression tests:
+	- should include NorSource, GG and JaCY
+		- ideally would like confirmation from respective grammarians that ace does the right thing (some version of ACE, some version of the grammar), so that knowing that answers haven't changed is useful
+	- should include some transfer grammar as well
+		- need a tool to test results... do tsdb profiles even store transfer results? probably...
+
 - transfer: what is the correct interpretation of the logical identity of variables attached to a +copy+'d EP?
+- transfer: should variables that are QEQ be unifiable? (trigger rules: we believe 'yes'. berthold wants 'yes' for fixup rules too.)
 
-- bug(?): when a rule is promoted from regular lexical to orthographemic by finding an entry in the irregulars table, we should also add a free "pass-through" regular orthographemic pattern, so that the rule will still match things that aren't in the irregulars table
-
-fully automated regression testing
-		both parsing and generation
-		ERG: mrs, csli, hike, maybe something else too
+fully automated regression testing of both parsing and generation
+	notes:
+		+ this works and is invaluable
+		- we limit unpacking to some number of MB and 1000 results
+			- comparison tool should be aware of that somehow
+				- e.g. diffs in # of results when we run out of RAM are acceptable
+			- diffs after first 1000 results aren't detected... unfortunate.
+	grammars:
+		ERG: mrs, csli, hike
 		HaG: hausa.items
 		GG: mrs, babel
+			- tried adding 'mrs' to the mix.
+				- parsing: ok.
+				- generating: the "gold" mrs profile included with GG is sufficiently out of date that generation is impossible.
+					- no "decisions" data, so an update may be tricky.
+					- but maybe a tree match update could succeed?
+					- problem: logon deustch 'mrs' profile has items numbered as multiples of 10, but gg gold 'mrs' profile has them as multiples of 1... sigh.
+		JaCY: ?
+		NorSource: massifcentral-pos ... LKB and ACE agree (jul-26-2012) modulo LKB bugs
 
 berthold wants
 	- *updating* an ace tsdb profile -- doesn't work, apparently?
@@ -82,6 +105,8 @@ ideas:
 DONE:
 
 unreleased
+	- keep track of start/end vertices in lattice mapping
+	- add a free pass-through when a non-spelling-change-rule becomes a spelling-change-rule by way of the irregs table
 0.9.10pre3
 	- roll back (by default) to original +copy+ variable semantics
 	- single quoted 'strings are now warnings and are converted to "STRINGS"
