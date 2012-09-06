@@ -471,6 +471,7 @@ void	recover_transfer(void	*transfer)
 	for(i=0;i<ncleanup_rules;i++)
 		thaw_transfer_rule(cleanup_rules[i]);
 	clear_slab();
+	clear_mrs();
 	//printf("recover: %s\n", non_idiom_root);
 }
 
