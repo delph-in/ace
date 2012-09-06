@@ -139,12 +139,12 @@ void	start_and_alloc_profiler(struct profiler	**prof, char	*name, struct profile
 	if(tostop)stop_profiler(tostop, 1);
 }
 
-void	stop_profiler(struct profiler	*prof, int	nevents)
+double	stop_profiler(struct profiler	*prof, int	nevents)
 {
 	if(!prof->isrunning)
 	{
 		fprintf(stderr, "ERROR: can't stop profiler `%s'; it's not running.\n", prof->name);
-		return;
+		return 0;
 	}
 	prof->isrunning = 0;
 	struct timeval	stopped;
@@ -154,6 +154,7 @@ void	stop_profiler(struct profiler	*prof, int	nevents)
 	prof->elapsed += dt;
 	prof->ncalls++;
 	prof->nevents += nevents;
+	return dt;
 }
 
 void	sort_profiler(struct profiler	*prof)
@@ -172,7 +173,7 @@ void	freport_profiler_indent(FILE	*fout, struct profiler	*prof, int	ind)
 	int i;
 	for(i=0;i<ind;i++)
 		fprintf(fout, "    ");
-	fprintf(fout, "%32s : ", prof->name);
+	fprintf(fout, "%32s \033[1;34m:\033[0m ", prof->name);
 	fprint_time(fout, prof->elapsed);
 	if(prof->nevents)
 	{
@@ -207,6 +208,7 @@ struct profiler	*parse_profiler;
 struct profiler	*preprocess_profiler;
 struct profiler	*token_mapping_profiler;
 struct profiler	*lexical_lookup_profiler;
+struct profiler		*orth_profiler;
 struct profiler	*lexical_parsing_profiler;
 struct profiler	*lexical_filtering_profiler;
 struct profiler	*chart_parsing_profiler;
@@ -214,3 +216,6 @@ struct profiler	  *packing_profiler;
 struct profiler	*unpacking_profiler;
 struct profiler	*post_generation_mapping_profiler;
 struct profiler	*transfer_profiler;
+struct profiler	*generation_profiler;
+struct profiler	  *fixup_profiler;
+struct profiler	  *semlook_profiler;

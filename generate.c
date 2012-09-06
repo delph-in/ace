@@ -13,8 +13,12 @@
 #include "unpack.h"
 #include	"conf.h"
 #include	"transfer.h"
+#include	"timer.h"
+
+void	itsdb_report_gen(int readings, double	fixup_time);
 
 extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
+extern char	*master_addr;
 
 int	require_neps = 0, n_epsbv = 0, n_avsbv = 0;
 unsigned long long	*can_be_ccont_ep_bv;
@@ -278,6 +282,12 @@ int	generate(struct mrs	*mrs)
 	char		*str;
 	int			i, count = 0;
 
+	if(g_profiling)
+	{
+		if(generation_profiler)stop_profilers_recursively(generation_profiler);
+		start_and_alloc_profiler(&generation_profiler, "generation", NULL, NULL);
+	}
+
 #if DISJUNCTIVE_GENERATION
 	setup_disjunctive_generation_test();
 #endif
@@ -335,7 +345,18 @@ int	generate(struct mrs	*mrs)
 		dagify_mrs_ep(mrs->rels+i);
 	if(debug_level)printf("mrs-to-dg %.4f\n", timer());
 
+	if(g_profiling)start_and_alloc_profiler(&fixup_profiler, "fixup", generation_profiler, NULL);
 	struct mrs	*fixed_up_mrs = fixup_mrs(mrs);
+	double fixup_time = 0;
+	if(g_profiling)
+	{
+		double	tfix = stop_profiler(fixup_profiler, 1);
+		/*static FILE	*f = NULL;
+		if(!f)f = fopen("/tmp/fixup-timing.txt", "w");
+		fprintf(f, "%d %d %f\n", mrs->nrels, fixed_up_mrs->nrels, tfix);
+		fflush(f);*/
+		fixup_time = tfix;
+	}
 	if(debug_level)
 	{
 		printf("fixup result:\n");
@@ -353,7 +374,9 @@ int	generate(struct mrs	*mrs)
 
 	// set up some lexemes and rules for the generator to play with
 	// XXX for testing fixup speed, don't look anything up into the chart
+	if(g_profiling)start_and_alloc_profiler(&semlook_profiler, "semantic lookup", generation_profiler, NULL);
 	semantic_lookup(fixed_up_mrs);
+	if(g_profiling)stop_profiler(semlook_profiler, 1);
 
 	if(debug_level)printf("semlook %.4f\n", timer());
 
@@ -437,7 +460,8 @@ int	generate(struct mrs	*mrs)
 		if(debug_level)printf("probability = %f:\n", prob);
 		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
-		if(!inhibit_results)printf("%s\n", hyp->string);
+		if(master_addr)printf("SURFACE = %s\n", hyp->string);
+		else if(!inhibit_results)printf("%s\n", hyp->string);
 		if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, count);
 		count++;
 		//if(trace>0){ print_mrs(mrs_res); printf("\n"); }
@@ -460,12 +484,16 @@ int	generate(struct mrs	*mrs)
 			print_mrs(mrs_res);
 		}
 		free_mrs(mrs_res);
+		if(master_addr)printf("END RESULT\n");
 		return 1;
 	}
 	if(do_itsdb)itsdb_start_results();
+	if(master_addr)printf("SENT: mrs\n");
+	if(g_profiling)start_and_alloc_profiler(&unpacking_profiler, "unpacking", generation_profiler, NULL);
 	iterate_cell_root_hypotheses(cells, show_result, best_only);
+	if(g_profiling)stop_profiler(unpacking_profiler, 1);
 	if(do_itsdb)itsdb_end_results();
-	if(do_itsdb)itsdb_report_gen(count);
+	if(do_itsdb)itsdb_report_gen(count, fixup_time);
 	if(debug_level)printf("unpacked %.4f\n", timer());
 
 	if(lui_mode)
@@ -483,7 +511,9 @@ int	generate(struct mrs	*mrs)
 		}
 	}
 
+	if(master_addr)printf("\n");
 	fflush(stdout);
+
 	fprintf(stderr, "NOTE: %d passive, %d active edges in final generation chart; built %d passives total. [%d results]\n",
 		cells->p_nedges, cells->al_nedges + cells->ar_nedges, npassive_edges, count);
 
@@ -492,6 +522,7 @@ int	generate(struct mrs	*mrs)
 		char	*words[] = {"generate"};
 		output_lui_chart(words);
 	}*/
+	if(g_profiling)stop_profiler(generation_profiler, 1);
 
 	return count;
 }
