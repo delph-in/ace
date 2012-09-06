@@ -1422,7 +1422,7 @@ extern int do_itsdb;
 					{
 						inhibit_vpm--;
 						m = cleanup_mrs(m);	// both for parsing and generation
-						m = internal_to_external_mrs(m);
+						//m = internal_to_external_mrs(m);
 					}
 				}
 				int idiomatic = check_idioms(hyp->dg, m);
