@@ -38,6 +38,11 @@ struct type	*ut1, *ut2;
 
 int slab_usage() { return (noldslabs-1)*SLAB_SIZE + slabu; }
 
+int	slab_size_in_bytes()
+{
+	return (noldslabs-1)*SLAB_SIZE + slabu;
+}
+
 void	print_slab_stats()
 {
 	fprintf(stderr, "RAM: %dk\n", (noldslabs-1)*1024 + slabu/1024);
