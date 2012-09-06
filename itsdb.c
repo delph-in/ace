@@ -130,6 +130,7 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 
 	gettimeofday(&tv1, 0);
 	c0 = clock();
+	clear_mrs();
 	clear_slab();
 	if(g_mode == PARSING)
 		readings = parse_line(i_input);
@@ -216,7 +217,7 @@ void	itsdb_report_gen(int readings, double	fixup_time)
 itsdb_start_results() { capi_printf("(:results . ("); }
 itsdb_end_results() { capi_printf(")) "); }
 
-itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id, double	fixup_time)
+void	itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 {
 	char		*esc = malloc(strlen(hyp->string)*2+1), *p, *q;
 
