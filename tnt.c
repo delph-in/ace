@@ -34,7 +34,7 @@ void	become_tnt(char	*model, int	slave_fd)
 
 	printf("%%%% exec tnt\n");
 	fflush(stdout);
-	execlp("tnt", "tnt", "-z100", model, "-", NULL);
+	execlp("tnt", "tnt", "-z100", "-v0", model, "-", NULL);
 	printf("%%%% exec failed: %s\n", strerror(errno));
 	fflush(stdout);
 	exit(-1);
@@ -129,11 +129,12 @@ int	tnt_tag_sequence(int	nwords, char	**words, struct tnt_result	*results)
 	int i, res;
 
 	// send the tokens
-	for(i=0;i<nwords;i++)
+	for(i=-1;i<=nwords;i++)
 	{
-		int	wl = strlen(words[i]);
+		char	*w = (i==-1 || i==nwords)?".":words[i];
+		int	wl = strlen(w);
 		if(wl > 500) { fprintf(stderr, "ACE TNT bridge can't handle exceptionally long words; truncating\n"); wl = 500; }
-		res = write(tnt_fd, words[i], wl);
+		res = write(tnt_fd, w, wl);
 		if(res <= 0) { perror("write to TNT"); exit(-1); }
 		assert(res == wl);
 		res = write(tnt_fd, "\n", 1);
@@ -146,9 +147,10 @@ int	tnt_tag_sequence(int	nwords, char	**words, struct tnt_result	*results)
 
 	// recieve the tags
 	char	*line = NULL;
-	for(i=0;i<nwords;i++)
+	for(i=-1;i<=nwords;i++)
 	{
 		do { if(line)free(line); line = tnt_read(); } while(line[0] == '%' && line[1] == '%');
+		if(i==-1 || i==nwords)continue;
 		struct tnt_result	*res = &results[i];
 		res->ntags = 0;
 		res->tags = NULL;
@@ -166,6 +168,7 @@ int	tnt_tag_sequence(int	nwords, char	**words, struct tnt_result	*results)
 				struct tag_option	*opt = res->tags + res->ntags-1;
 				opt->tag = freeze_string(tag);
 				opt->prob = atof(p);
+				printf("word %s tag %s prob %f\n", words[i], opt->tag, opt->prob);
 			}
 		}
 	}
