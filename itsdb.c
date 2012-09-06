@@ -102,7 +102,7 @@ extern int best_only;
 
 int	tsdb_i_id = -1;
 
-int tsdb_nanalyses, tsdb_maxanalyses, tsdb_nderivations, tsdb_maxderivations=1000;
+int tsdb_nanalyses, tsdb_maxanalyses, tsdb_nderivations, tsdb_maxderivations=1;
 
 static int process_item(int i_id, const char *i_input, int parse_id, 
 		int edges, int nanalyses, int nderivations, int interactive, const char	*who_knows_what_this_argument_is)
@@ -198,7 +198,7 @@ itsdb_report(struct lattice	*tokens, int	status, int	tforest)
 	}
 }
 
-itsdb_report_gen(int readings)
+void	itsdb_report_gen(int readings, double	fixup_time)
 {
 	extern int total_edges, real_edges, passive_edges, slab_usage();
 
@@ -208,6 +208,7 @@ itsdb_report_gen(int readings)
 		passive_edges, real_edges - passive_edges);
 
 	capi_printf("(:others . %d) ", slab_usage());
+	capi_printf("(:tgc . %d) ", (int)(fixup_time * 1000));
 
 	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
 }
@@ -215,7 +216,7 @@ itsdb_report_gen(int readings)
 itsdb_start_results() { capi_printf("(:results . ("); }
 itsdb_end_results() { capi_printf(")) "); }
 
-itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
+itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id, double	fixup_time)
 {
 	char		*esc = malloc(strlen(hyp->string)*2+1), *p, *q;
 
@@ -448,6 +449,8 @@ int	capi_print_derivations()
 {
 	int id;
 
+	tsdb_nderivations = 0;
+	tsdb_nanalyses = 0;
 	id = 0;
 	int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
 	{
