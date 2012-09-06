@@ -131,7 +131,7 @@ struct type	*lookup_type(char	*name)
 			wnewname[i+1] = 0;
 			char	*newname = freeze_tombs(wnewname);
 			free(wnewname); free(wname);
-			fprintf(stderr, "NOTE: WARNING: deprecated type name |%s| being interpreted as |%s|\n", name, newname);
+			fprintf(stderr, "WARNING: deprecated type name |%s| being interpreted as |%s|\n", name, newname);
 			name = newname;
 			// if 'newname' is a pre-existing string type, then the memory for 'newname' will be leaked... acceptable since it's a deprecated usage and we warn them, but also not a huge problem since it probably only happens during grammar loading.  at run time, this could be reached when dagify()ing an MRS EP with a 'neg_rel, for example.  but in that situation, the slab-allocated leak will disappear when that item is done being processed.
 		}
