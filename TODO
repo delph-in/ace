@@ -1,5 +1,18 @@
 TODO:
 
+- sentence that crashes with erg-1111:
+	" Beginning in 1899, and continuing in 1903 and 1904, African-American regiments served during the summer months in the second and third oldest national parks in the United States (Sequoia and Yosemite)."
+
+- automatic configuration generation:
+	- there are lots and lots of things that should be easy to automatically determine when reading grammar TDL files
+	- e.g. cons-type is [probably] where FIRST and REST are introduced; list-type is [probably] the value of REST on cons-type, and null-type is some subtype of list-type incompatible with cons-type --- there may be only one?
+	- e.g. finding optimal/complete list of deleted daughters -- how? seems possible.
+	- e.g. semarg-type should probably be the introducer of the INSTLOC feature
+
+- figure out how to safely use index accessibility filtering and subsumption packing simultaneously
+	- when X packs in Y, and R is a rule/active edge, we don't need to build R(X) since it would pack in R(Y)
+		- but the IAF might reject R(Y) even if it would accept R(X).
+
 - PET cheats and has an explicit mapping from POS type to generic lexeme... which it may or may not actually use?  ACE actually unifies every token into every generic lexeme.
 
 - release.sh:
@@ -46,11 +59,7 @@ ideas:
 	- fix recursive labeling to check for cycles or empty SLASH difflists
 	- [mode to?] make output more script-friendly
 	- automatic time profile of a grammar
-		parsing: pretty good, but add
-			- orthographemic analysis
-			- each rule for lexical parsing
-			- MRS extraction
-			- idiom checking
+		+ parsing: pretty thorough
 		generation:
 			+ fixup rule application
 				+ each rule
@@ -232,6 +241,7 @@ unreleased
 delete deleted daughters from daughters of rule, since they can't ever be present in unified-in daughters
 
 figure out why unpacking is so much slower than PET (sometimes 10x slower!)
+	(note: in that comparison, PET wasn't actually extracting MRSes at all)
 	- mrs extraction is the big bottleneck
 	- approach one: memoization; most bits and pieces of MRS are reused many times
 		- tried this on mrs_var's with good results, should also do ep's and hcon's
