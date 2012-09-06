@@ -1,4 +1,6 @@
 #include	<stdio.h>
+#include	<errno.h>
+#include	<stdarg.h>
 #include	<signal.h>
 #include	<sys/time.h>
 #include	<getopt.h>
@@ -29,6 +31,7 @@ char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
+int timeout_seconds = 0;
 
 int	dont_unspecialize = 0;
 
@@ -127,6 +130,8 @@ void	parse_args(int	argc, char	*argv[])
 #define	TNT_MAX_TAGS_OPTION		1005
 		{"tnt-model", 1, NULL, TNT_MODEL_OPTION},
 		{"tnt-max-tags", 1, NULL, TNT_MAX_TAGS_OPTION},
+#define	TIMEOUT_OPTION			1006
+		{"timeout", 1, NULL, TIMEOUT_OPTION},
 		{NULL,0,NULL,0}
 		};
 
@@ -173,6 +178,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	LUI_FD_OPTION:	preexisting_lui_fd = atoi(optarg);	break;
 		case	TNT_MODEL_OPTION:	enable_tnt = 1; tnt_model_path = optarg; break;
 		case	TNT_MAX_TAGS_OPTION: tnt_max_tags = atoi(optarg); break;
+		case	TIMEOUT_OPTION: timeout_seconds = atoi(optarg); break;
 		case	0:	continue;	// auto-handled long option
 	} }
 	if(optind<argc-1)goto usage;
@@ -216,6 +222,225 @@ show_glb(char	*input)
 		t = glb(t, t2);
 	}
 	printf("glb = %s\n", t?t->name:"BOTTOM");
+}
+
+int		narbiterinputs;
+char	**arbiterinputs;
+char	**arbiter_job_ids;
+
+char	*arbiter_partial_line;
+int		arbiter_partial_line_length, arbiter_partial_line_length_a = 0;
+int		arbiter_fd = 0;
+
+void	make_blocking(int	fd)
+{
+	int	opt = fcntl(fd, F_GETFL);
+	fcntl(fd, F_SETFL, opt & ~O_NONBLOCK);
+}
+
+void	make_nonblocking(int	fd)
+{
+	int	opt = fcntl(fd, F_GETFL);
+	fcntl(fd, F_SETFL, opt | O_NONBLOCK);
+}
+
+void	arbiter_status(char	*format, ...)
+{
+	va_list	v;
+	va_start(v, format);
+	printf(":s ");
+	vprintf(format, v);
+	printf("\n");
+	fflush(stdout);
+	va_end(v);
+}
+
+void	arbiter_enqueue(char	*id, char	*input)
+{
+	narbiterinputs++;
+	arbiterinputs = realloc(arbiterinputs, sizeof(char*)*narbiterinputs);
+	arbiterinputs[narbiterinputs-1] = input;
+	arbiter_job_ids = realloc(arbiter_job_ids, sizeof(char*)*narbiterinputs);
+	arbiter_job_ids[narbiterinputs-1] = id;
+	arbiter_status("queuelen=%d", narbiterinputs);
+}
+
+void	arbiter_ram(char	*mem)
+{
+	int	forest, unpack;
+	if(2 == sscanf(mem, ":r %d %d", &forest, &unpack))
+	{
+		max_chart_megabytes = forest;
+		max_unpack_megabytes = unpack;
+	}
+	arbiter_status("chartlimit=%d", max_chart_megabytes);
+	arbiter_status("unpackinglimit=%d", max_unpack_megabytes);
+}
+
+void	arbiter_time(char	*res)
+{
+	int	max;
+	if(1 == sscanf(res, ":t %d", &max))
+		timeout_seconds = max;
+	arbiter_status("timelimit=%d", timeout_seconds);
+}
+
+void	arbiter_count(char	*res)
+{
+	int	max;
+	if(1 == sscanf(res, ":n %d", &max))
+		best_only = max;
+	arbiter_status("resultlimit=%d", best_only);
+}
+
+char	*current_arbiter_job_id = NULL;
+
+void	arbiter_cancel()
+{
+	if(current_arbiter_job_id)
+	{
+		extern int cancel_parse;
+		cancel_parse = 1;
+		arbiter_status("cancelling %s", current_arbiter_job_id);
+	}
+	else arbiter_status("no job to cancel");
+}
+
+void	arbiter_process(int	len)
+{
+	arbiter_partial_line[len] = 0;
+	if(arbiter_partial_line[0] != ':')
+	{
+		arbiter_status("missing colon");
+		return;
+	}
+
+	//arbiter_status("got '%s'", arbiter_partial_line);
+
+	// starts with a ':' -- a special command
+	switch(arbiter_partial_line[1])
+	{
+		case	'j':
+			{ assert(arbiter_partial_line[2]==' '); char	*sp = strchr(arbiter_partial_line+3, ' ');
+				if(!sp) { arbiter_status("no job id"); return; }
+				*sp = 0;
+				arbiter_enqueue(strdup(arbiter_partial_line+3), strdup(sp+1));
+				break; }
+		case	'r':	arbiter_ram(arbiter_partial_line);		break;
+		case	't':	arbiter_time(arbiter_partial_line);		break;
+		case	'n':	arbiter_count(arbiter_partial_line);	break;
+		case	'c':	arbiter_cancel(arbiter_partial_line);	break;
+		default:	arbiter_status("unknown command '%c'", arbiter_partial_line[1]);	break;
+	}
+}
+
+void	read_from_arbiter()
+{
+	int	expect_more = 1;
+	while(1)
+	{
+		char	buffer[1024];
+		if(!narbiterinputs)make_blocking(arbiter_fd);
+		else make_nonblocking(arbiter_fd);
+		int		r = read(arbiter_fd, buffer, 1023);
+		if(r == 0) { die = 1; break; }
+		if(r < 0)
+		{
+			if(errno == EAGAIN)break;	// would have blocked
+			restore_stderr();
+			perror("read");
+			die = 1;
+			break;
+		}
+		if(arbiter_partial_line_length + r > arbiter_partial_line_length_a)
+		{
+			arbiter_partial_line_length_a = 1 + 2 * (arbiter_partial_line_length + r);
+			arbiter_partial_line = realloc(arbiter_partial_line, arbiter_partial_line_length_a);
+		}
+		memcpy(arbiter_partial_line + arbiter_partial_line_length, buffer, r);
+		arbiter_partial_line_length += r;
+		int i;
+		for(i=arbiter_partial_line_length-r;i<arbiter_partial_line_length;i++)
+			if(arbiter_partial_line[i]=='\n')
+			{
+				arbiter_process(i);
+				arbiter_partial_line_length -= i+1;
+				memmove(arbiter_partial_line, arbiter_partial_line+i+1, arbiter_partial_line_length);
+				i -= i+1;
+			}
+	}
+}
+
+char	*arbiter_next_input()
+{
+	if(!narbiterinputs)make_blocking(arbiter_fd);
+	read_from_arbiter();
+	if(narbiterinputs)
+	{
+		char	*input = arbiterinputs[0];
+		current_arbiter_job_id = arbiter_job_ids[0];
+		--narbiterinputs;
+		memmove(arbiterinputs, arbiterinputs+1, sizeof(char*)*narbiterinputs);
+		memmove(arbiter_job_ids, arbiter_job_ids+1, sizeof(char*)*narbiterinputs);
+		return input;
+	}
+	return NULL;
+}
+
+struct job_stats	arbiter_input_loop(FILE	*fin)
+{
+	struct job_stats	st = {.success = 0, .fail = 0, .count = 0, .time = 0};
+	struct timeval		tv1, tv2;
+	struct timeval		jtv1, jtv2;
+	float				stdin_time = 0;
+
+	arbiter_fd = 0;
+	gettimeofday(&tv1, 0);
+	while(!die && !feof(fin))
+	{
+		char	*next_input = arbiter_next_input();
+		if(!next_input)break;
+		arbiter_status("start work job=%s", current_arbiter_job_id);
+		gettimeofday(&jtv1, 0);
+		int num_results;
+		clear_slab();
+		if(g_mode == PARSING)
+			num_results = parse_line(next_input);
+		else
+		{
+			clear_mrs();
+			clear_slab();
+			struct mrs	*mrs = parse_mrs(next_input);
+			if(g_mode == GENERATING)
+				num_results = generate(mrs);
+			else num_results = transfer(mrs);
+			free_mrs(mrs);
+		}
+		free(next_input);
+		gettimeofday(&jtv2, 0);
+		jtv2.tv_sec -= jtv1.tv_sec;
+		jtv2.tv_usec -= jtv1.tv_usec;
+		double	dt = jtv2.tv_sec + 0.000001 * jtv2.tv_usec;
+		int slab_size_in_bytes();
+		arbiter_status("stop work job=%s time=%f ram=%d results=%d", current_arbiter_job_id, dt, slab_size_in_bytes(), num_results);
+		free(current_arbiter_job_id);
+		current_arbiter_job_id = NULL;
+		if(num_results>0)st.success++;
+		else if(num_results==0)st.fail++;
+		if(num_results>=0)st.count++;
+		fflush(stderr);
+	}
+	restore_stderr();
+	//fprintf(stderr, "die = %d ; feof(fin) = %d\n", die, feof(fin));
+	if(fin==stdin)stdin_time += timer();
+	gettimeofday(&tv2, 0);
+
+	tv2.tv_sec -= tv1.tv_sec;
+	tv2.tv_usec -= tv1.tv_usec;
+	clear_slab();
+	st.ram = accum_ram_usage;
+	st.time = (float)tv2.tv_sec + (float)tv2.tv_usec/1000000 - stdin_time;
+	return st;
 }
 
 struct job_stats	main_input_loop(FILE	*fin)
@@ -445,7 +670,9 @@ int	main(int	argc, char	*argv[])
 
 	//treebank_control(); return 0;
 
-	if(!generation_server_lang)
+	if(master_addr)
+		stats = arbiter_input_loop(open_sentence_source());
+	else if(!generation_server_lang)
 		stats = main_input_loop(open_sentence_source());
 	else logon_generation_server(generation_server_lang);
 
@@ -456,7 +683,10 @@ int	main(int	argc, char	*argv[])
 		if(g_mode == PARSING)
 			report_profiler(parse_profiler);
 		if(g_mode == GENERATING)
+		{
+			report_profiler(generation_profiler);
 			report_profiler(transfer_profiler);
+		}
 	}
 	if(debug_level)freport_timers(stderr);
 	if(lui_mode)
