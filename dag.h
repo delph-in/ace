@@ -120,6 +120,15 @@ static inline void	set_slabstate(struct slab_state	*s)
 
 static inline	void	*slab_alloc(int	len) __attribute__ ((malloc));
 
+static inline void	slab_warm_cache()
+{
+	extern void	*last, *slab;
+	extern int	slabu, currslabsize;
+	// pull the next cacheline that will be allocated from the slab into cache,
+	// to avoid taking a cache miss when we allocate it and immediately start writing to it
+	__builtin_prefetch(slab+slabu, 1);
+}
+
 #define	DAG_ALIGNMENT	48
 static inline	void	*slab_alloc(int	len)
 {

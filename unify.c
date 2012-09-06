@@ -184,6 +184,8 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 	char		forwarded, i, j, ch, st;
 	struct slab_state	state;
 
+	//slab_warm_cache();
+
 #ifdef	COPY_COUNTS
 	copytraverse++;
 #endif
