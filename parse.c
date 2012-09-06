@@ -18,7 +18,7 @@
 struct lattice	*last_token_chart;
 
 extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trace, used_total, pused_total;
-extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only;
+extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only, timeout_seconds;
 extern float timer();
 
 #ifdef	LEVEL_TIMER
@@ -410,6 +410,14 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	apply_token_mapping(token_chart);
 	sort_lattice(token_chart);
 
+	if(token_chart->nvertices>70)
+	{
+		fprintf(stderr, "NOTE: giving up, too many words (70+)\n");
+		if(do_itsdb)itsdb_report(token_chart, -2, 0);
+		stop_timer(chart_setup_timer, 1);
+		return -2;
+	}
+
 	if(trace)print_token_chart(token_chart);
 
 	if(trace)printf("finished token mapping\n");
@@ -476,18 +484,12 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 		stop_timer(chart_setup_timer, 1);
 		return -2;
 	}
-	if(nwords>70)
-	{
-		fprintf(stderr, "NOTE: giving up, too many words (70+)\n");
-		if(do_itsdb)itsdb_report(token_chart, -2, 0);
-		stop_timer(chart_setup_timer, 1);
-		return -2;
-	}
 
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
 
-	//alarm(10);	// XXX make this commandline configurable, and apply it to unpacking too
+	if(timeout_seconds > 0)
+		alarm(timeout_seconds);	// XXX make this commandline configurable, and apply it to unpacking too
 
 	stop_timer(chart_setup_timer, 1);
 	static int chart_parsing_timer = -1;
@@ -521,7 +523,14 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 
 	if(do_forest)
 	{
-		output_forest(&cells[chart_size-1], token_chart);
+		char	*sentence = current_sentence;
+		fflush(stdout);
+		if(sentence)fprintf(stderr, "SENT: %s\n", sentence);
+		int found_root = output_forest(&cells[chart_size-1], token_chart);
+		fflush(stdout);
+		fprintf(stderr, "NOTE: %d readings [forest], ", found_root);
+		print_slab_stats();
+		fprintf(stderr, "\n");
 		num_parses = 1;
 	}
 	else if(!do_itsdb && !lui_mode)
@@ -536,6 +545,8 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 		fprintf(stderr, "NOTE: %d readings, added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
 			num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
 		print_slab_stats();
+
+		//rule_profiler();	// XXX comment me out normally
 	}
 	else if(do_itsdb)
 	{
@@ -670,4 +681,22 @@ show_last_parse_chart()
 	if(!last_token_chart)
 		fprintf(stderr, "no chart to display.\n");
 	else output_lui_chart(last_token_chart);
+}
+
+rule_profiler()
+{
+	int i,j;
+	static FILE	*f = NULL;
+	if(!f)f = fopen("/tmp/rule_profile.txt", "w");
+	for(i=0;i<chart_size*chart_size;i++)
+	{
+		struct chart_cell	*c = cells + i;
+		for(j=0;j<c->p_nedges;j++)
+		{
+			struct edge	*e = c->p_edges[j];
+			if(!e->rule)continue;
+			fprintf(f, "%s %d %d %d\n", e->rule->name, e->unpack?1:0, (e->to-e->from), chart_size - (e->to-e->from));
+		}
+	}
+	fflush(f);
 }
