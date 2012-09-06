@@ -7,6 +7,7 @@
 #include	"mrs.h"
 #include	"conf.h"
 #include	"freeze.h"
+#include	"timer.h"
 
 static int name;
 
@@ -330,6 +331,8 @@ void do_difflist(struct dg *dlist, void (*process)(struct dg *item))
 	do_list(list, process);
 }
 
+struct profiler	*mrs_profiler, *mrs_rels_profiler, *mrs_hcons_profiler;
+
 struct mrs	*cont_to_mrs(struct dg	*cont)
 {
 	static int	ltopf = -1, indexf, xargf, relsf, hconsf;
@@ -384,6 +387,8 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 //	static int	rel_timer = -1;
 //	if(rel_timer == -1)rel_timer = new_timer("extract EPs");
 //	start_timer(rel_timer);
+	if(g_profiling && mrs_profiler)
+		start_and_alloc_profiler(&mrs_rels_profiler, "EPs", mrs_profiler, NULL);
 	int	nrels = 0;
 	DO_LIST(rels, struct dg *rel, nrels++; );
 	mrs->rels = slab_alloc(sizeof(struct mrs_ep) * nrels);
@@ -392,6 +397,7 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		dg_to_mrs_ep(rel, &mrs->vlist, mrs->rels+mrs->nrels-1);
 		mrs->rels[mrs->nrels-1].epnum = mrs->nrels-1;
 	);
+	if(g_profiling && mrs_profiler)start_and_alloc_profiler(&mrs_hcons_profiler, "HCs", mrs_profiler, mrs_rels_profiler);
 //	stop_timer(rel_timer, nrels);
 //	static int	hc_timer = -1;
 //	if(hc_timer == -1)hc_timer = new_timer("extract HCs");
@@ -403,6 +409,7 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		mrs->nhcons++;
 		dg_to_mrs_hc(hc, &mrs->vlist, mrs->hcons+mrs->nhcons-1);
 	);
+	if(g_profiling && mrs_profiler)stop_profiler(mrs_hcons_profiler, mrs->nhcons);
 	if(mrs_enable_icons)
 	{
 		int	nic = 0;
@@ -424,10 +431,13 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 
 struct mrs	*extract_mrs(struct dg	*root)
 {
+	if(g_profiling)start_and_alloc_profiler(&mrs_profiler, "mrs extraction", unpacking_profiler, NULL);
 	struct dg	*cont = dg_path(root, extract_mrs_path);
 	assert(cont || !"extract_mrs: no semantics in given dag!\n");
 	//print_dg(cont);
-	return cont_to_mrs(cont);
+	struct mrs	*m = cont_to_mrs(cont);
+	if(g_profiling)stop_profiler(mrs_profiler, 1);
+	return m;
 }
 
 // mrs to dag conversion
