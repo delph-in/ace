@@ -13,6 +13,9 @@
 #define	FIXUP_FIRST_ROUTE_ONLY		1
 #define	CLEANUP_FIRST_ROUTE_ONLY	1
 
+//#define	EQUATE_QEQS_FOR_TRANSFER	0	// had thought this was right for some reason, perhaps related to the fixup test I did when Dan was here
+#define	EQUATE_QEQS_FOR_TRANSFER	1	// using this setting for the paper with Berthold
+
 #undef	NO_FIXUP
 //#define	NO_FIXUP
 
@@ -114,12 +117,10 @@ erase_instlocs(struct mrs	*m)
 		if(v->dg)
 		{
 			struct dg	*il = dg_hop(v->dg, instloc_feature);
-			if(il)
+			//if(il)
 			{
-				// INSTLOC was present.
+				// regardless of whether INSTLOC was present.
 				// replace it with a brand-new *string* dg.
-				// the following will not relocate/forward/etc v->dg,
-				// because the instloc feature slot is already there by precondition
 				add_dg_hop(v->dg, instloc_feature, new_instloc(0));
 			}
 		}
@@ -1004,6 +1005,28 @@ struct type	*transfer_next_skolem_constant()
 	return default_type_hierarchy()->strings[skolem_counter++];
 }
 
+void destroy_existing_instlocs(struct dg	*dg)
+{
+	if(!dg)return;
+	int	i;
+	dg = p_dereference_dg(dg);
+	struct dg	**arcs = DARCS(dg);
+	static int instloc = -1;
+	if(instloc ==-1)instloc = lookup_fname("INSTLOC");
+
+	for(i=0;i<dg->narcs;i++)
+	{
+		if(dg->label[i] == instloc)
+		{
+			struct type	*t = arcs[i]->xtype;
+			if(t->name[0]=='"')
+				arcs[i]->xtype = arcs[i]->type = default_type_hierarchy()->strtype;
+			return;
+		}
+		else destroy_existing_instlocs(arcs[i]);
+	}
+}
+
 void	skolemize_mrs(struct mrs	*m, int	equate_qeqs)
 {
 	int	i;
@@ -1042,7 +1065,7 @@ void	skolemize_mrs(struct mrs	*m, int	equate_qeqs)
 void	skolemize_for_transfer(struct mrs	*m)
 {
 	skolem_counter = 0;
-	skolemize_mrs(m, 0);
+	skolemize_mrs(m, EQUATE_QEQS_FOR_TRANSFER);
 }
 
 void	skolemize_for_generation(struct mrs	*m)
@@ -1055,7 +1078,13 @@ void	unskolemize_for_transfer(struct mrs	*m)
 {
 	int	i;
 
-	// untweak the INSTLOC fields of the mrs variables
+	for(i=0;i<m->nrels;i++)
+		destroy_existing_instlocs(m->rels[i].dg);
+	if(m->ltop)destroy_existing_instlocs(m->ltop->dg);
+	if(m->index)destroy_existing_instlocs(m->index->dg);
+	if(m->xarg)destroy_existing_instlocs(m->xarg->dg);
+
+	/*// untweak the INSTLOC fields of the mrs variables
 
 	for(i=0;i<m->vlist.nvars;i++)
 	{
@@ -1066,7 +1095,7 @@ void	unskolemize_for_transfer(struct mrs	*m)
 		struct dg	*iloc = dg_hop(dg, instloc_feature);
 		assert(iloc != NULL);
 		iloc->type = iloc->xtype = get_top();
-	}
+	}*/
 }
 
 check_mrs_var_is_on_vlist(struct mrs_var	*v, struct mrs_vlist	*vl)
@@ -1119,6 +1148,11 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	struct mrs_ep	new_eps[tr->output.neps];
 	int i, j;
 
+	struct dg	*old_var_dg[min->vlist.nvars];
+	// get the location of every old var in the unified mrs/rule dag conglomeration
+	for(i=0;i<min->vlist.nvars;i++)
+		old_var_dg[i] = dereference_dg(min->vlist.vars[i]->dg);
+
 	//struct dg	*full_tr_copy = copy_dg_with_comp_arcs(tr->dg);
 
 	struct dg	*copy_ep_out_dgs[tr->output.neps];
@@ -1149,6 +1183,7 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 
 	// before applying +copy+ defaults, brand new variables need to get INSTLOCs assigned to them, so that they can't be smushed into old variables by the unifier.
 
+	extern unsigned int generation;
 #ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
 	int	nov = tr->output.mrs->vlist.nvars, ninstlocs_to_fix = 0;
 	struct dg	*instlocs_to_fix[nov];
@@ -1157,7 +1192,6 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		struct mrs_var	*v = tr->output.mrs->vlist.vars[i];
 		if(!v->dg)continue;	// sometimes there are fake variables... e.g. invented LTOPs
 		struct dg	*rule_vdg = dereference_dg(v->dg);
-		extern unsigned int generation;
 		if(rule_vdg->gen == generation && rule_vdg->copy)
 		{
 			// look at every variable that was copied out of the output section
@@ -1171,6 +1205,18 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		}
 	}
 #endif
+
+	// we have now copied everything that we will copy;
+	// figure out where old variables' dags got copied to
+	for(i=0;i<min->vlist.nvars;i++)
+	{
+		if(old_var_dg[i]->gen != generation)
+			old_var_dg[i] = NULL;	// didn't get copied at all
+		else old_var_dg[i] = old_var_dg[i]->copy;
+	}
+	// old_var_dg[] now are either NULL or are pointers into the new copies
+	// critically, if an old variable got copy()'d multiple times above,
+	// the same copy was returned each time.
 
 	bump_generation();
 
@@ -1195,6 +1241,12 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 			/*printf("applying +copy+; revised output dag is:\n");
 			print_dg(copy_ep_out_dgs[i]);printf("\n");*/
 		}
+
+	// if any old variable dags were default unified with new variable dags, they
+	// may have been forwarded
+	for(i=0;i<min->vlist.nvars;i++)
+		if(old_var_dg[i])
+			old_var_dg[i] = dereference_dg(old_var_dg[i]);
 
 	//printf("for result (after applying +copy+), tr dg is:\n");print_dg(full_tr_copy);printf("\n");
 
@@ -1227,18 +1279,48 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	bzero(new_var_map, sizeof(new_var_map));
 	for(i=0;i<new_vars.nvars;i++)
 	{
+		// for every extracted variable 'v', one of the following must happen:
+		// 1. it's an old variable; set new_var_map[] accordingly
+		// 2. it's truly new; make sure it has a new INSTLOC
+		// 3. we can't tell, throw an error
 		struct mrs_var	*v = new_vars.vars[i];
 		if(v->is_const)continue;	// don't try to align new constants to old constants; they aren't skolemized anyway.
 		struct dg	*vdg = v->dg;
 		if(ALLOW_SEMI_MODE)
 			v->semi_dg = vdg;	// ?? or should it be vdg = v->semi_dg?
 		vdg = dereference_dg(vdg);
+
 		struct dg	*iloc = dg_hop(vdg, instloc_feature);
 		assert(iloc != NULL);
+
+		// old_var_dg[]-based method of figuring out whether it's an old variable
+		int	noldvars = 0;
+		for(j=0;j<min->vlist.nvars;j++)
+			if(old_var_dg[j] == vdg)
+			{
+				new_var_map[j] = v;
+				noldvars++;
+			}
+		if(!noldvars)
+		{
+			// it may need to have an INSTLOC allocated
+			char	*ilt = iloc->xtype->name;
+			if(*ilt != '"')
+				iloc->xtype = iloc->type = transfer_next_skolem_constant();
+		}
+
+/*
+		// INSTLOC-based method of figuring out whether it's an old variable...
 		char	*ilt = iloc->xtype->name;
 		if(*ilt == '"')
 		{
 			// INSTLOC was set; this variable may exist in the input MRS. find it.
+			//   in case v is a handle that is/was part of a QEQ,
+			//   the INSTLOC by itself may not be enough to determine which
+			//   input variable 'v' corresponds to.
+			//   e.g. 'v' may be the RSTR of a newly +copy+'d quantifier EP
+			//   we have to make sure we new_var_map[] the old HI end of the QEQ
+			//   to 'v', rather than the old LO end.
 			//printf("new var %d has instloc type %s\n", i, ilt);
 			for(j=0;j<min->vlist.nvars;j++)
 			{
@@ -1281,6 +1363,7 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 			//printf("new var %d was really new\n", i);
 #endif
 		}
+*/
 	}
 
 	/*for(i=0;i<tr->output.neps;i++)
@@ -1569,6 +1652,9 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 	return nfires;
 }
 
+struct profiler	**fixup_profilers;
+struct profiler	**cleanup_profilers;
+struct profiler	**idiom_profilers;
 struct profiler	**transfer_rule_profilers;
 
 int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct mrs	***Results, int first_route_only)
@@ -1618,7 +1704,10 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 	// since we copy every output mrs, the following will actually work
 	// and will lead to less confusion for consumers
 	for(i=0;i<ts.n;i++)
+	{
+		unskolemize_for_transfer(ts.mrs[i]);
 		make_reliable_vnums(ts.mrs[i]);
+	}
 
 	if(g_profiling)stop_profiler(transfer_profiler, 1);
 
@@ -1674,13 +1763,16 @@ struct mrs	*fixup_mrs(struct mrs	*m)
 #ifdef	NO_FIXUP
 	return m;
 #else
+	if(!nfixup_rules)return m;
 	m = reformat_mrs_for_transfer(m);
 	//printf("reformatted mrs:\n");
 	//print_mrs(m);
 	//printf("there are %d fixup rules\n", nfixup_rules);
 
 	struct mrs	**results = NULL;
+	transfer_rule_profilers = fixup_profilers;
 	int	n = transfer_mrs(nfixup_rules, fixup_rules, m, &results, FIXUP_FIRST_ROUTE_ONLY);
+	fixup_profilers = transfer_rule_profilers;
 	assert(n >= 0);
 	if(n > 1)
 		fprintf(stderr, "WARNING: ambiguity in generator fixup rules; using first result.\n");
@@ -1696,7 +1788,9 @@ struct mrs	*cleanup_mrs(struct mrs	*m)
 	//printf("reformatted mrs:\n");
 	//print_mrs(m);
 	struct mrs	**results = NULL;
+	transfer_rule_profilers = cleanup_profilers;
 	int	n = transfer_mrs(ncleanup_rules, cleanup_rules, m, &results, CLEANUP_FIRST_ROUTE_ONLY);
+	cleanup_profilers = transfer_rule_profilers;
 	assert(n >= 0);
 	if(n > 1)
 		fprintf(stderr, "WARNING: ambiguity in generator cleanup rules; using first result.\n");
