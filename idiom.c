@@ -13,6 +13,7 @@
 #include	"type.h"
 #include	"hash.h"
 #include	"conf.h"
+#include	"timer.h"
 
 struct transfer_rule	**idiom_rules;
 int						nidiom_rules;
@@ -51,28 +52,35 @@ int	is_idiom_free(struct mrs	*m)
 
 int	check_idioms(struct dg	*dg, struct mrs	*m)
 {
-	if(non_idiom_root)
+	if(!non_idiom_root)
+		return 1; // hack to make idiom analyses succeed if non_idiom_root is not declared
+
+	static struct profiler	*idiom_profiler = NULL;
+	if(g_profiling)start_and_alloc_profiler(&idiom_profiler, "idiom check", unpacking_profiler, NULL);
+	//printf("non_idiom_root = %s\n", non_idiom_root);
+	static struct dg	*non_idiom_root_dg = NULL;
+	if(!non_idiom_root_dg)
 	{
-		//printf("non_idiom_root = %s\n", non_idiom_root);
-		static struct dg	*non_idiom_root_dg = NULL;
+		non_idiom_root_dg = find_instance(non_idiom_root);
 		if(!non_idiom_root_dg)
 		{
-			non_idiom_root_dg = find_instance(non_idiom_root);
-			if(!non_idiom_root_dg)
-			{
-				fprintf(stderr, "runtime error: unable to find instance `%s'\n", non_idiom_root);
-				exit(-1);
-			}
+			fprintf(stderr, "runtime error: unable to find instance `%s'\n", non_idiom_root);
+			exit(-1);
 		}
-		int res = unify_dg_tmp(dg, non_idiom_root_dg, -1);
-		if(res == 0)return 1;	// no further checking necessary.
 	}
-	else return 1;	// hack to make idiom analyses succeed if non_idiom_root is not declared
+	int res = unify_dg_tmp(dg, non_idiom_root_dg, -1);
+	if(res == 0)goto idiomatic;	// no further checking necessary.
 
 	if(!m)m = extract_mrs(dg);
 
 	struct mrs	**results;
-	int	n = transfer_mrs(nidiom_rules, idiom_rules, m, &results, 0);
+	extern struct profiler	**transfer_rule_profilers, **idiom_profilers;
+	transfer_rule_profilers = idiom_profilers;
+	struct mrs	*mc = external_to_internal_mrs(m);
+	struct mrs	*reformat_mrs_for_transfer(struct mrs	*m);
+	mc = reformat_mrs_for_transfer(mc);
+	int	n = transfer_mrs(nidiom_rules, idiom_rules, mc, &results, 0);
+	idiom_profilers = transfer_rule_profilers;
 	//printf("%d idiom rule transfer result[s]\n", n);
 
 	int	i;
@@ -82,8 +90,12 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 		if(is_idiom_free(results[i]))
 		{
 			//printf("idiom free.\n");
-			return 1;
+			goto idiomatic;
 		}
 	}
+	if(g_profiling)stop_profiler(idiom_profiler, 1);
 	return 0;
+idiomatic:
+	if(g_profiling)stop_profiler(idiom_profiler, 1);
+	return 1;
 }
