@@ -1332,7 +1332,15 @@ extern int do_itsdb;
 		if(edge->frozen)
 		{
 			fprintf(stderr, "ERROR: found a frozen edge #%d (not packed) in the root cell!\n", edge->id);
-			exit(-1);
+			//exit(-1);
+			continue;
+			// XXX these can occur in generation when index accessibility filtering causes a more general analysis to be discarded...
+			// XXX looking forward to finding a way NOT to have that happen.
+			// packing and and index accessibility filtering at the moment seem to be incompatible... see email to oe/glenn jul-27-2012
+			// for now, pretend they are compatible... brush the problem under the rug...
+			// it's rare.
+			// this means we do miss realizations occassionally, in theory.
+			// case: GG 'babel' suite item 177
 		}
 		if( (g_mode!=GENERATING || ep_span_is_root(edge->ep_span_bv, edge->neps)) && is_root(edge->dg) )// && !edge->frozen )
 		{
@@ -1355,6 +1363,7 @@ extern int do_itsdb;
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		edge = cell->p_edges[i];
+		if(edge->frozen)continue;
 		if( (g_mode!=GENERATING || ep_span_is_root(edge->ep_span_bv, edge->neps)) && is_root(edge->dg) )
 		{
 			for(j=-1;j<edge->npack;j++)
