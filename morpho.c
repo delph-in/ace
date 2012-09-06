@@ -6,6 +6,7 @@
 #include	<wctype.h>
 #include	<ctype.h>
 #include	"unicode.h"
+#include	"timer.h"
 
 #define	USE_GENERICS
 
@@ -49,41 +50,6 @@ struct ochart
 
 void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule, int	depth);
 void	unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int routelen, int *rnums);
-
-int	check_mbs(char	*mbs);
-/*int	check_mbs(char	*mbs)
-{
-	int		len = strlen(mbs);
-	wchar_t	*wide = malloc(sizeof(wchar_t)*(len+1));
-	if(-1 == mbstowcs(wide, mbs, len+1))
-	{
-		free(wide);
-		return -1;
-	}
-	else
-	{
-		free(wide);
-		return 0;
-	}
-}*/
-
-wchar_t	*towide(char	*mbs);
-/*wchar_t	*towide(char	*mbs)
-{
-	int		len = strlen(mbs);
-	wchar_t	*wide = malloc(sizeof(wchar_t)*(len+1));
-	if(-1 == mbstowcs(wide, mbs, len+1))
-	{
-		extern char	*current_sentence;
-		restore_stderr();
-		perror("multibyte decoding failed");
-		fprintf(stderr, "on string `%s'\n", mbs);
-		if(current_sentence)
-			fprintf(stderr, "in sentence `%s'\n", current_sentence);
-		exit(-1);
-	}
-	return wide;
-}*/
 
 char	*freeze_tombs(wchar_t	*w)
 {
@@ -168,7 +134,9 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 	sort_lattice(tc);
 	//print_token_chart(tc);
 
+
 	// compute all the orthography variations of each token
+	if(g_profiling)start_and_alloc_profiler(&orth_profiler, "orthographemic exploration", lexical_lookup_profiler, NULL);
 	for(i=0;i<tc->nedges;i++)
 	{
 		//printf("edge %d\n", i);
@@ -201,6 +169,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		}
 #endif
 	}
+	if(g_profiling)stop_profiler(orth_profiler,1);
 
 	// do lexical lookup on each variation of each token
 	for(i=0;i<tc->nedges;i++)
@@ -231,7 +200,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 					{
 						// the inner positions in MWEs can't have any orules
 						char	stemcmp[1024];
-						sprintf(stemcmp, "\"%s\"", tok->string);
+						snprintf(stemcmp, 1023, "\"%s\"", tok->string);
 						if(strcasecmp(lex->stem[pos]->name, stemcmp))return 0;
 					}
 					for(i=0;i<mwe_lat_e->to->nfollowers;i++)
@@ -250,7 +219,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 					{
 						struct ochart_edge	*e2 = tok->oc->edges[i];
 						char	stemcmp[1024];
-						sprintf(stemcmp, "\"%s\"", e2->form);
+						snprintf(stemcmp, 1023, "\"%s\"", e2->form);
 						if(strcasecmp(lex->stem[pos]->name, stemcmp))continue;
 						if(is_type_only_oedge(e2, or_suffix))
 						{
@@ -269,7 +238,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 					{
 						struct ochart_edge	*e2 = tok->oc->edges[i];
 						char	stemcmp[1024];
-						sprintf(stemcmp, "\"%s\"", e2->form);
+						snprintf(stemcmp, 1023, "\"%s\"", e2->form);
 						if(strcasecmp(lex->stem[pos]->name, stemcmp))continue;
 						if(is_type_only_oedge(e2, or_suffix))
 						{
@@ -346,7 +315,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 				le->north_routes = carg_e->north_routes;
 				le->orth_routes = carg_e->orth_routes;
 				if(install_tokens_in_le(le, &t) != 0)continue;
-				//fprintf(stderr, "for carg '%s' and pos '%s', issued generic '%s'\n", carg, t->postag, le->lex->word);
+				//fprintf(stderr, "for token '%s', issued generic '%s'\n", t->string, le->lex->word);
 				extern int form_to_relation;
 				if(form_to_relation)
 					show_form_to_relation(le, &t);
