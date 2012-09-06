@@ -15,6 +15,7 @@
 #include	"lexical-parse.h"
 #include	"lattice-mapping.h"
 #include	"token.h"
+#include	"timer.h"
 
 extern int inhibit_pack;
 
@@ -65,6 +66,15 @@ struct lattice	*lexical_lookup_into_chart(struct lattice	*token_chart)
 	return lc;
 }
 
+struct profiler	*start_lrule_profiler(struct rule	*r)
+{
+	static struct profiler	**profs=NULL;
+	if(!profs)profs = calloc(sizeof(struct profiler*),nrules);
+	start_and_alloc_profiler(profs+r->rnum, r->name, lexical_parsing_profiler, NULL);
+	lexical_parsing_profiler->sortable = 5;
+	return profs[r->rnum];
+}
+
 int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**epsila, char	*used)
 {
 	struct edge	*e = le->edge;
@@ -81,6 +91,9 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 		//if(check_lexical_rule_constraints(rules[i], le->edge))continue;
 		//printf("should I try lexrule '%s'?\n", rules[i]->name);
 		epsila[i]->from = epsila[i]->to = le->edge->from;
+		struct profiler	*prof;
+		int	fired = 0;
+		if(g_profiling)prof = start_lrule_profiler(rules[i]);
 		if(filter(epsila[i], le->edge))
 		{
 			//printf("trying lexrule '%s' on edge #%d ('%s')\n", rules[i]->name, le->edge->id, show_orth_leaves(le->edge));
@@ -95,9 +108,11 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 			{
 				//printf(" -- built new edge #%d ('%s')\n", e->id, show_orth_leaves(e));
 				add_new_lexical_edge(lc, e);
+				fired = 1;
 			}
 			//else unify_backtrace();
 		}
+		if(g_profiling)stop_profiler(prof, fired);
 	}
 	return 0;
 }
@@ -172,10 +187,14 @@ int	reduce_lexical_lattice(struct lattice	*lat, struct lattice	*toklat)
 	extern int debug_level;
 	char		cover[1024];
 
+	static struct profiler	*redprof = NULL;
+
 	int	length = lat->lattice_vertex_id_gen - 1;
 	//printf("reducer: length = %d\n", length);
 	if(length<=0)return 0;
 	assert(length < sizeof(cover));
+
+	if(g_profiling)start_and_alloc_profiler(&redprof, "chart reduction", lexical_parsing_profiler, NULL);
 
 	//sanity_check_agenda(length);
 	bzero(cover, length);
@@ -197,7 +216,9 @@ int	reduce_lexical_lattice(struct lattice	*lat, struct lattice	*toklat)
 					struct edge	*e2 = lat->edges[J]->edge;
 					assert(e2->lex);
 					struct dg	*to = dg_path(e2->dg, chart_dependencies_to[i]);
-					if(to && descendent_of(to->xtype->tnum, from->xtype))satisfied = 1;
+					//if(to && descendent_of(to->xtype->tnum, from->xtype))satisfied = 1;
+					// glb seems more appropriate than descendent_of, and indeed explained a rather obscure difference vs pet...
+					if(to && glb(to->xtype, from->xtype))satisfied = 1;
 				}
 				if(!satisfied)break;
 				//printf("dep on `%s' satisfied\n", e1->lex->word);
@@ -211,9 +232,9 @@ int	reduce_lexical_lattice(struct lattice	*lat, struct lattice	*toklat)
 			// can survive chart reduction, and if we mark this one as frozen
 			// then the parent might not make it into the chart
 			//e1->frozen = 1;
+			//printf("reduce edge #%d %s dep %d\n", e1->id, e1->lex->word, i);
 			remove_lattice_edge(lat, lat->edges[I]);
 			I--;
-			//printf("reduce edge #%d %s\n", e1->id, e1->lex->word);
 		}
 		else	// keep
 		{
@@ -225,6 +246,8 @@ int	reduce_lexical_lattice(struct lattice	*lat, struct lattice	*toklat)
 			}
 		}
 	}
+
+	if(g_profiling)stop_profiler(redprof, lat->nedges);
 
 	// check that lexemes cover the whole span;
 	// if not we have no chance of building a spanning analysis.
