@@ -126,7 +126,7 @@ void	add_edge_to_chart_cell(struct chart_cell	*cell, struct edge	*edge)
 	}
 
 	total_edges++;
-	if(edge->to!=edge->from)real_edges++;
+	if(edge->have != 0)real_edges++;
 }
 
 void	add_edge_to_chart(struct edge	*edge)
