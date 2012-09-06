@@ -14,7 +14,9 @@
 #include	"token.h"
 #include	"unicode.h"
 
-void output_packed_tree(struct edge	*e)
+int	find_token_id(struct token	*t, struct lattice	*l);
+
+void output_packed_tree(struct edge	*e, struct lattice	*tokens)
 {
 	if(e->unpack)return;
 	e->unpack = (void*)1;
@@ -28,14 +30,51 @@ void output_packed_tree(struct edge	*e)
 		printf("%d", e->pack[i]->id);
 	}
 	printf("] (");
-	for(i=0;i<e->have;i++)
+	if(!e->rule)
 	{
-		if(i)printf(",");
-		printf("%d", e->daughters[i]->id);
+		for(i=0;i<e->lex->stemlen;i++)
+		{
+			if(i)printf(",");
+			printf("%d", find_token_id((struct token*)e->daughters[i], tokens));
+		}
+	}
+	else
+	{
+		for(i=0;i<e->have;i++)
+		{
+			if(i)printf(",");
+			printf("%d", e->daughters[i]->id);
+		}
 	}
 	printf("))\n");
-	for(i=0;i<e->npack;i++)output_packed_tree(e->pack[i]);
-	for(i=0;i<e->have;i++)output_packed_tree(e->daughters[i]);
+	for(i=0;i<e->npack;i++)output_packed_tree(e->pack[i], tokens);
+	for(i=0;i<e->have;i++)output_packed_tree(e->daughters[i], tokens);
+}
+
+set_path_number(struct token	*T, struct path	path, int	n)
+{
+	char	str[16];
+	sprintf(str, "\"%d\"", n);
+	// this can in theory break reentrancies, if there's
+	// already a node at this path and it's reentrant with somewhere else.
+	struct dg	*new_dag_for_unfrozen_string(char	*str);
+	T->dg = dg_path_add(T->dg, path, new_dag_for_unfrozen_string(str));
+}
+
+update_cfrom(struct token	*T, int	new_cfrom)
+{
+	if(T->cfrom == new_cfrom)return;
+	T->cfrom = new_cfrom;
+	// also update the AVM path
+	set_path_number(T, token_from_path, new_cfrom);
+}
+
+update_cto(struct token	*T, int	new_cto)
+{
+	if(T->cto == new_cto)return;
+	T->cto = new_cto;
+	// also update the AVM path
+	set_path_number(T, token_to_path, new_cto);
 }
 
 int reestimate_token_cto(struct token	*tok)
@@ -62,9 +101,11 @@ int reestimate_token_cto(struct token	*tok)
 			else break;
 		}
 	}
+	free(wtok);
+	free(wsent);
 	//printf("first %d wide characters match\n", i);
 	if(i == 0)return -1;
-	tok->cto = tok->cfrom + i;
+	update_cto(tok, tok->cfrom + i);
 	return 0;
 }
 
@@ -125,9 +166,9 @@ do_retry:
 			{
 				struct token	*T = tokens->edges[j]->token;
 				if(tokens->edges[j]->from == tokens->edges[i]->to)
-					T->cfrom = new_cto;
+					update_cfrom(T, new_cto);
 				if(tokens->edges[j]->to == tokens->edges[i]->to)
-					T->cto = new_cto;
+					update_cto(T, new_cto);
 			}
 			suspicious[tokens->edges[i]->to->id] = 0;
 			progress = 1;
@@ -139,6 +180,7 @@ do_retry:
 output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 {
 	int	i;
+	int	found_root = 0;
 	struct edge	*edge;
 	for(i=0;i<cell->p_nedges;i++)
 	{
@@ -146,7 +188,8 @@ output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 		if( (g_mode!=GENERATING || edge->neps == require_neps) && is_root(edge->dg) && !edge->frozen )
 		{
 			printf("root %d\n", edge->id);
-			output_packed_tree(edge);
+			output_packed_tree(edge, tokens);
+			found_root = 1;
 		}
 	}
 	improve_token_lattice_characterization(tokens);
@@ -154,7 +197,7 @@ output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 	{
 		struct lattice_edge	*le = tokens->edges[i];
 		struct token	*t = le->token;
-		int j;
+		/*int j;
 		for(j=0;j<i;j++)
 		{
 			struct lattice_edge	*le2 = tokens->edges[j];
@@ -162,7 +205,25 @@ output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 			if(le->from == le2->from && le->to == le2->to)
 				break;
 		}
-		if(j<i)continue;	// already output a representative for this span
-		printf("token %d %d %d %d %s\n", le->from->id, le->to->id, t->cfrom, t->cto, t->string);
+		if(j<i)continue;	// already output a representative for this span*/
+		//printf("token %d %d %d %d %s\n", le->from->id, le->to->id, t->cfrom, t->cto, t->string);
+		char	token_str[10240];
+		if(enable_token_avms)
+		{
+			extern int dag_print_style;
+			dag_print_style = 1;
+			snprint_dg(token_str, 10239, t->dg);
+			dag_print_style = 0;
+		}
+		else
+		{
+			//sprintf(token_str, "%s", t->string);
+			char	*heap_escape(char	*str);
+			char	*formesc = heap_escape(t->string);
+			sprintf(token_str, "token [ +FROM \"%d\" +TO \"%d\" +FORM \"%s\" ]", t->cfrom, t->cto, formesc);
+			free(formesc);
+		}
+		printf("token %d %d %d %s\n", find_token_id(t, tokens), le->from->id, le->to->id, token_str);
 	}
+	return found_root;
 }
