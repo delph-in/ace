@@ -51,7 +51,7 @@ struct dg	*build_one_pos_tags_list(char	*tag, struct dg	*rest)
 	char	tag_str[32];
 	sprintf(tag_str, "\"%s\"", tag);
 	struct dg	*list = atomic_dg(g_cons_type);
-	struct dg	*tagdg = new_dag_for_unfrozen_string(tag_str);
+	struct dg	*tagdg = tag?new_dag_for_unfrozen_string(tag_str):atomic_dg(default_type_hierarchy()->strtype->name);
 	list = add_dg_hop(list, 1, tagdg);	// FIRST
 	list = add_dg_hop(list, 2, rest?:type_dg(g_null_type));	// REST
 	return list;
@@ -195,6 +195,8 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 	}
 	free(tags);
 	free(unk);
+	free(ntags);
+	free(probs);
 	tc->lattice_vertex_id_gen = 10000;
 	return tc;
 }
