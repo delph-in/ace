@@ -141,7 +141,9 @@ int	parse_yy(char	*yy)
 		bzero(e, sizeof(*e));
 		int	vfrom, vto;
 		e->token = slab_alloc(sizeof(struct token));
+		bzero(e->token, sizeof(struct token));
 		*e->token = yy_read_token(&yy, &vfrom, &vto);
+		e->token->eid = next_eid();
 		e->from = get_vtx(vfrom);
 		e->to = get_vtx(vto);
 		add_lattice_edge(tc, e);

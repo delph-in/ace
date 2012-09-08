@@ -40,6 +40,7 @@ struct lattice_rule_set	*lexical_filtering_rules = NULL;
 struct lattice_rule_set	*post_generation_mapping_rules = NULL;
 
 int	mapping_tokens = 0;
+int	noriginaltokens, nmappingtokens;
 
 struct edge	*new_edge(struct dg	*d)
 {
@@ -101,7 +102,7 @@ void	compile_lattice_rule_set(struct lattice_rule_set	*rs)
 		for(j=0;j<rs->rules[i]->ninput+rs->rules[i]->ncontext;j++)
 		{
 			struct lattice_regex_constraints	*rec = rs->rules[i]->regex_constraints+j;
-			rec->re = malloc(sizeof(regex_t)*rec->count);
+			rec->re = calloc(sizeof(regex_t),rec->count);
 			for(k=0;k<rec->count;k++)
 			{
 				//printf("... compiling `%S'\n", rec->regexs[k]);
@@ -594,6 +595,8 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 struct token	*extract_token_from_dg(struct dg	*dg)
 {
 	struct token	*t = slab_alloc(sizeof(struct token));
+	bzero(t, sizeof(*t));
+	t->eid = next_eid();
 	t->dg = dg;
 	struct dg	*str_dg = dg_path(dg, token_form_path);
 	assert(str_dg != NULL);
@@ -765,6 +768,7 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 		remove_lattice_edge(lat, inputs[i]);
 		did_remove++;
 	}
+	if(mapping_tokens)nmappingtokens += did_add;
 	return did_add + did_remove;
 }
 
@@ -1197,6 +1201,8 @@ void	apply_token_mapping(struct lattice	*lat)
 {
 	lattice_mapping_profiler = token_mapping_profiler;
 	mapping_tokens = 1;
+	noriginaltokens = lat->nedges;
+	nmappingtokens = lat->nedges;
 	apply_lattice_mapping(lat, token_mapping_rules);
 	mapping_tokens = 0;
 }

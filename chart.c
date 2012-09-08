@@ -912,8 +912,6 @@ int	combine(struct edge	*a, struct edge	*b)
 	else return 0;
 }
 
-int	is_root(struct dg	*d);
-
 char	*show_orth_leaves(struct edge	*e)
 {
 	int		i;

@@ -16,6 +16,9 @@ struct token
 	struct dg	*dg;
 
 	struct ochart	*oc;
+
+	int	eid;	// edge id when we pretend tokens are edges
+	int	used;	// starts at 0 and is set to 1 when we reach it from a root
 };
 
 struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto);

@@ -174,8 +174,10 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 		e->from = vfrom;
 		e->to = vto;
 		e->token = slab_alloc(sizeof(struct token));
+		bzero(e->token, sizeof(struct token));
 		tc->edges[i] = e;
 		add_lattice_vertex_follower(vfrom, e);
+		e->token->eid = next_eid();
 		e->token->npostags = ntags[i];
 		e->token->postags = slab_alloc(sizeof(struct postag)*ntags[i]);
 		int j;
