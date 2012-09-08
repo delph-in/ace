@@ -1035,13 +1035,19 @@ void	skolemize_mrs(struct mrs	*m, int	equate_qeqs)
 	// tweak the INSTLOC fields of the mrs variables
 	// so that they won't unify with each other.
 
+	make_reliable_vnums(m);
+
 	struct type	*sktypes[m->vlist.nvars];
 	for(i=0;i<m->vlist.nvars;i++)
 		sktypes[i] = transfer_next_skolem_constant();
 
 	if(equate_qeqs)
 		for(i=0;i<m->nhcons;i++)
+		{
+			assert(m->hcons[i].hi->vnum >= 0 && m->hcons[i].hi->vnum < m->vlist.nvars);
+			assert(m->hcons[i].lo->vnum >= 0 && m->hcons[i].lo->vnum < m->vlist.nvars);
 			sktypes[m->hcons[i].hi->vnum] = sktypes[m->hcons[i].lo->vnum];
+		}
 
 	for(i=0;i<m->vlist.nvars;i++)
 	{
@@ -1728,6 +1734,7 @@ struct mrs	*reformat_mrs_for_transfer(struct mrs	*m)
 	for(i=0;i<m->vlist.nvars;i++)
 		if(!m->vlist.vars[i]->dg)
 			dagify_mrs_var(m->vlist.vars[i], NULL);
+		else m->vlist.vars[i]->dg->gen = 0;	// if gen ==1 we stand a chance of dg_to_mrs_var() not extracting a new struct mrs_var, and worse still, the variable not making it onto the new_vlist.
 	for(i=0;i<m->nrels;i++)
 		dagify_mrs_ep(m->rels+i);
 
