@@ -60,10 +60,6 @@ questions:
 #include	"lattice-mapping.h"
 #include	"token.h"
 
-#define	TOKEN_EDGE_STATUS	(8)
-#define	ROOT_EDGE_STATUS	(1|2)
-#define	NONROOT_EDGE_STATUS	(2)
-
 //#define	capi_printf(fmt...)	fprintf(stderr, fmt)
 
 void tsdb_report_derivation(struct hypothesis	*hyp);
@@ -80,7 +76,8 @@ static int create_test_run(const char *data, int run_id, const char *comment,
 {
 	char platform [1024];
 
-	if(protocol_version > 0 && protocol_version <= 2) {
+	if(protocol_version > 0)// && protocol_version <= 2)
+	{
 
 #if defined(__GNUC__) && defined(__GNUC_MINOR__)
 		sprintf(platform, "gcc %d.%d", __GNUC__, __GNUC_MINOR__);
@@ -90,6 +87,18 @@ static int create_test_run(const char *data, int run_id, const char *comment,
 
 		capi_printf("(:application . \"answer\") (:platform . \"%s\")",
 				platform);
+		extern char	*grammar_version;
+		capi_printf(" (:grammar . \"%s\")", grammar_version?:"unknown");
+		if(protocol_version >= 2)
+			capi_printf(" (:protocol . %d)", protocol_version);
+		int	nlrules = 0, i;
+		for(i=0;i<nrules;i++)if(rules[i]->lexical)nlrules++;
+		capi_printf(" (:avms . %d) (:lexicon . %d) (:lrules . %d) (:rules . %d)",
+				default_type_hierarchy()->ntypes,
+				nlexemes, nlrules, nrules-nlrules);
+		if(protocol_version == 2)
+			itsdb_dump_chart = 1;
+		else itsdb_dump_chart = 0;
 	}
 	return 0;
 }
@@ -163,7 +172,7 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	if(error)capi_printf(" (:error . \"%s\")", error);
 }
 
-itsdb_report(struct lattice	*tokens, int	status, int	tforest)
+int itsdb_report(struct lattice	*tokens, struct lattice	*lexical_chart, int	status, int	tforest)
 {
 	extern int total_edges, real_edges, passive_edges, slab_usage();
 
@@ -173,7 +182,8 @@ itsdb_report(struct lattice	*tokens, int	status, int	tforest)
 		//capi_printf("(:tcpu . %d) ", tforest);
 
 		int readings;
-		if(itsdb_dump_chart)capi_print_chart(tokens, status);
+		if(itsdb_dump_chart)
+			capi_print_chart(tokens, lexical_chart, status);
 		if(status == 0)
 		{
 			readings = capi_print_derivations();
@@ -323,13 +333,16 @@ void tsdb_report_mrs(struct mrs	*mrs)
 	capi_printf("\")");
 }
 
-int this_edge_is_root(struct edge	*edge)
+char	*this_edge_is_root(struct edge	*edge)
 {
-	if(edge->from != 0)return 0;
-	if(edge->to != chart_size-1)return 0;
-	if( (g_mode!=GENERATING || edge->neps == require_neps) && is_root(edge->dg) && !edge->frozen )
-		return 1;
-	return 0;
+	if(edge->from != 0)return NULL;
+	if(edge->to != chart_size-1)return NULL;
+	if( (g_mode!=GENERATING || edge->neps == require_neps) && !edge->frozen)
+	{
+		char	*r = is_root(edge->dg);
+		return r;
+	}
+	return NULL;
 }
 
 void	reset_unpacking_e(struct edge	*e)
@@ -361,47 +374,76 @@ void	reset_unpacking()
 			}
 }
 
-int	find_token_id(struct token	*t, struct lattice	*l)
-{
-	int i;
-	for(i=0;i<l->nedges;i++)
-		if(l->edges[i]->token == t)return -(i+1);
-	return 0;
-}
+#define	TOKEN_EDGE_TYPE		0
+#define	LEXEME_EDGE_TYPE	1
+#define	LEXRULE_EDGE_TYPE	2
+#define	SYNRULE_EDGE_TYPE	3
+#define	ROOT_EDGE_TYPE		4
 
-void	capi_print_chart_edge(struct edge	*e, struct lattice	*tokens)
+#define	RESULT_EDGE_STATUS	1
+#define	ACTIVE_EDGE_STATUS	2
+#define	PACKED_EDGE_STATUS	4
+#define	FROSTED_EDGE_STATUS	8
+#define	FROZEN_EDGE_STATUS	16
+
+int	nlexr_edges, nsynr_edges;
+
+void	capi_print_chart_edge(struct edge	*e, struct lattice	*tokens, int	was_packed)
 {
 	if(e->unpack)return;
 	e->unpack = (void*)0x1;
 	char	*sign = e->rule?e->rule->name:e->lex->word;
 	int	i;
-	capi_printf(" ((:id . %d) (:label . \"%s\") (:start . %d) (:end . %d) (:status . %d)", e->id, sign, e->from, e->to, this_edge_is_root(e)?ROOT_EDGE_STATUS:NONROOT_EDGE_STATUS);
+	capi_printf(" ((:e-id . %d) (:e-label . \"%s\") (:e-start . %d) (:e-end . %d) (:e-status . %d)", e->id, sign, e->from, e->to, RESULT_EDGE_STATUS | (was_packed?PACKED_EDGE_STATUS:0));
 	if(!e->rule)
 	{
 		// lexeme edge
-		capi_printf(" (:daughters . (");
-		for(i=0;i<e->lex->stemlen;i++)capi_printf(" %d", find_token_id((struct token*)e->daughters[i], tokens));
+		capi_printf(" (:e-type . %d)", LEXEME_EDGE_TYPE);
+		capi_printf(" (:e-daughters . (");
+		for(i=0;i<e->lex->stemlen;i++)capi_printf(" %d", ((struct token*)e->daughters[i])->eid);
+		capi_printf(" ))");
 	}
 	else
 	{
 		// rule edge
-		capi_printf(" (:daughters . (");
+		capi_printf(" (:e-daughters . (");
 		for(i=0;i<e->have;i++)capi_printf(" %d", e->daughters[i]->id);
+		capi_printf(" ))");
+
+		if(e->rule->lexical)
+		{
+			capi_printf(" (:e-type . %d)", LEXRULE_EDGE_TYPE);
+			nlexr_edges++;
+		}
+		else
+		{
+			capi_printf(" (:e-type . %d)", SYNRULE_EDGE_TYPE);
+			nsynr_edges++;
+		}
 	}
-	capi_printf(")) (:alternates . (");
+	capi_printf(" (:e-alternates . (");
 	for(i=0;i<e->npack;i++)capi_printf(" %d", e->pack[i]->id);
 	capi_printf(")))");
 	for(i=0;i<e->npack;i++)
-		capi_print_chart_edge(e->pack[i], tokens);
+		capi_print_chart_edge(e->pack[i], tokens, 1);
 	for(i=0;i<e->have;i++)
-		capi_print_chart_edge(e->daughters[i], tokens);
+		capi_print_chart_edge(e->daughters[i], tokens, 0);
 }
 
-int capi_print_chart(struct lattice	*tokens, int	status)
+void	capi_print_root_edge(char	*name, int	daughter_id, int	start, int	end)
+{
+	int	my_id = next_eid();
+	capi_printf(" ((:e-id . %d) (:e-label . \"%s\") (:e-start . %d) (:e-end . %d) (:e-status . %d) (:e-type . %d) (:e-daughters . (%d)) (:e-alternates . ()))",
+		my_id, name, start, end, RESULT_EDGE_STATUS, ROOT_EDGE_TYPE, daughter_id);
+}
+
+int capi_print_chart(struct lattice	*tokens, struct lattice	*lexical_chart, int	status)
 {
 	capi_printf("(:chart . (");
-	int i;
+	int i, nroots = 0;
 
+	nlexr_edges = 0;
+	nsynr_edges = 0;
 	if(status == 0)
 	{
 		struct chart_cell	*root_cell = &cells[chart_size-1];
@@ -409,8 +451,13 @@ int capi_print_chart(struct lattice	*tokens, int	status)
 		for(i=0;i<root_cell->p_nedges;i++)
 		{
 			struct edge	*edge = root_cell->p_edges[i];
-			if(this_edge_is_root(edge))
-				capi_print_chart_edge(edge, tokens);
+			char	*r = this_edge_is_root(edge);
+			if(r)
+			{
+				nroots++;
+				capi_print_root_edge(r, edge->id, edge->from, edge->to);
+				capi_print_chart_edge(edge, tokens, 0);
+			}
 		}
 		reset_unpacking();
 	}
@@ -421,7 +468,7 @@ int capi_print_chart(struct lattice	*tokens, int	status)
 	{
 		struct lattice_edge	*le = tokens->edges[i];
 		struct token	*t = le->token;
-		capi_printf(" ((:id . %d) (:start . %d) (:end . %d)", -(i+1), le->from->id, le->to->id);
+		capi_printf(" ((:e-id . %d) (:e-start . %d) (:e-end . %d)", t->eid, le->from->id, le->to->id);
 		char	token_str[10240];
 		if(enable_token_avms)
 		{
@@ -438,12 +485,23 @@ int capi_print_chart(struct lattice	*tokens, int	status)
 			free(formesc);
 		}
 		char	*labelesc = heap_escape(token_str);
-		capi_printf(" (:status . %d) (:label . \"%s\") (:daughters . ()) (:alternates . ()))",
-			TOKEN_EDGE_STATUS, labelesc);
+		capi_printf(" (:e-status . %d) (:e-type . %d) (:e-label . \"%s\") (:e-daughters . ()) (:e-alternates . ()))",
+			t->used?RESULT_EDGE_STATUS:0, TOKEN_EDGE_TYPE, labelesc);
 		free(labelesc);
 	}
 
 	capi_printf("))");
+	if(status == 0)
+	{
+		capi_printf("(:tedges . %d) ", tokens->nedges);
+		capi_printf("(:eedges . %d) ", lexical_chart->nedges);
+		capi_printf("(:ledges . %d) ", nlexr_edges);
+		capi_printf("(:sedges . %d) ", nsynr_edges);
+		capi_printf("(:redges . %d) ", nroots);
+		extern int noriginaltokens, nmappingtokens;
+		capi_printf("(:ninputs . %d) ", noriginaltokens);
+		capi_printf("(:ninputs . %d) ", nmappingtokens);
+	}
 }
 
 int	capi_print_derivations()
@@ -468,7 +526,8 @@ int	capi_print_derivations()
 		if(report_labels)
 			tsdb_report_labels(hyp);
 
-		capi_printf(" (:score .%f))", hyp->score);
+		//capi_printf(" (:score .%f))", hyp->score);
+		capi_printf(" (:flags ((:ascore . %f) (:probability . %f))))", hyp->score, prob);
 #ifndef TSDB
 		capi_printf("\n");
 #endif

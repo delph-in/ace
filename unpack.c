@@ -122,6 +122,7 @@ void score_hypothesis(struct hypothesis *h)
 		for(i=0;i<lex->stemlen;i++)
 		{
 			struct token	*tok = (struct token*)e->daughters[i];
+			tok->used = 1;	// any token that gets reached in scoring is part of a result
 			if(strlen(tok->string) + (sp-surface) > 1000)return;
 			if(tok->cfrom==-1 || tok->cto==-1)return;
 			// if we wanted to preserve capitalization, we would do:
@@ -910,6 +911,8 @@ struct token	*gen_extract_one_token(struct hypothesis	*h, int	k, char	*inflected
 	assert(h->edge->lex && !h->edge->rule);
 	struct token	*t = slab_alloc(sizeof(*t));
 	bzero(t, sizeof(*t));
+	t->eid = -1;	// these get re-extracted all the time; who can say when two tokens are logically identical?
+	t->used = 1;
 	if(!enable_token_avms)goto missing_token;
 	struct dg	*toklist = dg_path(h->dg, lex_tokens_list_path);
 	if(toklist == NULL)goto missing_token;
@@ -1035,7 +1038,7 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...),
 					for(i=0;i<ntokens;i++)
 					{
 						struct token	*tok = tokens[i];
-						int	id = ((unsigned long long)tok)%713;	// XXX ok, it's a hack, but who really cares about the token ID anyway? (answer: treebanker)
+						int	id = tok->eid;
 						char	*tokstr = dstr_lookup((void*)tok, from);
 						if(!tokstr)
 						{

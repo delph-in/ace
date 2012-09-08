@@ -31,6 +31,7 @@ struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels);
 struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels);
 struct lexeme	*get_lex_by_name(char *name);
 
+extern int nlexemes;
 extern int		ngeneric_les;
 extern struct lexeme	**generic_les;
 extern struct generic_le_info	*generic_le_infos;

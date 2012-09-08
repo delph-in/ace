@@ -9,6 +9,7 @@
 #include	"rule.h"
 #include	"freeze.h"
 
+int timeout_seconds = 0;
 int	form_to_relation = 0;
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 char	*save_grammar_path = 0;

@@ -161,7 +161,7 @@ void	recover_instances(void	*ptr)
 
 extern int trace;
 
-int	is_root(struct dg	*dg)
+char	*is_root(struct dg	*dg)
 {
 	int		i, res, flag = (g_mode == PARSING)?1:2;
 
@@ -170,7 +170,7 @@ int	is_root(struct dg	*dg)
 		res = unify_dg_tmp(dg, instances[i].dg, -1);
 		forget_tmp();
 		if(!res)
-			return 1;
+			return instances[i].name;
 #ifdef UNIFY_PATHS
 		else if(trace>2)
 		{
@@ -179,7 +179,7 @@ int	is_root(struct dg	*dg)
 		}
 #endif
 	}
-	return 0;
+	return NULL;
 }
 
 int	study_instance(char	*lhs, struct dg	*dg)

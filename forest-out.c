@@ -14,8 +14,6 @@
 #include	"token.h"
 #include	"unicode.h"
 
-int	find_token_id(struct token	*t, struct lattice	*l);
-
 void output_packed_tree(struct edge	*e, struct lattice	*tokens)
 {
 	if(e->unpack)return;
@@ -35,7 +33,7 @@ void output_packed_tree(struct edge	*e, struct lattice	*tokens)
 		for(i=0;i<e->lex->stemlen;i++)
 		{
 			if(i)printf(",");
-			printf("%d", find_token_id((struct token*)e->daughters[i], tokens));
+			printf("%d", ((struct token*)e->daughters[i])->eid);
 		}
 	}
 	else
@@ -223,7 +221,7 @@ output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 			sprintf(token_str, "token [ +FROM \"%d\" +TO \"%d\" +FORM \"%s\" ]", t->cfrom, t->cto, formesc);
 			free(formesc);
 		}
-		printf("token %d %d %d %s\n", find_token_id(t, tokens), le->from->id, le->to->id, token_str);
+		printf("token %d %d %d %s\n", t->eid, le->from->id, le->to->id, token_str);
 	}
 	return found_root;
 }

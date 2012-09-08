@@ -27,7 +27,7 @@ void		lex_filter_rules();
 void		agenda_rules(int	count);
 int			load_rules();
 int			load_roots();
-int			is_root(struct dg	*dg);
+char		*is_root(struct dg	*dg);
 struct rule	*get_rule_by_name(char	*name);
 struct rule	*lookup_rule(char	*name);	// same as get_rule_by_name
 

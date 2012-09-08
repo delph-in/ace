@@ -395,7 +395,7 @@ extern struct type_hierarchy	*main_th, *semi_th;
 	G->stochmodel = freeze_stochastic_model();
 	freezer_note("stochastic-model");
 
-	int l = snprintf(G->message, sizeof(G->message)-1, "frozen grammar file: ace |%s| grammar |%s %s|",
+	int l = snprintf(G->message, sizeof(G->message)-1, "frozen grammar file: ace |%s| grammar |%s;;%s|",
 		ACE_VERSION, grammar_dir, grammar_version);
 	if(l > sizeof(G->message)-3)
 		fprintf(stderr, "WARNING: not enough room in 128 bytes to record grammar information\n");
@@ -464,6 +464,13 @@ static int	load_freeze()
 	{
 		fprintf(stderr, "version mismatch: this is ACE version %s, but this grammar image was compiled by ACE version %s\n", ACE_VERSION, frozen_ace_version);
 		exit(-1);
+	}
+	char	*frozen_grammar_version = strstr(frozen_grammar, ";;");
+	if(frozen_grammar_version)
+	{
+		frozen_grammar_version += 2;
+		grammar_version = strdup(frozen_grammar_version);
+		if(debug_level > 0)fprintf(stderr, "NOTE: loading frozen grammar %s\n", grammar_version);
 	}
 
 extern struct type_hierarchy	*main_th, *semi_th;

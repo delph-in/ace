@@ -60,7 +60,7 @@ void	commit_slab()
 		close(freeze_fd);
 		freeze_next = NULL;
 	}
-	else if(debug_level) { printf("permanent "); print_slab_stats(); }
+	else if(debug_level) { fprintf(stderr, "permanent "); print_slab_stats(); fprintf(stderr, "\n"); }
 	currslabsize = SLAB_SIZE;
 	noldslabs = 0;
 	aoldslabs = 0;
