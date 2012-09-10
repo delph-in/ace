@@ -232,6 +232,10 @@ char		**fnames;
 
 int	subsume_forward, subsume_backward;
 
+// due to subgraph sharing, a node 'a' can appear in both inputs to subsume_dg1(a,b).
+// it is not automatically equivalent; different reentrancies can appear from the (nonidentical) rest of the dags into 'a'
+// e.g.:   x = [ A: #1=moo B: #2=moo C: #2=moo ]   and y = [ A: #2=moo B: #2=moo C: #3=moo ]
+// we would use subsume_same_dg(#2) and notice that #2 is reentrant with #1 on the left and #3 on the right.
 // make sure 'copy' is either null or self-referential all the way through 'a's arcs
 int	subsume_same_dg(struct dg	*a)
 {
@@ -397,9 +401,10 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	}
 	else
 	{
-		//printf(" `%s'#%d vs `%s'#%d flags %d %d\n", a->xtype->name, a->narcs, b->xtype->name, b->narcs, subsume_forward, subsume_backward);
-		//for(i=0;i<a->narcs;i++)printf(" %s", fnames[a->label[i]]); printf("\n");
-		//for(i=0;i<b->narcs;i++)printf(" %s", fnames[b->label[i]]); printf("\n");
+		/*printf(" `%s'#%d vs `%s'#%d flags %d %d\n", a->xtype->name, a->narcs, b->xtype->name, b->narcs, subsume_forward, subsume_backward);
+		for(i=0;i<a->narcs;i++)printf(" %s", fnames[a->label[i]]); printf("\n");
+		for(i=0;i<b->narcs;i++)printf(" %s", fnames[b->label[i]]); printf("\n");
+		unify_backtrace();*/
 		return 0;
 	}
 	return 1;

@@ -562,7 +562,7 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 
 void dagify_mrs_ep(struct mrs_ep *ep)
 {
-	struct dg	*dg = atomic_dg("relation");
+	struct dg	*dg = atomic_dg("relation");	// XXX should this be configurable?
 	int			i;
 
 	dg = add_dg_feature(dg, "PRED", atomic_dg(ep->pred));
