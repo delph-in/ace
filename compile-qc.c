@@ -76,6 +76,7 @@ int	compile_qc(char	*qccode_path)
 	char	line[10240];
 	int		lnum = 0;
 	int		n_record = 0;
+	//char	*last_push = "/";
 	while(NULL != fgets(line, 10239, qccode))
 	{
 		lnum++;
@@ -102,12 +103,15 @@ int	compile_qc(char	*qccode_path)
 				fprintf(gcc, "	if(stack[sp]) entries[%d] = dg_type(stack[sp]);\n", x);
 				fprintf(gcc, "	else entries[%d] = NULL;\n", x);
 				n_record++;
+				//struct type	*T = strcmp(last_push, "/")?most_general_type_for_feat(default_type_hierarchy(), lookup_fname(last_push)):lookup_type("sign");
+				//fprintf(stderr, "QC[%d] feature=%s type=%s subtypes=%d\n", x, last_push, T->name, T->ndescendents);
 			}
 			else if(1 == sscanf(tok, "PUSH(%[^)])", feat))
 			{
 				int	l = lookup_fname(feat);
 				fprintf(gcc, "	if(stack[sp++])stack[sp] = noninline_dg_hop(stack[sp-1], %d);\n", l);
 				fprintf(gcc, "	else stack[sp] = NULL;");
+				//last_push = strdup(feat);
 			}
 			else
 			{
