@@ -1734,7 +1734,11 @@ struct mrs	*reformat_mrs_for_transfer(struct mrs	*m)
 	for(i=0;i<m->vlist.nvars;i++)
 		if(!m->vlist.vars[i]->dg)
 			dagify_mrs_var(m->vlist.vars[i], NULL);
-		else m->vlist.vars[i]->dg->gen = 0;	// if gen ==1 we stand a chance of dg_to_mrs_var() not extracting a new struct mrs_var, and worse still, the variable not making it onto the new_vlist.
+		else
+		{
+			m->vlist.vars[i]->dg = p_dereference_dg(m->vlist.vars[i]->dg);
+			m->vlist.vars[i]->dg->gen = 0;	// if gen ==1 we stand a chance of dg_to_mrs_var() not extracting a new struct mrs_var, and worse still, the variable not making it onto the new_vlist.
+		}
 	for(i=0;i<m->nrels;i++)
 		dagify_mrs_ep(m->rels+i);
 
