@@ -380,6 +380,8 @@ int	generate(struct mrs	*mrs)
 
 	if(debug_level)printf("semlook %.4f\n", timer());
 
+	if(!inhibit_pack)enable_packing(2);
+
 	int	npassive_edges = 0;
 	sentential = 0;
 	while( (edge = next_agenda(0)) )
@@ -389,6 +391,8 @@ int	generate(struct mrs	*mrs)
 		if(gen_process_edge(edge)){break;}
 	}
 	if(debug_level)printf("packed %.4f\n", timer());
+
+	enable_packing(0);
 
 	/*struct mrs	*hax_ref = external_to_internal_mrs(mrs);
 	if(trace)

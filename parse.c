@@ -466,6 +466,9 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 
 	if(g_profiling)start_and_alloc_profiler(&chart_parsing_profiler, "chart parsing", parse_profiler, lexical_filtering_profiler);
 
+	// lexemes have no packing restrictor applied to them thus far.
+	// make sure all copy()'s from here on out (until unpacking time) are restricting.
+	if(!inhibit_pack)enable_packing(1);
 	// setup the main parse chart
 	int nwords = prepare_parse_chart(lexical_chart);
 	if(nwords < 0)
@@ -510,6 +513,8 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 		}
 		if(parse_process_edge(edge))break;
 	}
+
+	enable_packing(0);
 
 	stop_timer(chart_parsing_timer, 1);
 

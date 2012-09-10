@@ -811,6 +811,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 	{
 		if(!arity)
 		{
+			// lexeme edge.  we don't restrict these.
 			if(unspecialize)
 			{
 				// generator lexeme.  don't put the specialized RELS list in.

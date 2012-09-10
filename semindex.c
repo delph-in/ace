@@ -412,6 +412,9 @@ int	instantiate_alignment(struct ep_alignment	*a)
 		//printf("aligned `%s' to eps ", e->lex->word);
 		//for(i=0;i<=e->nextra_preds;i++)printf(" %d", align[i]->epnum); printf("\n");
 		edge = lexical_edge(e->lex, 0, 0, rels);
+		// the edge has not been restricted yet...
+		extern int	dont_unspecialize;
+		if(edge && !dont_unspecialize)edge->dg = restrict_copy_dg(edge->dg, 1);
 		//cont = walk_dg(edge->dg, savef, "SYNSEM", "LOCAL", "CONT", NULL);
 	}
 	if(e->what == RULE)
