@@ -1,7 +1,23 @@
 TODO:
 
-- sentence that crashes with erg-1111:
-	" Beginning in 1899, and continuing in 1903 and 1904, African-American regiments served during the summer months in the second and third oldest national parks in the United States (Sequoia and Yosemite)."
+- figure out why there are frozen edges in the chart when parsing babel (ace-regression tester)
+
+- idea: do an initial parse with a cheaper (strictly less strict) grammar, see what edges are connected to roots, and use that as a top-down filter on a second pass with the full grammar.
+	- a bit like the limiting case of increasing the packing restrictor, but the simpler grammar could be of a significantly different shape
+		- e.g. a (big?) CFG, or: [ how would that CFG filter the main grammar edges? ]
+		- e.g. a quickcheck-only grammar, if we can figure out how to compute/approximate the QC vector of new edges without building the AVM
+			- this version might be ammenable to GPGPU programing
+			- easy to filter main grammar edges: at least one quickcheck edge must subsume each main grammar edge's qc vector
+			- if the first pass (qc only) were fast enough and discriminative enough, might filter out a lot of the superfluous main chart edges
+			- implementation: alter unify_and_build1() to use QC vectors exclusively and not build/unify/copy DAGs at all (on first pass); alter filter() to discard edges that aren't subsumed by a pass1 edge during second pass
+				- could also try (full-grammar) unpacking directly from the QC forest
+				- question as to whether lexical parsing should always be full-grammar, or should be QC-only on the first pass
+
+- (optionally?) apply mrs-deleted-roles only to post-parsing/post-generation MRS extraction; NOT to transfer-internal extractions
+	- berthold says the apply-it-everywhere behavior matches LKB
+		- but it doesn't necessarily make sense for the GG fixup application application
+			- GG parsing mrs-deleted-roles kills off some superfluous roles
+			- but GG generation mrs-deleted-roles has to keep them around for fixup to work (resulting in ugly MRS outputs from generation -- although generally nobody looks at those anyway)
 
 - automatic configuration generation:
 	- there are lots and lots of things that should be easy to automatically determine when reading grammar TDL files

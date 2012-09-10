@@ -16,7 +16,9 @@ void enable_trim(int trim);
 
 extern int	g_loaded;
 
-#define SHOULD_TRIM(label)			(copy_restrictor && copy_restrictor[label])
+//#define SHOULD_TRIM(label)			(copy_restrictor && copy_restrictor[label])
+// it is possible for glb constraints to pull features back in that our packing-restrictor'd rule and lexeme AVMs do not contain, so apply the packing restrictor when copying as well.
+#define SHOULD_TRIM(label)			((copy_restrictor && copy_restrictor[label]) || (unify_restrictor && unify_restrictor[label]))
 #define PACKING_RESTRICTOR(label)	(unify_restrictor && unify_restrictor[label])
 
 // global generation counter for invalidating quasi-destructive operations
@@ -159,7 +161,8 @@ static int darc_cmp(const void	*a, const void	*b)
 	return ((const struct darc*)a)->label - ((const struct darc*)b)->label;
 }
 
-int	copypath[1024], copypathp;
+#define	MAX_COPY_PATH	1024
+int	copypath[MAX_COPY_PATH], copypathp;
 
 static void print_copy_path(char	*name)
 {
@@ -178,6 +181,7 @@ static void print_copy_path(char	*name)
 
 static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 {
+extern struct darc	*carcstack;
 	struct dg	*dg, **aptr, **optr;
 	unsigned short	*alptr, *olptr;
 	struct dg	*newcopy;
@@ -299,6 +303,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 			ch = 0;
 
 #ifdef	COPY_PATHS
+			assert(copypathp < MAX_COPY_PATH);
 			copypath[copypathp++] = *olptr;
 #endif
 			*alptr = *olptr;
@@ -352,6 +357,7 @@ static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 		ch = 0;
 
 #ifdef	COPY_PATHS
+		assert(copypathp < MAX_COPY_PATH);
 		copypath[copypathp++] = copylabel;
 #endif
 		*alptr = copylabel;
@@ -500,6 +506,7 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 		//		fnames[aptr->label], newcopy->type->name, xarc.dest);
 
 #ifdef	COPY_PATHS
+		assert(copypathp < MAX_COPY_PATH);
 		copypath[copypathp++] = copylabel;
 #endif
 		*alptr = copylabel;
