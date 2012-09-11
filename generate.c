@@ -81,7 +81,11 @@ int index_accessibility_filter_one_ep(struct edge	*e, struct mrs_ep	*ep)
 	int i;
 	if(index_accessibility_filter_one_var(e, ep->lbl))return 1;
 	for(i=0;i<ep->nargs;i++)
-		if(index_accessibility_filter_one_var(e, ep->args[i].value))return 1;
+		if(index_accessibility_filter_one_var(e, ep->args[i].value))
+		{
+			//printf("%s %s inaccessible\n", ep->pred, ep->args[i].name);
+			return 1;
+		}
 	return 0;
 }
 
@@ -186,6 +190,7 @@ int	gen_process_edge(struct edge	*e)
 	unsigned long long	*previously_accessible = temp_bv;					// use as scratch space
 	unsigned long long	*previously_inaccessible = e->inaccessible_vars_bv;	// use as scratch space
 
+	//printf("process #%d\n", e->id);
 	for(i=0;i<e->have;i++)
 	{
 		if(e->daughters[i]->frozen==1)
@@ -201,6 +206,26 @@ int	gen_process_edge(struct edge	*e)
 	{
 		// compute the set of variables actually accessible on 'e'
 		accessible_vars(e, e->accessible_vars_bv);
+		/*void print_varset(char	*name, unsigned long long	*bv)
+		{
+			int	i;
+			printf("%s	", name);
+			for(i=0;i<current_internal_input_mrs->vlist.nvars;i++)
+				if(bitvec_test(bv, i))
+				{
+					struct mrs_var	*v = current_internal_input_mrs->vlist.vars[i];
+					printf(" %s%d", v->type, v->vnum);
+				}
+			printf("\n");
+		}
+		print_varset("prev inaccessible", previously_inaccessible);
+		print_varset("prev   accessible", previously_accessible);
+		print_varset("now    accessible", e->accessible_vars_bv);
+		printf("EPs covered:  ");
+		for(i=0;i<current_internal_input_mrs->nrels;i++)
+			if(bitvec_test(e->ep_span_bv, i))
+				printf(" [%d]=%s", i, current_internal_input_mrs->rels[i].pred);
+		printf("\n");*/
 		// inaccessible variables are ones that were once accessible but no longer are
 		// newly inaccessible variables are ones that were accessible on a daughter but are not accessible on 'e'
 		// variables that were inaccessible on a daughter are still inaccessible on 'e'
@@ -315,6 +340,8 @@ int	generate(struct mrs	*mrs)
 	// XXX now that we are doing skolemize_for_generation(),
 	// and now that fixup() is undoing the following skolemization work,
 	// it would probably make sense to just not do this work.
+	// XXX ... we have to at least do the dagify() work here,
+	// since some grammars have no fixup rules, and fixup_mrs() does not (re)dagify if there are no rules
 
 	// set up the skolemization and specialization dags we'll need.
 	struct dg	*skar[mrs->vlist.nvars];
