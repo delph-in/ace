@@ -213,6 +213,7 @@ struct type_hierarchy	*freeze_type_hierarchy(struct type_hierarchy	*thin)
 		if(thin->types[i]->tnum != i)
 		{
 			fprintf(stderr, "type %s tnum %d is wrong.\n", thin->types[i]->name, thin->types[i]->tnum);
+			fprintf(stderr, "claimed tnum = %d; actual tnum = %d\n", thin->types[i]->tnum, i);
 			exit(-1);
 		}
 

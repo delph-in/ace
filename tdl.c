@@ -643,6 +643,7 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 			if(!strcmp(rnames[j], R->corefs[i].name))break;
 		if(j==nr)
 		{
+			assert(nr < 256);
 			reentrancies[j] = atomic_dg(top_type);
 			rnames[j] = R->corefs[i].name;
 			nr++;
@@ -799,7 +800,7 @@ static struct dg	*listify(struct dagify_record	*R, char	*str, struct dg	**last)
 	R->current_pathlen = iplen;
 	if(last)*last = lp;
 
-	return dg;
+	return p_dereference_dg(dg);
 }
 
 static struct dg	*dlistify(struct dagify_record	*R, char	*str)
@@ -1039,7 +1040,8 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 			_current_building_type = NULL;
 			return 0;
 		}
-		else if(loud_noises)
+		res = p_dereference_dg(res);
+		if(loud_noises)
 		{
 			printf("res: "); print_dg(res); printf("\n");
 		}
@@ -1072,6 +1074,7 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 #endif
 		dg = NULL;
 	}
+	dg = p_dereference_dg(dg);
 
 	for(i=0;i<R.ncorefs;i++)
 	{
