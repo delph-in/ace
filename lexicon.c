@@ -48,7 +48,11 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 		if(rels)
 		{
 #ifdef UNIFY_PATHS
-			//printf("specialization of `%s' failed: ", lex->word); unify_backtrace();
+			if(trace > 1)
+			{
+				printf("specialization of `%s' failed: ", lex->word);
+				unify_backtrace();
+			}
 #endif
 			return 0;
 		}
