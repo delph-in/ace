@@ -4,12 +4,7 @@
 #include	<string.h>
 #include	<assert.h>
 
-struct tree
-{
-	char	*label;
-	int		ndaughters;
-	struct tree	**daughters;
-};
+#include	"tree.h"
 
 struct string
 {
@@ -59,77 +54,6 @@ struct sr_mistakes
 
 char	*trim_string(char	*str);
 
-
-struct tree	*string_to_tree(char	*str)
-{
-	assert(*str == '(');
-	str++;
-	str = trim_string(str);
-	int		len = strlen(str);
-	assert(len>1);
-	char	*end = str + len-1;
-	if(!(*end == ')'))
-	{
-		printf("bad tree string: '%s'\n", str);
-		assert(*end == ')');
-	}
-	*end = 0;
-	str = trim_string(str);
-
-	if(isdigit(*str))
-	{
-		// rule or lexeme node
-		char	*dp = strchr(str, '(');
-		char	*edge_number_string = strtok(str, " \t");
-		char	*type = strtok(NULL, " \t");
-		char	*score_number_string = strtok(NULL, " \t");
-		assert(score_number_string != NULL);
-
-		struct tree	*t = calloc(sizeof(struct tree), 1);
-		t->label = strdup(type);
-		while(dp && *dp)
-		{
-			char	*edp = dp+1;
-			int		npar = 1, inq = 0;
-			while(npar>0 && *edp) switch(*edp++) {
-				case '\\': if(*edp)edp++; break;
-				case '"': inq = !inq; break;
-				case '(': if(!inq)npar++; break;
-				case ')': if(!inq)npar--; break;
-			}
-			if(!(npar==0 && inq==0))
-			{
-				printf("bad daughter tree: '%s'\n", dp);
-				assert(npar==0 && inq==0);
-			}
-			*edp++ = 0;	// found end of daughter tree
-			t->ndaughters++;
-			t->daughters = realloc(t->daughters, sizeof(void*)*t->ndaughters);
-			t->daughters[t->ndaughters-1] = string_to_tree(dp);
-			if(t->daughters[t->ndaughters-1] == (void*)0x1)
-				t->ndaughters--;
-			dp = strchr(edp, '(');
-		}
-		return t;
-	}
-	else if(*str=='"')
-	{
-		// token node
-		struct tree	*t = calloc(sizeof(struct tree), 1);
-		char	*q = str+1;
-		while(*q && *q!='"')q++;
-		*q = 0;
-		t->label = strdup(str);
-		return t;
-	}
-	else
-	{
-		// root node
-		char	*dp = strchr(str, '(');
-		return string_to_tree(trim_string(dp));
-	}
-}
-
 struct string	*extract_string(struct tree	*t)
 {
 	if(t->ndaughters==0)
@@ -173,15 +97,6 @@ struct tree	*read_tree(FILE	*f)
 
 	char	*s = trim_string(line);
 	return string_to_tree(s);
-}
-
-print_tree(struct tree	*t, int	indent)
-{
-	int i;
-	for(i=0;i<indent;i++)printf("  ");
-	printf("%s\n", t->label);
-	for(i=0;i<t->ndaughters;i++)
-		print_tree(t->daughters[i], indent+1);
 }
 
 extract_sr_trace(struct tree	*t, struct sr_trace	*sr)
