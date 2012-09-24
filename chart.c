@@ -877,8 +877,16 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 		}
 		if(noldslabs >= max_chart_megabytes)
 		{
-			fprintf(stderr, "NOTE: terminating search, too much RAM\n");
-			return -1;	// give up :(
+			extern char *master_addr;
+			if(!(master_addr && 1==arbiter_request_memory()))
+			{
+				fprintf(stderr, "NOTE: terminating search, too much RAM\n");
+				return -1;	// give up :(
+			}
+			else
+			{
+				// arbiter allocated us more RAM. how nice. :-)
+			}
 		}
 		return 1;
 	}
