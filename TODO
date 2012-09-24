@@ -1,6 +1,17 @@
 TODO:
 
-- figure out why there are frozen edges in the chart when parsing babel (ace-regression tester)
+- ace bugs:
+	- from berthold
+		- PET/ACE/LKB parsing differences on tsnlp test suite
+			- LKB and PET disagree in about 90 items
+			- ACE and PET disagree in about 110 items
+			- LKB and ACE disagree in about 50 items
+		- make QEQs equatable for transfer... should make a config option
+		- index accessibility filtering and subsumption packing are actually subtly incompatible. shows up in GG -- override frozen edge warnings in unpack.c for now.
+	- *possible* theoretical bug...
+		- the index accessibility filter identifies variables by their INSTLOC.  the two variables in a QEQ have the same INSTLOC, when cheap-scoping is on (e.g. all common grammars?).  that means when we collect_vars() we could mis-identify them.  if < x qeq y >, then suppose there were an edge A with x accessible and y not yet mentioned.  if R(A) makes x inaccessible, we may declare y inaccessible too.  then if other parts of the semantics reference y, R(A) will be wrongly rejected.
+		- on the other hand, it's not clear that this can actually happen.  if R(A) makes x inaccessible and y has not been mentioned yet, then there's no way for the < x qeq y > HCONS element to be built, right?
+		- conversely (and more plausibly), x will likely stay accessible long after y is made inaccessible.  unfortunately, we won't be able to notice that y was made inaccessible, because x looks the same.  result: edges may pass the filter that could have been rejected!
 
 - idea: do an initial parse with a cheaper (strictly less strict) grammar, see what edges are connected to roots, and use that as a top-down filter on a second pass with the full grammar.
 	- a bit like the limiting case of increasing the packing restrictor, but the simpler grammar could be of a significantly different shape
