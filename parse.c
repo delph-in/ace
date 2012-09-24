@@ -363,11 +363,16 @@ int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
 			print_mrs(mrs);
 			extern int report_labels;
 			char	*dstr = report_labels?hypothesis_to_labelled_tree_string(hyp):hypothesis_to_dstring(hyp);
+			fflush(stdout);
 			puts(dstr);
-			free(dstr);
+			fflush(stdout);
 			mrs_end = "\n";
+			/*extern int saved_termerr;
+			write(saved_termerr, dstr, strlen(dstr));
+			write(saved_termerr, mrs_end, 1);*/
 			//print_hypothesis(hyp, printf, 0);
 			//printf((mrs_end = "\n"));
+			free(dstr);
 		}
 		else print_mrs(mrs);
 	}
