@@ -5,6 +5,7 @@
 #include	<sys/mman.h>
 #include	<unistd.h>
 #include	<stdlib.h>
+//#include	<asm/mman.h>
 
 #include	"dag.h"
 #include	"rule.h"
@@ -440,8 +441,12 @@ static int	load_freeze()
 		exit(-1);
 	}
 
-	//G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED, loaded_freeze_fd, 0);
 	G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, loaded_freeze_fd, 0);
+	// first try to map with HUGETLB
+	//G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_HUGETLB, loaded_freeze_fd, 0);
+	//fprintf(stderr, "result of mmap grammar with HUGETLB: %p\n", G);
+	//if(G == (void*)MAP_FAILED)
+	//	G = (struct grammar*)mmap((void*)FREEZER_MMAP_BASE, loaded_freeze_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, loaded_freeze_fd, 0);
 	if(G == (void*)MAP_FAILED)
 	{
 		perror("mmap");
