@@ -99,6 +99,7 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 			//printf("trying lexrule '%s' on edge #%d ('%s')\n", rules[i]->name, le->edge->id, show_orth_leaves(le->edge));
 			struct edge	*e = NULL;
 			int	res = unify_and_build1(epsila[i], le->edge, &e, 1);
+			extern int trace;
 			if(res == -1)
 			{
 				//fprintf(stderr, "unify_and_build1 got mad\n");
@@ -110,7 +111,11 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 				add_new_lexical_edge(lc, e);
 				fired = 1;
 			}
-			//else unify_backtrace();
+			else if(trace>1)
+			{
+				printf("rule %s failed on lexical-parsing edge #%d\n", rules[i]->name, e->id);
+				unify_backtrace();
+			}
 		}
 		if(g_profiling)stop_profiler(prof, fired);
 	}
