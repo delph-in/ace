@@ -40,7 +40,7 @@ void	become_tnt(char	*model, int	slave_fd)
 	exit(-1);
 }
 
-char	*tnt_read()
+char	*tnt_read(int	blocking)
 {
 	static char	chunk[1024];
 	static int savelen = 0;
@@ -49,9 +49,12 @@ char	*tnt_read()
 		goto already;
 
 	chunk[1023] = 0;
+	if(blocking)make_blocking(tnt_fd);
+	else make_nonblocking(tnt_fd);
 	while(savelen < 1023)
 	{
 		int r = read(tnt_fd, chunk+savelen, 1023-savelen);
+		if(r<0 && errno == EAGAIN && !blocking)return NULL;
 		if(r<=0) { perror("read from TNT"); tnt_kill(); exit(-1); }
 		//else printf("read %d bytes from tnt: %.*s\n", r, r, chunk+savelen);
 		savelen += r;
@@ -88,7 +91,7 @@ int	tnt_init(char	*model, int	maxtags)
 	tnt_fd = master_fd;
 
 	tnt_pid = pid;
-	char	*line = tnt_read();
+	char	*line = tnt_read(1);
 	int i;
 	if(strcmp(line, "%% exec tnt"))
 	{
@@ -99,15 +102,15 @@ int	tnt_init(char	*model, int	maxtags)
 		return -1;
 	}
 	free(line);
-	line = tnt_read();
-	if(!strncmp(line, "%% exec failed: ", 16))
+	line = tnt_read(0);
+	if(line && !strncmp(line, "%% exec failed: ", 16))
 	{
 		fprintf(stderr, "unexpected error while trying to start TNT subprocess: %s\n", line+16);
 		free(line);
 		tnt_kill();
 		return -1;
 	}
-	free(line);
+	if(line)free(line);
 	tnt_max_tags = maxtags;
 	if(debug_level)fprintf(stderr, "TNT subprocess started successfully with PID %d\n", tnt_pid);
 	return 0;
@@ -149,7 +152,7 @@ int	tnt_tag_sequence(int	nwords, char	**words, struct tnt_result	*results)
 	char	*line = NULL;
 	for(i=-1;i<=nwords;i++)
 	{
-		do { if(line)free(line); line = tnt_read(); } while(line[0] == '%' && line[1] == '%');
+		do { if(line)free(line); line = tnt_read(1); } while(line[0] == '%' && line[1] == '%');
 		if(i==-1 || i==nwords)continue;
 		struct tnt_result	*res = &results[i];
 		res->ntags = 0;
@@ -172,7 +175,7 @@ int	tnt_tag_sequence(int	nwords, char	**words, struct tnt_result	*results)
 			}
 		}
 	}
-	do { if(line)free(line); line = tnt_read(); } while(line[0] == '%' && line[1] == '%');
+	do { if(line)free(line); line = tnt_read(1); } while(line[0] == '%' && line[1] == '%');
 	assert(strlen(line) == 0);
 	free(line);
 	return 0;
