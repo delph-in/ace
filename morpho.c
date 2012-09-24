@@ -403,7 +403,7 @@ void unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int r
 		{
 			fprintf(stderr, "WARNING: ran up against orthographemic rule chain limit (configured at %d) during orthographemic analysis\n", ortho_max_rules);
 			fprintf(stderr, "WARNING:   (to suppress this warning, use `ortho-warn-on-max-rules := no.')\n");
-			fprintf(stderr, "WARNING: rule chain from '%s' to '%s':\n", visit->form, target->form);
+			fprintf(stderr, "WARNING: rule chain from '%s' to '%s':", visit->form, target->form);
 			for(i=0;i<routelen;i++)
 				fprintf(stderr, "  %s", rules[rnums[i]]->name);
 			fprintf(stderr, "\n");
