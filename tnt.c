@@ -40,6 +40,18 @@ void	become_tnt(char	*model, int	slave_fd)
 	exit(-1);
 }
 
+void	make_blocking(int	fd)
+{
+	int	opt = fcntl(fd, F_GETFL);
+	fcntl(fd, F_SETFL, opt & ~O_NONBLOCK);
+}
+
+void	make_nonblocking(int	fd)
+{
+	int	opt = fcntl(fd, F_GETFL);
+	fcntl(fd, F_SETFL, opt | O_NONBLOCK);
+}
+
 char	*tnt_read(int	blocking)
 {
 	static char	chunk[1024];
