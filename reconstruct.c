@@ -441,7 +441,7 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 				{
 					fprintf(stderr, "reconstruction: unification failed for rule '%s'\n", t->label);
 					unify_backtrace();
-					print_tree(t,0);
+					if(reconstruction_noise_level > 1)print_tree(t,0);
 				}
 				//printf("rule dg [ want arg %d ]\n", i);
 				//print_dg(rule_dg);
@@ -460,7 +460,7 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 			if(reconstruction_noise_level)
 			{
 				fprintf(stderr, "reconstruction: cycle check failed for rule '%s'\n", t->label);
-				print_tree(t, 0);
+				if(reconstruction_noise_level > 1)print_tree(t, 0);
 			}
 			return NULL;
 		}
