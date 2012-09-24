@@ -10,6 +10,8 @@
 
 int	nunifications;
 
+int	reconstruction_noise_level = 1;
+
 struct lexeme	*get_lex_by_name_hash(char	*name)
 {
 	static struct hash	*h = NULL;
@@ -26,7 +28,7 @@ struct lexeme	*get_lex_by_name_hash(char	*name)
 		if(!strcmp(name, generic_les[i]->word))
 			{ hash_add(h, strdup(name), generic_les[i]); return generic_les[i]; }
 
-	fprintf(stderr, "unknown lexeme '%s'!\n", name);
+	if(reconstruction_noise_level)fprintf(stderr, "unknown lexeme '%s'!\n", name);
 	return NULL;
 }
 
@@ -324,7 +326,8 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 		free(lname);
 		if(!l)
 		{
-			fprintf(stderr, "unable to find lexeme '%s'\n", t->label);
+			if(reconstruction_noise_level)
+				fprintf(stderr, "unable to find lexeme '%s'\n", t->label);
 			return NULL;
 		}
 		struct dg	*d = lexical_dg(l, NULL);
@@ -336,8 +339,9 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 			int	i;
 			if(!(l->stemlen == t->daughters[0]->ntokens))
 			{
-				fprintf(stderr, "lexeme '%s' stem has %d tokens; tree has %d\n", l->word, l->stemlen, t->daughters[0]->ntokens);
-				exit(-1);
+				if(reconstruction_noise_level)
+					fprintf(stderr, "lexeme '%s' stem has %d tokens; tree has %d\n", l->word, l->stemlen, t->daughters[0]->ntokens);
+				return NULL;
 			}
 			for(i=0;i<l->stemlen;i++)
 			{
@@ -371,9 +375,12 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 			int status = install_tokens_in_le(&le, tpl);
 			if(status != 0)
 			{
-				fprintf(stderr, "failed to install tokens in lexeme '%s'\n", l->word);
-				unify_backtrace();
-				exit(-1);
+				if(reconstruction_noise_level)
+				{
+					fprintf(stderr, "failed to install tokens in lexeme '%s'\n", l->word);
+					unify_backtrace();
+				}
+				return NULL;
 			}
 	//printf("reconstructed lexeme DAG [l->stemlen = %d]:\n", l->stemlen);
 	//print_dg(le.dg);
@@ -405,12 +412,14 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 		struct rule	*r = get_rule_by_name(t->label);
 		if(!r)
 		{
-			fprintf(stderr, "unable to find rule '%s'\n", t->label);
+			if(reconstruction_noise_level)
+				fprintf(stderr, "unable to find rule '%s'\n", t->label);
 			return NULL;
 		}
 		if(t->ndaughters != r->ndaughters)
 		{
-			fprintf(stderr, "rule %s has %d daughters but tree node has %d\n", r->name, r->ndaughters, t->ndaughters);
+			if(reconstruction_noise_level)
+				fprintf(stderr, "rule %s has %d daughters but tree node has %d\n", r->name, r->ndaughters, t->ndaughters);
 			return NULL;
 		}
 		int	i;
@@ -428,9 +437,12 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 			if(result!=0)
 			{
 				forget_tmp();
-				fprintf(stderr, "reconstruction: unification failed for rule '%s'\n", t->label);
-				unify_backtrace();
-				print_tree(t,0);
+				if(reconstruction_noise_level)
+				{
+					fprintf(stderr, "reconstruction: unification failed for rule '%s'\n", t->label);
+					unify_backtrace();
+					print_tree(t,0);
+				}
 				//printf("rule dg [ want arg %d ]\n", i);
 				//print_dg(rule_dg);
 				//printf("\n\n");
@@ -445,8 +457,11 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 		struct dg	*d = finalize_tmp(rule_dg, 1);
 		if(!d)
 		{
-			fprintf(stderr, "reconstruction: cycle check failed for rule '%s'\n", t->label);
-			print_tree(t, 0);
+			if(reconstruction_noise_level)
+			{
+				fprintf(stderr, "reconstruction: cycle check failed for rule '%s'\n", t->label);
+				print_tree(t, 0);
+			}
 			return NULL;
 		}
 		if(callback)callback(t, d);
