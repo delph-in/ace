@@ -8,6 +8,7 @@
 #include	<sys/mman.h>
 #include	"dag.h"
 #include	"conf.h"
+//#include	<asm/mman.h>
 
 #define	MAX_FEATURES	(256*256-1)
 
@@ -16,6 +17,7 @@ extern int	loud_noises;
 
 // monotonic allocator for dags, can be rolled back to cancel a failed unification
 #define	SLAB_SIZE	(1024*1024)	// 1MB per slab
+//#define	SLAB_SIZE	(4*1024*1024)	// 4MB per slab -- more likely to get a hugetlb entry
 
 void		**oldslabs;
 int		noldslabs, aoldslabs;
@@ -89,8 +91,9 @@ void	clear_slab()
 		{
 			for(i=64;i<aoldslabs;i++)
 			{
-				free(oldslabs[i]);
-				oldslabs[i] = 0;
+				//free(oldslabs[i]);
+				munmap(oldslabs[i], SLAB_SIZE);
+				oldslabs[i] = NULL;
 			}
 			aoldslabs = 64;
 		}
@@ -113,7 +116,15 @@ void	next_slab()
 		aoldslabs++;
 		if(debug_level>1 && noldslabs>1)fprintf(stderr, "slab: moving to next slab with old at %dkbytes\n", slabu/1024);
 		oldslabs = realloc(oldslabs, sizeof(void*)*aoldslabs);
-		oldslabs[aoldslabs-1] = malloc(SLAB_SIZE);
+		//oldslabs[aoldslabs-1] = malloc(SLAB_SIZE);
+		/*void	*ptr = mmap(NULL, SLAB_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_HUGETLB, -1, 0);
+		if(!ptr)
+		{
+			perror("mmap hugetlb failed");
+			ptr = mmap(NULL, SLAB_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+		}*/
+		void	*ptr = mmap(NULL, SLAB_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+		oldslabs[aoldslabs-1] = ptr;
 	}
 	slab = oldslabs[noldslabs-1];
 	slabu = 0;
