@@ -61,7 +61,7 @@ struct string	*extract_string(struct tree	*t)
 		struct string	*s = malloc(sizeof(struct string));
 		s->nwords = 1;
 		s->words = malloc(sizeof(char*)*1);
-		s->words[0] = strtok(t->label+1, " ");
+		s->words[0] = strtok(t->label, " ");
 		char	*p;
 		while(p = strtok(NULL, " "))
 		{
