@@ -50,7 +50,7 @@ static char	*read_string(char	**S)
 	if(*q++ != '"')return NULL;
 	*p = 0;
 	*S = q;
-	return string;
+	return string+1;
 }
 
 static int read_number(char	**S)
