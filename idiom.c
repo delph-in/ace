@@ -50,6 +50,14 @@ int	is_idiom_free(struct mrs	*m)
 	return 1;
 }
 
+void	prevent_mrs_aliases(struct mrs	*m)
+{
+	clear_mrs();
+	int i;
+	for(i=0;i<m->vlist.nvars;i++)
+		m->vlist.vars[i]->dg = NULL;
+}
+
 int	check_idioms(struct dg	*dg, struct mrs	*m)
 {
 	if(!non_idiom_root)
@@ -73,6 +81,9 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 
 	if(!m)m = extract_mrs(dg);
 
+	// since the idiom test transfer rules populate the mrs variable cache with non-vpm'd mrs_vars, we need to make sure we don't get crosstalk with the vpm'd cached variables.
+	prevent_mrs_aliases(m);
+
 	struct mrs	**results;
 	extern struct profiler	**transfer_rule_profilers, **idiom_profilers;
 	transfer_rule_profilers = idiom_profilers;
@@ -82,6 +93,8 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 	int	n = transfer_mrs(nidiom_rules, idiom_rules, mc, &results, 0);
 	idiom_profilers = transfer_rule_profilers;
 	//printf("%d idiom rule transfer result[s]\n", n);
+
+	prevent_mrs_aliases(m);
 
 	int	i;
 	for(i=0;i<n;i++)
