@@ -82,7 +82,7 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 	if(!m)m = extract_mrs(dg);
 
 	// since the idiom test transfer rules populate the mrs variable cache with non-vpm'd mrs_vars, we need to make sure we don't get crosstalk with the vpm'd cached variables.
-	prevent_mrs_aliases(m);
+	//prevent_mrs_aliases(m);
 
 	struct mrs	**results;
 	extern struct profiler	**transfer_rule_profilers, **idiom_profilers;
@@ -94,7 +94,7 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 	idiom_profilers = transfer_rule_profilers;
 	//printf("%d idiom rule transfer result[s]\n", n);
 
-	prevent_mrs_aliases(m);
+	//prevent_mrs_aliases(m);
 
 	int	i;
 	for(i=0;i<n;i++)

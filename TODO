@@ -4,8 +4,11 @@ TODO:
 	- the dag-to-mrs cache is used both by transfer and by parse-result processing, but with different values of inhibit_vpm.  we need to straighten that out.
 		- when idiom testing is being applied, we could in theory be getting VPM'd variables out when we don't want to
 		- after idiom testing is applied, we are in practice getting non-VPM'd variables out when we actually want VPM'd ones (parse "Abrams kept barking." with erg-1111...)
-		+ for now, we'll just clear the variable cache before and after applying idiom testing.  that will slow down mrs extraction some, but getting it right is worth it.
+		- for now, we'll just clear the variable cache before and after applying idiom testing.  that will slow down mrs extraction some, but getting it right is worth it.
 			- we might be able to keep two separate caches, if we think hard?
+				- XXX but that caused a crash when parsing:
+					There are many possible starting points to reach the top of the 1775 meter high Rendalssølen.
+				- so for now, rolled back to the buggy but non-crashing version :-/
 	- from berthold
 		- PET/ACE/LKB parsing differences on tsnlp test suite
 			- LKB and PET disagree in about 90 items
