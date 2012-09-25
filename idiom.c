@@ -77,24 +77,24 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 		}
 	}
 	int res = unify_dg_tmp(dg, non_idiom_root_dg, -1);
+	forget_tmp();
 	if(res == 0)goto idiomatic;	// no further checking necessary.
 
 	if(!m)m = extract_mrs(dg);
 
-	// since the idiom test transfer rules populate the mrs variable cache with non-vpm'd mrs_vars, we need to make sure we don't get crosstalk with the vpm'd cached variables.
-	//prevent_mrs_aliases(m);
-
 	struct mrs	**results;
 	extern struct profiler	**transfer_rule_profilers, **idiom_profilers;
 	transfer_rule_profilers = idiom_profilers;
-	struct mrs	*mc = external_to_internal_mrs(m);
+	struct mrs	*mc = external_to_internal_mrs(m);	// unnecessary in light of what follows?
 	struct mrs	*reformat_mrs_for_transfer(struct mrs	*m);
-	mc = reformat_mrs_for_transfer(mc);
+	mc = reformat_mrs_for_transfer(mc);	// this essentially re-extracts 'mc' from its ->dg pointers, with no VPM
 	int	n = transfer_mrs(nidiom_rules, idiom_rules, mc, &results, 0);
 	idiom_profilers = transfer_rule_profilers;
 	//printf("%d idiom rule transfer result[s]\n", n);
 
-	//prevent_mrs_aliases(m);
+	// at this point, 'mc' and 'm' share ->dg pointers, but the MRS extraction machinery
+	// is set up to associate those dgs with the 'mc' no-vpm 'struct mrs_var's.
+	prevent_mrs_aliases(mc);
 
 	int	i;
 	for(i=0;i<n;i++)

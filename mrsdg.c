@@ -156,7 +156,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 			var = varhash[hc];
 			var->refs = 2;
 			var->vnum = vlist->nvars;
-			//printf("reuse dg %p, think var %p\n", dg, varhash[hc]);
+			//printf("reuse dg %p, think var %p	%s\n", dg, var, var->type);
 		}
 		else
 		{
@@ -187,7 +187,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 					var = vnew;
 				}
 			}
-			//printf("new var %p dg %p\n", var, dg);
+			//printf("new var %p dg %p	%s\n", var, dg, var->type);
 			//if(varhash[hc])free_mrs_var(varhash[hc]);
 			if(varhash[hc])varhash_collis++;
 			else varhash_used++;
@@ -203,9 +203,10 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 		dg->gen = 1;
 		return var;
 	}
-	//printf("back to dg %p, think var %p\n", dg, dg->copy);
-	((struct mrs_var*)dg->copy)->refs++;
-	return (struct mrs_var*)dg->copy;
+	struct mrs_var	*v = (struct mrs_var*)dg->copy;
+	//printf("back to dg %p, think var %p	%s\n", dg, v, v->type);
+	v->refs++;
+	return v;
 }
 
 void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
