@@ -160,6 +160,7 @@ read_from_arbiter()
 			cancel_parse = die = 1;
 			break;
 		}
+		make_blocking(arbiter_fd);	// be sure to leave the socket in blocking mode, so that printf()'s etc don't have partial sends
 		if(arbiter_partial_line_length + r > arbiter_partial_line_length_a)
 		{
 			arbiter_partial_line_length_a = 1 + 2 * (arbiter_partial_line_length + r);
@@ -177,11 +178,11 @@ read_from_arbiter()
 				i -= i+1;
 			}
 	}
+	make_blocking(arbiter_fd);	// be sure to leave the socket in blocking mode, so printf()'s etc don't have partial sends
 }
 
 char	*arbiter_next_input()
 {
-	if(!narbiterinputs)make_blocking(arbiter_fd);
 	read_from_arbiter();
 	if(narbiterinputs)
 	{
