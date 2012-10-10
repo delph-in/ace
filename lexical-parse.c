@@ -113,7 +113,7 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 			}
 			else if(trace>1)
 			{
-				printf("rule %s failed on lexical-parsing edge #%d\n", rules[i]->name, e->id);
+				printf("rule %s failed on lexical-parsing edge #%d\n", rules[i]->name, le->edge->id);
 				unify_backtrace();
 			}
 		}
