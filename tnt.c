@@ -183,7 +183,7 @@ int	tnt_tag_sequence(int	nwords, char	**words, struct tnt_result	*results)
 				struct tag_option	*opt = res->tags + res->ntags-1;
 				opt->tag = freeze_string(tag);
 				opt->prob = atof(p);
-				printf("word %s tag %s prob %f\n", words[i], opt->tag, opt->prob);
+				//printf("word %s tag %s prob %f\n", words[i], opt->tag, opt->prob);
 			}
 		}
 	}
