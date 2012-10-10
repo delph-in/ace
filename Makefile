@@ -40,7 +40,7 @@ ace: ${APPOBJ}
 	${CC} ${EXPORT_DYNAMIC_CFLAG} ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm ${BOOST_REGEX_LIBS} -ldl
 
 static: ${APPOBJ}
-	${CC} -Wl,--dynamic-list=dylist.txt ${CFLAGS} ${APPOBJ} -static ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm -L ~/local/lib/ -lboost_regex -lstdc++ -la -ldl -o ace.static
+	${CC} -Wl,--dynamic-list=dylist.txt ${CFLAGS} ${APPOBJ} -Wl,-Bstatic -static ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -static -lpthread -lm -L ~/local/lib/ -lboost_regex -lstdc++ -la -ldl -o ace.static
 
 post/post.o:
 	make -C post
