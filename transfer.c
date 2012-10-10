@@ -1595,7 +1595,8 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 		extern int noldslabs;
 		if(noldslabs >= MAX_TRANSFER_CHUNKS)
 		{
-			printf("NOTE: hit RAM limit while transfering\n");
+			fprintf(stderr, "NOTE: hit RAM limit while transfering\n");
+			itsdb_error("ran out of RAM while transfering");
 			return -1;
 		}
 		struct mrs	*min = ts->mrs[i];

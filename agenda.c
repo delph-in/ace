@@ -186,8 +186,7 @@ void sanity_check_agenda(int length)
 	printf("passed sanity\n");
 }
 
-//struct path	comp_head_path, head_path, subj_ind_path, sind_path;
-//int			dep_init = 0;
+/*
 
 int	reduce_chart(int	length)//, char **words)
 {
@@ -254,11 +253,14 @@ int	reduce_chart(int	length)//, char **words)
 		{
 			//if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d `%s'!\n", i, words[i]);
 			if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d!\n", i);
+			itsdb_error("post-reduction lexical gap");
 			return -1;
 		}
 
 	return 0;
 }
+
+*/
 
 // can 'lt' fit in first position of rule?
 static inline int	lexfirst(struct type	*lt, int	rule)

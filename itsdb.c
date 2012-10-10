@@ -113,6 +113,22 @@ int	tsdb_i_id = -1;
 
 int tsdb_nanalyses, tsdb_maxanalyses, tsdb_nderivations, tsdb_maxderivations=1;
 
+static char	*the_itsdb_error;
+
+void itsdb_error(char	*error)
+{
+	extern int do_itsdb;
+	if(!do_itsdb)return;
+	if(the_itsdb_error)
+	{
+		char	*e2 = malloc(strlen(the_itsdb_error) + strlen(error) + 10);
+		sprintf(e2, "%s, %s", the_itsdb_error, error);
+		free(the_itsdb_error);
+		the_itsdb_error = e2;
+	}
+	else the_itsdb_error = strdup(error);
+}
+
 static int process_item(int i_id, const char *i_input, int parse_id, 
 		int edges, int nanalyses, int nderivations, int interactive, const char	*who_knows_what_this_argument_is)
 {
@@ -120,8 +136,8 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	int readings;
 	struct timeval tv1, tv2;
 	clock_t	c0, c1;
-	char	*error = 0;
 
+	the_itsdb_error = NULL;
 	//fprintf(stderr, "process_item asked for: %d = nanalyses, %d = nderivations\n", nanalyses, nderivations);
 	tsdb_maxanalyses = nanalyses;
 	tsdb_maxderivations = nderivations;
@@ -151,7 +167,7 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 		if(!m)
 		{
 			readings = -1;
-			error = "unable to parse mrs input";
+			itsdb_error("unable to parse MRS input");
 		}
 		else
 		{
@@ -169,7 +185,12 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	capi_printf(" (:total . %d) (:treal . %d)", cpuclock_msec, wallclock_msec);
 	capi_printf(" (:tcpu . %d)", cpuclock_msec);
 
-	if(error)capi_printf(" (:error . \"%s\")", error);
+	if(the_itsdb_error)
+	{
+		capi_printf(" (:error . \"%s\")", the_itsdb_error);
+		free(the_itsdb_error);
+		the_itsdb_error = NULL;
+	}
 }
 
 int itsdb_report(struct lattice	*tokens, struct lattice	*lexical_chart, int	status, int	tforest)

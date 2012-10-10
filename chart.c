@@ -881,6 +881,7 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 			if(!(master_addr && 1==arbiter_request_memory()))
 			{
 				fprintf(stderr, "NOTE: terminating search, too much RAM\n");
+				itsdb_error("ran out of RAM while building forest");
 				return -1;	// give up :(
 			}
 			else

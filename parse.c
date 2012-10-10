@@ -233,6 +233,7 @@ int	cancel_parse;
 void	alarm_handler(int	sig)
 {
 	fprintf(stderr, "NOTE: cancelling parse, taking too long\n");
+	itsdb_error("timeout");
 	cancel_parse = 1;
 }
 
@@ -417,6 +418,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	if(token_chart->nvertices>70)
 	{
 		fprintf(stderr, "NOTE: giving up, too many words (70+)\n");
+		itsdb_error("too many words (70+)");
 		if(do_itsdb)itsdb_report(token_chart, NULL, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
@@ -446,7 +448,11 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	{
 		// do lexical parsing
 		int rv = lexical_parse_lattice(lexical_chart);
-		if(rv == -1)return -1;	// ran out of memory in lexical parsing!
+		if(rv == -1)
+		{
+			itsdb_error("ran out of RAM in lexical parsing");
+			return -1;	// ran out of memory in lexical parsing!
+		}
 	}
 
 	if(reduce_lexical_lattice(lexical_chart, token_chart))
@@ -479,6 +485,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	if(nwords < 0)
 	{
 		fprintf(stderr, "NOTE: negative lexical chart length\n");
+		itsdb_error("negative lexical chart length");
 		if(do_itsdb)itsdb_report(token_chart, lexical_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
@@ -487,6 +494,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	if(!nwords)
 	{
 		fprintf(stderr, "NOTE: nothing to parse\n");
+		itsdb_error("nothing to parse");
 		if(do_itsdb)itsdb_report(token_chart, lexical_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
@@ -655,6 +663,7 @@ int	check_mbs(char	*mbs);
 	if(nwords>1000)
 	{
 		fprintf(stderr, "NOTE: 0 readings, too many words (1000+)\n");
+		itsdb_error("too many words (1000+ before token mapping)");
 		if(!inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
 		goto finished;
 	}

@@ -588,6 +588,7 @@ int	semindex_try_generics(struct mrs_ep	*ep, struct ep_alignment	**Rest, char	*e
 	{
 		// we should look at the other set of generics (activated by the pos tag in the relation name)
 		fprintf(stderr, "NOTE: EP '%s' is unknown in the semantic index\n", ep->pred);
+		itsdb_error("input EP not in index");
 	}
 }
 

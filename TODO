@@ -146,6 +146,9 @@ ideas:
 DONE:
 
 unreleased
+	- new arbiter communication mechanism whereby ACE and arbiter negotiate RAM limits per item
+	- output :error's more consistently for ITSDB
+	- support forest format for new tsdb schema
 0.9.10pre4
 	- don't overwrite user's config file if they swap -G and -g by mistake
 	- keep track of start/end vertices in lattice mapping

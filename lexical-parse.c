@@ -62,7 +62,12 @@ struct lattice	*lexical_lookup_into_chart(struct lattice	*token_chart)
 	}
 
 	int res = lexical_lookup(token_chart, edge_handler);
-	if(res!=0)return NULL;// { fprintf(stderr, "NOTE: lexical coverage gap\n"); return NULL; }
+	if(res!=0)
+	{
+		//fprintf(stderr, "NOTE: lexical coverage gap\n");
+		itsdb_error("pre-reduction lexical gap");
+		return NULL;
+	}
 	return lc;
 }
 
@@ -274,6 +279,7 @@ int	reduce_lexical_lattice(struct lattice	*lat, struct lattice	*toklat)
 					}
 				}
 				fprintf(stderr, "NOTE: lexemes do not span position %d `%s'!\n", i, word?:"?");
+				itsdb_error("post-reduction lexical gap");
 			}
 			return -1;
 		}

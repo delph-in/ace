@@ -174,8 +174,8 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	extern int currslabsize;
 	if(len >= currslabsize)
 	{
-		printf("NOTE: couldn't allocate %d decompositions, giving up\n",n);
-		return NULL;
+		fprintf(stderr, "NOTE: couldn't allocate %d decompositions, giving up\n",n);
+		longjmp(out_of_memory_jump, 3);
 	}
 	d = dec = slab_alloc(len);
 
@@ -1326,7 +1326,8 @@ extern int do_itsdb;
 
 	if(setjmp(out_of_memory_jump) != 0)
 	{
-		printf("NOTE: hit RAM limit while unpacking\n");
+		fprintf(stderr, "NOTE: hit RAM limit while unpacking\n");
+		itsdb_error("ran out of RAM while unpacking");
 		goto resume_after_oom;
 	}
 
@@ -1336,6 +1337,7 @@ extern int do_itsdb;
 		if(edge->frozen)
 		{
 			fprintf(stderr, "ERROR: found a frozen edge #%d (not packed) in the root cell!\n", edge->id);
+			itsdb_error("frozen edge in root cell");
 			//exit(-1);
 			continue;
 			// XXX these can occur in generation when index accessibility filtering causes a more general analysis to be discarded...
