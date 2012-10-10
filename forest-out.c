@@ -14,14 +14,17 @@
 #include	"token.h"
 #include	"unicode.h"
 
-void output_packed_tree(struct edge	*e, struct lattice	*tokens)
+void output_packed_tree(struct edge	*e, struct lattice	*tokens, int waspacked)
 {
 	if(e->unpack)return;
 	e->unpack = (void*)1;
 	char	*sign = e->rule?e->rule->name:e->lex->word;
 	//char	*sign = e->rule?e->rule->name:e->lex->lextype->name;
 	int	i;
-	printf("(%d %s %d %d [", e->id, sign, e->from, e->to);
+	int type = 3;
+	if(!e->rule)type=1;
+	else if(e->rule->lexical)type=2;
+	printf("(%d %s %d %d %d %d [", e->id, sign, e->from, e->to, waspacked, type);
 	for(i=0;i<e->npack;i++)
 	{
 		if(i)printf(",");
@@ -45,8 +48,8 @@ void output_packed_tree(struct edge	*e, struct lattice	*tokens)
 		}
 	}
 	printf("))\n");
-	for(i=0;i<e->npack;i++)output_packed_tree(e->pack[i], tokens);
-	for(i=0;i<e->have;i++)output_packed_tree(e->daughters[i], tokens);
+	for(i=0;i<e->npack;i++)output_packed_tree(e->pack[i], tokens, 1);
+	for(i=0;i<e->have;i++)output_packed_tree(e->daughters[i], tokens, 0);
 }
 
 set_path_number(struct token	*T, struct path	path, int	n)
@@ -175,6 +178,8 @@ do_retry:
 	if(progress && retry-- > 0)goto do_retry;
 }
 
+char	*this_edge_is_root(struct edge	*edge);
+
 output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 {
 	int	i;
@@ -183,10 +188,12 @@ output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		edge = cell->p_edges[i];
-		if( (g_mode!=GENERATING || edge->neps == require_neps) && is_root(edge->dg) && !edge->frozen )
+		char	*symbol = this_edge_is_root(edge);
+		//if( (g_mode!=GENERATING || edge->neps == require_neps) && is_root(edge->dg) && !edge->frozen )
+		if(symbol)
 		{
-			printf("root %d\n", edge->id);
-			output_packed_tree(edge, tokens);
+			printf("root %d %d %d %d %s\n", next_eid(), edge->from, edge->to, edge->id, symbol);
+			output_packed_tree(edge, tokens, 0);
 			found_root = 1;
 		}
 	}
@@ -221,7 +228,7 @@ output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 			sprintf(token_str, "token [ +FROM \"%d\" +TO \"%d\" +FORM \"%s\" ]", t->cfrom, t->cto, formesc);
 			free(formesc);
 		}
-		printf("token %d %d %d %s\n", t->eid, le->from->id, le->to->id, token_str);
+		printf("token %d %d %d %d %s\n", t->eid, le->from->id, le->to->id, t->used, token_str);
 	}
 	return found_root;
 }
