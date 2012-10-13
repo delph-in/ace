@@ -67,6 +67,8 @@ int	max_chart_megabytes = 1200, max_unpack_megabytes = 1500;
 int preexisting_lui_fd = -1;
 int input_from_lui = 0;
 
+int	tsdb_notes = 0;	// if 1, print NOTEs with `parse' relation data and `run' relation data
+
 extern float timer();
 
 int	parse_line(char	*line);
@@ -119,6 +121,7 @@ void	parse_args(int	argc, char	*argv[])
 		{"itsdb-forest", 0, &itsdb_dump_chart, 1},
 		{"report-labels", 0, &report_labels, 1},
 		{"input-from-lui", 0, &input_from_lui, 1},
+		{"tsdb-notes", 0, &tsdb_notes, 1},
 #define	MAX_UNPACK_MEGABYTES_OPTION	1000
 		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},
 #define	MAX_CHART_MEGABYTES_OPTION	1001
@@ -488,6 +491,7 @@ int	main(int	argc, char	*argv[])
 	initialize_engine();
 
 	if(do_itsdb) itsdb_mode();
+	if(tsdb_notes)tsdb_run_note();
 	setup_signal_handlers();
 	if(preexisting_lui_fd != -1)
 	{

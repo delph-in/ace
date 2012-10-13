@@ -556,8 +556,6 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 		if(chart_size>0)
 			num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], parse_show_result, best_only);
 		else num_parses = 0;
-		if(num_parses && !inhibit_results)printf("\n\n");
-		fflush(stdout);
 
 		fprintf(stderr, "NOTE: %d readings, added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
 			num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
@@ -601,7 +599,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 
 void	preprocess_line(char	*string, int	*Nwords, char	***Words, int	**CFrom, int	**CTo);
 
-int	parse_line(char	*line)
+int	parse_line1(char	*line)
 {
 	char	copy[10240];
 	int	nparse = 0;
@@ -611,6 +609,8 @@ int	parse_line(char	*line)
 	extern int preprocess_only;
 
 	timer();
+	extern int tsdb_notes;
+	if(tsdb_notes)tsdb_parse_note_start();
 	if(g_profiling)
 	{
 		if(parse_profiler)stop_profilers_recursively(parse_profiler);
@@ -683,6 +683,7 @@ int	check_mbs(char	*mbs);
 	if(do_itsdb && nparse==-1)itsdb_report(NULL, NULL, -1, 0);
 
 finished:
+	if(tsdb_notes)tsdb_parse_note_end();
 	if(g_profiling)stop_profilers_recursively(parse_profiler);
 	clear_mrs();
 	clear_slab();
@@ -691,6 +692,14 @@ finished:
 	free(cfrom);
 	free(cto);
 	return nparse;
+}
+
+int parse_line(char	*line)
+{
+	int res = parse_line1(line);
+	if(!inhibit_results)printf("\n\n");
+	fflush(stdout);
+	return res;
 }
 
 show_last_parse_chart()

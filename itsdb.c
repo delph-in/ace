@@ -71,31 +71,45 @@ int itsdb_dump_chart = 0;
 
 const int itsdb_wants_mrs = 1;
 
+void	create_tsdb_run_note(char	*str, int	protocol_version)
+{
+	char platform [1024];
+#if defined(__GNUC__) && defined(__GNUC_MINOR__)
+	sprintf(platform, "gcc %d.%d", __GNUC__, __GNUC_MINOR__);
+#else
+	sprintf(platform, "unknown");
+#endif
+
+	str += sprintf(str, "(:application . \"answer\") (:platform . \"%s\")",
+			platform);
+	extern char	*grammar_version;
+	str += sprintf(str, " (:grammar . \"%s\")", grammar_version?:"unknown");
+	if(protocol_version >= 2)
+		str += sprintf(str, " (:protocol . %d)", protocol_version);
+	int	nlrules = 0, i;
+	for(i=0;i<nrules;i++)if(rules[i]->lexical)nlrules++;
+	str += sprintf(str, " (:avms . %d) (:lexicon . %d) (:lrules . %d) (:rules . %d)",
+			default_type_hierarchy()->ntypes,
+			nlexemes, nlrules, nrules-nlrules);
+}
+
+void tsdb_run_note()
+{
+	char	buffer[10240];
+	create_tsdb_run_note(buffer, 1);
+	printf("NOTE: tsdb run: %s\n", buffer);
+	fflush(stdout);
+}
+
 static int create_test_run(const char *data, int run_id, const char *comment,
 		int interactive, int protocol_version, const char *custom)
 {
-	char platform [1024];
-
 	if(protocol_version > 0)// && protocol_version <= 2)
 	{
+		char	runnote[10240];
+		create_tsdb_run_note(runnote, protocol_version);
+		capi_printf("%s", runnote);
 
-#if defined(__GNUC__) && defined(__GNUC_MINOR__)
-		sprintf(platform, "gcc %d.%d", __GNUC__, __GNUC_MINOR__);
-#else
-		sprintf(platform, "unknown");
-#endif
-
-		capi_printf("(:application . \"answer\") (:platform . \"%s\")",
-				platform);
-		extern char	*grammar_version;
-		capi_printf(" (:grammar . \"%s\")", grammar_version?:"unknown");
-		if(protocol_version >= 2)
-			capi_printf(" (:protocol . %d)", protocol_version);
-		int	nlrules = 0, i;
-		for(i=0;i<nrules;i++)if(rules[i]->lexical)nlrules++;
-		capi_printf(" (:avms . %d) (:lexicon . %d) (:lrules . %d) (:rules . %d)",
-				default_type_hierarchy()->ntypes,
-				nlexemes, nlrules, nrules-nlrules);
 		if(protocol_version == 2)
 			itsdb_dump_chart = 1;
 		else itsdb_dump_chart = 0;
@@ -129,13 +143,49 @@ void itsdb_error(char	*error)
 	else the_itsdb_error = strdup(error);
 }
 
+static struct timeval	pnstart;
+static int cpustart;
+tsdb_parse_note_start()
+{
+	gettimeofday(&pnstart, NULL);
+	cpustart = clock();
+}
+
+create_tsdb_parse_note(char	*str)
+{
+	struct timeval	tv2;
+	int	c1;
+	gettimeofday(&tv2, 0);
+	c1 = clock();
+
+	int	wallclock_msec = 1000*(tv2.tv_sec - pnstart.tv_sec) + 0.001*(tv2.tv_usec - pnstart.tv_usec);
+	int	cpuclock_msec = (int)((long long)(c1-cpustart)*1000 / CLOCKS_PER_SEC);
+	str += sprintf(str, " (:total . %d) (:treal . %d)", cpuclock_msec, wallclock_msec);
+	str += sprintf(str, " (:tcpu . %d)", cpuclock_msec);
+
+	str += sprintf(str, " (:others . %d)", slab_usage());
+
+	if(the_itsdb_error)
+	{
+		str += sprintf(str, " (:error . \"%s\")", the_itsdb_error);
+		free(the_itsdb_error);
+		the_itsdb_error = NULL;
+	}
+}
+
+tsdb_parse_note_end()
+{
+	char	buffer[10240];
+	create_tsdb_parse_note(buffer);
+	printf("NOTE: tsdb parse: %s\n", buffer);
+	fflush(stdout);
+}
+
 static int process_item(int i_id, const char *i_input, int parse_id, 
 		int edges, int nanalyses, int nderivations, int interactive, const char	*who_knows_what_this_argument_is)
 {
 	extern int total_edges, real_edges, passive_edges;
 	int readings;
-	struct timeval tv1, tv2;
-	clock_t	c0, c1;
 
 	the_itsdb_error = NULL;
 	//fprintf(stderr, "process_item asked for: %d = nanalyses, %d = nderivations\n", nanalyses, nderivations);
@@ -153,8 +203,7 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	extern int want_mrs;
 	want_mrs = itsdb_wants_mrs;
 
-	gettimeofday(&tv1, 0);
-	c0 = clock();
+	tsdb_parse_note_start();
 	clear_mrs();
 	clear_slab();
 	if(g_mode == PARSING)
@@ -177,20 +226,9 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 		}
 		free(mutable_input);
 	}
-	gettimeofday(&tv2, 0);
-	c1 = clock();
-
-	int	wallclock_msec = 1000*(tv2.tv_sec - tv1.tv_sec) + 0.001*(tv2.tv_usec - tv1.tv_usec);
-	int	cpuclock_msec = (int)((long long)(c1-c0)*1000 / CLOCKS_PER_SEC);
-	capi_printf(" (:total . %d) (:treal . %d)", cpuclock_msec, wallclock_msec);
-	capi_printf(" (:tcpu . %d)", cpuclock_msec);
-
-	if(the_itsdb_error)
-	{
-		capi_printf(" (:error . \"%s\")", the_itsdb_error);
-		free(the_itsdb_error);
-		the_itsdb_error = NULL;
-	}
+	char	buffer[10240];
+	create_tsdb_parse_note(buffer);
+	capi_printf("%s", buffer);
 }
 
 int itsdb_report(struct lattice	*tokens, struct lattice	*lexical_chart, int	status, int	tforest)
@@ -219,8 +257,6 @@ int itsdb_report(struct lattice	*tokens, struct lattice	*lexical_chart, int	stat
 			capi_printf("(:readings . 0) (:pedges . 0) (:aedges . 0) ");
 			readings = -2;
 		}
-
-		capi_printf("(:others . %d) ", slab_usage());
 		return readings;
 	}
 	else
@@ -239,7 +275,6 @@ void	itsdb_report_gen(int readings, double	fixup_time)
 		tsdb_nanalyses,
 		passive_edges, real_edges - passive_edges);
 
-	capi_printf("(:others . %d) ", slab_usage());
 	capi_printf("(:tgc . %d) ", (int)(fixup_time * 1000));
 
 	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
