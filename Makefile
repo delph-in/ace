@@ -58,7 +58,7 @@ libace.a: libace.o ${OBJ}
 	ar cru libace.a ${OBJ} post/post.o libace.o
 	ranlib libace.a
 
-install: ace libace.so
+install: ace libace.so libace.a
 	cp ace ${PREFIX}/bin/
 	cp libace.so ${PREFIX}/lib/
 	cp libace.a ${PREFIX}/lib/
