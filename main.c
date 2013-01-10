@@ -439,7 +439,7 @@ void	initialize_engine()
 void	report_stats(struct job_stats	stats)
 {
 	if(stats.count)
-		fprintf(stderr, "NOTE: %s %d / %d sentences, avg %dk, time %.5fs\n", (g_mode==PARSING)?"parsed":"generated",
+		fprintf(stderr, "NOTE: %s %d / %d sentences, avg %dk, time %.5fs\n", (g_mode==PARSING)?"parsed":(g_mode==GENERATING?"generated":"transfered"),
 			stats.success, stats.count, (int)(stats.ram / stats.count / 1024), (float)stats.time);
 
 	rule_stats();
