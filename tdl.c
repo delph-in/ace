@@ -551,7 +551,7 @@ struct dg	*type_dg(char		*name)
 	struct type	*type = find_type(name, 1);
 	struct dg	*ret;
 
-	if(!type)exit(-1);
+	if(!type)return NULL;//exit(-1);
 	if(!type->dg)return atomic_dg(name);
 	ret = copy_dg(type->dg);
 	if(!ret) { fprintf(stderr, "type_dg(%s) couldn't copy %p\n", name, type->dg); exit(-1); }
@@ -1635,6 +1635,8 @@ int load_grammar(char	*path)
 
 		load_quickcheck();
 		setup_rule_filter();
+		//prepare_qc_rules();
+
 		// make sure we have complete restrictor sets in case recent activity has added new features...
 		load_restrictors();
 	}
