@@ -375,7 +375,7 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 
 	if(0 != unify_dg_infrom(le_toklist, in_toklist))
 	{
-		if(trace) { fprintf(stderr, "failed to unfiy tokens LIST\n"); unify_backtrace(); }
+		if(trace) { fprintf(stderr, "failed to unify tokens LIST\n"); unify_backtrace(); }
 		return -1;
 	}
 	if(0 != unify_dg_infrom(le_toklast, in_toklast))
