@@ -110,7 +110,7 @@ static char	*parse_word(char	**P, int advance)
 	int inq = 0, esc = 0;
 	while(*p && (inq || *p!=' '))
 	{
-		if(esc) { esc = 1; }
+		if(esc) { esc = 0; }
 		else
 		{
 			if(*p=='\\')esc=1;
