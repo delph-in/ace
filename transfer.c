@@ -6,21 +6,6 @@
 #include	<assert.h>
 
 #define	MAX_TRANSFER_CHUNKS	2560
-
-//#define	COPIED_VARIABLES_NEED_REENTRANCIES
-#undef	COPIED_VARIABLES_NEED_REENTRANCIES
-
-#define	FIXUP_FIRST_ROUTE_ONLY		1
-#define	CLEANUP_FIRST_ROUTE_ONLY	1
-
-//#define	EQUATE_QEQS_FOR_TRANSFER	0	// had thought this was right for some reason, perhaps related to the fixup test I did when Dan was here
-#define	EQUATE_QEQS_FOR_TRANSFER	1	// using this setting for the paper with Berthold
-
-#undef	NO_FIXUP
-//#define	NO_FIXUP
-
-#define	ALLOW_SEMI_MODE	0
-
 //#define	DEBUG	printf
 #define	DEBUG(...)	do { } while(0)
 
@@ -191,7 +176,15 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 
 void	process_saved_tcopy(struct transfer_rule	*r, struct tcopy	*c)
 {
-	int	i;
+	int i;
+	extern char	**fnames;
+	printf("rule '%s' -- should record a copy from: ", r->name);
+	for(i=0;i<c->frompathlen;i++)printf(" %s", fnames[c->frompath[i]]);
+	printf("\n to: ");
+	for(i=0;i<c->topathlen;i++)printf(" %s", fnames[c->topath[i]]);
+	printf("\n");
+	assert(!"not implemented yet");
+	/*
 	int minlen = 2 + rels_list_path.count;
 	if(c->pathlen < minlen)goto badcopy;
 	if(c->path[0] != lookup_fname("OUTPUT"))goto  badcopy;
@@ -215,7 +208,7 @@ void	process_saved_tcopy(struct transfer_rule	*r, struct tcopy	*c)
 	for(i=0;i<c->pathlen;i++)
 		fprintf(stderr, " %s", fnames[c->path[i]]);
 	fprintf(stderr, "\n");
-	exit(-1);
+	exit(-1);*/
 }
 
 void warn_about_equals(struct transfer_rule	*tr)
@@ -247,7 +240,8 @@ struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg)
 	for(i=0;i<saved_ntcopies;i++)
 	{
 		process_saved_tcopy(tr, &saved_tcopies[i]);
-		free(saved_tcopies[i].path);
+		free(saved_tcopies[i].frompath);
+		free(saved_tcopies[i].topath);
 		saved_ntcopies = 0;
 	}
 	//printf("processing transfer rule '%s',  have:\n", name);
@@ -1133,402 +1127,6 @@ check_all_mrs_vars_are_on_vlist(struct mrs	*m)
 		check_mrs_var_is_on_vlist(hc->hi, &m->vlist);
 		check_mrs_var_is_on_vlist(hc->lo, &m->vlist);
 	}
-}
-
-// when creating a new EP (i.e. on the output list),
-// in principal all of the variables it references are (potentially) changed or new.
-// we can get away with considering them all new.
-// *but* they may be / will be reentrant with variables referenced by other parts of the MRS.
-// use the new variables' INSTLOC to see what old variable they correspond to,
-// and in the result MRS, update all obsoleted old variables to their new counterparts.
-
-struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*hcalignment, struct mrs	*min)
-{
-	struct mrs_vlist	new_vars;
-	bzero(&new_vars, sizeof(new_vars));
-	struct mrs_var	*vpbuffer[64];
-	new_vars.vars = vpbuffer;
-
-	//printf("finding result of transfer rule '%s'\n", tr->name);
-	//check_all_mrs_vars_are_on_vlist(min);
-
-	struct mrs_ep	new_eps[tr->output.neps];
-	int i, j;
-
-	struct dg	*old_var_dg[min->vlist.nvars];
-	// get the location of every old var in the unified mrs/rule dag conglomeration
-	for(i=0;i<min->vlist.nvars;i++)
-		old_var_dg[i] = dereference_dg(min->vlist.vars[i]->dg);
-
-	//struct dg	*full_tr_copy = copy_dg_with_comp_arcs(tr->dg);
-
-	struct dg	*copy_ep_out_dgs[tr->output.neps];
-	struct dg	*copy_ep_in_dgs[tr->input.neps];
-	struct dg	*copy_hc_hi[tr->output.nhcons];
-	struct dg	*copy_hc_lo[tr->output.nhcons];
-	struct mrs_var	*copy_hc_hi_v[tr->output.nhcons];
-	struct mrs_var	*copy_hc_lo_v[tr->output.nhcons];
-	for(i=0;i<tr->output.neps;i++)
-	{
-		copy_ep_out_dgs[i] = copy_dg_with_comp_arcs(tr->output.eps[i].dg);
-		if(copy_ep_out_dgs[i] == NULL)
-			return NULL;	// cycle detected; the unification really failed but we didn't notice until now.
-		if(tr->output_copy_map[i])	// copy whatever we can from input[i]
-		{
-			assert(i < tr->input.neps);
-			// default unify is destructive, for now.
-			copy_ep_in_dgs[i] = copy_dg_with_comp_arcs(tr->input.eps[i].dg);
-			if(copy_ep_in_dgs[i] == NULL)
-				return NULL;	// cycle detected; the unification really failed but we didn't notice until now.
-		}
-	}
-	for(i=0;i<tr->output.nhcons;i++)
-	{
-		copy_hc_hi[i] = copy_dg_with_comp_arcs(tr->output.mrs->hcons[i].hi->dg);
-		copy_hc_lo[i] = copy_dg_with_comp_arcs(tr->output.mrs->hcons[i].lo->dg);
-	}
-
-	// before applying +copy+ defaults, brand new variables need to get INSTLOCs assigned to them, so that they can't be smushed into old variables by the unifier.
-
-	extern unsigned int generation;
-#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
-	int	nov = tr->output.mrs->vlist.nvars, ninstlocs_to_fix = 0;
-	struct dg	*instlocs_to_fix[nov];
-	for(i=0;i<tr->output.mrs->vlist.nvars;i++)
-	{
-		struct mrs_var	*v = tr->output.mrs->vlist.vars[i];
-		if(!v->dg)continue;	// sometimes there are fake variables... e.g. invented LTOPs
-		struct dg	*rule_vdg = dereference_dg(v->dg);
-		if(rule_vdg->gen == generation && rule_vdg->copy)
-		{
-			// look at every variable that was copied out of the output section
-			struct dg	*copy_vdg = rule_vdg->copy;
-			struct dg	*copy_il = dg_hop(copy_vdg, instloc_feature);
-			if(!copy_il || copy_il->xtype->name[0]!='"')
-			{
-				// this copy_vdg does not have a grounded INSTLOC.
-				instlocs_to_fix[ninstlocs_to_fix++] = copy_vdg;
-			}
-		}
-	}
-#endif
-
-	// we have now copied everything that we will copy;
-	// figure out where old variables' dags got copied to
-	for(i=0;i<min->vlist.nvars;i++)
-	{
-		if(old_var_dg[i]->gen != generation)
-			old_var_dg[i] = NULL;	// didn't get copied at all
-		else old_var_dg[i] = old_var_dg[i]->copy;
-	}
-	// old_var_dg[] now are either NULL or are pointers into the new copies
-	// critically, if an old variable got copy()'d multiple times above,
-	// the same copy was returned each time.
-
-	bump_generation();
-
-#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
-	for(i=0;i<ninstlocs_to_fix;i++)
-	{
-		struct dg	*new_il = new_instloc(1);
-		new_il->type = new_il->xtype = transfer_next_skolem_constant();
-		add_dg_hop(instlocs_to_fix[i], instloc_feature, new_il);
-		//printf("fixing instloc for new variable dg %p to %s\n", instlocs_to_fix[i], new_il->type->name);
-	}
-#endif
-
-	for(i=0;i<tr->output.neps;i++)
-		if(tr->output_copy_map[i])	// copy whatever we can from input[i]
-		{
-			/*printf("applying +copy+; input dag to copy is:\n");
-			print_dg(copy_ep_in_dgs[i]);printf("\n");
-			printf("applying +copy+; output dag to refine is:\n");
-			print_dg(copy_ep_out_dgs[i]);printf("\n");*/
-			unify_dg_defaults(copy_ep_out_dgs[i], copy_ep_in_dgs[i]);
-			/*printf("applying +copy+; revised output dag is:\n");
-			print_dg(copy_ep_out_dgs[i]);printf("\n");*/
-		}
-
-	// if any old variable dags were default unified with new variable dags, they
-	// may have been forwarded
-	for(i=0;i<min->vlist.nvars;i++)
-		if(old_var_dg[i])
-			old_var_dg[i] = dereference_dg(old_var_dg[i]);
-
-	//printf("for result (after applying +copy+), tr dg is:\n");print_dg(full_tr_copy);printf("\n");
-
-	inhibit_vpm = 1;	// in SEMI-mode, the variables are already external.  in non-SEMI-mode, we want to keep variables internal.
-	clear_mrs();	// we don't want spurious reentrancies with variables read off of previous invocations of this rule
-	for(i=0;i<tr->output.neps;i++)
-	{
-		dg_to_mrs_ep(copy_ep_out_dgs[i], &new_vars, &new_eps[i]);
-		/*printf("new EP %d:    ", i);
-		printf("[ %s LBL: ", new_eps[i].pred);
-		print_mrs_var(new_eps[i].lbl);
-		for(j=0;j<new_eps[i].nargs;j++)
-		{
-			printf(" %s: ", new_eps[i].args[j].name);
-			print_mrs_var(new_eps[i].args[j].value);
-		}
-		printf(" ]\n");*/
-	}
-	for(i=0;i<tr->output.nhcons;i++)
-	{
-		copy_hc_hi_v[i] = dg_to_mrs_var(copy_hc_hi[i], &new_vars);
-		copy_hc_lo_v[i] = dg_to_mrs_var(copy_hc_lo[i], &new_vars);
-	}
-	for(i=0;i<new_vars.nvars;i++)
-		new_vars.vars[i]->dg->copy = NULL;	// make sure dg_to_mrs_var in future passes doesn't return this by mistake
-	inhibit_vpm = 0;
-	// see if any of the new variables are old variables in disguise.
-	// for truly new variables, issue a new INSTLOC.
-	struct mrs_var	*new_var_map[min->vlist.nvars];
-	bzero(new_var_map, sizeof(new_var_map));
-	for(i=0;i<new_vars.nvars;i++)
-	{
-		// for every extracted variable 'v', one of the following must happen:
-		// 1. it's an old variable; set new_var_map[] accordingly
-		// 2. it's truly new; make sure it has a new INSTLOC
-		// 3. we can't tell, throw an error
-		struct mrs_var	*v = new_vars.vars[i];
-		if(v->is_const)continue;	// don't try to align new constants to old constants; they aren't skolemized anyway.
-		struct dg	*vdg = v->dg;
-		if(ALLOW_SEMI_MODE)
-			v->semi_dg = vdg;	// ?? or should it be vdg = v->semi_dg?
-		vdg = dereference_dg(vdg);
-
-		struct dg	*iloc = dg_hop(vdg, instloc_feature);
-		assert(iloc != NULL);
-
-		// old_var_dg[]-based method of figuring out whether it's an old variable
-		int	noldvars = 0;
-		for(j=0;j<min->vlist.nvars;j++)
-			if(old_var_dg[j] == vdg)
-			{
-				new_var_map[j] = v;
-				noldvars++;
-			}
-		if(!noldvars)
-		{
-			// it may need to have an INSTLOC allocated
-			char	*ilt = iloc->xtype->name;
-			if(*ilt != '"')
-				iloc->xtype = iloc->type = transfer_next_skolem_constant();
-		}
-
-/*
-		// INSTLOC-based method of figuring out whether it's an old variable...
-		char	*ilt = iloc->xtype->name;
-		if(*ilt == '"')
-		{
-			// INSTLOC was set; this variable may exist in the input MRS. find it.
-			//   in case v is a handle that is/was part of a QEQ,
-			//   the INSTLOC by itself may not be enough to determine which
-			//   input variable 'v' corresponds to.
-			//   e.g. 'v' may be the RSTR of a newly +copy+'d quantifier EP
-			//   we have to make sure we new_var_map[] the old HI end of the QEQ
-			//   to 'v', rather than the old LO end.
-			//printf("new var %d has instloc type %s\n", i, ilt);
-			for(j=0;j<min->vlist.nvars;j++)
-			{
-				struct mrs_var	*ivar = min->vlist.vars[j];
-				if(ivar->is_const)continue;
-				struct dg	*ivdg = ALLOW_SEMI_MODE?ivar->semi_dg:ivar->dg;
-				struct dg	*iiloc = dg_hop(ivdg, instloc_feature);
-				assert(iiloc != NULL);
-				if(iiloc->xtype == iloc->xtype)break;
-			}
-			if(j == min->vlist.nvars)
-			{
-#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
-				// make sure this was one of the variables we gave a brand new instloc to.
-				for(j=0;j<ninstlocs_to_fix;j++)
-					if(dereference_dg(instlocs_to_fix[j]) == vdg)break;
-				if(j==ninstlocs_to_fix)
-#endif
-				{
-					printf("ERROR: found INSTLOC %s in output Ep variable dg %p, but that is not a variable in the input MRS and is not a variable we assigned a new INSTLOC to.\n", ilt, vdg);
-					assert(!"not reached");
-				}
-			}
-			else
-			{
-				//printf(" ... was actually old variable %s%d\n", min->vlist.vars[j]->type, j);
-				new_var_map[j] = v;
-			}
-		}
-		else
-		{
-#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
-			// should have already allocated instlocs to all new variables... code higher up.
-			assert(!"not reached");
-#else
-
-			// INSTLOC was not set; this variable is being invented brand new by this rule.
-			// give it an INSTLOC for future use.
-			iloc->xtype = iloc->type = transfer_next_skolem_constant();
-			//printf("new var %d was really new\n", i);
-#endif
-		}
-*/
-	}
-
-	/*for(i=0;i<tr->output.neps;i++)
-	{
-		printf("output EP dag:\n");
-		print_dg(copy_ep_out_dgs[i]);
-		printf("\n");
-	}*/
-
-	int ncarried_input_variables = 0;
-	//char	input_variable_is_carried[min->vlist.nvars];
-	char	input_variable_is_carried[1024];//min->vlist.nvars];
-	bzero(input_variable_is_carried, sizeof(input_variable_is_carried));
-	make_reliable_vnums(min);
-	struct mrs_var	*map_variable(struct mrs_var	*vin)
-	{
-		if(!vin)return NULL;
-		assert(vin->vnum >= 0 && vin->vnum < min->vlist.nvars);
-		assert(min->vlist.vars[vin->vnum] == vin);
-		struct mrs_var	*corresponding_new_var = new_var_map[vin->vnum];
-		if(corresponding_new_var)
-			return corresponding_new_var;
-		if(!input_variable_is_carried[vin->vnum])
-		{
-			input_variable_is_carried[vin->vnum] = 1;
-			ncarried_input_variables++;
-		}
-		return vin;
-	}
-
-	//printf("activated rule '%s' to ditch %d EPs\n", tr->name, tr->input.neps);
-
-	struct mrs	*mout = slab_alloc(sizeof(*mout));
-	bzero(mout, sizeof(*mout));
-	mout->nhcons = min->nhcons - tr->input.nhcons + tr->output.nhcons;
-	mout->hcons = slab_alloc(sizeof(struct mrs_hcons) * mout->nhcons);
-	char	hc_ditch[min->nhcons];
-	bzero(hc_ditch, sizeof(hc_ditch));
-	for(i=0;i<tr->input.nhcons;i++)
-		hc_ditch[hcalignment[i]] = 1;
-	for(i=j=0;i<min->nhcons;i++)
-		if(!hc_ditch[i])
-		{
-			struct mrs_hcons	*hcin = min->hcons+i;
-			struct mrs_hcons	*hcout = mout->hcons+j;
-			hcout->type = hcin->type;
-			hcout->hi = map_variable(hcin->hi);
-			hcout->lo = map_variable(hcin->lo);
-			j++;
-		}
-	for(i=0;i<tr->output.nhcons;i++)
-	{
-		struct mrs_hcons	*hcnew = tr->output.mrs->hcons+i;
-		struct mrs_hcons	*hcout = mout->hcons + j;
-		hcout->type = hcnew->type;
-		hcout->hi = copy_hc_hi_v[i];
-		hcout->lo = copy_hc_lo_v[i];
-		j++;
-	}
-	assert(mout->nhcons == j);
-	mout->ltop = map_variable(min->ltop);
-	mout->index = map_variable(min->index);
-	mout->xarg = map_variable(min->xarg);
-	mout->nrels = min->nrels - tr->input.neps + tr->output.neps;
-	mout->rels = slab_alloc(sizeof(struct mrs_ep) * mout->nrels);
-	char	ep_ditch[min->nrels];
-	bzero(ep_ditch, sizeof(ep_ditch));
-	for(i=0;i<tr->input.neps;i++)
-		ep_ditch[alignment[i]] = 1;
-	for(i=j=0;i<min->nrels;i++)
-		if(!ep_ditch[i])
-		{
-			struct mrs_ep	*epin = min->rels+i;
-			struct mrs_ep	*epout = mout->rels+j;
-			*epout = *epin;
-			epout->args = slab_alloc(sizeof(struct mrs_ep_role)*epin->nargs);
-			int k, anydiff = 1;
-			char	diffarg[epin->nargs];
-			epout->lbl = map_variable(epin->lbl);
-			for(k=0;k<epin->nargs;k++)
-			{
-				epout->args[k].name = epin->args[k].name;
-				epout->args[k].value = map_variable(epin->args[k].value);
-				if(epout->args[k].value != epin->args[k].value)
-				{
-					anydiff = 1;
-					diffarg[k] = 1;
-				}
-				else diffarg[k] = 0;
-			}
-			if(anydiff)
-			{
-				// need to build a new DAG for this EP
-				struct dg	*odg = dereference_dg(epin->dg);
-				int	label_bytes = DAG_EXTRA_LABELS_SIZE_FOR_COUNT(odg->narcs);
-				struct dg	*ndg = slab_alloc(sizeof(struct dg) + label_bytes + sizeof(struct dg*)*odg->narcs);
-				bzero(ndg, sizeof(struct dg));
-				ndg->type = ndg->xtype = odg->xtype;
-				ndg->narcs = odg->narcs;
-				struct dg	**narcs = DARCS(ndg);
-				struct dg	**oarcs = DARCS(odg);
-				for(k=0;k<odg->narcs;k++)
-				{
-					ndg->label[k] = odg->label[k];
-					extern char	**fnames;
-					char	*role = fnames[ndg->label[k]];
-					int l = -1;
-					if(!strcmp(role, "LBL"))
-					{
-						struct mrs_var	*v = epout->lbl;
-						narcs[k] = ALLOW_SEMI_MODE?v->semi_dg:v->dg;
-					}
-					else for(l=0;l<epout->nargs;l++)
-						if(!strcasecmp(role, epout->args[l].name))
-						{
-							struct mrs_var	*v = epout->args[l].value;
-							narcs[k] = ALLOW_SEMI_MODE?v->semi_dg:v->dg;
-							break;
-						}
-					if(l==epout->nargs)
-						narcs[k] = oarcs[k];
-					assert(narcs[k] != NULL);
-				}
-				epout->dg = ndg;
-				/*if(ALLOW_SEMI_MODE)
-					semi_reformat_mrs_ep(epout, 0);
-				else dagify_mrs_ep(epout);*/
-			}
-			epout->epnum = j;
-			j++;
-		}
-	for(i=0;i<tr->output.neps;i++)
-	{
-		mout->rels[j] = new_eps[i];
-		mout->rels[j].epnum = j;
-		j++;
-	}
-	assert(j == mout->nrels);
-	// the new vlist should have the old variables that were returned by map_variable(), union the new variables
-	mout->vlist.nvars = ncarried_input_variables + new_vars.nvars;
-	mout->vlist.vars = slab_alloc(sizeof(struct mrs_var*) * mout->vlist.nvars);
-	for(i=j=0;i<min->vlist.nvars;i++)
-		if(input_variable_is_carried[i])
-			mout->vlist.vars[j++] = map_variable(min->vlist.vars[i]);
-	for(i=0;i<new_vars.nvars;i++)
-		mout->vlist.vars[j++] = new_vars.vars[i];
-	assert(j == mout->vlist.nvars);
-	for(i=0;i<mout->vlist.nvars;i++)
-		mout->vlist.vars[i]->vnum = -1;	// the 'vnum' property is not reliable, since variables can be shared between different MRSes, and should only be used for printing purposes. set it to -1 to encourage crashing if we mistakenly try to rely on it some day.
-
-	setup_tmp();	// make sure subsequent forget_tmp() calls don't delete our saved EP dags or MRS structure
-
-	//check_all_mrs_vars_are_on_vlist(mout);
-	//check_all_mrs_vars_are_on_vlist(min);
-
-	//printf("result mrs = ");
-	//print_mrs(mout);
-	return mout;
 }
 
 int	equiv_mrs(struct mrs	*x, struct mrs	*y)

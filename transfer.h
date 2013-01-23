@@ -3,6 +3,21 @@
 #define		UNICODE
 #include	<boost/regex.h>
 
+#define	ALLOW_SEMI_MODE	0
+
+//#define	COPIED_VARIABLES_NEED_REENTRANCIES
+#undef	COPIED_VARIABLES_NEED_REENTRANCIES
+
+#define	FIXUP_FIRST_ROUTE_ONLY		1
+#define	CLEANUP_FIRST_ROUTE_ONLY	1
+
+//#define	EQUATE_QEQS_FOR_TRANSFER	0	// had thought this was right for some reason, perhaps related to the fixup test I did when Dan was here
+#define	EQUATE_QEQS_FOR_TRANSFER	1	// using this setting for the paper with Berthold
+
+#undef	NO_FIXUP
+//#define	NO_FIXUP
+
+
 struct mrs_ep_desc
 {
 	wchar_t	*pred_re;
@@ -42,8 +57,10 @@ int	load_transfer_rules();
 // for use when loading rules with ugly +copy+ specifications
 struct tcopy
 {
-	int	*path;
-	int	pathlen;
+	int	*frompath;
+	int	*topath;
+	int	frompathlen;
+	int	topathlen;
 };
 extern int saved_ntcopies;
 extern struct tcopy	*saved_tcopies;
@@ -63,4 +80,7 @@ int	study_cleanup_rule(char	*name, struct dg	*dg);
 struct mrs	*fixup_mrs(struct mrs	*m);
 struct mrs	*cleanup_mrs(struct mrs	*m);
 
+struct type	*transfer_next_skolem_constant();
+
 int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct mrs	***Results, int first_route_only);
+struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*hcalignment, struct mrs	*min);
