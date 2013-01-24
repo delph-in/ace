@@ -571,10 +571,17 @@ struct dagify_record
 	}	*corefs;
 	int	ncorefs;
 	int	unique_addendum;
-
+/*
 	struct tcopy	*tcopies;
-	int	ntcopies;
+	int	ntcopies;*/
 };
+
+/* a note about coreferencing and +copy+ in transfer rules...
+ * constraints appearing on the OUTPUT portion of a transfer rule are never applied to the other parts,
+ * even when they are coreferenced.  instead, type constraints on the OUTPUT portion are stored under a separate dg (tr->output_override),
+ * and the portion from the input (tr->dg / OUTPUT) is default-unified into it.
+ * we can then treat +copy+ as if it were a written coreference between the corresponding INPUT and OUTPUT EP.
+ */
 
 static void coreference(struct dagify_record	*R, char	*name)
 {
@@ -584,22 +591,44 @@ static void coreference(struct dagify_record	*R, char	*name)
 	R->corefs[R->ncorefs-1].pathlen = R->current_pathlen;
 	memcpy(R->corefs[R->ncorefs-1].path, R->current_path, sizeof(int) * R->current_pathlen);
 	char	*uniqname;
-	uniqname = malloc(strlen(name) + 16);
+	uniqname = malloc(strlen(name) + 20);
+	//int	in_output = (g_transfer!=0 && R->current_pathlen!=0 && R->current_path[0]==lookup_fname("OUTPUT"));
+	//sprintf(uniqname, "%s %s %d", in_output?"_o_":"_i_", name, R->unique_addendum);
 	sprintf(uniqname, "%s %d", name, R->unique_addendum);
 	R->corefs[R->ncorefs-1].name = uniqname;
 }
 
-static void record_transfer_copy(struct dagify_record	*R)
+/*static void record_tcopy(struct dagify_record	*R, int	*from, int	flen, int	*to, int	tlen)
+{
+	R->ntcopies++;
+	R->tcopies = realloc(R->tcopies, sizeof(struct tcopy)*R->ntcopies);
+	R->tcopies[R->ntcopies-1].frompath = malloc(sizeof(int) * flen);
+	R->tcopies[R->ntcopies-1].frompathlen = flen;
+	memcpy(R->tcopies[R->ntcopies-1].frompath, from, sizeof(int)*flen);
+	R->tcopies[R->ntcopies-1].topath = malloc(sizeof(int) * tlen);
+	R->tcopies[R->ntcopies-1].topathlen = tlen;
+	memcpy(R->tcopies[R->ntcopies-1].topath, to, sizeof(int)*tlen);
+}*/
+
+static void transfer_ep_copy(struct dagify_record	*R)
 {
 	// as near as I can tell, +copy+ means the (say, I'th) output should be
 	// identical to the I'th input, with some additional constraints thrown in.
 	// the additional output specifications are meant to override features of the input when copied.
-	// they are *not* constraints on the input, so we can't implement this with a coreference.
-	R->ntcopies++;
-	R->tcopies = realloc(R->tcopies, sizeof(struct tcopy)*R->ntcopies);
-	R->tcopies[R->ntcopies-1].path = malloc(sizeof(int) * R->current_pathlen);
-	R->tcopies[R->ntcopies-1].pathlen = R->current_pathlen;
-	memcpy(R->tcopies[R->ntcopies-1].path, R->current_path, sizeof(int) * R->current_pathlen);
+	// we treat this just like a coreference (but note that type constraints inside transfer rule
+	// OUTPUT sections have special treatment)
+	assert(R->current_pathlen && lookup_fname("OUTPUT") == R->current_path[0]);
+	//int	pathcopy[R->current_pathlen];
+	//memcpy(pathcopy, R->current_path, sizeof(int)*R->current_pathlen);
+	//pathcopy[0] = lookup_fname("INPUT");
+	//record_tcopy(R, pathcopy, R->current_pathlen, R->current_path, R->current_pathlen);
+	static int tcopy_id = 0;
+	char	name[128];
+	sprintf(name, "tcopy-%d", tcopy_id++);
+	R->current_path[0] = lookup_fname("INPUT");
+	coreference(R, name);
+	R->current_path[0] = lookup_fname("OUTPUT");
+	coreference(R, name);
 }
 
 struct dg *add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target)
@@ -666,6 +695,31 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 			return -1;
 		}
 	}
+	/*if(g_transfer!=0)
+	{
+		for(j=0;j<nr;j++)
+		{
+			if(strncmp(rnames[j], "_o_ ", 4))continue;
+			// [j] is an OUTPUT tag; see if we can find a matching INPUT tag
+			for(i=0;i<nr;i++)
+			{
+				if(strncmp(rnames[i], "_i_ ", 4))continue;
+				if(strcmp(rnames[i]+4, rnames[j]+4))continue;
+				// [i] is the corresponding INPUT tag.
+				// need to generate a tcopy record.
+				// first, find representative paths for the INPUT and OUTPUT equivalence classes.
+				int k, l;
+				for(k=0;k<R->ncorefs;k++)
+					if(!strcmp(rnames[j], R->corefs[k].name))break;
+				assert(k<R->ncorefs);
+				for(l=0;l<R->ncorefs;l++)
+					if(!strcmp(rnames[i], R->corefs[l].name))break;
+				assert(l<R->ncorefs);
+				// [l] is the INPUT path, which needs to be default unified to the OUTPUT path, [k], after transfer rule processing
+				record_tcopy(R, R->corefs[l].path, R->corefs[l].pathlen, R->corefs[k].path, R->corefs[k].pathlen);
+			}
+		}
+	}*/
 	//printf("patch succeeded\n");
 	return 0;
 }
@@ -860,7 +914,7 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 		}
 		if(g_transfer!=0 && !strcmp(str, "+copy+"))
 		{
-			record_transfer_copy(R);
+			transfer_ep_copy(R);
 			dg = type_dg(top_type);
 		}
 		else dg = type_dg(str);
@@ -1084,11 +1138,16 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 	}
 	if(R.corefs)free(R.corefs);
 
-	if(R.ntcopies)
+	/*if(R.ntcopies)
 	{
 		saved_tcopies = R.tcopies;
 		saved_ntcopies = R.ntcopies;
 	}
+	else
+	{
+		saved_tcopies = NULL;
+		saved_ntcopies = 0;
+	}*/
 
 	return dg;
 }
@@ -1297,13 +1356,99 @@ void	load_version(char *path)
 	*/
 }
 
+void	recursive_bleach(struct dg	*dg, struct type	*top)
+{
+	assert(dg != NULL);
+	dg->type = dg->xtype = top;
+	int i;
+	struct dg	**arcs = DARCS(dg);
+	for(i=0;i<dg->narcs;i++)
+		recursive_bleach(arcs[i], top);
+}
+
+int	mtrify_tdl_line(char	*lhs, char	*rhs, void	*ref)
+{
+	int	(*process_mtr)(char	*lhs, struct dg	*main_dg, struct dg	*output_override) = ref;
+
+	// first, split off the rule type
+	char	*type, *amp, *dag;
+
+	amp = strchr(rhs, '&');
+	if(!amp) { fprintf(stderr, "transfer rule `%s': no & found\n", lhs); return -1; }
+	*amp = 0;
+	dag = trim_string(amp+1);
+	type = trim_string(rhs);
+	struct dg	*tydg = type_dg(type);
+	if(!tydg) { fprintf(stderr, "transfer rule `%s' has nonextant type `%s'\n", lhs, type); return -1; }
+
+	//printf("transfer rule '%s'\n", lhs);
+	//printf("unparsed rhs: %s\n", dag);
+
+	struct dagify_record	R;
+	bzero(&R, sizeof(R));
+	struct dg	*main_dg = rdagify(&R, dag, NULL);
+	if(!main_dg)return -1;
+
+	//printf("main dg before type or bleaching:\n"); print_dg(main_dg);printf("\n");
+
+	// copy OUTPUT as output_override, and then bleach out main_dg/OUTPUT types to *top*
+
+	struct dg	*main_out = dg_hop(main_dg, lookup_fname("OUTPUT"));
+	struct dg	*output_override;
+	if(!main_out)main_out = atomic_dg(top_type);	// some rules have no output and the MTR file doesn't bother to mention one
+	output_override = copy_dg(main_out);
+	recursive_bleach(main_out, lookup_type(top_type));
+	//printf("bleached main_out:\n"); print_dg(main_out); printf("\n");
+
+	// now apply coreferences
+	if(patch_coreferences(&R, main_dg))
+	{
+		fprintf(stderr, "mtrify: failed to patch in coreferences\n");
+#ifdef	UNIFY_PATHS
+		unify_backtrace();
+#endif
+		return -1;
+	}
+	main_dg = p_dereference_dg(main_dg);
+	int i;
+	for(i=0;i<R.ncorefs;i++)
+	{
+		if(R.corefs[i].path)
+			free(R.corefs[i].path);
+		free(R.corefs[i].name);
+	}
+	if(R.corefs)free(R.corefs);
+
+	// unify rule type into main_dg (but not into output_override)
+	if(0 != unify_dg_infrom(main_dg, tydg))
+	{
+		fprintf(stderr, "mtr: `%s' couldn't unify with rule type `%s'\n", lhs, type);
+#ifdef	UNIFY_PATHS
+		unify_backtrace();
+#endif
+		return -1;
+	}
+	main_dg = dereference_dg(main_dg);
+
+	//printf("transfer rule '%s'\n", lhs);
+	//printf("main dg with bleached OUTPUT:\n"); print_dg(main_dg);printf("\n");
+	//printf("output_override dg:\n"); print_dg(output_override);printf("\n");
+
+	return process_mtr(lhs, main_dg, output_override);
+}
+
+int	process_mtr_status(char	*status, int	(*process)(char	*lhs, struct dg	*main_dg, struct dg	*output_override))
+{
+	return process_tdl_status(status, mtrify_tdl_line, process);
+}
+
 void	load_triggers(char	*path)
 {
 	if(!path)return;
 	tdl_push_status("trigger-rule");
 	load_tdl(path);
 	tdl_pop_status();
-	process_tdl_dgs_status("trigger-rule", study_trigger_rule);
+	process_mtr_status("trigger-rule", study_trigger_rule);
 }
 
 void	load_idioms(char	*path)
@@ -1316,7 +1461,7 @@ void	load_idioms(char	*path)
 	tdl_push_status("idiom-rule");
 	load_tdl(path);
 	tdl_pop_status();
-	process_tdl_dgs_status("idiom-rule", study_idiom_rule);
+	process_mtr_status("idiom-rule", study_idiom_rule);
 }
 
 void	load_fixup_rules(char	*path)
@@ -1326,7 +1471,7 @@ void	load_fixup_rules(char	*path)
 	load_tdl(path);
 	tdl_pop_status();
 	g_transfer = 1;
-	process_tdl_dgs_status("fixup-rule", study_fixup_rule);
+	process_mtr_status("fixup-rule", study_fixup_rule);
 	g_transfer = 0;
 }
 
@@ -1337,7 +1482,7 @@ void	load_cleanup_rules(char	*path)
 	load_tdl(path);
 	tdl_pop_status();
 	g_transfer = 1;
-	process_tdl_dgs_status("cleanup-rule", study_cleanup_rule);
+	process_mtr_status("cleanup-rule", study_cleanup_rule);
 	g_transfer = 0;
 }
 

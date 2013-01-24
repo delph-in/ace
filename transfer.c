@@ -25,8 +25,8 @@ extern int inhibit_vpm;
 
 extern int	instloc_feature;
 
-int	saved_ntcopies = 0;
-struct tcopy	*saved_tcopies = NULL;
+//int	saved_ntcopies = 0;
+//struct tcopy	*saved_tcopies = NULL;
 
 int	is_semarg_type(struct type	*x);
 int equal_semarg_types(struct type	*x, struct type	*y);
@@ -174,6 +174,7 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 	return 0;
 }
 
+/*
 void	process_saved_tcopy(struct transfer_rule	*r, struct tcopy	*c)
 {
 	int i;
@@ -184,6 +185,7 @@ void	process_saved_tcopy(struct transfer_rule	*r, struct tcopy	*c)
 	for(i=0;i<c->topathlen;i++)printf(" %s", fnames[c->topath[i]]);
 	printf("\n");
 	assert(!"not implemented yet");
+	*/
 	/*
 	int minlen = 2 + rels_list_path.count;
 	if(c->pathlen < minlen)goto badcopy;
@@ -209,7 +211,7 @@ void	process_saved_tcopy(struct transfer_rule	*r, struct tcopy	*c)
 		fprintf(stderr, " %s", fnames[c->path[i]]);
 	fprintf(stderr, "\n");
 	exit(-1);*/
-}
+//}
 
 void warn_about_equals(struct transfer_rule	*tr)
 {
@@ -227,7 +229,7 @@ void warn_about_equals(struct transfer_rule	*tr)
 	}
 }
 
-struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg)
+struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	struct transfer_rule	*tr = calloc(sizeof(struct transfer_rule), 1);
 	tr->name = strdup(name);
@@ -235,15 +237,16 @@ struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg)
 	struct dg	*optdg = walk_dg(dg, flagspath, "FLAGS", "OPTIONAL", 0);
 	tr->optional = optdg?(!strcmp(optdg->xtype->name, "+")):0;
 	tr->dg = dg;
+	tr->output_override = output_override;
 	warn_about_equals(tr);
-	int i;
+	/*int i;
 	for(i=0;i<saved_ntcopies;i++)
 	{
 		process_saved_tcopy(tr, &saved_tcopies[i]);
 		free(saved_tcopies[i].frompath);
 		free(saved_tcopies[i].topath);
 		saved_ntcopies = 0;
-	}
+	}*/
 	//printf("processing transfer rule '%s',  have:\n", name);
 	//print_dg(dg);
 	return tr;
@@ -261,48 +264,48 @@ int						nfixup_rules;
 struct transfer_rule	**cleanup_rules;
 int						ncleanup_rules;
 
-int	study_trigger_rule(char	*name, struct dg	*dg)
+int	study_trigger_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	//printf("loading trigger rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
 	wellform(dg, "transfer rule");
-	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
+	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg, output_override);
 	if(!tr)return -1;
 	trigger_rules = realloc(trigger_rules, sizeof(struct transfer_rule*)*(ntrigger_rules+1));
 	trigger_rules[ntrigger_rules++] = tr;
 	return 0;
 }
 
-int	study_fixup_rule(char	*name, struct dg	*dg)
+int	study_fixup_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	//printf("loading fixup rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
 	wellform(dg, "transfer rule");
-	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
+	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg, output_override);
 	if(!tr)return -1;
 	fixup_rules = realloc(fixup_rules, sizeof(struct transfer_rule*)*(nfixup_rules+1));
 	fixup_rules[nfixup_rules++] = tr;
 	return 0;
 }
 
-int	study_cleanup_rule(char	*name, struct dg	*dg)
+int	study_cleanup_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	//printf("loading cleanup rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
 	wellform(dg, "transfer rule");
-	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
+	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg, output_override);
 	if(!tr)return -1;
 	cleanup_rules = realloc(cleanup_rules, sizeof(struct transfer_rule*)*(ncleanup_rules+1));
 	cleanup_rules[ncleanup_rules++] = tr;
 	return 0;
 }
 
-int	study_transfer_rule(char	*name, struct dg	*dg)
+int	study_transfer_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	//printf("loading transfer rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
 	wellform(dg, "transfer rule");
-	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
+	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg, output_override);
 	if(!tr)return -1;
 	transfer_rules = realloc(transfer_rules, sizeof(struct transfer_rule*)*(ntransfer_rules+1));
 	transfer_rules[ntransfer_rules++] = tr;
@@ -312,7 +315,7 @@ int	study_transfer_rule(char	*name, struct dg	*dg)
 int	load_transfer_rules()
 {
 	assert(g_transfer != 0);
-	if(process_tdl_dgs_status("rule", study_transfer_rule))
+	if(process_mtr_status("rule", study_transfer_rule))
 	{
 		fprintf(stderr, "transfer rules: unable to load rules, bailing out.\n");
 		exit(-1);
@@ -344,8 +347,9 @@ struct transfer_rule	*freeze_transfer_rule(struct transfer_rule	*tr)
 	bzero(fr, sizeof(*fr));
 	fr->name = freeze_string(tr->name);
 	fr->dg = freeze_dg(tr->dg);
-	fr->ncopy = tr->ncopy;
-	fr->copy = freeze_block(tr->copy, sizeof(int)*fr->ncopy);
+	fr->output_override = freeze_dg(tr->output_override);
+	//fr->ncopy = tr->ncopy;
+	//fr->copy = freeze_block(tr->copy, sizeof(int)*fr->ncopy);
 	return fr;
 }
 
@@ -420,13 +424,13 @@ int	thaw_transfer_rule(struct transfer_rule	*tr)
 	}
 	//printf("rule %s has %d EQs and %d SSs\n", tr->name, tr->neq, tr->nss);
 
-	tr->output_copy_map = calloc(1, tr->output.neps);
+	/*tr->output_copy_map = calloc(1, tr->output.neps);
 	int i;
 	for(i=0;i<tr->ncopy;i++)
 	{
 		assert(tr->copy[i] >= 0 && tr->copy[i] < tr->output.neps);
 		tr->output_copy_map[tr->copy[i]] = 1;
-	}
+	}*/
 
 	return 0;
 }
@@ -973,7 +977,10 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 			}
 			else
 			{
-				//printf("triggering '%s' via '%s', aligned on %s\n", lexid, trigger_rules[i]->name, mrsin->rels[alignment[0]].pred);
+				char	*aligned_on = "<none>";
+				if(trigger_rules[i]->input.neps + trigger_rules[i]->context.neps > 0)
+					aligned_on = mrsin->rels[alignment[0]].pred;
+				//printf("triggering '%s' via '%s', aligned on %s\n", lexid, trigger_rules[i]->name, aligned_on);
 				if(trigcons)
 				{
 					struct dg	*dg = copy_dg_with_comp_arcs(trigcons);

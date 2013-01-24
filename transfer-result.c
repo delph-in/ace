@@ -300,17 +300,25 @@ void	transfer_vlist_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs
 // use the new variables' INSTLOC to see what old variable they correspond to,
 // and in the result MRS, update all obsoleted old variables to their new counterparts.
 
+void	perform_override(struct dg	*into, struct dg	*from)
+{
+	assert(into && from);
+	if(from->xtype != get_top())	// don't override for nodes created implicitly along the path to an authored constraint
+		into->type = into->xtype = from->xtype;
+	int i;
+	struct dg	**fromarcs = DARCS(from);
+	for(i=0;i<from->narcs;i++)
+	{
+		struct dg	*into2 = dg_hop(into, from->label[i]);
+		assert(into2 || !"dag to be edited did not have the required path");
+		perform_override(into2, fromarcs[i]);
+	}
+}
+
 struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*hcalignment, struct mrs	*min)
 {
-	struct mrs_vlist	new_vars;
-	bzero(&new_vars, sizeof(new_vars));
-	struct mrs_var	*vpbuffer[64];
-	new_vars.vars = vpbuffer;
-
 	//printf("finding result of transfer rule '%s'\n", tr->name);
 	//check_all_mrs_vars_are_on_vlist(min);
-
-	struct mrs_ep	new_eps[tr->output.neps];
 	int i, j;
 
 	struct dg	*old_var_dg[min->vlist.nvars];
@@ -318,105 +326,61 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	for(i=0;i<min->vlist.nvars;i++)
 		old_var_dg[i] = dereference_dg(min->vlist.vars[i]->dg);
 
-	//struct dg	*full_tr_copy = copy_dg_with_comp_arcs(tr->dg);
+	// make a copy of the unified rule, so we can apply the output edits and extract things from it
+	struct dg	*full_tr_copy = copy_dg_with_comp_arcs(tr->dg);
+	if(!full_tr_copy)return NULL;	// cycle detected; the unification really failed but we didn't notice until now.
+
+	// now, apply the edits specified in the OUTPUT section
+	perform_override(dg_hop(full_tr_copy, lookup_fname("OUTPUT")), tr->output_override);
+
+	struct dg	*find_copied(struct dg	*rule_dg, int	must_exist)
+	{
+		extern unsigned int generation;
+		rule_dg = dereference_dg(rule_dg);	// see where it moved during unification
+		if(rule_dg->gen != generation)rule_dg = NULL;
+		else rule_dg = rule_dg->copy;	// see where it moved during copying -- might not have been copied
+		assert(rule_dg || !must_exist);
+		return rule_dg;
+	}
 
 	// make copies of all the output EPs and HCONSes -- and the input EPs too when we are working with a +copy+
 	struct dg	*copy_ep_out_dgs[tr->output.neps];
-	struct dg	*copy_ep_in_dgs[tr->input.neps];
 	struct dg	*copy_hc_hi[tr->output.nhcons];
 	struct dg	*copy_hc_lo[tr->output.nhcons];
 	struct mrs_var	*copy_hc_hi_v[tr->output.nhcons];
 	struct mrs_var	*copy_hc_lo_v[tr->output.nhcons];
 	for(i=0;i<tr->output.neps;i++)
-	{
-		copy_ep_out_dgs[i] = copy_dg_with_comp_arcs(tr->output.eps[i].dg);
-		if(copy_ep_out_dgs[i] == NULL)
-			return NULL;	// cycle detected; the unification really failed but we didn't notice until now.
-		if(tr->output_copy_map[i])	// copy whatever we can from input[i]
-		{
-			assert(i < tr->input.neps);
-			// default unify is destructive, for now.
-			copy_ep_in_dgs[i] = copy_dg_with_comp_arcs(tr->input.eps[i].dg);
-			if(copy_ep_in_dgs[i] == NULL)
-				return NULL;	// cycle detected; the unification really failed but we didn't notice until now.
-		}
-	}
+		copy_ep_out_dgs[i] = find_copied(tr->output.eps[i].dg, 1);
 	for(i=0;i<tr->output.nhcons;i++)
 	{
-		copy_hc_hi[i] = copy_dg_with_comp_arcs(tr->output.mrs->hcons[i].hi->dg);
-		copy_hc_lo[i] = copy_dg_with_comp_arcs(tr->output.mrs->hcons[i].lo->dg);
+		copy_hc_hi[i] = find_copied(tr->output.mrs->hcons[i].hi->dg, 1);
+		copy_hc_lo[i] = find_copied(tr->output.mrs->hcons[i].lo->dg, 1);
 	}
-
-	// before applying +copy+ defaults, brand new variables need to get INSTLOCs assigned to them, so that they can't be smushed into old variables by the unifier.
-
-	extern unsigned int generation;
-#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
-	int	nov = tr->output.mrs->vlist.nvars, ninstlocs_to_fix = 0;
-	struct dg	*instlocs_to_fix[nov];
-	for(i=0;i<tr->output.mrs->vlist.nvars;i++)
-	{
-		struct mrs_var	*v = tr->output.mrs->vlist.vars[i];
-		if(!v->dg)continue;	// sometimes there are fake variables... e.g. invented LTOPs
-		struct dg	*rule_vdg = dereference_dg(v->dg);
-		if(rule_vdg->gen == generation && rule_vdg->copy)
-		{
-			// look at every variable that was copied out of the output section
-			struct dg	*copy_vdg = rule_vdg->copy;
-			struct dg	*copy_il = dg_hop(copy_vdg, instloc_feature);
-			if(!copy_il || copy_il->xtype->name[0]!='"')
-			{
-				// this copy_vdg does not have a grounded INSTLOC.
-				instlocs_to_fix[ninstlocs_to_fix++] = copy_vdg;
-			}
-		}
-	}
-#endif
 
 	// we have now copied everything that we will copy;
 	// figure out where old variables' dags got copied to
 	for(i=0;i<min->vlist.nvars;i++)
-	{
-		if(old_var_dg[i]->gen != generation)
-			old_var_dg[i] = NULL;	// didn't get copied at all
-		else old_var_dg[i] = old_var_dg[i]->copy;
-	}
+		old_var_dg[i] = find_copied(min->vlist.vars[i]->dg, 0);
 	// old_var_dg[] now are either NULL or are pointers into the new copies
-	// critically, if an old variable got copy()'d multiple times above,
-	// the same copy was returned each time.
 
 	bump_generation();
 
-#ifdef	COPIED_VARIABLES_NEED_REENTRANCIES
-	for(i=0;i<ninstlocs_to_fix;i++)
-	{
-		struct dg	*new_il = new_instloc(1);
-		new_il->type = new_il->xtype = transfer_next_skolem_constant();
-		add_dg_hop(instlocs_to_fix[i], instloc_feature, new_il);
-		//printf("fixing instloc for new variable dg %p to %s\n", instlocs_to_fix[i], new_il->type->name);
-	}
-#endif
-
-	for(i=0;i<tr->output.neps;i++)
-		if(tr->output_copy_map[i])	// copy whatever we can from input[i]
-		{
-			/*printf("applying +copy+; input dag to copy is:\n");
-			print_dg(copy_ep_in_dgs[i]);printf("\n");
-			printf("applying +copy+; output dag to refine is:\n");
-			print_dg(copy_ep_out_dgs[i]);printf("\n");*/
-			unify_dg_defaults(copy_ep_out_dgs[i], copy_ep_in_dgs[i]);
-			/*printf("applying +copy+; revised output dag is:\n");
-			print_dg(copy_ep_out_dgs[i]);printf("\n");*/
-		}
-
-	// if any old variable dags were default unified with new variable dags, they
-	// may have been forwarded
-	for(i=0;i<min->vlist.nvars;i++)
-		if(old_var_dg[i])
-			old_var_dg[i] = dereference_dg(old_var_dg[i]);
-
 	//printf("for result (after applying +copy+), tr dg is:\n");print_dg(full_tr_copy);printf("\n");
 
+	// we have just produced three lists:
+	// copy_ep_out_dgs		-- 'struct dg's representing the output EPs
+	// copy_hc_hi			-- 'struct dg's representing the hi side of output HCONSs
+	// copy_hc_lo			-- 'struct dg's representing the lo side of output HCONSs
+
+	// from here on out, the job is to convert those into a new 'struct mrs', with all the right variable reentrancies
+
 	// extract 'struct mrs_ep' and 'struct mrs_var' for the EPs and HCONSes, from the 'struct dg's we just made
+	struct mrs_ep	new_eps[tr->output.neps];
+	struct mrs_vlist	new_vars;
+	bzero(&new_vars, sizeof(new_vars));
+	struct mrs_var	*vpbuffer[64];
+	new_vars.vars = vpbuffer;
+
 	transfer_result_dg_to_mrs(tr, &new_vars, copy_ep_out_dgs, new_eps, copy_hc_hi, copy_hc_lo, copy_hc_hi_v, copy_hc_lo_v);
 
 	// figure out what new variable each old variable maps to, if any, and assign skolem constants to new varibles

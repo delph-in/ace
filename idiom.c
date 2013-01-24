@@ -20,11 +20,11 @@ int						nidiom_rules;
 
 char	*non_idiom_root = NULL;
 
-int	study_idiom_rule(char	*name, struct dg	*dg)
+int	study_idiom_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	//printf("loading idiom rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
-	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg);
+	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg, output_override);
 	if(!tr)return -1;
 	idiom_rules = realloc(idiom_rules, sizeof(struct idiom_rule*)*(nidiom_rules+1));
 	idiom_rules[nidiom_rules++] = tr;

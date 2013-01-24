@@ -38,15 +38,16 @@ struct transfer_rule
 {
 	char	*name;
 	struct mrs_desc	input, context, filter, output;
-	struct dg	*dg;
+	struct dg	*dg;	// in this dg, all types under OUTPUT are washed out to *top* (but features remain)
+	struct dg	*output_override;	// another version of the part of dg under OUTPUT where the types are not washed out (but missing reentrancies with the rest of 'dg')
 
 	int	neq, nss;
 	struct dg	**eq, **ss;
 
 	int	optional;
-	int	ncopy;
+	/*int	ncopy;
 	int	*copy;
-	char	*output_copy_map;
+	char	*output_copy_map;*/
 };
 
 extern int g_transfer;
@@ -54,6 +55,7 @@ extern int	ntransfer_rules;
 extern struct transfer_rule	**transfer_rules;
 int	load_transfer_rules();
 
+/*
 // for use when loading rules with ugly +copy+ specifications
 struct tcopy
 {
@@ -64,19 +66,20 @@ struct tcopy
 };
 extern int saved_ntcopies;
 extern struct tcopy	*saved_tcopies;
+*/
 
 int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callback)(int	*alignment, int	*hcalignment));
-struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg);
+struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg, struct dg	*output_override);
 
-int	study_trigger_rule(char	*name, struct dg	*dg);
+int	study_trigger_rule(char	*name, struct dg	*main_dg, struct dg	*output_override);
 void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct dg	*cons));
 
 extern char	*non_idiom_root;
-int	study_idiom_rule(char	*name, struct dg	*dg);
+int	study_idiom_rule(char	*name, struct dg	*main_dg, struct dg	*output_override);
 int	check_idioms(struct dg	*dg, struct mrs	*m);
 
-int	study_fixup_rule(char	*name, struct dg	*dg);
-int	study_cleanup_rule(char	*name, struct dg	*dg);
+int	study_fixup_rule(char	*name, struct dg	*main_dg, struct dg	*output_override);
+int	study_cleanup_rule(char	*name, struct dg	*main_dg, struct dg	*output_override);
 struct mrs	*fixup_mrs(struct mrs	*m);
 struct mrs	*cleanup_mrs(struct mrs	*m);
 
