@@ -137,6 +137,7 @@ void	transfer_result_dg_to_mrs(struct transfer_rule	*tr, struct mrs_vlist	*new_v
 		/*printf("new EP %d:    ", i);
 		printf("[ %s LBL: ", new_eps[i].pred);
 		print_mrs_var(new_eps[i].lbl);
+		int j;
 		for(j=0;j<new_eps[i].nargs;j++)
 		{
 			printf(" %s: ", new_eps[i].args[j].name);
@@ -305,6 +306,8 @@ void	perform_override(struct dg	*into, struct dg	*from)
 	assert(into && from);
 	if(from->xtype != get_top())	// don't override for nodes created implicitly along the path to an authored constraint
 		into->type = into->xtype = from->xtype;
+	else if(into->xtype == NULL)	// except to revive nodes that were marked for deletion due to nonexistant input variables
+		into->xtype = into->type;
 	int i;
 	struct dg	**fromarcs = DARCS(from);
 	for(i=0;i<from->narcs;i++)
@@ -312,6 +315,34 @@ void	perform_override(struct dg	*into, struct dg	*from)
 		struct dg	*into2 = dg_hop(into, from->label[i]);
 		assert(into2 || !"dag to be edited did not have the required path");
 		perform_override(into2, fromarcs[i]);
+	}
+}
+
+void	prune_unmatched_parts(struct dg	*dg)
+{
+	assert(dg && dg->xtype);
+	int i, newn = 0, oldn = dg->narcs;
+	unsigned short	newlabels[oldn];
+	struct dg	**arcs = DARCS(dg);
+	struct dg	*newarcs[oldn];
+	for(i=0;i<oldn;i++)
+	{
+		if(arcs[i]->xtype == NULL)	// pruned
+			{ }
+		else	// kept
+		{
+			newlabels[newn] = dg->label[i];
+			newarcs[newn] = arcs[i];
+			newn++;
+			prune_unmatched_parts(arcs[i]);
+		}
+	}
+	if(newn != oldn)
+	{
+		dg->narcs = newn;
+		arcs = DARCS(dg);
+		memcpy(dg->label, newlabels, sizeof(unsigned short)*newn);
+		memcpy(arcs, newarcs, sizeof(struct dg*)*newn);
 	}
 }
 
@@ -326,12 +357,42 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	for(i=0;i<min->vlist.nvars;i++)
 		old_var_dg[i] = dereference_dg(min->vlist.vars[i]->dg);
 
+	// if a rule variable was touched by the unifier, it matched something in the input
+	extern unsigned int generation;
+	char	input_vars_exist[tr->input.mrs->vlist.nvars];
+	for(i=0;i<tr->input.mrs->vlist.nvars;i++)
+		input_vars_exist[i] = (!tr->input.mrs->vlist.vars[i]->dg || tr->input.mrs->vlist.vars[i]->dg->gen == generation)?1:0;
+	char	context_vars_exist[tr->context.mrs->vlist.nvars];
+	for(i=0;i<tr->context.mrs->vlist.nvars;i++)
+		context_vars_exist[i] = (!tr->context.mrs->vlist.vars[i]->dg || tr->context.mrs->vlist.vars[i]->dg->gen == generation)?1:0;
+
 	// make a copy of the unified rule, so we can apply the output edits and extract things from it
 	struct dg	*full_tr_copy = copy_dg_with_comp_arcs(tr->dg);
 	if(!full_tr_copy)return NULL;	// cycle detected; the unification really failed but we didn't notice until now.
 
+	// mark parts of the copy that come from parts of the rule matching nonexistant variables from min, by setting their '->xtype' to NULL
+	for(i=0;i<tr->input.mrs->vlist.nvars;i++)
+		if(!input_vars_exist[i])
+		{
+			struct mrs_var	*v = tr->input.mrs->vlist.vars[i];
+			assert(v->dg->copy);
+			v->dg->copy->xtype = NULL;
+			//printf("rule input variable %s did not exist in mrs input\n", v->name);
+		}
+	for(i=0;i<tr->context.mrs->vlist.nvars;i++)
+		if(!context_vars_exist[i])
+		{
+			assert(tr->context.mrs->vlist.vars[i]->dg->copy);
+			tr->context.mrs->vlist.vars[i]->dg->copy->xtype = NULL;
+		}
+
 	// now, apply the edits specified in the OUTPUT section
+	// note that in cases where output_override says something about a variable that didn't exist in the input,
+	// this undoes the above marking.
 	perform_override(dg_hop(full_tr_copy, lookup_fname("OUTPUT")), tr->output_override);
+
+	// prune parts of the result that came from matching variables that didn't exist in the input
+	prune_unmatched_parts(full_tr_copy);
 
 	struct dg	*find_copied(struct dg	*rule_dg, int	must_exist)
 	{
