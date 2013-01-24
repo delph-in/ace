@@ -367,10 +367,24 @@ int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
 	ep->active = 0;
 	if(node)
 	{
+		int local_count = 0;
 		for(i=0;i<node->nrelatives;i++)
-			if(pred_subsumes(node->relatives[i]->pred, node->pred))
-				count += activate_semindex_node(node->relatives[i], ep, Rest);
-		count += activate_semindex_node(node, ep, Rest);
+		{
+			// note: generating with GG requires adding signs with *less* specific predicates, which can be constrained by other signs.
+			// but generating off the result of JAEN requires adding signs with *more* specific predicates, which are of course subsumed by the input
+			// we used to only look at things that are less specific:
+			//  if(pred_subsumes(node->relatives[i]->pred, node->pred))
+			// now we will look at everything (but don't hit the node itself twice)
+			if(strcmp(node->relatives[i]->pred, node->pred))
+			{
+				//printf("going into %s\n", node->relatives[i]->pred);
+				local_count += activate_semindex_node(node->relatives[i], ep, Rest);
+			}
+			//else printf("not going into %s\n", node->relatives[i]->pred);
+		}
+		local_count += activate_semindex_node(node, ep, Rest);
+		count += local_count;
+		//printf("local activated count = %d\n", local_count);
 	}
 	if(carg)
 	{
