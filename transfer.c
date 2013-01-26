@@ -1134,6 +1134,12 @@ check_all_mrs_vars_are_on_vlist(struct mrs	*m)
 		check_mrs_var_is_on_vlist(hc->hi, &m->vlist);
 		check_mrs_var_is_on_vlist(hc->lo, &m->vlist);
 	}
+	for(i=0;i<m->nicons;i++)
+	{
+		struct mrs_icons	*ic = m->icons+i;
+		check_mrs_var_is_on_vlist(ic->left, &m->vlist);
+		check_mrs_var_is_on_vlist(ic->right, &m->vlist);
+	}
 }
 
 int	equiv_mrs(struct mrs	*x, struct mrs	*y)
@@ -1367,6 +1373,11 @@ struct mrs	*reformat_mrs_for_transfer(struct mrs	*m)
 	{
 		m->hcons[i].hi = dg_to_mrs_var(m->hcons[i].hi->dg, &new_vlist);
 		m->hcons[i].lo = dg_to_mrs_var(m->hcons[i].lo->dg, &new_vlist);
+	}
+	for(i=0;i<m->nicons;i++)
+	{
+		m->icons[i].left = dg_to_mrs_var(m->icons[i].left->dg, &new_vlist);
+		m->icons[i].right = dg_to_mrs_var(m->icons[i].right->dg, &new_vlist);
 	}
 	new_vlist.vars = malloc(sizeof(struct mrs_var*) * new_vlist.nvars);
 	memcpy(new_vlist.vars, tmp_vlist, sizeof(struct mrs_var*) * new_vlist.nvars);

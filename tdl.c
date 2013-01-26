@@ -1319,6 +1319,11 @@ void run_task(char *task, int (*worker)())
 
 void	load_version(char *path)
 {
+	if(!path)
+	{
+		grammar_version = "unknown";
+		return;
+	}
 	load_lisp(path);
 	char	*v = get_lisp_parameter("*grammar-version*");
 	if(!v)grammar_version = "unknown";

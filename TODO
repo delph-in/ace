@@ -145,6 +145,8 @@ ideas:
 
 DONE:
 
+0.9.12
+	- pass ICONS unchanged through transfer
 0.9.11
 	- improve transfer enough that we can run JAEN at least for simple inputs
 0.9.10

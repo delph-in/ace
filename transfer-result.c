@@ -193,6 +193,21 @@ void	transfer_hcons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs
 	assert(mout->nhcons == expected_hcons);
 }
 
+void	transfer_icons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, struct mrs_var	*(*map_variable)(struct mrs_var	*vin))
+{
+	int	i;
+	mout->nicons = min->nicons;
+	mout->icons = slab_alloc(sizeof(struct mrs_icons) * mout->nicons);
+	for(i=0;i<min->nicons;i++)
+	{
+		struct mrs_icons	*icin = min->icons+i;
+		struct mrs_icons	*icout = mout->icons+i;
+		icout->type = icin->type;
+		icout->left = map_variable(icin->left);
+		icout->right = map_variable(icin->right);
+	}
+}
+
 void	transfer_ep_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, int	*alignment, struct mrs_ep	*new_eps, struct mrs_var	*(*map_variable)(struct mrs_var	*vin))
 {
 	int	expected_rels = min->nrels - tr->input.neps + tr->output.neps;
@@ -475,6 +490,7 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	transfer_top_level_variables(tr, min, mout, map_variable);
 	transfer_ep_result(tr, min, mout, alignment, new_eps, map_variable);
 	transfer_hcons_result(tr, min, mout, hcalignment, copy_hc_hi_v, copy_hc_lo_v, map_variable);
+	transfer_icons_result(tr, min, mout, map_variable);
 	transfer_vlist_result(tr, min, mout, &new_vars, ncarried_input_variables, input_variable_is_carried, map_variable);
 
 	setup_tmp();	// make sure subsequent forget_tmp() calls don't delete our saved EP dags or MRS structure
