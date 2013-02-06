@@ -38,7 +38,7 @@ struct type	*uglb;
 struct type	*ut1, *ut2;
 #endif
 
-int slab_usage() { return (noldslabs-1)*SLAB_SIZE + slabu; }
+long long slab_usage() { return (long long)(noldslabs-1)*SLAB_SIZE + slabu; }
 
 int	slab_size_in_bytes()
 {

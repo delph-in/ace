@@ -81,6 +81,7 @@ struct dg	*finalize_tmp(struct dg	*d, int trim);
 struct dg	*finalize_tmp_noss(struct dg	*d, int trim);
 int		check_cycles(struct dg	*dg);
 void		forget_tmp();
+long long slab_usage();
 
 // quickcheck operations
 #include	"qc.h"

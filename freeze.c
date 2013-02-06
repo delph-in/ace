@@ -274,12 +274,11 @@ void	*freeze_block(void	*src, int	len)
 
 static void freezer_note(char *designation)
 {
-	extern int slab_usage();
 	static int last_bytes = 0;
-	int			size = slab_usage() - last_bytes;
+	long long			size = slab_usage() - last_bytes;
 	last_bytes = slab_usage();
-	if(size<8192)printf(" %s: %d", designation, size);
-	else if(size<1024*1024)printf(" %s: %dK", designation, (size+512)/1024);
+	if(size<8192)printf(" %s: %lld", designation, size);
+	else if(size<1024*1024)printf(" %s: %lldK", designation, (size+512)/1024);
 	else if(size<1024*1024*1024)printf(" %s: %.1fM", designation, ((float)size+512*1024)/(1024*1024));
 	else printf(" %s: %.1fG", designation, ((float)size+512*1024*1024)/(1024*1024*1024));
 }
