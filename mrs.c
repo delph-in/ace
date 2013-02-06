@@ -838,8 +838,8 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 
 	if(epi == in->nrels)
 	{
-		char	hused[in->nhcons];
-		bzero(hused, in->nhcons);
+		char	hused[out->nhcons];
+		bzero(hused, out->nhcons);
 		//printf("checking HCONS subsumption\n");
 		DEBUG("mrs subsumption passed RELS checks\n");
 		return mrs_subsumes1(in, out, 0, vmap, hused);
@@ -901,8 +901,8 @@ int mrs_subsumes1(struct mrs *in, struct mrs *out, int hci, int *vmap, char *use
 	{
 		if(mrs_enable_icons)
 		{
-			char	iused[in->nicons];
-			bzero(iused, in->nicons);
+			char	iused[out->nicons];
+			bzero(iused, out->nicons);
 			//printf("checking ICONS subsumption\n");
 			DEBUG("mrs subsumption passed HCONS checks\n");
 			return mrs_subsumes2(in, out, 0, vmap, iused);
