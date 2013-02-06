@@ -398,7 +398,14 @@ void	initialize_engine()
 		if(enable_post)
 		{
 		//	post_train_from("../post/brown.train.txt");
-			post_load_from_text_dump("post/english-postagger.hmm");
+			int post_load_result = post_load_from_text_dump("post/english-postagger.hmm");
+			if(post_load_result != 0)
+			{
+				fprintf(stderr, "unable to read post/english-postagger.hmm.");
+				fprintf(stderr, "disabling built-in POS tagger (TNT support is still available).\n");
+				fprintf(stderr, "to re-enable, make sure post/english-postagger.hmm exists (e.g. run ACE from the ace-" ACE_VERSION "/ directory).");
+				enable_post = 0;
+			}
 		}
 #endif
 		gettimeofday(&tv2, 0);

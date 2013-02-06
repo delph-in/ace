@@ -1,8 +1,7 @@
 TODO:
 
-- pos tagger model has a hardcoded path currently, and grammar loading fails if it isn't found
-	- better: print a warning, and disable pos tagging if the file isn't found, but still finish loading the grammar
-	- also: grammar config file could specify a path to the model, and Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
+- pos tagger model has a hardcoded path currently
+	- grammar config file could specify a path to the model, and Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 - ace bugs:
 	+ the dag-to-mrs cache is used both by transfer and by parse-result processing, but with different values of inhibit_vpm.  we need to straighten that out.
@@ -149,6 +148,10 @@ ideas:
 
 DONE:
 
+0.9.13
+	- itsdb token counting updated
+	- don't fail as badly when can't find postagger model
+	- when 'invent-ltop: yes.', also add a QEQ
 0.9.12
 	- pass ICONS unchanged through transfer
 0.9.11

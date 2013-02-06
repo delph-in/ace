@@ -118,11 +118,11 @@ int	post_train_from(char	*fname)
 	}
 }
 
-void	post_load_from_text_dump(char	*fname)
+int	post_load_from_text_dump(char	*fname)
 {
 	int	i;
 	FILE	*f = fopen(fname, "r");
-	assert(f != NULL);
+	if(!f)return -1;
 
 	int	my_ntags;
 	assert(1 == fscanf(f, "tags %d\n", &my_ntags));
@@ -174,4 +174,5 @@ void	post_load_from_text_dump(char	*fname)
 	load_hmm_from_text(f);
 
 	fclose(f);
+	return 0;
 }
