@@ -13,7 +13,7 @@
 #include	"type.h"
 #include	"hash.h"
 #include	"conf.h"
-#include	"timer.h"
+#include	"profiler.h"
 
 struct transfer_rule	**idiom_rules;
 int						nidiom_rules;

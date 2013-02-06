@@ -15,7 +15,7 @@
 #include	"lexical-parse.h"
 #include	"lattice-mapping.h"
 #include	"token.h"
-#include	"timer.h"
+#include	"profiler.h"
 
 extern int inhibit_pack;
 

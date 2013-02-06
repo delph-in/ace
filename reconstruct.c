@@ -5,8 +5,8 @@
 #include	<assert.h>
 
 #include	"reconstruct.h"
-#include	<ace/token.h>
-#include	<ace/freeze.h>
+#include	"token.h"
+#include	"freeze.h"
 
 int	nunifications;
 

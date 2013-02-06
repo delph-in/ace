@@ -1,5 +1,9 @@
 TODO:
 
+- pos tagger model has a hardcoded path currently, and grammar loading fails if it isn't found
+	- better: print a warning, and disable pos tagging if the file isn't found, but still finish loading the grammar
+	- also: grammar config file could specify a path to the model, and Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
+
 - ace bugs:
 	+ the dag-to-mrs cache is used both by transfer and by parse-result processing, but with different values of inhibit_vpm.  we need to straighten that out.
 		- when idiom testing is being applied, we could in theory be getting VPM'd variables out when we don't want to

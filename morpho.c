@@ -6,7 +6,7 @@
 #include	<wctype.h>
 #include	<ctype.h>
 #include	"unicode.h"
-#include	"timer.h"
+#include	"profiler.h"
 
 #define	USE_GENERICS
 

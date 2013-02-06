@@ -1,10 +1,10 @@
 #include	"tree.h"
 
-#include	<ace/hash.h>
-#include	<ace/dag.h>
-#include	<ace/rule.h>
-#include	<ace/lexicon.h>
-#include	<ace/mrs.h>
+#include	"hash.h"
+#include	"dag.h"
+#include	"rule.h"
+#include	"lexicon.h"
+#include	"mrs.h"
 
 struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, struct dg	*d));
 void	free_mrs_stuff(struct mrs	*m);

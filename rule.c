@@ -836,7 +836,7 @@ configure_rules_key_driven()
 /*
 configure_rules_head_driven()
 {
-	FILE	*f = fopen("../erg/erg.hds", "r");
+	FILE	*f = fopen("../erg/etc/rules.hds", "r");
 	assert(f != NULL);
 	char	rname[1024];
 	int		arity, head;

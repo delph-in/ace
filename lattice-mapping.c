@@ -22,7 +22,7 @@
 
 #include	"lattice-mapping.h"
 #include	"token.h"
-#include	"timer.h"
+#include	"profiler.h"
 
 #include	"unicode.h"
 

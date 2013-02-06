@@ -18,7 +18,7 @@
 #include	"hash.h"
 #include	"conf.h"
 #include	"mrs.h"
-#include	"timer.h"
+#include	"profiler.h"
 
 extern struct type_hierarchy	*semi_th, *main_th;
 extern int inhibit_vpm;
