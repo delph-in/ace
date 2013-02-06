@@ -24,6 +24,7 @@
 #include	"tnt.h"
 
 #include	"timer.h"
+#include	"profiler.h"
 
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 extern int itsdb_dump_chart;
@@ -234,6 +235,8 @@ struct job_stats	arbiter_input_loop(FILE	*fin)
 	struct timeval		tv1, tv2;
 	struct timeval		jtv1, jtv2;
 	float				stdin_time = 0;
+
+	if(tsdb_notes)tsdb_run_note();	// now that we are connected to arbiter
 
 	extern int arbiter_fd, arbiter_processing;
 	extern char	*current_arbiter_job_id;
@@ -491,7 +494,7 @@ int	main(int	argc, char	*argv[])
 	initialize_engine();
 
 	if(do_itsdb) itsdb_mode();
-	if(tsdb_notes)tsdb_run_note();
+	if(tsdb_notes && !master_addr)tsdb_run_note();
 	setup_signal_handlers();
 	if(preexisting_lui_fd != -1)
 	{
