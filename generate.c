@@ -13,7 +13,7 @@
 #include "unpack.h"
 #include	"conf.h"
 #include	"transfer.h"
-#include	"timer.h"
+#include	"profiler.h"
 
 void	itsdb_report_gen(int readings, double	fixup_time);
 
@@ -312,6 +312,8 @@ int	generate(struct mrs	*mrs)
 		if(generation_profiler)stop_profilers_recursively(generation_profiler);
 		start_and_alloc_profiler(&generation_profiler, "generation", NULL, NULL);
 	}
+	extern int tsdb_notes;
+	if(tsdb_notes)tsdb_parse_note_start();
 
 #if DISJUNCTIVE_GENERATION
 	setup_disjunctive_generation_test();
@@ -542,6 +544,7 @@ int	generate(struct mrs	*mrs)
 		}
 	}
 
+	if(tsdb_notes)tsdb_parse_note_end();
 	if(master_addr)printf("\n");
 	fflush(stdout);
 
