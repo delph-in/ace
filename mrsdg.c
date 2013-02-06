@@ -8,6 +8,7 @@
 #include	"conf.h"
 #include	"freeze.h"
 #include	"timer.h"
+#include	"profiler.h"
 
 static int name;
 
@@ -372,14 +373,18 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	hook = dg_path(cont, hook_path);
 	rels = dg_path(cont, rels_list_path);
 	hcons = dg_path(cont, hcons_list_path);
+	struct mrs_var	*grammar_ltop = NULL;
 	if(mrs_enable_icons)
 		icons = dg_path(cont, icons_list_path);
 	if(hook)
 	{
 		if(invent_ltop)
 		{
-			// XXX hack see chat w/ oe 2010-08-30
+			// msg-less grammars tend to want their LTOP to be disconnected from the top constructed label.  we used to just add a new hole for LTOP -- now we add a qeq to go with it.
+			// originally a hack -- see chat w/ oe 2010-08-30
+			// grew into something more tenable.
 			mrs->ltop = invent_mrs_var(handle_type, &mrs->vlist);
+			grammar_ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
 		}
 		else mrs->ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
 		mrs->index = dg_to_mrs_var(dg_hop(hook, indexf), &mrs->vlist);
@@ -403,13 +408,21 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 //	static int	hc_timer = -1;
 //	if(hc_timer == -1)hc_timer = new_timer("extract HCs");
 //	start_timer(hc_timer);
-	int	nhc = 0;
+	int	nhc = (invent_ltop && grammar_ltop)?1:0;
 	DO_LIST(hcons, struct dg *hc, nhc++; );
 	mrs->hcons = slab_alloc(sizeof(struct mrs_hcons) * nhc);
+	if(invent_ltop && grammar_ltop)
+	{
+		mrs->hcons[mrs->nhcons].type = hcons_qeq;
+		mrs->hcons[mrs->nhcons].hi = mrs->ltop;
+		mrs->hcons[mrs->nhcons].lo = grammar_ltop;
+		mrs->nhcons++;
+	}
 	DO_LIST(hcons, struct dg *hc,
 		mrs->nhcons++;
 		dg_to_mrs_hc(hc, &mrs->vlist, mrs->hcons+mrs->nhcons-1);
 	);
+	assert(nhc == mrs->nhcons);
 	if(g_profiling && mrs_profiler)stop_profiler(mrs_hcons_profiler, mrs->nhcons);
 	if(mrs_enable_icons)
 	{
