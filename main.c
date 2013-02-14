@@ -80,7 +80,7 @@ FILE	*open_sentence_source()
 	assert(sentence_path != 0);
 	if(!strcmp(sentence_path, "-"))
 	{
-		if(master_addr)
+		if(master_addr && strcmp(master_addr, "-"))
 			connect_to_master(master_addr);
 		fin = stdin;
 	}
@@ -302,6 +302,8 @@ struct job_stats	main_input_loop(FILE	*fin)
 //	if(g_mode == GENERATING)	// Stephan suggested this, but it's actually slower.
 //		configure_rules_head_driven();
 
+	if(tsdb_notes)tsdb_run_note();
+
 	gettimeofday(&tv1, 0);
 	while(!die && !feof(fin))
 	{
@@ -501,7 +503,6 @@ int	main(int	argc, char	*argv[])
 	initialize_engine();
 
 	if(do_itsdb) itsdb_mode();
-	if(tsdb_notes && !master_addr)tsdb_run_note();
 	setup_signal_handlers();
 	if(preexisting_lui_fd != -1)
 	{
@@ -527,7 +528,7 @@ int	main(int	argc, char	*argv[])
 
 	//treebank_control(); return 0;
 
-	if(master_addr)
+	if(master_addr && strcmp(master_addr, "-"))
 		stats = arbiter_input_loop(open_sentence_source());
 	else if(!generation_server_lang)
 		stats = main_input_loop(open_sentence_source());
