@@ -257,6 +257,7 @@ void	post_tag_sequence(int	len, char	**lemmas, char	**_tags, int *unk)
 {
 	int	words[len], answers[len], i;
 
+	remember_word_count();
 	for(i=0;i<len;i++)
 	{
 		char	copy[25600], *p, *q;
@@ -273,6 +274,7 @@ void	post_tag_sequence(int	len, char	**lemmas, char	**_tags, int *unk)
 	}
 	viterbi_decode(len, words, answers);
 	for(i=0;i<len;i++)_tags[i] = tags[answers[i]]->tag;
+	forget_new_words();
 }
 
 dump_hmm_to_text(FILE	*f)

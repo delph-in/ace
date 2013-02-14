@@ -89,29 +89,62 @@ struct word	*lookup_word(char	*word, int	mode, int	first)
 			return word_hash[hash][i];
 	}
 
-	// insert the word
-	word_hlen[hash]++;
-	words_hash_len++;
-	if(word_hfrozen[hash])
-	{
-		struct word	**n = malloc(sizeof(struct word**)*word_hlen[hash]);
-		memcpy(n, word_hash[hash], sizeof(struct word**)*(word_hlen[hash]-1)); 
-		word_hash[hash] = n;
-		word_hfrozen[hash] = 0;
-	}
-	else word_hash[hash] = realloc(word_hash[hash], sizeof(struct word**)*word_hlen[hash]);
+	// create the word
 	w = malloc(sizeof(struct word));
 	w->index = nwords++;
 	w->word = strdup(word);
 	w->nfreqs = ntags;
 	w->count = 0;
-	words_ascii_len += (strlen(w->word)&~3) + 4;
-	if(mode)w->tprob = 0;
-	else w->tprob = unknown_tprob(word, first);
-	word_hash[hash][i] = w;
+
+	if(mode)
+	{
+		// during loading/training, add 'w' to the hash table etc
+		words_ascii_len += (strlen(w->word)&~3) + 4;
+		word_hlen[hash]++;
+		words_hash_len++;
+		if(word_hfrozen[hash])
+		{
+			struct word	**n = malloc(sizeof(struct word**)*word_hlen[hash]);
+			memcpy(n, word_hash[hash], sizeof(struct word**)*(word_hlen[hash]-1)); 
+			word_hash[hash] = n;
+			word_hfrozen[hash] = 0;
+		}
+		else word_hash[hash] = realloc(word_hash[hash], sizeof(struct word**)*word_hlen[hash]);
+		w->tprob = 0;
+		word_hash[hash][i] = w;
+	}
+	else
+	{
+		// at runtime, don't add 'w' to the hash table;
+		// we want different 'w' structures for different contexts,
+		// and we don't want 'w' to live beyond one sentence.
+		w->tprob = unknown_tprob(word, first);
+	}
 	word_index = realloc(word_index, sizeof(struct word**)*nwords);
 	word_index[w->index] = w;
 	return w;
+}
+
+// mechanism for destroying unknown words created during processing.
+// we want to do that because unknown words take their tag distribution from their context partly, and we don't want the tagging of a sentence to depend on what sentences were tagged before it in this particular run.
+
+static int old_word_count;
+remember_word_count()
+{
+	old_word_count = nwords;
+}
+
+forget_new_words()
+{
+	int i;
+	for(i=old_word_count;i<nwords;i++)
+	{
+		struct word	*w = word_index[i];
+		free(w->word);
+		free(w->tprob);
+		free(w);
+	}
+	nwords = old_word_count;
 }
 
 struct words_info

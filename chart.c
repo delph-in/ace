@@ -932,7 +932,7 @@ char	*show_orth_leaves(struct edge	*e)
 		{
 			int len = 0, i;
 			for(i=0;i<e->lex->stemlen;i++)len += strlen(e->lex->stem[i]->name) + 1 - 2;
-			ret = malloc(len+2); *ret = 0;
+			ret = malloc(len+4); *ret = 0;
 			for(i=0;i<e->lex->stemlen;i++)
 			{
 				if(i)strcat(ret, " ");
