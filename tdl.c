@@ -16,6 +16,10 @@
 #include	"hash.h"
 #include	"conf.h"
 #include	"unicode.h"
+#ifdef POST
+#include	"post.h"
+#endif
+#include	"version.h"
 
 int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
@@ -95,7 +99,7 @@ char	*get_conf_unq(char	*lhs)
 char	*get_conf_file_path(char	*dir, char	*lhs)
 {
 	char	*u = get_conf_unq(lhs), *p = 0;
-	if(!u)return 0;
+	if(!u)return NULL;
 	assert(-1 != asprintf(&p, "%s/%s", dir, u));
 	return p;
 }
@@ -1802,6 +1806,25 @@ int load_grammar(char	*path)
 
 	// make sure all string types have numbers
 	number_strings();
+
+#ifdef	POST
+	if(enable_post)
+	{
+		char	*post_model_path = get_conf_file_path(confdir, "post-model-path");
+		if(!post_model_path)post_model_path = "post/english-postagger.hmm";
+		//post_train_from("../post/brown.train.txt");
+		int post_load_result = post_load_from_text_dump(post_model_path);
+		if(post_load_result != 0)
+		{
+			fprintf(stderr, "unable to read `%s'.", post_model_path);
+			fprintf(stderr, "disabling built-in POS tagger (TNT support is still available).\n");
+			fprintf(stderr, "to re-enable the built-in POS tagger, either:\n");
+			fprintf(stderr, "  - make sure `%s' exists (e.g. run ACE from the ace-" ACE_VERSION "/ directory), or", post_model_path);
+			fprintf(stderr, "  - set the `post-model-path' configuration variable appropriately\n");
+			enable_post = 0;
+		}
+	}
+#endif
 
 	return 0;
 }

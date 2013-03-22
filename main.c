@@ -17,9 +17,6 @@
 #include	"lexicon.h"
 #include	"mrs.h"
 #include	"transfer.h"
-#ifdef POST
-#include	"post.h"
-#endif
 #include	"version.h"
 #include	"tnt.h"
 
@@ -154,7 +151,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'y':	yy_mode = 1; break;
 		case	'g':	load_grammar_path = optarg;	break;
 		case	'G':	save_grammar_path = optarg;	break;
-		case	'O':	do_forest = 1;	break;
+		case	'O':	do_forest++;	break;
 		case	'E':	preprocess_only = 1;		break;
 		case	'P':	export_parts = 1;		break;
 		case	'm':	master_addr = optarg;	break;
@@ -396,20 +393,6 @@ void	initialize_engine()
 
 		gettimeofday(&tv1, 0);
 		load_grammar(load_grammar_path);
-#ifdef	POST
-		if(enable_post)
-		{
-		//	post_train_from("../post/brown.train.txt");
-			int post_load_result = post_load_from_text_dump("post/english-postagger.hmm");
-			if(post_load_result != 0)
-			{
-				fprintf(stderr, "unable to read post/english-postagger.hmm.");
-				fprintf(stderr, "disabling built-in POS tagger (TNT support is still available).\n");
-				fprintf(stderr, "to re-enable, make sure post/english-postagger.hmm exists (e.g. run ACE from the ace-" ACE_VERSION "/ directory).");
-				enable_post = 0;
-			}
-		}
-#endif
 		gettimeofday(&tv2, 0);
 		tv2.tv_sec -= tv1.tv_sec;
 		tv2.tv_usec -= tv1.tv_usec;
@@ -528,6 +511,8 @@ int	main(int	argc, char	*argv[])
 
 	//treebank_control(); return 0;
 
+	//lexicon_glb_type_experiment();
+
 	if(master_addr && strcmp(master_addr, "-"))
 		stats = arbiter_input_loop(open_sentence_source());
 	else if(!generation_server_lang)
@@ -557,3 +542,29 @@ int	main(int	argc, char	*argv[])
 	if(stats.success<=0 && stats.count>0)return -1;
 	else return 0;
 }
+
+/*lexicon_glb_type_experiment()
+{
+	extern struct lexeme	**lexemes;
+	int i;
+	for(i=0;i<nlexemes;i++)
+	{
+		struct type	*pred = lexemes[i]->pred;
+		if(!pred)continue;
+		int j;
+		for(j=0;j<pred->ndescendents;j++)
+		{
+			struct type	*desc = default_type_hierarchy()->types[pred->descendents[j]];
+			if(!strncmp(desc->name, "g(", 2))
+			{
+				int k;
+				printf("predicate '%s' has GLB subtype '%s'", pred->name, desc->name);
+				printf("  = %s", desc->parents[0]->name);
+				for(k=1;k<desc->nparents;k++)printf(" & %s", desc->parents[k]->name);
+				printf("    with daughters:   %s", desc->daughters[0]->name);
+				for(k=1;k<desc->ndaughters;k++)printf(", %s", desc->daughters[k]->name);
+				printf("\n");
+			}
+		}
+	}
+}*/
