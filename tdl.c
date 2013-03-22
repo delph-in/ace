@@ -478,15 +478,6 @@ int	process_tdl_dgs_status(char	*status, int	(*callback)(char	*lhs, struct dg	*d
 	return process_tdl_status(status, dagify_tdl_line, callback);
 }
 
-int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), void	*ref)
-{
-	free_tdl();
-	if(load_tdl(path))return -1;
-	if(process_tdl_status(tdlstatus, callback, ref))return -1;
-	free_tdl();
-	return 0;
-}
-
 struct type	*find_type(char	*name, int	constrain)
 {
 	struct type	*type = lookup_type(name);
@@ -1281,21 +1272,6 @@ int	typify_tdl_line(char	*lhs, char	*rhs_save, void	*ref)
 	return res;
 }
 
-/*int	iterate_tdl_dgs(char	*path, int	(*callback)(char	*lhs, struct dg	*dg))
-{
-	if(callback == constrain_type)enable_out_of_order = 1;
-	else enable_out_of_order = 0;
-
-	return iterate_tdl(path, dagify_tdl_line, callback);
-}
-
-int	iterate_tdl_lex(char	*path)
-{
-	enable_out_of_order = 0;
-
-	return iterate_tdl(path, lexify_tdl_line, 0);
-}*/
-
 int	g_loaded = 0;
 extern int	nlexemes, nrules, norules, ninstances, glb_type_count, debug_level, nfnames;
 
@@ -1800,13 +1776,6 @@ int load_grammar(char	*path)
 		load_transfer_output_vpm(get_conf_file_path(confdir, "output-vpm"));
 	}
 
-	// make sure none of the grammar is auto-freed when the first parse is over
-	free_tdl();
-	commit_slab();
-
-	// make sure all string types have numbers
-	number_strings();
-
 #ifdef	POST
 	if(enable_post)
 	{
@@ -1816,7 +1785,7 @@ int load_grammar(char	*path)
 		int post_load_result = post_load_from_text_dump(post_model_path);
 		if(post_load_result != 0)
 		{
-			fprintf(stderr, "unable to read `%s'.", post_model_path);
+			fprintf(stderr, "unable to read `%s'.\n", post_model_path);
 			fprintf(stderr, "disabling built-in POS tagger (TNT support is still available).\n");
 			fprintf(stderr, "to re-enable the built-in POS tagger, either:\n");
 			fprintf(stderr, "  - make sure `%s' exists (e.g. run ACE from the ace-" ACE_VERSION "/ directory), or", post_model_path);
@@ -1825,6 +1794,13 @@ int load_grammar(char	*path)
 		}
 	}
 #endif
+
+	// make sure none of the grammar is auto-freed when the first parse is over
+	free_tdl();
+	commit_slab();
+
+	// make sure all string types have numbers
+	number_strings();
 
 	return 0;
 }
