@@ -14,7 +14,7 @@
 #include	"token.h"
 #include	"unicode.h"
 
-void output_packed_tree(struct edge	*e, struct lattice	*tokens, int waspacked)
+void output_packed_tree(struct edge	*e, struct lattice	*tokens, int waspacked, int wasroot)
 {
 	if(e->unpack)return;
 	e->unpack = (void*)1;
@@ -24,7 +24,7 @@ void output_packed_tree(struct edge	*e, struct lattice	*tokens, int waspacked)
 	int type = 3;
 	if(!e->rule)type=1;
 	else if(e->rule->lexical)type=2;
-	printf("(%d %s %d %d %d %d [", e->id, sign, e->from, e->to, waspacked, type);
+	printf("(%d %s %d %d %d %d [", e->id, sign, e->from, e->to, (waspacked?4:0) | (wasroot?1:0), type);
 	for(i=0;i<e->npack;i++)
 	{
 		if(i)printf(",");
@@ -48,8 +48,8 @@ void output_packed_tree(struct edge	*e, struct lattice	*tokens, int waspacked)
 		}
 	}
 	printf("))\n");
-	for(i=0;i<e->npack;i++)output_packed_tree(e->pack[i], tokens, 1);
-	for(i=0;i<e->have;i++)output_packed_tree(e->daughters[i], tokens, 0);
+	for(i=0;i<e->npack;i++)output_packed_tree(e->pack[i], tokens, 1, wasroot);
+	for(i=0;i<e->have;i++)output_packed_tree(e->daughters[i], tokens, 0, wasroot);
 }
 
 set_path_number(struct token	*T, struct path	path, int	n)
@@ -184,34 +184,36 @@ output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 {
 	int	i;
 	int	found_root = 0;
+	extern int do_forest;
 	struct edge	*edge;
+	// output rooted passive edges, and root-condition pseudoedges
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		edge = cell->p_edges[i];
 		char	*symbol = this_edge_is_root(edge);
-		//if( (g_mode!=GENERATING || edge->neps == require_neps) && is_root(edge->dg) && !edge->frozen )
 		if(symbol)
 		{
 			printf("root %d %d %d %d %s\n", next_eid(), edge->from, edge->to, edge->id, symbol);
-			output_packed_tree(edge, tokens, 0);
+			output_packed_tree(edge, tokens, 0, 1);
 			found_root = 1;
 		}
 	}
+	if(do_forest > 1)	// output all passive edges
+	{
+		int c;
+		for(c=0;c<chart_size*chart_size;c++)
+		{
+			struct chart_cell	*cell = cells+c;
+			for(i=0;i<cell->p_nedges;i++)
+				output_packed_tree(cell->p_edges[i], tokens, 0, 0);
+		}
+	}
+	// output an edge for each token
 	improve_token_lattice_characterization(tokens);
 	for(i=0;i<tokens->nedges;i++)
 	{
 		struct lattice_edge	*le = tokens->edges[i];
 		struct token	*t = le->token;
-		/*int j;
-		for(j=0;j<i;j++)
-		{
-			struct lattice_edge	*le2 = tokens->edges[j];
-			struct token	*t2 = le2->token;
-			if(le->from == le2->from && le->to == le2->to)
-				break;
-		}
-		if(j<i)continue;	// already output a representative for this span*/
-		//printf("token %d %d %d %d %s\n", le->from->id, le->to->id, t->cfrom, t->cto, t->string);
 		char	token_str[10240];
 		if(enable_token_avms)
 		{

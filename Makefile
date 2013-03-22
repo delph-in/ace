@@ -50,7 +50,7 @@ ${PICOBJS} : pic/%.o: %.c
 
 libace.so: pic/libace.o ${PICOBJS} post/post.o
 	rm -f libace.so
-	gcc -shared ${PICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS} -ldl -lutil
+	gcc -shared ${PICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS} -ldl -lutil -la
 # note: -lutil cannot be compiled statically into a shared library, because the bozos that built it didn't use -fPIC...
 
 libace.a: libace.o ${OBJ}
