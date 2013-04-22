@@ -5,7 +5,9 @@
 #include	<sys/time.h>
 #include	<assert.h>
 
-#define	MAX_TRANSFER_CHUNKS	2560
+extern int max_unpack_megabytes;
+//#define	MAX_TRANSFER_CHUNKS	2560
+#define	MAX_TRANSFER_CHUNKS	(max_unpack_megabytes)
 //#define	DEBUG	printf
 #define	DEBUG(...)	do { } while(0)
 
