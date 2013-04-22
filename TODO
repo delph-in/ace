@@ -145,6 +145,7 @@ ideas:
 - now that post-model-path config option exists, Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 DONE:
+	- new configuration setting `top-hcons-type'; defaults to `qeq', but can be set to `leq' or `none'
 	- option -OO causes *all* forest edges to be output, not just the rooted ones
 	- pos tagger model is configurable by `post-model-path' parameter
 0.9.13

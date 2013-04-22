@@ -47,6 +47,7 @@ char		*token_type;
 int			ortho_max_rules = 7;
 int			ortho_warn_max_rules = 1;
 extern int invent_ltop;
+char		*top_hcons_type = NULL;
 
 // options configured but not saved in the freezer:
 struct path	label_path;
@@ -180,6 +181,7 @@ struct conf
 	struct path	rule_rels_path;
 	struct path	extract_mrs_path;
 	int	invent_ltop;
+	char	*top_hcons_type;
 	int	instloc_feature;
 
 	struct path	*chart_dependencies_to, *chart_dependencies_from;
@@ -239,6 +241,7 @@ void	*freeze_conf()
 	c->null_type = freeze_string(g_null_type);
 	c->diff_list_type = freeze_string(g_diff_list_type);
 	c->invent_ltop = invent_ltop;
+	c->top_hcons_type = freeze_string(top_hcons_type);
 
 	c->hook_path = freeze_path(hook_path);
 	c->rels_list_path = freeze_path(rels_list_path);
@@ -323,6 +326,7 @@ void	recover_conf(void	*vc)
 	g_null_type = c->null_type;
 	g_diff_list_type = c->diff_list_type;
 	invent_ltop = c->invent_ltop;
+	top_hcons_type = c->top_hcons_type;
 
 	hook_path = c->hook_path;
 	rels_list_path = c->rels_list_path;
@@ -473,7 +477,16 @@ int	load_conf()
 	g_null_type = get_conf("null-type")?:"null";
 	g_diff_list_type = get_conf("diff-list-type")?:"diff-list";
 
-	invent_ltop = get_conf_bool("invent-ltop", 1);	// msg-less grammars tend to want their LTOP to be floating
+	invent_ltop = get_conf_bool("invent-ltop", 1);	// msg-less grammars tend to want their TOP to be floating
+	top_hcons_type = get_conf("top-hcons-type")?:"qeq";	// what sort of hcons should be introduced between the TOP and the LTOP?
+	if(!strcasecmp(top_hcons_type, "qeq")){}
+	else if(!strcasecmp(top_hcons_type, "leq")){}
+	else
+	{
+		fprintf(stderr, "unknown value `%s' for parameter `top-hcons-type'\n", top_hcons_type);
+		fprintf(stderr, "defaulting to `none'; known values are `qeq', `leq', and `none'.\n");
+		top_hcons_type = "none";
+	}
 
 	hook_path = try_get_conf_path("hook-path", "HOOK");
 	rels_list_path = try_get_conf_path("mrs-rels-list", "RELS LIST");

@@ -25,6 +25,7 @@ struct multifeature
 int	inhibit_vpm = 0;
 
 int	invent_ltop;
+extern char	*top_hcons_type;
 
 // dag to mrs conversion
 
@@ -384,7 +385,8 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 			// originally a hack -- see chat w/ oe 2010-08-30
 			// grew into something more tenable.
 			mrs->ltop = invent_mrs_var(handle_type, &mrs->vlist);
-			grammar_ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
+			if(top_hcons_type && strcasecmp(top_hcons_type, "") && strcasecmp(top_hcons_type, "none"))
+				grammar_ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
 		}
 		else mrs->ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
 		mrs->index = dg_to_mrs_var(dg_hop(hook, indexf), &mrs->vlist);
@@ -413,7 +415,9 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	mrs->hcons = slab_alloc(sizeof(struct mrs_hcons) * nhc);
 	if(invent_ltop && grammar_ltop)
 	{
-		mrs->hcons[mrs->nhcons].type = hcons_qeq;
+		if(!strcasecmp(top_hcons_type, "qeq")) mrs->hcons[mrs->nhcons].type = hcons_qeq;
+		else if(!strcasecmp(top_hcons_type, "leq")) mrs->hcons[mrs->nhcons].type = hcons_leq;
+		else assert(!"bad top hcons type");
 		mrs->hcons[mrs->nhcons].hi = mrs->ltop;
 		mrs->hcons[mrs->nhcons].lo = grammar_ltop;
 		mrs->nhcons++;
