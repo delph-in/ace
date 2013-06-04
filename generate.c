@@ -17,6 +17,7 @@
 
 void	itsdb_report_gen(int readings, double	fixup_time);
 
+extern int	disable_subsumption_test;
 extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
 extern char	*master_addr;
 
@@ -462,10 +463,10 @@ int	generate(struct mrs	*mrs)
 		//if(!mrs_subsumes(mrs, mrs_res))
 		//if(!mrs_subsumes(hax_ref, hax_res))
 #ifdef	SEMI_SIDE_SUBSUMPTION_TEST
-		if(!mrs_subsumes(current_input_mrs, mrs_res))	// totally SEMI-side comparison
+		if((disable_subsumption_test==0) && !mrs_subsumes(current_input_mrs, mrs_res))	// totally SEMI-side comparison
 #else
 		struct mrs	*hax_res = external_to_internal_mrs(mrs_res);
-		if(!mrs_subsumes(current_internal_input_mrs, hax_res))	// grammar-side comparison
+		if((disable_subsumption_test==0) && !mrs_subsumes(current_internal_input_mrs, hax_res))	// grammar-side comparison
 #endif
 		{
 			if(trace)

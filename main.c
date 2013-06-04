@@ -58,6 +58,7 @@ float	stdin_time = 0;
 int	form_to_relation = 0;
 int	show_realization_trees = 0;
 int	show_realization_mrses = 0;
+int	disable_subsumption_test = 0;
 int report_labels = 0;
 extern int equivalence_packing_only;
 
@@ -113,6 +114,7 @@ void	parse_args(int	argc, char	*argv[])
 	}
 
 	struct option long_options[] = {
+		{"disable-subsumption-test", 0, &disable_subsumption_test, 1},
 		{"show-realization-trees", 0, &show_realization_trees, 1},
 		{"show-realization-mrses", 0, &show_realization_mrses, 1},
 		{"equivalence-packing", 0, &equivalence_packing_only, 1},
