@@ -21,31 +21,17 @@
 #include	<assert.h>
 
 #include	"hash.h"
+#include	"lisp.h"
 
 struct hash	*lisp_parameters;
 
 static char	*lisp_fname;
 static int	lisp_lnum;
 
-struct s_exp
-{
-	enum {
-		s_exp_id = 1,
-		s_exp_str = 2,
-		s_exp_list = 3
-	}	type;
-	int	quoted;
-	char	*value;
-	int				len;
-	struct s_exp	**list;
-};
-
 struct field
 {
 	struct s_exp	*value;
 };
-
-struct s_exp	*parse_lisp(char	**P, int	quoted);
 
 int	is_lisp_id_char(char	x)
 {
@@ -62,6 +48,7 @@ int	is_lisp_s_exp_char(char	x)
 	if(x=='(')return 1;
 	if(x==')')return 1;
 	if(x=='"')return 1;
+	if(x=='.')return 1;
 	if(is_lisp_id_char(x))return 1;
 	return 0;
 }
@@ -91,7 +78,7 @@ int	lisp_skip_junk(char	**P)
 	while(!is_lisp_s_exp_char(**P))
 	{
 		if(**P == ';')skip_to_eol(P);
-		else if(strchr(" \t\n", **P))
+		else if(strchr(" \t\n\r", **P))
 		{
 			if(**P == '\n')lisp_lnum++;
 			(*P)++;
@@ -115,6 +102,20 @@ struct s_exp	*parse_lisp_list(char	**P)
 	l->type = s_exp_list;
 	while(**P != ')')
 	{
+		if(**P == '.')
+		{
+			if(l->len != 1 || l->type == s_exp_cons)
+			{
+				cons_error:
+				fprintf(stderr, "%s:%d:  lisp parse error; cons cell notation in a list of length %d\n", lisp_fname, lisp_lnum, l->len);
+				return NULL;
+			}
+			l->type = s_exp_cons;
+			(*P)++;
+			if(0 != lisp_skip_junk(P))return NULL;
+			continue;
+		}
+		if(l->type == s_exp_cons && l->len > 1)goto cons_error;
 		struct s_exp	*s = parse_lisp(P, 0);
 		if(!s)return NULL;
 		if(0 != lisp_skip_junk(P))return NULL;
@@ -122,6 +123,8 @@ struct s_exp	*parse_lisp_list(char	**P)
 		l->list = realloc(l->list, sizeof(struct s_exp*)*l->len);
 		l->list[l->len-1] = s;
 	}
+	if(l->type == s_exp_cons && l->len == 1)goto cons_error;
+	assert(l->type != s_exp_cons || l->len == 2);
 	assert(**P == ')');
 	(*P)++;
 	return l;
