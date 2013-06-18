@@ -103,6 +103,10 @@ void	clear_slab()
 	}
 }
 
+#ifndef MAP_ANONYMOUS
+#define	MAP_ANONYMOUS	MAP_ANON
+#endif
+
 void	next_slab()
 {
 	if(freeze_next)
