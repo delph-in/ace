@@ -286,7 +286,16 @@ int	parse_token_avm(struct hash	*taghash, struct dg	*d, char	**S)
 	return 0;
 }
 
-struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, struct dg	*d))
+void	recons_unification_failure(struct reconstruction_error	*error)
+{
+	bzero(error,sizeof(*error));
+	extern struct type	*ut1, *ut2;
+	error->path = stringify_unify_failure_path();
+	error->type1 = strdup(ut1?ut1->name:"UNKNOWN");
+	error->type2 = strdup(ut2?ut2->name:"UNKNOWN");
+}
+
+struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tree	*t, struct dg	*d), struct reconstruction_error	*error)
 {
 	if(!enable_token_avms)do_reconstruct_tokens = 0;
 	if(t->ndaughters == 1 && t->daughters[0]->ndaughters == 0)
@@ -327,7 +336,14 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 		if(!l)
 		{
 			if(reconstruction_noise_level)
-				fprintf(stderr, "unable to find lexeme '%s'\n", t->label);
+				fprintf(stderr, "unable to find lexeme '%s'\n", uln);
+			if(error)
+			{
+				bzero(error,sizeof(*error));
+				error->type = reconsNoSuchLexeme;
+				error->node = t;
+				error->comment = strdup(uln);
+			}
 			return NULL;
 		}
 		struct dg	*d = lexical_dg(l, NULL);
@@ -341,6 +357,13 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 			{
 				if(reconstruction_noise_level)
 					fprintf(stderr, "lexeme '%s' stem has %d tokens; tree has %d\n", l->word, l->stemlen, t->daughters[0]->ntokens);
+				if(error)
+				{
+					bzero(error,sizeof(*error));
+					error->type = reconsIncompatibleToken;
+					error->node = t;
+					error->comment = strdup("wrong number of tokens");
+				}
 				return NULL;
 			}
 			for(i=0;i<l->stemlen;i++)
@@ -356,20 +379,6 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 				parse_token_avm(taghash, tok->dg, &c);
 				hash_free(taghash);
 				free(cpy);
-				//printf("parsed token AVM:\n");
-				//print_dg(tok->dg);
-				//printf("\n");
-				/*
-				tok->string = t->label;
-				tok->cfrom = t->cfrom;
-				tok->cto = t->cto;
-				tok->npostags = 1;
-				tok->postags = malloc(sizeof(struct postag));
-				tok->postags[0].tag = NULL;
-				tok->postags[0].prob = "";
-				// one of these days we may have to break down and parse the AVM description in the t->tokens[] strings in a principled way, and just reconstruct exactly the AVM that is described.  it would really be a good idea... but I'm too lazy right now.
-				build_token_dag(tok);
-				tok->dg = reconstruct_token(tt->tokens[i], tok->dg);*/
 				tpl[i] = tl+i;
 			}
 			int status = install_tokens_in_le(&le, tpl);
@@ -380,11 +389,17 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 					fprintf(stderr, "failed to install tokens in lexeme '%s'\n", l->word);
 					unify_backtrace();
 				}
+				if(error)
+				{
+					recons_unification_failure(error);
+					error->node = t;
+					error->type = reconsIncompatibleToken;
+				}
 				return NULL;
 			}
-	//printf("reconstructed lexeme DAG [l->stemlen = %d]:\n", l->stemlen);
-	//print_dg(le.dg);
-	//printf("\n");
+			//printf("reconstructed lexeme DAG [l->stemlen = %d]:\n", l->stemlen);
+			//print_dg(le.dg);
+			//printf("\n");
 		}
 		else if(lkb_carg)
 		{
@@ -400,7 +415,23 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 			set_token_dg_feat(tok.dg, cargtype, "+CARG");
 			struct token	*tpl[1];
 			tpl[0] = &tok;
-			install_tokens_in_le(&le, tpl);
+			int status = install_tokens_in_le(&le, tpl);
+			if(status != 0)
+			{
+				if(reconstruction_noise_level)
+				{
+					fprintf(stderr, "failed to install tokens in lexeme '%s'\n", l->word);
+					unify_backtrace();
+				}
+				if(error)
+				{
+					recons_unification_failure(error);
+					error->type = reconsIncompatibleToken;
+					error->node = t;
+					error->comment = strdup("hallucinating a token from an LKB CARG specification");
+				}
+				return NULL;
+			}
 		}
 		assert(d != NULL);
 		if(callback)callback(t, d);
@@ -414,19 +445,32 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 		{
 			if(reconstruction_noise_level)
 				fprintf(stderr, "unable to find rule '%s'\n", t->label);
+			if(error)
+			{
+				bzero(error,sizeof(*error));
+				error->type = reconsNoSuchRule;
+				error->node = t;
+			}
 			return NULL;
 		}
 		if(t->ndaughters != r->ndaughters)
 		{
 			if(reconstruction_noise_level)
 				fprintf(stderr, "rule %s has %d daughters but tree node has %d\n", r->name, r->ndaughters, t->ndaughters);
+			if(error)
+			{
+				bzero(error,sizeof(*error));
+				error->type = reconsNoSuchRule;
+				error->node = t;
+				error->comment = strdup("Grammar rule with that name had a different number of daughters.");
+			}
 			return NULL;
 		}
 		int	i;
 		struct dg	*daughters[r->ndaughters];
 		for(i=0;i<t->ndaughters;i++)
 		{
-			daughters[i] = reconstruct_tree(t->daughters[i], callback);
+			daughters[i] = reconstruct_tree_or_error(t->daughters[i], callback, error);
 			if(!daughters[i])return NULL;
 		}
 		struct dg	*rule_dg = copy_dg(r->dg);
@@ -442,6 +486,13 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 					fprintf(stderr, "reconstruction: unification failed for rule '%s'\n", t->label);
 					unify_backtrace();
 					if(reconstruction_noise_level > 1)print_tree(t,0);
+				}
+				if(error)
+				{
+					recons_unification_failure(error);
+					error->type = reconsRuleGLB;
+					error->node = t;
+					error->daughter = i;
 				}
 				//printf("rule dg [ want arg %d ]\n", i);
 				//print_dg(rule_dg);
@@ -462,11 +513,22 @@ struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, str
 				fprintf(stderr, "reconstruction: cycle check failed for rule '%s'\n", t->label);
 				if(reconstruction_noise_level > 1)print_tree(t, 0);
 			}
+			if(error)
+			{
+				bzero(error,sizeof(*error));
+				error->type = reconsRuleCycle;
+				error->node = t;
+			}
 			return NULL;
 		}
 		if(callback)callback(t, d);
 		return d;
 	}
+}
+
+struct dg	*reconstruct_tree(struct tree	*t, void	(*callback)(struct tree	*t, struct dg	*d))
+{
+	return reconstruct_tree_or_error(t, callback, NULL);
 }
 
 // for some reason, certain parts of 'm' are heap (most are slab)

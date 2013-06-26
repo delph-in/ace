@@ -593,6 +593,20 @@ void	unify_backtrace()
 		fprintf(stdout, "  might have been trying to unify types %s + %s\n", ut1->name, ut2->name);
 }
 
+char	*stringify_unify_failure_path()
+{
+	int	i, l = 0;
+	for(i=0;i<upathl;i++)l += strlen(fnames[upath[i]]) + 5;
+	char	*path = malloc(l);
+	*path = 0;
+	for(i=0;i<upathl;i++)
+	{
+		if(i)strcat(path, " ");
+		strcat(path, fnames[upath[i]]);
+	}
+	return path;
+}
+
 void	subsume_backtrace()
 {
 	int	i;
