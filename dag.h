@@ -55,6 +55,7 @@ int		lookup_fname(char	*label);
 void		null_generation();
 void		print_dg(struct dg	*d);
 void		unify_backtrace();
+char	*stringify_unify_failure_path();
 void		introduce_feature(int	label, int	type);
 struct dg	*add_dg_hop(struct dg	*d, int	label, struct dg	*value);
 struct dg	*add_dg_feature(struct dg	*d, char	*label, struct dg	*value);
