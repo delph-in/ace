@@ -29,6 +29,7 @@ char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
+int show_gen_chart = 0;
 int timeout_seconds = 0;
 
 int	dont_unspecialize = 0;
@@ -121,6 +122,7 @@ void	parse_args(int	argc, char	*argv[])
 		{"itsdb-forest", 0, &itsdb_dump_chart, 1},
 		{"report-labels", 0, &report_labels, 1},
 		{"input-from-lui", 0, &input_from_lui, 1},
+		{"show-gen-chart", 0, &show_gen_chart, 1},
 		{"tsdb-notes", 0, &tsdb_notes, 1},
 #define	MAX_UNPACK_MEGABYTES_OPTION	1000
 		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},

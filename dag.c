@@ -150,6 +150,12 @@ void	*slab_realloc(void	*ptr, int	oldlen, int	newlen)
 	}
 }
 
+void	*slab_alloc_unaligned(int	len)
+{
+	if(len%4)len = len + 4 - (len%4);
+	return slab_alloc(len);
+}
+
 struct dg	*walk_dg(struct dg	*dg, int *save, ...)
 {
 	va_list	va;

@@ -19,6 +19,7 @@ void	itsdb_report_gen(int readings, double	fixup_time);
 
 extern int	disable_subsumption_test;
 extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
+extern int show_gen_chart;
 extern char	*master_addr;
 
 int	require_neps = 0, n_epsbv = 0, n_avsbv = 0;
@@ -543,6 +544,8 @@ int	generate(struct mrs	*mrs)
 			saved_realizations = realizations;
 			saved_nrealizations = nrealizations;
 		}
+		if(show_gen_chart)
+			lui_gen_chart(fixed_up_mrs);
 	}
 
 	if(tsdb_notes)tsdb_parse_note_end();

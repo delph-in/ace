@@ -13,6 +13,8 @@
 #include	"lattice-mapping.h"
 #include	"token.h"
 
+void	lui_gen_chart_level2(int	chart_id, int	nedge_ids, int	*edge_ids);
+
 extern int preexisting_lui_fd;
 extern int input_from_lui;
 
@@ -74,6 +76,29 @@ void	*lui_listener(void *foo)
 			else if(!strncmp(lp, "version ", 8)) {}
 			else if(strstr(lp, " forget")) {}
 			else if(!strncmp(lp, "parse ", 6))parse_from_lui(lp+6);
+			else if(!strncmp(lp, "genchart ", 9))
+			{
+				int cid, neid=0, *eid=NULL;
+				int	offset = 0;
+				char	*p;
+				sscanf(lp, "genchart %d explore [%n", &cid, &offset);
+				p = lp + offset;
+				assert(p>lp);
+				assert(p[-1]=='[');
+				for(p=strtok(p," ");p;p=strtok(NULL," "))
+				{
+					neid++;
+					eid = realloc(eid,sizeof(int)*neid);
+					eid[neid-1] = atoi(p);
+				}
+				if(cid != chart_id)
+				{
+					fprintf(stderr, "LUI: out-of-date chart %d requested [%d is current]\n", cid, chart_id);
+					continue;
+				}
+				fprintf(stderr, "NOTE: replying to LUI request to browse genchart level 2 on %d EIDs\n", neid);
+				lui_gen_chart_level2(cid, neid, eid);
+			}
 			else if(!strcmp(lp, "")) {}
 			else fprintf(stderr, "LUI: unknown `%s'\n", lp);
 		}
@@ -141,7 +166,7 @@ int lui_initialize()
 
 void	output_lui_chart(struct lattice	*token_lattice)
 {
-	int	i, j, k, l;
+	int	i, j, k;
 	struct edge	*e, *esave;
 	extern char	*current_sentence;
 
@@ -177,9 +202,10 @@ void	output_lui_chart(struct lattice	*token_lattice)
 		if(e->rule)
 		{
 			struct dg *rn = dg_hop(e->rule->dg, lookup_fname("RNAME"));
-			char *symb = rn?strdup(rn->xtype->name):e->rule->name;
-			if(rn) { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
+			char *symb = strdup(rn?rn->xtype->name:e->rule->name);
+			if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
 			fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, e->from, e->to, symb, e->rule->name);
+			int l;
 			for(l=0;l<e->have;l++)
 				fprintf(lui_write, " %d", e->daughters[l]->id);
 			fprintf(lui_write, "]");
@@ -413,5 +439,188 @@ void	lui_text(char	*message)
 {
 	lui_initialize();
 	fprintf(lui_write, "text %d #X[\"%s\"] \"ACE message\"\n", ++chart_id, message);
+	fflush(lui_write);
+}
+
+char	*slab_orth_leaves(struct edge	*e)
+{
+	int		i;
+	char	*sub, *ret;
+
+	if(!e->have)
+	{
+		if(e->lex)
+		{
+			int len = 0, i;
+			for(i=0;i<e->lex->stemlen;i++)len += strlen(e->lex->stem[i]->name) + 1 - 2;
+			ret = slab_alloc_unaligned(len+4); *ret = 0;
+			for(i=0;i<e->lex->stemlen;i++)
+			{
+				if(i)strcat(ret, " ");
+				strcat(ret, e->lex->stem[i]->name+1);
+				ret[strlen(ret)-1] = 0;
+			}
+			return ret;
+		}
+		return "[null]";
+	}
+	if(!e->daughters)return "*INVENTED*";
+	if(e->have==1)
+	{
+		sub = slab_orth_leaves(e->daughters[0]);
+		if(e->rule->orth)
+		{
+			//printf("applying orth rule `%s' to `%s'\n", e->rule->name, sub);
+			ret = inflect(e->rule->orth, sub);
+			return ret;
+		}
+		else return sub;
+	}
+	else
+	{
+		int		l = e->have-1;
+		char	*sub[e->have];
+		for(i=0;i<e->have;i++)
+		{
+			sub[i] = slab_orth_leaves(e->daughters[i]);
+			l += strlen(sub[i]);
+		}
+		ret = slab_alloc_unaligned(l + 1);
+		*ret = 0;
+		for(i=0;i<e->have;i++)
+		{
+			if(i)strcat(ret, " ");
+			strcat(ret, sub[i]);
+		}
+		return ret;
+	}
+	assert(!"not reached");
+}
+
+void	lui_gen_chart(struct mrs	*m)
+{
+	int i, j;
+	lui_initialize();
+	// reuse current chart_id, since we are in -l mode, and the realizations window will have already allocated one.
+	fprintf(lui_write, "genchart %d [", chart_id);
+	for(i=0;i<m->nrels;i++)fprintf(lui_write, " \"%s\"", slab_escape(m->rels[i].pred));
+	fprintf(lui_write, "] [");
+	struct chart_cell	*c = cells;
+	for(i=0;i<c->p_nedges;i++)
+	{
+		struct edge	*e = c->p_edges[i];
+		int r = ep_span_is_root(e->ep_span_bv, e->neps) && is_root(e->dg);
+		char	*yield = slab_orth_leaves(e);
+		char	*esc = slab_escape(yield);
+		fprintf(lui_write, " #G[%d %d [", e->id, r);
+		for(j=0;j<m->nrels;j++)
+			if(bitvec_test(e->ep_span_bv, j))
+				fprintf(lui_write, " %d", j);
+		fprintf(lui_write, "] \"%s\"]", esc);
+	}
+	fprintf(lui_write, "] \"Generation Chart\"\n");
+	fflush(lui_write);
+}
+
+struct edge	*find_gen_edge(int	id)
+{
+	struct chart_cell	*c = cells;
+	int i;
+	for(i=0;i<c->p_nedges;i++)
+		if(c->p_edges[i]->id == id)
+			return c->p_edges[i];
+	return NULL;
+}
+
+int	set_gen_fromto(struct edge	*e, int	left)
+{
+	int i;
+	e->from = left;
+	for(i=0;i<e->have;i++)
+	{
+		set_gen_fromto(e->daughters[i], left);
+		left = e->daughters[i]->to;
+	}
+	if(!e->have)left++;
+	e->to = left;
+	return left;
+}
+
+struct edge	*first_lexical_daughter(struct edge	*e)
+{
+	if(e->lex || e->rule->lexical)return e;
+	assert(e->have);
+	return first_lexical_daughter(e->daughters[0]);
+}
+
+
+/* the following is a copy of lui_show_chart() that has not been fully adapted yet.
+ * I started on it, and then realized I'm not sure what constitute the vertices. */
+void	lui_gen_chart_level2(int	chart_id, int	nedge_ids, int	*edge_ids)
+{
+	int	i;
+
+extern int inhibit_pack;
+	assert(inhibit_pack);	// this guarantees that an edge has a unique yield
+
+	if(nedge_ids <= 0)
+	{
+		fprintf(stderr, "cannot display a chart of %d edges\n", nedge_ids);
+		return;
+	}
+	struct edge	*canonical, *e;
+	canonical = find_gen_edge(edge_ids[0]);
+	assert(canonical != NULL);
+	int	canonical_count = set_gen_fromto(canonical, 0);
+	for(i=1;i<nedge_ids;i++)
+	{
+		e = find_gen_edge(edge_ids[i]);
+		assert(e != NULL);
+		int	count = set_gen_fromto(e, 0);
+		assert(count == canonical_count);
+	}
+
+	fprintf(lui_write, "chart %d %d \"%s\"", chart_id, canonical_count, "Generation Chart Level 2");
+	char	covermap[canonical_count];
+	bzero(covermap, canonical_count);
+
+	void	lui_print_chart_edge(struct edge	*e)
+	{
+		if(e->unpack)return;
+		e->unpack = (void*)0x1;
+		if(!covermap[e->from])
+		{
+			struct edge	*firstlex = first_lexical_daughter(e);
+			char	*yield = slab_orth_leaves(firstlex);
+			fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -(e->from+1), -(e->from+1), e->from, e->to, slab_escape(yield));
+			covermap[e->from] = 1;
+		}
+		if(e->rule)
+		{
+			struct dg *rn = dg_hop(e->rule->dg, lookup_fname("RNAME"));
+			char *symb = strdup(rn?rn->xtype->name:e->rule->name);
+			if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
+			fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, e->from, e->to, symb, e->rule->name);
+			int l;
+			for(l=0;l<e->have;l++)
+				fprintf(lui_write, " %d", e->daughters[l]->id);
+			fprintf(lui_write, "]");
+		}
+		else if(e->lex)
+		{
+			fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, e->from, e->to, e->lex->word, e->lex->word);
+			fprintf(lui_write, " %d]", -(e->from+1));
+		}
+		int i;
+		for(i=0;i<e->have;i++)
+			lui_print_chart_edge(e->daughters[i]);
+	}
+
+	reset_unpacking();
+	for(i=0;i<nedge_ids;i++)
+		lui_print_chart_edge(find_gen_edge(edge_ids[i]));
+	reset_unpacking();
+
+	fprintf(lui_write, "\n");
 	fflush(lui_write);
 }
