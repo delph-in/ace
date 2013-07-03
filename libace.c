@@ -14,6 +14,7 @@ int tsdb_notes = 0;
 int timeout_seconds = 0;
 int	form_to_relation = 0;
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
+int show_gen_chart = 0;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;

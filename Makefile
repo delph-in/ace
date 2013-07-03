@@ -34,6 +34,7 @@ CFLAGS+=${DELPHIN_CFLAGS} ${POST_CFLAGS} ${REPP_CFLAGS}
 OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.o qc.o agenda.o net.o glb.o semindex.o hash.o mrs.o mrsvpm.o mrsdg.o itsdb.o pack.o unpack.o maxent.o generate.o parse.o lui.o conf.o preprocessor.o treebank-control.o token.o lattice-mapping.o lexical-parse.o generalize.o transfer.o transfer-result.o edge-vectors.o forest-out.o exunpack.o semilattice.o rebuild-th.o compile-qc.o idiom.o yy.o lisp.o tnt.o tree.o reconstruct.o arbiter.o profiler.o
 
 PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o)
+HIDDENPICOBJS=pic/timer.o
 APPOBJ=${OBJ} main.o post/post.o timer.o
 
 ace: ${APPOBJ}
@@ -48,14 +49,17 @@ post/post.o:
 ${PICOBJS} : pic/%.o: %.c
 	${CC} ${CFLAGS} -fPIC -c $< -o $@
 
-libace.so: pic/libace.o ${PICOBJS} post/post.o
+${HIDDENPICOBJS} : pic/%.o: %.c
+	${CC} ${CFLAGS} -fvisibility=hidden -fPIC -c $< -o $@
+
+libace.so: ${PICOBJS} ${HIDDENPICOBJS} post/post.o
 	rm -f libace.so
-	gcc -shared ${PICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS} -ldl -lutil -la
+	gcc -shared ${PICOBJS} ${HIDDENPICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS} -ldl -lutil
 # note: -lutil cannot be compiled statically into a shared library, because the bozos that built it didn't use -fPIC...
 
 libace.a: libace.o ${OBJ}
 	rm -f libace.a
-	ar cru libace.a ${OBJ} post/post.o libace.o
+	ar cru libace.a ${PICOBJS} ${HIDDENPICOBJS} post/post.o
 	ranlib libace.a
 
 install: ace libace.so libace.a
