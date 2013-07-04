@@ -137,7 +137,13 @@ void	next_slab()
 
 void	*slab_realloc(void	*ptr, int	oldlen, int	newlen)
 {
-	/*if(ptr == last && slabu -oldlen +newlen < currslabsize)
+	if(oldlen > newlen)
+	{
+		if(ptr == last)
+			slabu -= oldlen - newlen;
+		return ptr;
+	}
+	else /*if(ptr == last && slabu -oldlen +newlen < currslabsize)
 	{
 		slabu += newlen - oldlen;
 		return ptr;
