@@ -353,7 +353,7 @@ int	load_tdl(char	*path)
 //		if(line[0]=='\n')continue;
 //		if(line[strlen(line)-1]=='\n')	// make sure we don't kill noeol files' last char
 //			line[strlen(line)-1] = 0;
-		if(line[0]!='%')in_comment = process_comments(line, in_comment);
+		if(in_comment || line[0]!='%')in_comment = process_comments(line, in_comment);
 
 		lp = trim_string(line);
 
@@ -1066,6 +1066,8 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 		if(!lhs)return 0;
 		rhs = rdagify(R, ptr+1, building_type);
 		if(!rhs)return 0;
+		lhs = dereference_dg(lhs);
+		rhs = dereference_dg(rhs);
 		if(building_type)
 		{
 			lhs->type = rhs->type = building_type;
@@ -1343,6 +1345,7 @@ void	load_version(char *path)
 
 void	recursive_bleach(struct dg	*dg, struct type	*top)
 {
+	dg = dereference_dg(dg);
 	assert(dg != NULL);
 	dg->type = dg->xtype = top;
 	int i;
