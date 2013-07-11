@@ -166,11 +166,11 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 			//if(var_extract_timer == -1)var_extract_timer = new_timer("mrs var extr");
 			//start_timer(var_extract_timer);
 			var = slab_calloc(sizeof(struct mrs_var), 1);
-			struct type	*t = dg->type;
+			struct type	*t = dg->xtype;
 			if(t->name[0]=='"' || !descendent_of(t->tnum, semarg)) var->is_const = 1;
 			var->dg = dg;
-			var->type = var->is_const?strdup("c"):strdup(dg->type->name);
-			var->name = strdup(dg->type->name);
+			var->type = var->is_const?strdup("c"):strdup(dg->xtype->name);
+			var->name = strdup(dg->xtype->name);
 			var->vnum = vlist->nvars;
 			var->refs = 1;
 			if(!var->is_const)
@@ -272,10 +272,10 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 		struct dg	*cto_dg = dg_hop(dg, ctof);
 		if(cfrom_dg!=NULL && cto_dg!=NULL)
 		{
-			if(cfrom_dg->type->name[0]=='"' && cto_dg->type->name[0]=='"')
+			if(cfrom_dg->xtype->name[0]=='"' && cto_dg->xtype->name[0]=='"')
 			{
-				ep->cfrom = atoi(cfrom_dg->type->name+1);
-				ep->cto = atoi(cto_dg->type->name+1);
+				ep->cfrom = atoi(cfrom_dg->xtype->name+1);
+				ep->cto = atoi(cto_dg->xtype->name+1);
 			}
 		}
 	}
@@ -287,6 +287,7 @@ void	dg_to_mrs_hc(struct dg *dg, struct mrs_vlist *vlist, struct mrs_hcons	*hc)
 	static int		hargf = -1, largf;
 	static struct type *qeq, *geq, *leq;
 
+	dg = dereference_dg(dg);
 	if(hargf==-1)
 	{
 		hargf = lookup_fname("HARG");
@@ -295,12 +296,12 @@ void	dg_to_mrs_hc(struct dg *dg, struct mrs_vlist *vlist, struct mrs_hcons	*hc)
 		geq = lookup_type("geq");
 		leq = lookup_type("leq");
 	}
-	if(dg->type == qeq)hc->type = hcons_qeq;
-	else if(dg->type == geq)hc->type = hcons_geq;
-	else if(dg->type == leq)hc->type = hcons_leq;
+	if(dg->xtype == qeq)hc->type = hcons_qeq;
+	else if(dg->xtype == geq)hc->type = hcons_geq;
+	else if(dg->xtype == leq)hc->type = hcons_leq;
 	else
 	{
-		fprintf(stderr, "unknown HCONS type `%s'\n", dg->type->name);
+		fprintf(stderr, "unknown HCONS type `%s'\n", dg->xtype->name);
 		exit(-1);
 	}
 	hc->hi = dg_to_mrs_var(dg_hop(dg, hargf), vlist);
@@ -311,7 +312,8 @@ void	dg_to_mrs_ic(struct dg *dg, struct mrs_vlist *vlist, struct mrs_icons	*ic)
 {
 	struct dg		*left, *right;
 
-	ic->type = dg->type->name;
+	dg = dereference_dg(dg);
+	ic->type = dg->xtype->name;
 	ic->left = dg_to_mrs_var(dg_hop(dg, icons_left_feature), vlist);
 	ic->right = dg_to_mrs_var(dg_hop(dg, icons_right_feature), vlist);
 }

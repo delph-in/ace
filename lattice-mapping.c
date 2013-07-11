@@ -472,6 +472,7 @@ struct re_match_set
 
 void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	*mats)
 {
+	d = dereference_dg(d);
 	if(d->xtype->name[0]=='"')
 	{
 		if(!strstr(d->xtype->name, "${"))return;

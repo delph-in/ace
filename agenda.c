@@ -286,7 +286,7 @@ int	lexrulefilt_f(int	x, int	rule)
 	for(t=lstart[x];t;t=t->next)
 	{
 		if(!(t->edge->from==x && t->edge->lex))break;
-		if(lexfirst(t->edge->dg->type, rule))return 0;
+		if(lexfirst(t->edge->dg->xtype, rule))return 0;
 	}
 	return 1;
 }
@@ -305,7 +305,7 @@ int	lexrulefilt_l(int	x, int	rule)
 		for(t=lstart[s];t;t=t->next)
 		{
 			if(!(t->edge->to==x && t->edge->lex))break;
-			if(lexlast(t->edge->dg->type, rule))return 0;
+			if(lexlast(t->edge->dg->xtype, rule))return 0;
 		}
 	}
 	return 1;

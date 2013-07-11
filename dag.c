@@ -230,8 +230,7 @@ struct dg	*add_dg_hop(struct dg	*d, int	label, struct dg	*value)
 		if(dn != d)
 		{
 			// oops! we left the old dg behind, forward it along
-			d->gen = 9;
-			d->forward = dn;
+			permanent_forward_dg(d, dn);
 			d = dn;
 		}
 		// arcs go directly after the `struct dg'
@@ -276,20 +275,20 @@ int	subsume_same_dg(struct dg	*a)
 
 	if(a->gen!=generation)
 	{
-		a->forward = a->copy = 0;
+		a->copy = 0;
 		a->carcs = 0; a->ncarcs = 0;
-		a->type = a->xtype;
+		_set_forward(a, NULL);
 		a->gen = generation;
 	}
 
-	if(a->copy==a && a->forward==a)return 1;
+	if(a->copy==a && FORWARD(a)==a)return 1;
 	if(a->copy)subsume_forward = 0;
-	if(a->forward)subsume_backward = 0;
+	if(FORWARD(a))subsume_backward = 0;
 	if(!subsume_forward && !subsume_backward)return 0;
-	//if(a->copy || a->forward)return 0;
+	//if(a->copy || FORWARD(a))return 0;
 
 	a->copy = a;
-	a->forward = a;
+	_set_forward(a, a);
 
 	arcs = DARCS(a);
 	for(i=0;i<a->narcs;i++)
@@ -323,17 +322,17 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	if(a->gen!=generation)
 	{
 		//printf("reset lhs\n");
-		a->forward = a->copy = 0;
+		a->copy = 0;
 		a->carcs = 0; a->ncarcs = 0;
-		a->type = a->xtype;
+		_set_forward(a, NULL);
 		a->gen = generation;
 	}
 	if(b->gen!=generation)
 	{
 		//printf("reset rhs\n");
-		b->forward = b->copy = 0;
+		b->copy = 0;
 		b->carcs = 0; b->ncarcs = 0;
-		b->type = b->xtype;
+		_set_forward(b, NULL);
 		b->gen = generation;
 	}
 
@@ -360,7 +359,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		}
 	}
 
-	if(a->copy == b && b->forward == a)return 1;
+	if(a->copy == b && FORWARD(b) == a)return 1;
 
 	if(!a->copy)a->copy = b;
 	else if(a->copy != b)
@@ -369,18 +368,14 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		//printf("not forward... (lhs = %p)\n", a->copy);
 	}
 
-	if(!b->forward)b->forward = a;
-	else if(b->forward != a)
+	if(!FORWARD(b))_set_forward(b, a);
+	else if(FORWARD(b) != a)
 	{
 		subsume_backward = 0;
-		//printf("not backward... (rhs = %p)\n", b->forward);
+		//printf("not backward... (rhs = %p)\n", FORWARD(b));
 	}
 
 	if(!subsume_forward && !subsume_backward) { ut1 = a->xtype; ut2 = b->xtype; return 0; }
-	//if(a->copy || b->forward)return 0;
-
-	//a->copy = b;
-	//b->forward = a;
 
 	//printf("maybe %p [%s] <=> %p [%s]\n", a, a->xtype->name, b, b->xtype->name);
 
@@ -525,7 +520,7 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 		/*if(k>intro)
 		{
 			//printf("dag `%s' uses `%s', introduced by %s\n",
-					//d->type->name, fnames[d->label[i]],
+					//d->xtype->name, fnames[d->label[i]],
 					//th->types[introduce[d->label[i]]]->name);
 			intro = k;
 		}*/
@@ -542,18 +537,18 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 			up = nup;
 		}
 	}
-	//if(intro==-1)return d->type;
+	//if(intro==-1)return d->xtype;
 	if(!up)
 	{
 		//if(d->narcs)printf("type inferred for %d features [%s ...] = null\n", d->narcs, fnames[d->label[0]]);
-		return d->type;
+		return d->xtype;
 	}
 	else
 	{
 		//printf("type inferred for %d features = %s\n", d->narcs, up->name);
-		return glb(d->type, up);
-		//return glb(d->type, types[intro]);
-		//if(descendent_of(d->type->tnum, types[intro]))return d->type;
+		return glb(d->xtype, up);
+		//return glb(d->xtype, types[intro]);
+		//if(descendent_of(d->xtype->tnum, types[intro]))return d->xtype;
 		//return types[intro];
 	}
 }

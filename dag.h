@@ -35,14 +35,16 @@ struct dg
 	struct type	*xtype;
 //#define	DARCS(dg1)	((struct dg**)((void*)dg1+sizeof(struct dg) + (dg1->narcs-2+3)/4 * 4))
 #define	DARCS(dg1)	((struct dg**)((void*)dg1+sizeof(struct dg) + DAG_EXTRA_LABELS_SIZE(dg1)))
-	struct dg	*forward;
+	//struct dg	*forward;
+#define	FORWARD(dg1)	((struct dg*)(dg1->type))
 	struct darc	*carcs;
 	struct dg	*copy;
 	unsigned int	gen;
-	unsigned char	narcs, ncarcs;
+	unsigned char	narcs, ncarcs:7;
+	unsigned char	forwarded:1;
 	//unsigned char	label[2];
 	unsigned short	label[1];
-};
+} __attribute__((packed));
 
 // basic dag operations
 int		unify_dg_infrom(struct dg	*dg1, struct dg	*dg2);
@@ -132,7 +134,8 @@ static inline void	slab_warm_cache()
 	__builtin_prefetch(slab+slabu, 1);
 }
 
-#define	DAG_ALIGNMENT	48
+//#define	DAG_ALIGNMENT	48
+#define	DAG_ALIGNMENT	40
 static inline	void	*slab_alloc(int	len)
 {
 	extern void	*last, *slab;
@@ -144,7 +147,7 @@ static inline	void	*slab_alloc(int	len)
 
 	// align these special cases
 	//if(len>=48 && len <=64)
-	if(len == 48)	// dag node with no arcs
+	if(len == sizeof(struct dg))	// dag node with no arcs
 	{
 		if((unsigned long)last % DAG_ALIGNMENT)
 		{
@@ -172,9 +175,15 @@ static inline	void	*slab_alloc(int	len)
 	return last;
 }
 
+static inline _set_forward(struct dg	*dg, struct dg	*dest)
+{
+	dg->forwarded = 1;
+	dg->type = (struct type*)dest;
+}
+
 static inline struct dg	*p_dereference_dg(struct dg	*dg)
 {
-	while(dg && dg->gen==9 && dg->forward)dg = dg->forward;
+	while(dg && dg->gen==9 && dg->forwarded)dg = FORWARD(dg);
 	return dg;
 }
 
@@ -184,18 +193,15 @@ static inline struct dg	*dereference_dg(struct dg	*dg)
 	struct dg	*fw = dg;
 	extern unsigned int	generation;
 
-	//if(dg->gen != generation && dg->gen!=9)return dg;
-	//if((dg->gen==generation || dg->gen==9) && dg->forward && !dg->forward->forward)return dg->forward;
-
 	while(1)
 	{
 		// step 'fw' twice
-		if(fw->gen==generation || fw->gen==9) { if(fw->forward)fw = fw->forward; else return fw; }
-		if(fw->gen==generation || fw->gen==9) { if(fw->forward)fw = fw->forward; else return fw; }
+		if(fw->gen==generation || fw->gen==9) { if(fw->forwarded)fw = FORWARD(fw); else return fw; }
+		if(fw->gen==generation || fw->gen==9) { if(fw->forwarded)fw = FORWARD(fw); else return fw; }
 		else return fw;
 		
 		// step 'dg' once
-		dg = dg->forward;
+		dg = FORWARD(dg);
 		if(dg == fw)
 		{
 			fprintf(stderr, "XXX deref cycle\n");
@@ -207,7 +213,7 @@ static inline struct dg	*dereference_dg(struct dg	*dg)
 static inline struct dg	*dereference_dg(struct dg	*dg)
 {
 	extern unsigned int	generation;
-	while(dg && (dg->gen==9 || dg->gen==generation) && dg->forward)dg = dg->forward;
+	while(dg && (dg->gen==9 || dg->gen==generation) && dg->forwarded)dg = FORWARD(dg);
 	return dg;
 }
 #endif
@@ -218,7 +224,7 @@ static inline struct dg	*dg_hop(struct dg	*d, int	label)
 	extern unsigned int	generation;
 	struct dg	**arcs;
 
-	if(d->forward)d = dereference_dg(d);
+	if(d->forwarded)d = dereference_dg(d);
 	if(!d)return 0;
 	arcs = DARCS(d);
 
@@ -244,7 +250,7 @@ static inline struct dg	*dg_hop(struct dg	*d, int	label)
 	}
 	return 0;
 ret:
-	if(d->forward)return dereference_dg(d);
+	if(d->forwarded)return dereference_dg(d);
 	else return d;
 }
 

@@ -319,6 +319,8 @@ void	transfer_vlist_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs
 void	perform_override(struct dg	*into, struct dg	*from)
 {
 	assert(into && from);
+	into = dereference_dg(into);
+	from = dereference_dg(from);
 	if(from->xtype != get_top())	// don't override for nodes created implicitly along the path to an authored constraint
 		into->type = into->xtype = from->xtype;
 	else if(into->xtype == NULL)	// except to revive nodes that were marked for deletion due to nonexistant input variables

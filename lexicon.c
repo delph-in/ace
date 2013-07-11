@@ -272,7 +272,7 @@ void	simplify_lexeme(struct lexeme	*l)
 	if(kr->narcs != 1 || kr->label[0] != predfeat)return;
 	pr = dg_hop(kr, predfeat);
 	// we want l->pred
-	if(pr->narcs != 0 || pr->type != l->pred)return;
+	if(pr->narcs != 0 || pr->xtype != l->pred)return;
 
 	// check PHON branch
 	ph = dg_hop(ss, phonfeat);
@@ -286,9 +286,9 @@ void	simplify_lexeme(struct lexeme	*l)
 		if(on->narcs != 1 || on->label[0] != __tlfeat)return;
 		__tl = dg_hop(on, __tlfeat);
 		// we want 'native_token_list' with no arcs
-		if(__tl->type != native_token_list || __tl->narcs != 0)return;
+		if(__tl->xtype != native_token_list || __tl->narcs != 0)return;
 		// we want predictable onset
-		if(on->type != predict_onset(l->stem[0]->name))return;
+		if(on->xtype != predict_onset(l->stem[0]->name))return;
 		l->onset = 1;
 	}
 

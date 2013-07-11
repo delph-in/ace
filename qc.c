@@ -36,6 +36,7 @@ qc_extractor_function	qc_extractor = NULL;
 struct type	*dg_type(struct dg	*d)
 {
 	extern unsigned int	generation;
+	// this is called on the results of dg_hop... safe to assume it is dereferenced.
 	if(d->gen == generation)return d->type;
 	return d->xtype;
 }

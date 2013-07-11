@@ -429,11 +429,11 @@ void	wellform(struct dg	*d, char	*typename)
 
 	for(i=0;i<d->narcs;i++)
 	{
-		arcs[i] = (struct dg*)dereference_dg(arcs[i]);
+		arcs[i] = dereference_dg(arcs[i]);
 		if(arcs[i]->gen != generation)
 		{
 			arcs[i]->type = arcs[i]->xtype;
-			arcs[i]->forward = 0;
+			arcs[i]->forwarded = 0;
 			arcs[i]->copy = 0;
 			arcs[i]->ncarcs = 0;
 			arcs[i]->carcs = 0;
@@ -444,19 +444,19 @@ void	wellform(struct dg	*d, char	*typename)
 		t = most_general_type_for_dg(arcs[i]);
 		if(!t)
 		{
-			fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", arcs[i]->type->name);
+			fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", arcs[i]->xtype->name);
 			exit(-1);
 		}
-		if(t != arcs[i]->type || (wellforming_th && type_has_been_updated(t)))
+		if(t != arcs[i]->xtype || (wellforming_th && type_has_been_updated(t)))
 		{
-			/*printf("well-formedness forces dag `%s' -> `%s'  (inside constraint for type %s)\n", arcs[i]->type->name, t->name, typename);
+			/*printf("well-formedness forces dag `%s' -> `%s'  (inside constraint for type %s)\n", arcs[i]->xtype->name, t->name, typename);
 			int j;
 			for(j=0;j<wfpl;j++)
 				printf("%s ", fnames[wfpath[j]]);
 			printf("\n");*/
-			if(!descendent_of(t->tnum, arcs[i]->type))
+			if(!descendent_of(t->tnum, arcs[i]->xtype))
 			{
-				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i]->type->name, t->name);
+				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i]->xtype->name, t->name);
 				fprintf(stderr, "	while processing `%s'\n", typename);
 				exit(-1);
 			}

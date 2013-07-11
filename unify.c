@@ -45,7 +45,7 @@ void dagreset_c(struct dg	*d);
 
 static inline void	p_forward_dg(struct dg	*from, struct dg	*to)
 {
-	from->forward = to;
+	_set_forward(from, to);
 	from->gen = 9;
 	from->ncarcs = 0;
 	from->carcs = 0;
@@ -58,12 +58,11 @@ void	permanent_forward_dg(struct dg	*from, struct dg	*to)
 
 static inline void	forward_dg(struct dg	*from, struct dg	*to)
 {
-	from->forward = to;
+	_set_forward(from, to);
 	if(from->gen != generation)
 	{
 		from->ncarcs = 0;
 		from->carcs = 0;
-		from->type = from->xtype;
 		from->gen = generation;
 	}
 }
@@ -82,16 +81,13 @@ int	check_cycles(struct dg	*dg)
 	struct dg	**arcs;
 
 	if(!dg)return -1;
-	if(dg->forward)
-	{
-		dg = dereference_dg(dg);
-		if(!dg)return -1;
-	}
+	dg = dereference_dg(dg);
+	if(!dg)return -1;
 
 	if(dg->gen != generation)
 	{
 		dg->gen = generation;
-		dg->forward = 0;
+		dg->forwarded = 0;
 		dg->ncarcs = 0;
 		dg->carcs = 0;
 		dg->type = dg->xtype;
@@ -137,12 +133,13 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 	newcopy->ncarcs = 0;
 	newcopy->carcs = 0;
 	//newcopy->narcs = dg->narcs;
-	if(dg->gen==9){}//newcopy->gen = 9;
-	else
-	{
-		newcopy->forward = 0;
+	assert(dg->gen != 9);	// we've already dereferenced it...
+	//if(dg->gen==9){}//newcopy->gen = 9;
+	//else
+	//{
+		newcopy->forwarded = 0;
 		newcopy->gen = generation;
-	}
+	//}
 	memcpy(newcopy->label, dg->label, sizeof(unsigned short) * dg->narcs);
 	aptr = DARCS(newcopy);
 	optr = DARCS(dg);
@@ -193,18 +190,14 @@ extern struct darc	*carcstack;
 #ifdef	COPY_COUNTS
 	copytraverse++;
 #endif
-	if(dg_underef->forward)
-	{
-		dg = dereference_dg(dg_underef);
-		if(!dg)return 0;
-	}
-	else dg = dg_underef;
+	dg = dereference_dg(dg_underef);
+	if(!dg)return 0;
 	forwarded = (dg != dg_underef);
 
 	if(dg->gen != generation)
 	{
 		dg->copy = 0;
-		dg->forward = 0;
+		dg->forwarded = 0;
 		dg->ncarcs = 0;
 		dg->carcs = 0;
 		dg->type = dg->xtype;
@@ -279,7 +272,7 @@ extern struct darc	*carcstack;
 	newcopy->gen = generation;
 	newcopy->copy = 0;
 	newcopy->ncarcs = 0;
-	newcopy->forward = 0;
+	newcopy->forwarded = 0;
 	newcopy->narcs = na;
 	aptr = DARCS(newcopy);
 	alptr = newcopy->label;
@@ -299,7 +292,7 @@ extern struct darc	*carcstack;
 				continue;
 			}
 			//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
-			//		fnames[aptr->label], newcopy->type->name, optr->dest);
+			//		fnames[aptr->label], newcopy->xtype->name, optr->dest);
 			ch = 0;
 
 #ifdef	COPY_PATHS
@@ -353,7 +346,7 @@ extern struct darc	*carcstack;
 			continue;
 		}
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
-		//		fnames[aptr->label], newcopy->type->name, xarc.dest);
+		//		fnames[aptr->label], newcopy->xtype->name, xarc.dest);
 		ch = 0;
 
 #ifdef	COPY_PATHS
@@ -429,22 +422,23 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 	if(dg->gen != generation)
 	{
 		dg->copy = 0;
-		dg->forward = 0;
+		dg->forwarded = 0;
 		dg->ncarcs = 0;
 		dg->carcs = 0;
 		dg->type = dg->xtype;
 		dg->gen = generation;
 	}
-	else if(dg->copy && dg->copy->gen == generation)
+	else if(dg->copy)
 	{
-		// we set the copy's 'forward' to be nonnull while this node is still copying
-		// this lets us detect a cycle
-		if(dg->copy->forward)
+		if((unsigned long long)dg->copy == 3)
 		{
+			// cycle detected!
 			//fprintf(stderr, "NOTE: cycle\n");
-			return 0;
+			return NULL;
 		}
-		return dg->copy;
+		if(dg->copy->gen == generation)
+			return dg->copy;
+		assert(!"not reached -- why would copy be set and not be up-to-generation?");
 	}
 
 #define	CDWCA_RESTRICTOR(x)	(PACKING_RESTRICTOR(x) || (cdwca_should_trim && SHOULD_TRIM(x)))
@@ -457,21 +451,21 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 	//int	ab = (na-2 + 3)/4 * 4;
 	int		ab = DAG_EXTRA_LABELS_SIZE_FOR_COUNT(na);
 	newcopy = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*na);
-	dg->copy = newcopy;
 	*newcopy = *dg;
 	newcopy->xtype = newcopy->type = (dg->gen==generation)?dg->type:dg->xtype;
 	newcopy->gen = generation;
-	newcopy->copy = 0;
+	newcopy->copy = NULL;
 	newcopy->ncarcs = 0;
-	newcopy->carcs = 0;
+	newcopy->carcs = NULL;
 	newcopy->narcs = na;
+	newcopy->forwarded = 0;
 	alptr = newcopy->label;
 	aptr = DARCS(newcopy);
 	olptr = dg->label;
 	optr = DARCS(dg);
 
 	// mark that we are inside this node, to detect cycles
-	newcopy->forward = (void*)1;
+	dg->copy = (void*)3;
 
 	for(j=0,i=0;i<dg->narcs || j<dg->ncarcs;) // mergesort
 	{
@@ -503,7 +497,7 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 		if(CDWCA_RESTRICTOR(copylabel))
 			continue;
 		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
-		//		fnames[aptr->label], newcopy->type->name, xarc.dest);
+		//		fnames[aptr->label], newcopy->xtype->name, xarc.dest);
 
 #ifdef	COPY_PATHS
 		assert(copypathp < MAX_COPY_PATH);
@@ -515,11 +509,11 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 		copypathp--;
 #endif
 
-		if(!*aptr)return 0;
+		if(!*aptr)return NULL;
 		aptr++; alptr++;
 	}
 
-	newcopy->forward = 0;
+	dg->copy = newcopy;
 	return newcopy;
 }
 
@@ -611,8 +605,8 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 		dg1->ncarcs = 0;
 		dg1->carcs = 0;
 	}
+	dg1->forwarded = 0;
 	dg1->xtype = dg1->type = t;
-	dg1->forward = 0;
 	dg1->gen = generation;
 	//fprintf(stderr, "type `%s' at ", t->name); unify_backtrace();
 
@@ -668,7 +662,7 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 	{
 		if(!g_loaded)
 		{
-			fprintf(stderr, "UNIFY: failed additional constraints from glb-type `%s'\n", extra->type->name);
+			fprintf(stderr, "UNIFY: failed additional constraints from glb-type `%s'\n", extra->xtype->name);
 			print_dg(extra); printf("\n");
 		}
 		return -1;
@@ -733,8 +727,8 @@ int		unify_dg_defaults(struct dg	*dg1, struct dg	*dg2)
 		dg1->ncarcs = 0;
 		dg1->carcs = 0;
 	}
+	dg1->forwarded = 0;
 	dg1->xtype = dg1->type = t;
-	dg1->forward = 0;
 	dg1->gen = generation;
 	//printf("type `%s' at ", t->name); unify_backtrace();
 
@@ -853,12 +847,12 @@ struct dg	*get_extra_type_dg(struct type	*t)
 
 	if(extra)
 	{
-		extra->gen = generation;
+		extra->forwarded = 0;
 		extra->type = extra->xtype;
 		extra->ncarcs = 0;
 		extra->carcs = 0;
-		extra->forward = 0;
 		extra->copy = 0;
+		extra->gen = generation;
 	}
 	else
 	{
@@ -880,8 +874,8 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	struct dg	**arcs1, **arcs2;
 
 	if(dg1 == dg2)return 0;
-	if(dg1->forward)dg1 = dereference_dg(dg1);
-	if(dg2->forward)dg2 = dereference_dg(dg2);
+	dg1 = dereference_dg(dg1);
+	dg2 = dereference_dg(dg2);
 	if(!dg1 || !dg2)return -1;
 
 	if(dg1 == dg2)return 0;
@@ -919,12 +913,12 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 		if(t->dg->gen != generation)
 		{
 			extra = t->dg;
-			extra->gen = generation;
+			extra->forwarded = 0;
 			extra->type = extra->xtype;
 			extra->ncarcs = 0;
 			extra->carcs = 0;
-			extra->forward = 0;
 			extra->copy = 0;
+			extra->gen = generation;
 		}
 		else
 		{
@@ -995,8 +989,8 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 		dg1->carcs = 0;
 		dg1->gen = generation;
 	}
+	dg1->forwarded = 0;
 	dg1->type = t;
-	dg1->forward = 0;
 	//fprintf(stderr, "type `%s' at ", t->name); unify_backtrace();
 
 	forward_dg(dg2, dg1);
@@ -1333,7 +1327,7 @@ void dgreset_r(struct dg	*d)
 	d->ncarcs = 0;
 	d->carcs = 0;
 	d->copy = 0;
-	d->forward = 0;
+	d->forwarded = 0;
 	d->type = d->xtype;
 	d->gen = generation;
 

@@ -76,7 +76,7 @@ patch_variable_types(struct mrs	*m)
 		if(v->dg)
 		{
 			struct type	*tp = lookup_type(type);
-			v->dg->type = v->dg->xtype = tp;
+			v->dg->xtype = tp;
 		}
 	}
 }
@@ -771,10 +771,6 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 			}
 			// we require that the *original* type of the node that matched tr->eq[i]
 			// is equal to the *original* type of tr->eq[i] itself
-			//struct dg	*now = dereference_dg(tr->eq[i]);
-			//struct type	*tnow = (now->gen == generation)?now->type:now->xtype;
-			//struct type	*tshould = tr->eq[i]->xtype;
-			//if(equal_semarg_types(tnow, tshould) == 0)
 			struct dg	*ep_original = dereference_dg(tr->eq[i]);
 			struct type	*t_ep_original = ep_original->xtype;
 			struct type	*t_eq_original = tr->eq[i]->xtype;
@@ -800,9 +796,6 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 				forget_tmp();
 				return -1;
 			}
-			//struct dg	*now = dereference_dg(tr->ss[i]);
-			//struct type	*tnow = (now->gen == generation)?now->type:now->xtype;
-			//if(!descendent_of(tnow->tnum, tr->ss[i]->xtype))
 			struct dg	*ep_original = dereference_dg(tr->ss[i]);
 			struct type	*t_ep_original = ep_original->xtype;
 			struct type	*t_ss_original = tr->ss[i]->xtype;
@@ -1024,7 +1017,10 @@ void destroy_existing_instlocs(struct dg	*dg)
 		{
 			struct type	*t = arcs[i]->xtype;
 			if(t->name[0]=='"')
-				arcs[i]->xtype = arcs[i]->type = default_type_hierarchy()->strtype;
+			{
+				struct dg	*iloc = dereference_dg(arcs[i]);
+				iloc->xtype = iloc->type = default_type_hierarchy()->strtype;
+			}
 			return;
 		}
 		else destroy_existing_instlocs(arcs[i]);

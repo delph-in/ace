@@ -60,6 +60,8 @@ struct dg	*generalize(struct dg	*a, struct dg	*b)
 
 	// otherwise, we're making a new dg and adding it to both 'a' and 'b's copy lists
 
+	a = dereference_dg(a);
+	b = dereference_dg(b);
 	t1 = (a->gen==generation)?a->type:a->xtype;
 	t2 = (b->gen==generation)?b->type:b->xtype;
 
@@ -76,12 +78,13 @@ struct dg	*generalize(struct dg	*a, struct dg	*b)
 	struct dg	*g = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*narcs), *aa, *bb;
 
 	g->type = g->xtype = t;
-	g->gen = generation;
-	g->copy = g->forward = NULL;
+	g->copy = NULL;
 	g->narcs = 0;
 	g->ncarcs = 0;
+	g->forwarded = 0;
 	g->carcs = NULL;
 	g->narcs = narcs;
+	g->gen = generation;
 	narcs = 0;
 
 	if(t->dg)

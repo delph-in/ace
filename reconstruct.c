@@ -247,6 +247,7 @@ int	parse_token_avm(struct hash	*taghash, struct dg	*d, char	**S)
 	char	delim = **S;
 	**S = 0;
 	// must freeze_string() because if the type becomes a new temporary string, it will point at the argument...
+	d = dereference_dg(d);
 	d->type = d->xtype = lookup_type(freeze_string(typename));
 	**S = delim;
 	skip_space(S);

@@ -999,7 +999,7 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...),
 		else if(e->lex)
 		{
 			sign = e->lex->word;
-			//sign = e->dg->type->name;
+			//sign = e->dg->xtype->name;
 		}
 		if(!labelled)
 			print(" (%d %s %f %d %d", e->id, sign, hyp->score, from, from+hyp->toklen);

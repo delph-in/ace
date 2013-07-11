@@ -22,6 +22,17 @@ TODO:
 		- on the other hand, it's not clear that this can actually happen.  if R(A) makes x inaccessible and y has not been mentioned yet, then there's no way for the < x qeq y > HCONS element to be built, right?
 		- conversely (and more plausibly), x will likely stay accessible long after y is made inaccessible.  unfortunately, we won't be able to notice that y was made inaccessible, because x looks the same.  result: edges may pass the filter that could have been rejected!
 
+- find a way to not have to recurse down parts of the dag that are predictably sharable (e.g. are out of generation and are self-contained)
+	- I tried this in the past and decided it was too hard.  why?
+	- each node needs a bit saying whether it's self-contained
+		- X is self contained means: nodes reachable from X [not including X itself] are only reachable by passing through X
+		- computing that bit statically is perhaps not hard
+		- maintaining it when unifying/copying is... impossible to do efficiently?
+			- X&Y is self-contained if X and Y both are... plus some other situations.
+
+- reduce dag node size -- already got rid of 'forward'; can also get rid of 'copy' (merge with 'carcs').
+	- could also trade in 8-byte pointers for 2-byte indices into a table, probably -- but the extra indirection may be expensive. for 'type', every dag node being unified would get one. for 'copy', every node being copied would get one... becomes like the previous dgtmp experiment.  which in hindsight wasn't such a terrible thing...
+
 - idea: do an initial parse with a cheaper (strictly less strict) grammar, see what edges are connected to roots, and use that as a top-down filter on a second pass with the full grammar.
 	- a bit like the limiting case of increasing the packing restrictor, but the simpler grammar could be of a significantly different shape
 		- e.g. a (big?) CFG, or: [ how would that CFG filter the main grammar edges? ]
@@ -84,6 +95,7 @@ fully automated regression testing of both parsing and generation
 
 berthold wants
 	- *updating* an ace tsdb profile -- doesn't work, apparently?
+		- reason: ace uses packed edge IDs in derivations, [incr tsdb()] assumes that edges with the same ID dominate the same tree, hence have the same AVM
 	- LUI support
 		-generator trees
 		+full chart

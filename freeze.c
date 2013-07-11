@@ -177,7 +177,7 @@ void	patch_dg(struct dg	*dg)
 	dg->ncarcs = 0;
 	dg->carcs = 0;
 	dg->gen = 0;
-	dg->forward = 0;
+	dg->forwarded = 0;
 	dg->copy = 0;
 	dg->type = dg->xtype;
 
