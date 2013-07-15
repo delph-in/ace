@@ -54,6 +54,7 @@ extern long long	accum_ram_usage;
 extern char			*use_roots, *disable_signs;
 extern int do_forest;
 extern int g_profiling;
+extern int use_packed_edge_ids;
 float	stdin_time = 0;
 
 int	form_to_relation = 0;
@@ -119,6 +120,7 @@ void	parse_args(int	argc, char	*argv[])
 		{"show-realization-trees", 0, &show_realization_trees, 1},
 		{"show-realization-mrses", 0, &show_realization_mrses, 1},
 		{"equivalence-packing", 0, &equivalence_packing_only, 1},
+		{"packed-edge-ids", 0, &use_packed_edge_ids, 1},
 		{"itsdb-forest", 0, &itsdb_dump_chart, 1},
 		{"report-labels", 0, &report_labels, 1},
 		{"input-from-lui", 0, &input_from_lui, 1},

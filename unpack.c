@@ -38,6 +38,7 @@ unsigned long long	ndecomposed;
 static jmp_buf	out_of_memory_jump;
 
 int	max_grandparenting = 3;
+int use_packed_edge_ids = 0;
 
 int	total_hyps;
 
@@ -415,6 +416,7 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypagenda_it
 	h->dg = NULL; h->string = NULL;
 	h->checkup = 0;
 	h->toklen = 0;
+	h->eid = use_packed_edge_ids?h->edge->id:next_eid();
 	for(i=0;i<h->arity;i++)
 		h->toklen += h->rhslist[i]->toklen;
 
@@ -443,6 +445,7 @@ struct hypothesis *leaf_hypothesis(struct edge *e, struct scoring_ancestry	ances
 	hyp->arity = 0;
 	hyp->rhslist = NULL;
 	hyp->indexlist = NULL;
+	hyp->eid = hyp->edge->id;
 
 	assert(e->lex);
 	build_hypothesis_surface(hyp);
@@ -1002,7 +1005,7 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...),
 			//sign = e->dg->xtype->name;
 		}
 		if(!labelled)
-			print(" (%d %s %f %d %d", e->id, sign, hyp->score, from, from+hyp->toklen);
+			print(" (%d %s %f %d %d", hyp->eid, sign, hyp->score, from, from+hyp->toklen);
 		else print(" (\"%s\"", label_dag(hyp->dg, "?"));
 		if(e->have)
 		{

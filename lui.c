@@ -313,11 +313,11 @@ void lui_format_tree(struct hypothesis *h, char *surf)
 	if(!surf && e->lex)surf = h->string;
 	if(!arity)
 		fprintf(lui_write, " #T[%d \"%s\" \"%s\" %d %s",
-			e->id, label, surf, e->id, sign);
+			e->id, label, surf, h->eid, sign);
 	else
 	{
 		fprintf(lui_write, " #T[%d \"%s\" %s %d %s",
-			e->id, label, "nil", e->id, sign);
+			e->id, label, "nil", h->eid, sign);
 		for(i=0;i<arity;i++)
 			lui_format_tree(h->rhslist[i], surf);
 	}

@@ -26,6 +26,7 @@ struct hypothesis
 	char				*string;	// surface yield
 	int					checkup;
 
+	int	eid;	// assign each unique subtree/hypothesis an edge id in unpacking, to make it look like we aren't doing any packing.  with --packed-edge-ids, this gets edge->id instead.
 	int	toklen;	// how many tokens this tree spans
 
 	// internal to a hypothesis as a scored tree
