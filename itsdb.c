@@ -245,7 +245,11 @@ int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, in
 			capi_print_chart(tokens, lexical_chart, nrepptokens, status);
 		if(status == 0)
 		{
-			readings = capi_print_derivations();
+			// when requesting the chart, nanalyses=0 means don't actually report any derivations.
+			if(itsdb_dump_chart && tsdb_maxanalyses == 0)
+				readings = 0;
+			// otherwise, enumerate some derivations!
+			else readings = capi_print_derivations();
 
 			capi_printf("(:readings . %d) (:pedges . %d) (:aedges . %d) ",
 	//			readings,
@@ -617,7 +621,9 @@ void itsdb_mode()
 {
 	int fd;
 	close(1);
-	dup2(fd = open("/tmp/answer.itsdb", O_WRONLY | O_CREAT, 0600), 1);
+	char	logfilepath[256] = "/dev/null";
+	//sprintf(logfilepath, "/tmp/answer.itsdb");
+	dup2(fd = open(logfilepath, O_WRONLY | O_CREAT, 0600), 1);
 #ifdef TSDB
 	if(!capi_register(create_test_run, process_item, reconstruct_item, complete_test_run))
 		slave();
