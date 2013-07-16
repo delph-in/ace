@@ -231,7 +231,30 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	capi_printf("%s", buffer);
 }
 
-int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, int	nrepptokens, int	status, int	tforest)
+void	itsdb_dump_tokens(char	*name, char	*countname, struct lattice	*tokens)
+{
+	capi_printf("(%s . %d) ", countname, tokens->nedges);
+	capi_printf("(%s . \"", name);
+	int i;
+	for(i=0;i<tokens->nedges;i++)
+	{
+		// (id, start, end, [link,] path+, form [surface], ipos, lrule+[, {pos p}+])
+		struct lattice_edge	*e = tokens->edges[i];
+		struct token	*t = e->token;
+		char	tokstr[10240], *tsp = tokstr;
+		tsp += sprintf(tsp, "(%d, %d, %d, <%d:%d>, 1, \"%s\", 0, \"null\"",
+			t->eid, e->from->id, e->to->id, t->cfrom, t->cto, slab_escape(t->string));
+		int j;
+		if(t->npostags)tsp += sprintf(tsp, ",");
+		for(j=0;j<t->npostags;j++)
+			tsp += sprintf(tsp, " \"%s\" %s", slab_escape(t->postags[j].tag), t->postags[j].prob);
+		tsp += sprintf(tsp, ")");
+		capi_printf("%s%s", i?" ":"", slab_escape(tokstr));
+	}
+	capi_printf("\") ");
+}
+
+int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, int	status, int	tforest)
 {
 	extern int total_edges, real_edges, passive_edges;
 
@@ -239,10 +262,11 @@ int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, in
 	{
 		capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
 		//capi_printf("(:tcpu . %d) ", tforest);
+		if(tokens)itsdb_dump_tokens(":p-tokens", ":ntokens", tokens);
 
 		int readings;
 		if(itsdb_dump_chart)
-			capi_print_chart(tokens, lexical_chart, nrepptokens, status);
+			capi_print_chart(tokens, lexical_chart, status);
 		if(status == 0)
 		{
 			// when requesting the chart, nanalyses=0 means don't actually report any derivations.
@@ -497,7 +521,7 @@ void	capi_print_root_edge(char	*name, int	daughter_id, int	start, int	end)
 		my_id, name, start, end, RESULT_EDGE_STATUS, ROOT_EDGE_TYPE, daughter_id);
 }
 
-int capi_print_chart(struct lattice	*tokens, struct lattice	*lexical_chart, int	nrepptokens, int	status)
+int capi_print_chart(struct lattice	*tokens, struct lattice	*lexical_chart, int	status)
 {
 	capi_printf("(:chart . (");
 	int i, nroots = 0;
@@ -559,8 +583,8 @@ int capi_print_chart(struct lattice	*tokens, struct lattice	*lexical_chart, int	
 		// ninputs = tokens produced by REPP
 		// ntokens = tokens *after* chart mapping
 		// tedges = count of 'edge' relation tuples with type TOKEN_EDGE_TYPE
-		capi_printf("(:ninputs . %d) ", nrepptokens);
-		capi_printf("(:ntokens . %d) ", tokens->nedges);
+		//capi_printf("(:ninputs . %d) ", nrepptokens);
+		//capi_printf("(:ntokens . %d) ", tokens->nedges);
 		capi_printf("(:tedges . %d) ", ntokedges);
 		capi_printf("(:eedges . %d) ", lexical_chart->nedges);
 		capi_printf("(:ledges . %d) ", nlexr_edges);

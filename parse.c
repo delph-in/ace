@@ -16,7 +16,8 @@
 #include	"timer.h"
 #include	"profiler.h"
 
-int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, int	nrepptokens, int	status, int	tforest);
+void	itsdb_dump_tokens(char	*name, char	*countname, struct lattice	*tokens);
+int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, int	status, int	tforest);
 
 struct lattice	*last_token_chart;
 
@@ -413,7 +414,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	struct dg	*sem;
 	struct edge	*edge;
 
-	int	nrepptokens = token_chart->nedges;
+	if(do_itsdb)itsdb_dump_tokens(":p-input", ":ninputs", token_chart);
 	apply_token_mapping(token_chart);
 	sort_lattice(token_chart);
 
@@ -421,7 +422,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	{
 		fprintf(stderr, "NOTE: giving up, too many words (70+)\n");
 		itsdb_error("too many words (70+)");
-		if(do_itsdb)itsdb_report_parse(token_chart, NULL, nrepptokens, -2, 0);
+		if(do_itsdb)itsdb_report_parse(token_chart, NULL, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
 	}
@@ -461,7 +462,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	{
 		fprintf(stderr, "NOTE: post reduction gap\n");
 		stop_timer(chart_setup_timer, 1);
-		if(do_itsdb)itsdb_report_parse(token_chart, lexical_chart, nrepptokens, -2, 0);
+		if(do_itsdb)itsdb_report_parse(token_chart, lexical_chart, -2, 0);
 		return -2;
 	}
 
@@ -488,7 +489,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	{
 		fprintf(stderr, "NOTE: negative lexical chart length\n");
 		itsdb_error("negative lexical chart length");
-		if(do_itsdb)itsdb_report_parse(token_chart, lexical_chart, nrepptokens, -2, 0);
+		if(do_itsdb)itsdb_report_parse(token_chart, lexical_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
 	}
@@ -497,7 +498,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	{
 		fprintf(stderr, "NOTE: nothing to parse\n");
 		itsdb_error("nothing to parse");
-		if(do_itsdb)itsdb_report_parse(token_chart, lexical_chart, nrepptokens, -2, 0);
+		if(do_itsdb)itsdb_report_parse(token_chart, lexical_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
 	}
@@ -567,7 +568,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	}
 	else if(do_itsdb)
 	{
-		num_parses = itsdb_report_parse(token_chart, lexical_chart, nrepptokens, 0, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
+		num_parses = itsdb_report_parse(token_chart, lexical_chart, 0, (int)((long long)cforest*1000 / CLOCKS_PER_SEC));
 	}
 	else if(lui_mode)
 	{
@@ -682,7 +683,7 @@ int	check_mbs(char	*mbs);
 #endif
 
 	if(nparse<-1)fprintf(stderr, "NOTE: ignoring `%s'\n", current_sentence);
-	if(do_itsdb && nparse==-1)itsdb_report_parse(NULL, NULL, nwords, -1, 0);
+	if(do_itsdb && nparse==-1)itsdb_report_parse(NULL, NULL, -1, 0);
 
 finished:
 	if(tsdb_notes)tsdb_parse_note_end();
