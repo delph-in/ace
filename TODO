@@ -1,5 +1,7 @@
 TODO:
 
+- make hardcoded path in instantiate_gle() configurable?
+
 - ace bugs:
 	- ace demands that transfer rules have an '& [ ... ]' clause. the MMT transfer grammars don't, typically... silly, but no reason not to support that.
 	+ the dag-to-mrs cache is used both by transfer and by parse-result processing, but with different values of inhibit_vpm.  we need to straighten that out.

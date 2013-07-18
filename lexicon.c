@@ -377,7 +377,7 @@ struct lexeme	*make_lexeme(char	*word, struct dg	*dg, struct type	*type, struct 
 	// look up a few interesting ERG-specific paths in lexemes:
 	// SYNSEM.LKEYS.KEYREL.PRED is a predsort that the lexeme provides
 
-	synsem = dg_hop(fulldg, synsemfeat);
+	/*synsem = dg_hop(fulldg, synsemfeat);
 	if(synsem)
 	{
 		lkeys = dg_hop(synsem, lkeysfeat);
@@ -386,15 +386,16 @@ struct lexeme	*make_lexeme(char	*word, struct dg	*dg, struct type	*type, struct 
 			keyrel = dg_hop(lkeys, keyrelfeat);
 			if(keyrel)
 			{
-				pred = dg_hop(keyrel, predfeat);
+				pred = dg_hop(keyrel, predfeat);*/
+				pred = dg_path(fulldg, lex_pred_path);
 				if(pred && pred->xtype != predsort)
 				{
 					l->pred = pred->xtype;
 					//printf("lex `%s' provides `%s'\n", word, l->pred->name);
 				}
-			}
+			/*}
 		}
-	}
+	}*/
 
 	stem = dg_path(fulldg, lex_stem_path);
 

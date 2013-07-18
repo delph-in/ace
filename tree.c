@@ -119,6 +119,8 @@ struct tree	*string_to_tree_leaf(char	**Str)
 			t->ntokens++;
 			t->tokens = realloc(t->tokens, sizeof(char*) * t->ntokens);
 			t->tokens[t->ntokens-1] = tok;
+			t->tokenids = realloc(t->tokenids, sizeof(int) * t->ntokens);
+			t->tokenids[t->ntokens-1] = tok_id;
 			skip_space(&q);
 		}
 	}
@@ -358,6 +360,7 @@ void	free_tree(struct tree	*t)
 	for(i=0;i<t->ntokens;i++)
 		free(t->tokens[i]);
 	if(t->daughters)free(t->daughters);
+	if(t->tokenids)free(t->tokenids);
 	if(t->tokens)free(t->tokens);
 	if(t->label)free(t->label);
 	//if(t->decoration)free_tree_decoration(t->decoration);
