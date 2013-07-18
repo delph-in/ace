@@ -610,9 +610,10 @@ struct lexeme	*instantiate_gle(struct lexeme	*gle, char	*surface, char	*carg)
 	l->stem[0] = add_string(surface);
 	// set the CARG value
 	
-	static int savef[10] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
 	struct dg	*carg_dg;
-	carg_dg = walk_dg(l->dg, savef, "SYNSEM", "LOCAL", "CONT", "RELS", "LIST", "FIRST", "CARG", NULL);
+	//static int savef[10] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+	//carg_dg = walk_dg(l->dg, savef, "SYNSEM", "LOCAL", "CONT", "RELS", "LIST", "FIRST", "CARG", NULL);
+	carg_dg = dg_path(l->dg, lex_carg_path);
 	assert(carg_dg != NULL);
 	carg_dg->type = carg_dg->xtype = add_string(carg);
 	return l;
