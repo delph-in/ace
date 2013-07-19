@@ -688,6 +688,7 @@ int	check_mbs(char	*mbs);
 finished:
 	if(tsdb_notes)tsdb_parse_note_end();
 	if(g_profiling)stop_profilers_recursively(parse_profiler);
+	clear_mrs();
 	for(i=0;i<nwords;i++)free(words[i]);
 	free(words);
 	free(cfrom);
