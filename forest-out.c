@@ -81,7 +81,7 @@ update_cto(struct token	*T, int	new_cto)
 int reestimate_token_cto(struct token	*tok)
 {
 	//printf("ought to reestimate token '%s''s CTO\n", tok->string);
-	extern char	*current_sentence;
+	extern char	current_sentence[];
 
 	wchar_t	*wtok = towide(tok->string);
 	wchar_t	*wsent = towide(current_sentence);

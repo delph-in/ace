@@ -81,6 +81,7 @@ void		print_mrs(struct mrs	*mrs);
 void		print_mrs_var(struct mrs_var	*var);
 void		print_mrs_var_props(struct mrs_var	*var);
 struct mrs	*parse_mrs(char	*buffer);
+char		*read_mrs_string_or_line(FILE	*f, char	*line, int	maxlen);
 struct mrs	*read_mrs(FILE	*f);
 int			snprint_mrs(char	*str, int	len, struct mrs	*mrs);
 int	snprint_mrs_var_props(char	*str, int	len, struct mrs_var	*var);

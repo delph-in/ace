@@ -113,7 +113,7 @@ void score_hypothesis(struct hypothesis *h)
 		// construct the cannonical surface form
 		if(g_mode == GENERATING)return;	// FIXME: realization ranking doesn't have access to surface forms because we have no tokens...
 		//if(!enable_token_avms)return;
-		extern char	*current_sentence;
+		extern char	current_sentence[];
 		char	surface[1024], *sp = surface;
 		int	i;
 		struct edge	*e = h->edge;

@@ -449,15 +449,25 @@ struct mrs	*parse_mrs(char	*buffer)
 	return M;
 }
 
-struct mrs	*read_mrs(FILE	*f)
+char	*read_mrs_string_or_line(FILE	*f, char	*line, int	maxlen)
 {
-	int		abuf = 1024, lbuf = 0, balance = 0;
+	int		abuf = 1024, lbuf = 0, balance = 0, quoted = 0, escaped = 0;
+	int		llen = 0;
 	char	*buffer = malloc(abuf);
-	struct mrs	*mrs;
 
 	while(!feof(f) && (balance || !lbuf))
 	{
 		int ch = fgetc(f);
+		if(lbuf == 0 && line && llen < maxlen)
+		{
+			if(ch=='\n')
+			{
+				line[llen] = 0;
+				free(buffer);
+				return NULL;
+			}
+			line[llen++] = ch;
+		}
 		if(ch==' ' || ch=='\t' || ch=='\n' || ch=='\r')ch=' ';
 		if(ch!='[' && lbuf==0)continue;
 		//if(lbuf && buffer[lbuf-1]==' ' && ch==' ')continue;
@@ -466,9 +476,18 @@ struct mrs	*read_mrs(FILE	*f)
 			abuf *= 2;
 			buffer = realloc(buffer, abuf);
 		}
+		if(!escaped)
+		{
+			if(ch=='\\') { escaped = 1; continue; }
+			if(ch=='"')quoted = !quoted;
+		}
+		else
+		{
+			escaped = 0;
+		}
 		buffer[lbuf++] = ch;
-		if(ch=='[')balance++;
-		if(ch==']')balance--;
+		if(!quoted && ch=='[')balance++;
+		if(!quoted && ch==']')balance--;
 	}
 
 	if(balance || !lbuf)
@@ -480,12 +499,19 @@ struct mrs	*read_mrs(FILE	*f)
 			fprintf(stderr, "%s\n", buffer);
 		}
 		free(buffer);
-		return 0;
+		if(line)*line=0;
+		return NULL;
 	}
 	buffer[lbuf] = 0;
-	mrs = parse_mrs(buffer);
+	return buffer;
+}
+
+struct mrs	*read_mrs(FILE	*f)
+{
+	char	*buffer = read_mrs_string_or_line(f, NULL, 0);
+	struct mrs	*m = parse_mrs(buffer);
 	free(buffer);
-	return mrs;
+	return m;
 }
 
 struct mrs_var	*mrs_find_ep_role(struct mrs_ep	*ep, char	*role)

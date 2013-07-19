@@ -295,6 +295,24 @@ struct job_stats	arbiter_input_loop(FILE	*fin)
 	return st;
 }
 
+handle_lui_colon_command(char	*line)
+{
+	int	l = strlen(line);
+	if(l>3 && line[l-1]=='\n')line[l-1] = 0;
+	if(line[1]=='r' && line[2]==' ')
+		lui_rule(line+3);
+	if(line[1]=='l' && line[2]==' ')
+		lui_lex(line+3);
+	if(line[1]=='t' && line[2]==' ')
+		lui_type(line+3);
+	if(line[1]=='h' && line[2]==' ')
+		show_heirarchy(line+3);
+	if(line[1]=='g' && line[2]==' ')
+		show_glb(line+3);
+	if(line[1]=='c')
+		show_last_parse_chart();
+}
+
 struct job_stats	main_input_loop(FILE	*fin)
 {
 	struct job_stats	st = {.success = 0, .fail = 0, .count = 0, .time = 0};
@@ -311,48 +329,50 @@ struct job_stats	main_input_loop(FILE	*fin)
 	while(!die && !feof(fin))
 	{
 		int num_results;
-		clear_slab();
+		char	line[10240];
 		if(g_mode == PARSING)
 		{
-			char	line[10240];
 			if(fin==stdin)timer();
 			if(!fgets(line, 10240, fin))break;
 			if(fin==stdin)stdin_time += timer();
 			//start_timer(tid);
 			if(lui_mode && line[0]==':')
 			{
-				int	l = strlen(line);
-				if(l>3)line[l-1] = 0;
-				if(line[1]=='r' && line[2]==' ')
-					lui_rule(line+3);
-				if(line[1]=='l' && line[2]==' ')
-					lui_lex(line+3);
-				if(line[1]=='t' && line[2]==' ')
-					lui_type(line+3);
-				if(line[1]=='h' && line[2]==' ')
-					show_heirarchy(line+3);
-				if(line[1]=='g' && line[2]==' ')
-					show_glb(line+3);
-				if(line[1]=='c')
-					show_last_parse_chart();
+				handle_lui_colon_command(line);
 				num_results = -2;
 			}
-			else num_results = parse_line(line);
+			else
+			{
+				if(!lui_mode)clear_slab();
+				num_results = parse_line(line);
+			}
 			//double et = stop_timer(tid, 1);
 			//printf("%f seconds\n", et);
 		}
 		else
 		{
-			clear_mrs();
-			clear_slab();
 			if(fin==stdin)timer();
-			struct mrs	*mrs = read_mrs(fin);
+			char	*mrs_string = read_mrs_string_or_line(fin, line, 10230);
 			if(fin==stdin)stdin_time += timer();
-			if(!mrs && feof(fin))break;
-			if(g_mode == GENERATING)
-				num_results = generate(mrs);
-			else num_results = transfer(mrs);
-			free_mrs(mrs);
+			if(!mrs_string)
+			{
+				if(lui_mode && line[0]==':')
+					handle_lui_colon_command(line);
+				num_results = -2;
+			}
+			else
+			{
+				clear_mrs();
+				if(!lui_mode)clear_slab();
+				//struct mrs	*mrs = read_mrs(fin);
+				struct mrs	*mrs = parse_mrs(mrs_string);
+				free(mrs_string);
+				if(!mrs && feof(fin))break;
+				if(g_mode == GENERATING)
+					num_results = generate(mrs);
+				else num_results = transfer(mrs);
+				free_mrs(mrs);
+			}
 		}
 		if(num_results==-1 || num_results==-2)
 			{ if(num_results==-1)fprintf(stderr, "NOTE: ignore\n"); }
@@ -435,6 +455,7 @@ void	initialize_engine()
 
 	//check_unary_chains();
 	//decompose_rules();
+	clear_slab();
 }
 
 void	report_stats(struct job_stats	stats)

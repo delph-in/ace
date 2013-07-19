@@ -12,8 +12,12 @@
 #include	"unpack.h"
 #include	"lattice-mapping.h"
 #include	"token.h"
+#include	"hash.h"
 
 void	lui_gen_chart_level2(int	chart_id, int	nedge_ids, int	*edge_ids);
+void interactive_unify(char	*command);
+void	output_lui_dg_with_failure(struct dg	*dg, char *wtitle, struct path	relative_to);
+void	lui_text(char	*message);
 
 extern int preexisting_lui_fd;
 extern int input_from_lui;
@@ -100,6 +104,7 @@ void	*lui_listener(void *foo)
 				lui_gen_chart_level2(cid, neid, eid);
 			}
 			else if(!strcmp(lp, "")) {}
+			else if(!strncmp(lp, "unify ", 6))interactive_unify(lp);
 			else fprintf(stderr, "LUI: unknown `%s'\n", lp);
 		}
 	}
@@ -168,7 +173,7 @@ void	output_lui_chart(struct lattice	*token_lattice)
 {
 	int	i, j, k;
 	struct edge	*e, *esave;
-	extern char	*current_sentence;
+	extern char	current_sentence[];
 
 	lui_initialize();
 
@@ -204,7 +209,7 @@ void	output_lui_chart(struct lattice	*token_lattice)
 			struct dg *rn = dg_hop(e->rule->dg, lookup_fname("RNAME"));
 			char *symb = strdup(rn?rn->xtype->name:e->rule->name);
 			if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
-			fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, e->from, e->to, symb, e->rule->name);
+			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, symb, e->rule->name);
 			int l;
 			for(l=0;l<e->have;l++)
 				fprintf(lui_write, " %d", e->daughters[l]->id);
@@ -212,7 +217,7 @@ void	output_lui_chart(struct lattice	*token_lattice)
 		}
 		else if(e->lex)
 		{
-			fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, e->from, e->to, e->lex->word, e->lex->word);
+			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, e->lex->word, e->lex->word);
 			int k;
 			for(k=0;k<e->lex->stemlen;k++)
 			{
@@ -275,7 +280,126 @@ void	output_lui_chart(struct lattice	*token_lattice)
 	//print_dg(esave->dg); printf("\n\n");
 }
 
-void	output_lui_dg(struct dg	*dg, char *wtitle)
+struct hash	*lui_dgs = NULL;
+struct lui_obj
+{
+	enum { LUI_DG, LUI_EDGE }	what;
+	void	*ptr;
+};
+int	lui_id_allocator = 1;
+
+int	lui_register(int	what, void	*ptr)
+{
+	if(!lui_dgs)lui_dgs = hash_new("lui dgs");
+	char	str[32];
+	int	id = lui_id_allocator++;
+	sprintf(str, "%d", id);
+	struct lui_obj	*o = calloc(sizeof(*o),1);
+	o->what = what;
+	o->ptr = ptr;
+	hash_add(lui_dgs, strdup(str), o);
+	return id;
+}
+
+void	*fail_to_find(int what, char	*id)
+{
+	fprintf(stderr, "LUI asked for object %s, but couldn't find it\n", id);
+	return NULL;
+}
+
+void *lui_find(int	what, char	*id, int	complain)
+{
+	if(!lui_dgs)
+	{
+		if(!complain)return NULL;
+		return fail_to_find(what, id);
+	}
+	struct lui_obj	*o = hash_find(lui_dgs, id);
+	if(o->what != what)
+	{
+		if(!complain)return NULL;
+		fprintf(stderr, "wrong type:\n");
+		return fail_to_find(what, id);
+	}
+	return o->ptr;
+}
+
+int	lui_register_dg(struct dg	*dg)
+{
+	return lui_register(LUI_DG, dg);
+}
+
+int	lui_register_edge(struct edge	*e)
+{
+	return lui_register(LUI_EDGE, e);
+}
+
+struct edge	*lui_find_edge(char	*id)
+{
+	return (struct edge*)lui_find(LUI_EDGE, id, 1);
+}
+
+struct dg	*lui_find_dg(char	*id)
+{
+	struct dg	*d = (struct dg*)lui_find(LUI_DG, id, 0);
+	if(!d)
+	{
+		struct edge	*e = lui_find_edge(id);
+		if(!e)return NULL;
+		return e->dg;
+	}
+	else return d;
+}
+
+void interactive_unify(char	*command)
+{
+	char	left_id[32], right_id[32];
+	int		offset;
+	sscanf(command, "unify %s [%n", left_id, &offset);
+	char	*left_path_str = command + offset;
+	char	*end = strchr(left_path_str, ']');
+	assert(end != NULL);
+	*end++ = 0;
+	sscanf(end, " %s [%n", right_id, &offset);
+	char	*right_path_str = end + offset;
+	end = strchr(right_path_str, ']');
+	assert(end != NULL);
+	*end++ = 0;
+
+	//printf("should unify part of %s with part of %s\n", left_id, right_id);
+	struct dg	*left_dg = lui_find_dg(left_id);
+	struct dg	*right_dg = lui_find_dg(right_id);
+	struct dg	*original_right_dg = right_dg;
+	if(!left_dg || !right_dg)return;
+
+	struct path	left_path = string_to_path(left_path_str);
+	struct path	right_path = string_to_path(right_path_str);
+
+	left_dg = dg_path(left_dg, left_path);
+	if(!left_dg) { fprintf(stderr, "no such path in left DG\n"); return; }
+	right_dg = dg_path(right_dg, right_path);
+	if(!right_dg) { fprintf(stderr, "no such path in right DG\n"); return; }
+
+	//output_lui_dg(left_dg, "left");
+	//output_lui_dg(right_dg, "right");
+
+	int	result = unify_dg_tmp(left_dg, right_dg, -1);
+	struct dg	*result_dg = finalize_tmp(original_right_dg, 0);
+	if(!result_dg)
+	{
+		lui_text("cycle failure. sorry, I'm too lazy to tell you where.");
+	}
+	else if(result != 0)
+	{
+		output_lui_dg_with_failure(result_dg, "unification failure", right_path);
+	}
+	else
+	{
+		output_lui_dg(result_dg, "unification result");
+	}
+}
+
+void	output_lui_dg_id(struct dg	*dg, char *wtitle, int	id)
 {
 	static int dagid = 0;
 	int	tmp = dup(1);
@@ -283,7 +407,7 @@ void	output_lui_dg(struct dg	*dg, char *wtitle)
 	close(1);
 	dup2(lui_wfd, 1);
 
-	fprintf(lui_write, "avm %d ", ++dagid); fflush(lui_write);
+	fprintf(lui_write, "avm %d ", id); fflush(lui_write);
 	print_dg(dg); fflush(stdout);
 	fprintf(lui_write, " \"%s\"\n", wtitle?wtitle:"ACE DAG"); fflush(lui_write);
 
@@ -292,6 +416,45 @@ void	output_lui_dg(struct dg	*dg, char *wtitle)
 	close(tmp);
 
 	//fprintf(stderr, "LUI: wrote out a dag `%p'\n", dg);
+}
+
+void	output_lui_dg_id_with_failure(struct dg	*dg, char *wtitle, int	id, struct path	relative_to)
+{
+	static int dagid = 0;
+	int	tmp = dup(1);
+	lui_initialize();
+	close(1);
+	dup2(lui_wfd, 1);
+
+	fprintf(lui_write, "avm %d ", id); fflush(lui_write);
+	print_dg(dg); fflush(stdout);
+	extern int upathl, upath[];
+	extern struct type	*ut1, *ut2, *uglb;
+	fprintf(lui_write, " \"%s\" [ #U[%s 1 [", wtitle?wtitle:"ACE DAG", uglb?"constraint":"type");
+	int i, n=0;
+	extern char	**fnames;
+	for(i=0;i<relative_to.count;i++)
+		fprintf(lui_write, "%s%s", (n++)?" ":"", fnames[relative_to.fnums[i]]);
+	for(i=0;i<upathl;i++)fprintf(lui_write, "%s%s", (n++)?" ":"", fnames[upath[i]]);
+	if(uglb)fprintf(lui_write, "] %s %s %s -1]\n", ut1->name, ut2->name, uglb->name);
+	else    fprintf(lui_write, "] %s %s -1] ]\n", ut1->name, ut2->name);
+	fflush(lui_write);
+
+	close(1);
+	dup2(tmp, 1);
+	close(tmp);
+
+	//fprintf(stderr, "LUI: wrote out a dag `%p'\n", dg);
+}
+
+void	output_lui_dg(struct dg	*dg, char *wtitle)
+{
+	output_lui_dg_id(dg, wtitle, lui_register_dg(dg));
+}
+
+void	output_lui_dg_with_failure(struct dg	*dg, char *wtitle, struct path	relative_to)
+{
+	output_lui_dg_id_with_failure(dg, wtitle, lui_register_dg(dg), relative_to);
 }
 
 void lui_format_tree(struct hypothesis *h, char *surf)
@@ -313,11 +476,11 @@ void lui_format_tree(struct hypothesis *h, char *surf)
 	if(!surf && e->lex)surf = h->string;
 	if(!arity)
 		fprintf(lui_write, " #T[%d \"%s\" \"%s\" %d %s",
-			e->id, label, surf, h->eid, sign);
+			lui_register_edge(e), label, surf, h->eid, sign);
 	else
 	{
 		fprintf(lui_write, " #T[%d \"%s\" %s %d %s",
-			e->id, label, "nil", h->eid, sign);
+			lui_register_edge(e), label, "nil", h->eid, sign);
 		for(i=0;i<arity;i++)
 			lui_format_tree(h->rhslist[i], surf);
 	}
@@ -331,9 +494,13 @@ void	browse_lui(int eid, char *what)
 
 	if(!strstr(what, "gen-"))
 	{
-		find_edge:
+		char	eidstr[32];
+		//find_edge:
 		//fprintf(stderr, "LUI: browse edge %d's %s\n", eid, what);
-		for(i=0;i<chart_size;i++)
+		sprintf(eidstr, "%d", eid);
+		struct edge	*e = lui_find_edge(eidstr);
+		if(!e)return;
+		/*for(i=0;i<chart_size;i++)
 			for(j=0;j<chart_size;j++)
 				for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
 				{
@@ -341,11 +508,11 @@ void	browse_lui(int eid, char *what)
 					for(l=-1;l<E->npack;l++)
 					{
 						e = (l==-1)?E:E->pack[l];
-						if(e->id != eid)continue;
+						if(e->id != eid)continue;*/
 						if(!strcmp(what, "avm"))output_lui_dg(e->dg, "edge");
 						else fprintf(stderr, "LUI: don't know how to browse edge %d's `%s'\n", eid, what);
-					}
-				}
+					/*}
+				}*/
 	}
 	else
 	{
@@ -600,7 +767,7 @@ extern int inhibit_pack;
 			struct dg *rn = dg_hop(e->rule->dg, lookup_fname("RNAME"));
 			char *symb = strdup(rn?rn->xtype->name:e->rule->name);
 			if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
-			fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, e->from, e->to, symb, e->rule->name);
+			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, symb, e->rule->name);
 			int l;
 			for(l=0;l<e->have;l++)
 				fprintf(lui_write, " %d", e->daughters[l]->id);
@@ -608,7 +775,7 @@ extern int inhibit_pack;
 		}
 		else if(e->lex)
 		{
-			fprintf(lui_write, " #E[%d %d %d %d %s %s []", e->id, e->id, e->from, e->to, e->lex->word, e->lex->word);
+			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, e->lex->word, e->lex->word);
 			fprintf(lui_write, " %d]", -(e->from+1));
 		}
 		int i;

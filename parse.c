@@ -342,7 +342,7 @@ int	prepare_parse_chart(struct lattice	*lexical_chart)
 }
 
 //int		wcap[1024];
-char	*current_sentence = "(not initialized)";
+char	current_sentence[10240] = "(not initialized)";
 int didsent;
 
 void	(*parse_callback)(struct hypothesis	*hyp, struct mrs	*mrs) = NULL;
@@ -628,11 +628,11 @@ int	parse_line1(char	*line)
 
 	if(yy_mode)
 	{
-		current_sentence = "(yy mode)";
+		strcpy(current_sentence, "(yy mode)");
 		return parse_yy(line);
 	}
 
-	current_sentence = "(preparing)";
+	strcpy(current_sentence, "(preparing)");
 	while(line[0] && line[strlen(line)-1] == '\n')line[strlen(line)-1] = 0;
 int	check_mbs(char	*mbs);
 	if(!*line || check_mbs(line)==-1)
@@ -671,7 +671,7 @@ int	check_mbs(char	*mbs);
 		goto finished;
 	}
 
-	current_sentence = line;
+	strncpy(current_sentence, line, 10239);current_sentence[10239] = 0;
 	level = 0;
 	timer();
 	nparse = parse(nwords, words, cfrom, cto, current_sentence);
@@ -688,8 +688,6 @@ int	check_mbs(char	*mbs);
 finished:
 	if(tsdb_notes)tsdb_parse_note_end();
 	if(g_profiling)stop_profilers_recursively(parse_profiler);
-	clear_mrs();
-	clear_slab();
 	for(i=0;i<nwords;i++)free(words[i]);
 	free(words);
 	free(cfrom);

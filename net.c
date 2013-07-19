@@ -17,7 +17,7 @@ int	saved_termerr = 2;
 
 void	print_current_sentence(int	sig)
 {
-	extern	char	*current_sentence;
+	extern	char	current_sentence[];
 
 	int	r;
 	
