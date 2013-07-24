@@ -260,7 +260,7 @@ int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, in
 
 	if(status == 0 || status == -2)
 	{
-		capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
+		capi_printf("(:copies . %ld) (:unifications . %ld) ", top_copies, top_unifies + top_unifies_wellform);
 		//capi_printf("(:tcpu . %d) ", tforest);
 		if(tokens)itsdb_dump_tokens(":p-tokens", ":ntokens", tokens);
 
@@ -305,7 +305,7 @@ void	itsdb_report_gen(int readings, double	fixup_time)
 
 	capi_printf("(:tgc . %d) ", (int)(fixup_time * 1000));
 
-	capi_printf("(:copies . %d) (:unifications . %d) ", top_copies, top_unifies + top_unifies_wellform);
+	capi_printf("(:copies . %ld) (:unifications . %ld) ", top_copies, top_unifies + top_unifies_wellform);
 }
 
 itsdb_start_results() { capi_printf("(:results . ("); }

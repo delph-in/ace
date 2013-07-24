@@ -297,7 +297,7 @@ int	freeze_grammar()
 
 	G = slab_alloc(sizeof(struct grammar));
 
-	null_generation();
+	//null_generation();	// why? seems dangerous...
 
 extern struct type_hierarchy	*main_th, *semi_th;
 	G->main_th = freeze_type_hierarchy(main_th);

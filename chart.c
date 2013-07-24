@@ -679,7 +679,7 @@ int	filter(struct edge	*a, struct edge	*b)
 			if(!rule_root_utc[a->rule->rnum])
 			{
 				// yes, this fires a lot!
-				//printf("not using rule '%s' in spanning cell\n", a->rule->name);
+				if(trace>1)printf("not using rule '%s' in spanning cell\n", a->rule->name);
 				return 0;
 			}
 		}

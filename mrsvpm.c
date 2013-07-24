@@ -487,7 +487,7 @@ struct mrs_var	*convert_mrs_var(struct vpm *v, struct mrs_var	*vin)
 
 struct mrs_var	*internal_to_external_mrs_var(struct mrs_var	*vin)
 {
-	convert_mrs_var(parser_v, vin);
+	return convert_mrs_var(parser_v, vin);
 }
 
 struct mrs_var	*external_to_internal_mrs_var(struct mrs_var	*vin)

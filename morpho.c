@@ -10,8 +10,8 @@
 
 #define	USE_GENERICS
 
-//#define	SHOW_ORTH_ROUTE_COUNTS
-//#define	SHOW_ORTH_ROUTES
+#define	SHOW_ORTH_ROUTE_COUNTS
+#define	SHOW_ORTH_ROUTES
 
 static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, char	*stem, int type);
 
@@ -152,22 +152,26 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		// enumerate all possible ways of reaching each possible stem
 		for(j=0;j<t->oc->nedges;j++)
 			unfold_oroutes(t->oc->edges[j], t->oc->edges[j], 0, 0);
-#ifdef	SHOW_ORTH_ROUTE_COUNTS
-		for(j=0;j<t->oc->nedges;j++)
+//#ifdef	SHOW_ORTH_ROUTE_COUNTS
+		extern int trace;
+		if(trace > 1)
 		{
-			printf("%s -> %s [%d ways]\n", t->string, t->oc->edges[j]->form, t->oc->edges[j]->north_routes);
-#ifdef	SHOW_ORTH_ROUTES
-			for(k=0;k<t->oc->edges[j]->north_routes;k++)
+			for(j=0;j<t->oc->nedges;j++)
 			{
-				struct orth_route *r = t->oc->edges[j]->orth_routes+k;
-				int					l;
-				printf("	");
-				for(l=0;l<r->len;l++)printf(" %s", rules[r->rules[l]]->name);
-				printf("\n");
+				printf("%s -> %s [%d ways]\n", t->string, t->oc->edges[j]->form, t->oc->edges[j]->north_routes);
+//#ifdef	SHOW_ORTH_ROUTES
+				for(k=0;k<t->oc->edges[j]->north_routes;k++)
+				{
+					struct orth_route *r = t->oc->edges[j]->orth_routes+k;
+					int					l;
+					printf("	");
+					for(l=0;l<r->len;l++)printf(" %s", rules[r->rules[l]]->name);
+					printf("\n");
+				}
+//#endif
 			}
-#endif
 		}
-#endif
+//#endif
 	}
 	if(g_profiling)stop_profiler(orth_profiler,1);
 

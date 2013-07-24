@@ -445,6 +445,9 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 
 	if(g_profiling)start_and_alloc_profiler(&lexical_parsing_profiler, "lexical parsing", parse_profiler, lexical_lookup_profiler);
 
+	extern int chart_size;
+	chart_size = 0;	// set to a predictable value rather than leaving it whatever the last sentence had; used in deciding whether an edge is spanning or not, as early as lexical parsing, for deciding whether the rule_root_utc[] is applicable.
+
 	extern int reduce_chart_before_lexical_parsing;
 
 	if(!reduce_chart_before_lexical_parsing)
