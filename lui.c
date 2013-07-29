@@ -91,6 +91,7 @@ void	*lui_listener(void *foo)
 				assert(p[-1]=='[');
 				for(p=strtok(p," ");p;p=strtok(NULL," "))
 				{
+					if(*p==']')break;
 					neid++;
 					eid = realloc(eid,sizeof(int)*neid);
 					eid[neid-1] = atoi(p);
