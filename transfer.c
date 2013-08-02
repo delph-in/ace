@@ -958,6 +958,7 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 		{
 			struct dg	*flags = dg_hop(trigger_rules[i]->dg, lookup_fname("FLAGS"));
 			struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
+//#define TRIGGER_CONSTRAINT	// todo: make this enable-able in config.tdl.  can't just leave it on because most grammars don't define this feature, and adding it at runtime causes problems.
 #ifdef	TRIGGER_CONSTRAINT
 			struct dg	*trigcons = dg_hop(flags, lookup_fname("TRIGGER-CONSTRAINT"));
 #else

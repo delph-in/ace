@@ -48,12 +48,15 @@ struct dg	*new_dag_for_unfrozen_string(char	*str)
 
 struct dg	*build_one_pos_tags_list(char	*tag, struct dg	*rest)
 {
-	char	tag_str[32];
-	sprintf(tag_str, "\"%s\"", tag);
+	// jacy POS tags are loooong...
+	//char	tag_str[32];
+	char	*tag_str = malloc(strlen(tag)+3);
+	if(tag)sprintf(tag_str, "\"%s\"", tag);
 	struct dg	*list = atomic_dg(g_cons_type);
 	struct dg	*tagdg = tag?new_dag_for_unfrozen_string(tag_str):atomic_dg(default_type_hierarchy()->strtype->name);
 	list = add_dg_hop(list, 1, tagdg);	// FIRST
 	list = add_dg_hop(list, 2, rest?:type_dg(g_null_type));	// REST
+	free(tag_str);
 	return list;
 }
 
@@ -282,7 +285,11 @@ int	test_first_token_in_lex_dg(struct dg	*le_dg, struct token	*tok)
 		//printf("candidate token site: "); print_dg(lex_tok_dg); printf("\n");
 		int res = unify_dg_tmp(lex_tok_dg, tok->dg, -1);
 		forget_tmp();
-		if(res != 0)return -1;
+		if(res != 0)
+		{
+			//unify_backtrace();
+			return -1;
+		}
 	}
 	return 0;
 }
