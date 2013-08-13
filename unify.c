@@ -903,10 +903,10 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 	}
 
 	// apply GLB constraint if necessary
-	if(t != t1 && t!= t2 && t->dg && t->dg->narcs
-		&& !(0
+	if(t != t1 && t!= t2 && t->dg && t->dg->narcs)
+		/*&& !(0
 		|| (t->name[0]=='g' && t->name[1]=='(')
-		))
+		))*/
 	{
 //		if(t->name[0]=='g' && t->name[1]=='(')
 //			printf("reached glbtype '%s' and will waste time unifying...\n", t->name);
