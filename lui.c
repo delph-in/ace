@@ -26,6 +26,7 @@ extern int input_from_lui;
 static int lui_rfd = -1, lui_wfd;
 FILE		*lui_write, *lui_read;
 static int chart_id = 0;
+int	xtext_id_gen = 1;
 
 void	browse_lui(int eid, char *what, char	*what2);
 
@@ -162,6 +163,7 @@ int lui_initialize()
 		fprintf(lui_write, "parameter list-type %s\n", g_list_type);
 		fprintf(lui_write, "parameter empty-list-type %s\n", g_null_type);
 		fprintf(lui_write, "parameter non-empty-list-type %s\n", g_cons_type);
+		fprintf(lui_write, "parameter avm-collapsed-types [u i p e x h]\n");
 		fflush(lui_write);
 		pthread_create(&pth, 0, lui_listener, 0);
 		return 0;
@@ -534,6 +536,11 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 			}
 		}
 
+		fprintf(lui_write, " TOP: ");
+		output_lui_mrs_var(m->ltop);
+		fprintf(lui_write, " INDEX: ");
+		output_lui_mrs_var(m->index);
+
 		fprintf(lui_write, " RELS: ");
 		for(i=0;i<m->nrels;i++)
 		{
@@ -591,7 +598,71 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 	}
 	else if(!strcasecmp(type, "indexed"))
 	{
-		printf("indexed display is not implemented.\n");
+		char	gave_props[m->vlist.nvars];
+		bzero(gave_props, sizeof(gave_props));
+		void imrs_var(struct mrs_var	*v)
+		{
+			if(v->is_const)
+				fprintf(lui_write, " \"%s\"", slab_escape(v->name));
+			else
+			{
+				fprintf(lui_write, " #X[%d \"%s%d\"]", v->vnum, v->type, v->vnum);
+				if(!gave_props[v->vnum])
+				{
+					gave_props[v->vnum] = 1;
+					if(!v->nprops)return;
+					fprintf(lui_write, " \" (");
+					int i;
+					for(i=0;i<v->nprops;i++)
+						fprintf(lui_write, "%s%s", i?", ":"", v->props[i].value);
+					fprintf(lui_write, ")\"");
+				}
+			}
+		}
+		fprintf(lui_write, "text %d #X[\"TOP: \"", ++xtext_id_gen);
+		imrs_var(m->ltop);
+		fprintf(lui_write, " newline \"INDEX: \"");
+		imrs_var(m->index);
+		fprintf(lui_write, " newline newline");
+		int i, j, k;
+		for(i=0;i<m->nrels;i++)
+		{
+			struct mrs_ep	*e = &m->rels[i];
+			imrs_var(e->lbl);
+			if(e->pred[0]!='"')
+				fprintf(lui_write, " \":%s\"", slab_escape(e->pred));
+			else fprintf(lui_write, " \":\" %s", e->pred);
+			fprintf(lui_write, " \"<%d:%d>(\"", e->cfrom, e->cto);
+			for(j=0;j<e->nargs;j++)
+			{
+				if(j)fprintf(lui_write, " \", \"");
+				imrs_var(e->args[j].value);
+			}
+			fprintf(lui_write, "\")\" newline\n");
+		}
+		fprintf(lui_write, " newline \"HCONS: \"\n");
+		for(i=0;i<m->nhcons;i++)
+		{
+			fprintf(lui_write, " \"%s\"", i?", ":"");
+			imrs_var(m->hcons[i].hi);
+			fprintf(lui_write, " \" %s \"", (m->hcons[i].type==hcons_qeq)?"qeq":((m->hcons[i].type==hcons_leq)?"leq":((m->hcons[i].type==hcons_geq)?"geq":"???")));
+			imrs_var(m->hcons[i].lo);
+		}
+		fprintf(lui_write, " newline\n");
+		if(mrs_enable_icons)
+		{
+			fprintf(lui_write, " newline \"ICONS: \"\n");
+			for(i=0;i<m->nicons;i++)
+			{
+				fprintf(lui_write, " \"%s\"", i?", ":"");
+				imrs_var(m->icons[i].left);
+				fprintf(lui_write, " \" %s \"", m->icons[i].type);
+				imrs_var(m->icons[i].right);
+			}
+			fprintf(lui_write, " newline\n");
+		}
+		fprintf(lui_write, "] \"Indexed MRS\"\n");
+		fflush(lui_write);
 	}
 	else
 	{
@@ -687,7 +758,7 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 	return count;
 }
 
-int	xtext_id_gen = 1, ngenresults = 0;
+int	ngenresults = 0;
 
 void	lui_begin_gen_results(int	n)
 {
