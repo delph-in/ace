@@ -91,6 +91,7 @@ int reestimate_token_cto(struct token	*tok)
 	int i;
 	for(i=0;i<tlen;i++)
 	{
+		//printf("%C vs %C\n", wtok[i], wsent[tok->cfrom+i]);
 		if(iswpunct(wtok[i]))
 		{
 			if(iswpunct(wsent[tok->cfrom+i]))continue;
@@ -98,7 +99,7 @@ int reestimate_token_cto(struct token	*tok)
 		}
 		else
 		{
-			if(wsent[tok->cfrom+i] == wtok[i])continue;
+			if(towlower(wsent[tok->cfrom+i]) == towlower(wtok[i]))continue;
 			else break;
 		}
 	}

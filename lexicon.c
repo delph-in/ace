@@ -363,7 +363,11 @@ struct lexeme	*make_lexeme(char	*word, struct dg	*dg, struct type	*type, struct 
 	int			print = 0;
 
 	// XXX hack!
-	if(generation > MAX_GEN_RESET)generation = 11;
+	if(generation > MAX_GEN_RESET)
+	{
+		fprintf(stderr, "WARNING: generation overflow; bad things may happen\n");
+		generation = 11;
+	}
 	// XXX hack!
 
 	if(synsemfeat==-1)init_fnums();

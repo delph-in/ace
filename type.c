@@ -506,8 +506,8 @@ int	constrain_glbs_and_wellformedness()
 	}
 	number_strings();	// just in case
 
-	// XXX hack!
-	generation = 11;
+	// XXX hack!  why do this?  ran into a real case where this caused a generation crash....
+	//generation = 11;
 	// XXX hack!
 
 	int	first_time = 1;

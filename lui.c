@@ -4,6 +4,7 @@
 #include	<string.h>
 #include	<pthread.h>
 
+#include	"conf.h"
 #include	"chart.h"
 #include	"dag.h"
 #include	"rule.h"
@@ -26,7 +27,7 @@ static int lui_rfd = -1, lui_wfd;
 FILE		*lui_write, *lui_read;
 static int chart_id = 0;
 
-void	browse_lui(int eid, char *what);
+void	browse_lui(int eid, char *what, char	*what2);
 
 int waiting_for_lui = 0;
 char	*sentence_to_parse_from_lui = NULL;
@@ -71,11 +72,13 @@ void	*lui_listener(void *foo)
 			if(!strncmp(lp, "browse ", 7))
 			{
 				int cid, eid;
-				char what[256];
-				sscanf(lp, "browse %d %d %s\n", &cid, &eid, what);
-				if(cid != chart_id)
+				char what[256], what2[256] = "";
+				int fields = sscanf(lp, "browse %d %d %s %s\n", &cid, &eid, what, what2);
+				if(fields < 3)
+					fprintf(stderr, "LUI: bad 'browse' command\n");
+				else if(cid != chart_id)
 					fprintf(stderr, "LUI: out-of-date chart %d requested [%d is current]\n", cid, chart_id);
-				else browse_lui(eid, what);
+				else browse_lui(eid, what, what2);
 			}
 			else if(!strncmp(lp, "version ", 8)) {}
 			else if(strstr(lp, " forget")) {}
@@ -156,6 +159,10 @@ int lui_initialize()
 		make_listener_thread:
 		lui_write = fdopen(lui_wfd, "w");
 		lui_read = fdopen(lui_rfd, "r");
+		fprintf(lui_write, "parameter list-type %s\n", g_list_type);
+		fprintf(lui_write, "parameter empty-list-type %s\n", g_null_type);
+		fprintf(lui_write, "parameter non-empty-list-type %s\n", g_cons_type);
+		fflush(lui_write);
 		pthread_create(&pth, 0, lui_listener, 0);
 		return 0;
 	}
@@ -284,7 +291,7 @@ void	output_lui_chart(struct lattice	*token_lattice)
 struct hash	*lui_dgs = NULL;
 struct lui_obj
 {
-	enum { LUI_DG, LUI_EDGE }	what;
+	enum { LUI_DG, LUI_EDGE, LUI_TREE, LUI_MRS }	what;
 	void	*ptr;
 };
 int	lui_id_allocator = 1;
@@ -335,21 +342,30 @@ int	lui_register_edge(struct edge	*e)
 	return lui_register(LUI_EDGE, e);
 }
 
+int	lui_register_tree(struct hypothesis	*h)
+{
+	return lui_register(LUI_TREE, h);
+}
+
 struct edge	*lui_find_edge(char	*id)
 {
 	return (struct edge*)lui_find(LUI_EDGE, id, 1);
 }
 
+struct hypothesis	*lui_find_tree(char	*id)
+{
+	return (struct hypothesis*)lui_find(LUI_TREE, id, 1);
+}
+
 struct dg	*lui_find_dg(char	*id)
 {
 	struct dg	*d = (struct dg*)lui_find(LUI_DG, id, 0);
-	if(!d)
-	{
-		struct edge	*e = lui_find_edge(id);
-		if(!e)return NULL;
-		return e->dg;
-	}
-	else return d;
+	if(d)return d;
+	struct edge	*e = (struct edge*)lui_find(LUI_EDGE, id, 0);
+	if(e)return e->dg;
+	struct hypothesis	*h = lui_find_tree(id);
+	if(h)return h->dg;
+	return NULL;
 }
 
 void interactive_unify(char	*command)
@@ -477,21 +493,115 @@ void lui_format_tree(struct hypothesis *h, char *surf)
 	if(!surf && e->lex)surf = h->string;
 	if(!arity)
 		fprintf(lui_write, " #T[%d \"%s\" \"%s\" %d %s",
-			lui_register_edge(e), label, surf, h->eid, sign);
+			lui_register_tree(h), label, surf, h->eid, sign);
 	else
 	{
 		fprintf(lui_write, " #T[%d \"%s\" %s %d %s",
-			lui_register_edge(e), label, "nil", h->eid, sign);
+			lui_register_tree(h), label, "nil", h->eid, sign);
 		for(i=0;i<arity;i++)
 			lui_format_tree(h->rhslist[i], surf);
 	}
 	fprintf(lui_write, "]");
 }
 
-void	browse_lui(int eid, char *what)
+void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
+{
+	struct mrs	*m = extract_mrs(h->dg);
+	if(!strcasecmp(type, "simple"))
+	{
+		int	id = lui_register(LUI_MRS, m);
+		fprintf(lui_write, "avm %d #D[mrs", id);
+		int i, j, k;
+
+		make_reliable_vnums(m);
+
+		void	output_lui_mrs_var(struct mrs_var	*v)
+		{
+			if(!v->is_const)
+			{
+				fprintf(lui_write, "<%d>=#D[%s", v->vnum, v->type);
+				int k;
+				for(k=0;k<v->nprops;k++)
+				{
+					fprintf(lui_write, " %s: \"%s\"", v->props[k].name, v->props[k].value);
+				}
+				fprintf(lui_write, "]");
+			}
+			else
+			{
+				char	*esc = slab_escape(v->name);
+				fprintf(lui_write, "\"%s\"", esc);
+			}
+		}
+
+		fprintf(lui_write, " RELS: ");
+		for(i=0;i<m->nrels;i++)
+		{
+			struct mrs_ep	*e = &m->rels[i];
+			fprintf(lui_write, "#D[%s FIRST: #D[%s", g_cons_type, e->pred);
+			fprintf(lui_write, " LBL: ");
+			output_lui_mrs_var(e->lbl);
+			for(j=0;j<e->nargs;j++)
+			{
+				fprintf(lui_write, " %s: ", e->args[j].name);
+				output_lui_mrs_var(e->args[j].value);
+			}
+			fprintf(lui_write, "] REST: ");
+		}
+		fprintf(lui_write, "#D[%s]", g_null_type);
+		for(i=0;i<m->nrels;i++)fprintf(lui_write, " ]");
+
+		fprintf(lui_write, " HCONS: ");
+		for(i=0;i<m->nhcons;i++)
+		{
+			struct mrs_hcons	*h = &m->hcons[i];
+			char	*type = "???";
+			if(h->type == hcons_qeq)type = "qeq";
+			if(h->type == hcons_leq)type = "leq";
+			if(h->type == hcons_geq)type = "geq";
+			fprintf(lui_write, "#D[%s FIRST: #D[%s", g_cons_type, type);
+			fprintf(lui_write, " HARG: ");
+			output_lui_mrs_var(h->hi);
+			fprintf(lui_write, " LARG: ");
+			output_lui_mrs_var(h->lo);
+			fprintf(lui_write, "] REST: ");
+		}
+		fprintf(lui_write, "#D[%s]", g_null_type);
+		for(i=0;i<m->nhcons;i++)fprintf(lui_write, " ]");
+
+		if(mrs_enable_icons)
+		{
+			fprintf(lui_write, " ICONS: ");
+			for(i=0;i<m->nicons;i++)
+			{
+				struct mrs_icons	*h = &m->icons[i];
+				fprintf(lui_write, "#D[%s FIRST: #D[%s", g_cons_type, h->type);
+				fprintf(lui_write, " IARG1: ");
+				output_lui_mrs_var(h->left);
+				fprintf(lui_write, " IARG2: ");
+				output_lui_mrs_var(h->right);
+				fprintf(lui_write, "] REST: ");
+			}
+			fprintf(lui_write, "#D[%s]", g_null_type);
+			for(i=0;i<m->nicons;i++)fprintf(lui_write, " ]");
+		}
+
+		fprintf(lui_write, "] \"Simple MRS\"\n");
+		fflush(lui_write);
+	}
+	else if(!strcasecmp(type, "indexed"))
+	{
+		printf("indexed display is not implemented.\n");
+	}
+	else
+	{
+		printf("mrs display of type '%s' is not implemented.\n", type);
+	}
+}
+
+void	browse_lui(int eid, char *what, char	*what2)
 {
 	int i, j, k, l;
-	struct edge *e, *E;
 
 	if(!strstr(what, "gen-"))
 	{
@@ -499,21 +609,19 @@ void	browse_lui(int eid, char *what)
 		//find_edge:
 		//fprintf(stderr, "LUI: browse edge %d's %s\n", eid, what);
 		sprintf(eidstr, "%d", eid);
-		struct edge	*e = lui_find_edge(eidstr);
-		if(!e)return;
-		/*for(i=0;i<chart_size;i++)
-			for(j=0;j<chart_size;j++)
-				for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
-				{
-					E = cells[j*chart_size + i].p_edges[k];
-					for(l=-1;l<E->npack;l++)
-					{
-						e = (l==-1)?E:E->pack[l];
-						if(e->id != eid)continue;*/
-						if(!strcmp(what, "avm"))output_lui_dg(e->dg, "edge");
-						else fprintf(stderr, "LUI: don't know how to browse edge %d's `%s'\n", eid, what);
-					/*}
-				}*/
+		if(!strcmp(what, "avm"))
+		{
+			struct dg	*d = lui_find_dg(eidstr);
+			if(d)output_lui_dg(d, "edge");
+			else printf("no such LUI dag #%s\n", eidstr);
+		}
+		else if(!strcmp(what, "mrs"))
+		{
+			struct hypothesis	*h = lui_find_tree(eidstr);
+			if(h)output_lui_edge_mrs(h, what2);
+			else printf("no such LUI tree #%s\n", eidstr);
+		}
+		else fprintf(stderr, "LUI: don't know how to browse edge %d's `%s'\n", eid, what);
 	}
 	else
 	{
