@@ -298,7 +298,9 @@ int	pack_edge(struct edge	*edge)
 				if(!check_srf(edge->rule, h->rule))continue;
 
 			packtry++;
+#ifndef	GEN_SUBSUMPTION_QC
 			if(!gen_qc && equiv_quickcheck(h->qc, edge->qc, &fw, &bk))continue;
+#endif
 			packqc++;
 
 			PACKBUG("would like to pack #%d `%s' and #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));

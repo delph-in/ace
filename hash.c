@@ -29,7 +29,7 @@ static inline unsigned hash_code(struct hash *ht, char	*key)
 		int	i;
 		for(i=0;i<ht->has_flk;i++)
 		{
-			int	b = i%24;
+			int	b = (i*7)%24;
 			code ^= ((unsigned)key[i])<<b;
 		}
 	}

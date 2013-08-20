@@ -648,7 +648,7 @@ int	filter(struct edge	*a, struct edge	*b)
 
 	if(a->hex == b)return 0;	// already did this
 	if(a->have==-1)return 0;	// ghosted hyperactive edge -- got kicked out of the chart for a latent cycle
-	if(b->have==-1)return 0;	// ghosted hyperpassive edge -- got hicked out of the chart for a latent cycle
+	if(b->have==-1)return 0;	// ghosted hyperpassive edge -- got kicked out of the chart for a latent cycle
 
 //	if(b->lex && b->north_routes==-1 && a->need==1)return 0;	// unknown-word edges may not undergo unaries
 
@@ -670,23 +670,37 @@ int	filter(struct edge	*a, struct edge	*b)
 	// don't allow span-only rules to finish on a non-span
 	if(nofragments && a->rule->frag_only)return 0;
 
-	if(gmode == PARSING && a->have == a->need-1)
+	if(gmode == PARSING)
 	{
-		if( (a->from==0 || b->from==0) && (a->to==chart_size-1 || b->to==chart_size-1) )
+		int	rfrom = a->from, rto = a->to;
+		if(b->from<rfrom)rfrom = b->from;
+		if(b->to>rto)rto = b->to;
+		if(a->have == a->need-1)
 		{
-			// spanning edge
-			extern char	*rule_root_utc;
-			if(!rule_root_utc[a->rule->rnum])
+			// building a passive edge
+			if(rfrom && rto==chart_size-1)
 			{
-				// yes, this fires a lot!
-				if(trace>1)printf("not using rule '%s' in spanning cell\n", a->rule->name);
-				return 0;
+				// spanning edge
+				extern char	*rule_root_utc;
+				if(!rule_root_utc[a->rule->rnum])
+				{
+					// yes, this fires a lot!
+					if(trace>1)printf("not using rule '%s' in spanning cell\n", a->rule->name);
+					return 0;
+				}
+			}
+			else
+			{
+				// non-spanning edge
+				if(a->rule->span_only) return 0;
 			}
 		}
 		else
 		{
-			// non-spanning edge
-			if(a->rule->span_only) return 0;
+			// building an active edge
+			// these tests are done in parse_process_edge()...
+			//if(a->rtl && rfrom == 0)return 0;	// would have no room to grow left
+			//if(!a->rtl && rto == chart_size - 1)return 0;	// would have no room to grow right
 		}
 	}
 

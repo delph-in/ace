@@ -182,6 +182,21 @@ char	*is_root(struct dg	*dg)
 	return NULL;
 }
 
+int	qc_is_root(struct qc	*q)
+{
+	struct qc	**rqc = NULL;
+	int		i, flag = (g_mode == PARSING)?1:2;
+	if(!rqc)
+	{
+		rqc = calloc(sizeof(struct qc*),ninstances);
+		for(i=0;i<ninstances;i++) if(instances[i].root_flag & flag)
+			rqc[i] = extract_qc(instances[i].dg);
+	}
+	for(i=0;i<ninstances;i++)
+		if(rqc[i] && !quickcheck(rqc[i], q))return 1;
+	return 0;
+}
+
 int	study_instance(char	*lhs, struct dg	*dg)
 {
 	ninstances++;

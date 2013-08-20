@@ -26,7 +26,11 @@ struct qc
 
 int	__qc_use_heap = 0;
 
+#ifdef HIDEOUS_HACK
 static struct type	*olist, *minus, *_0dlist;
+static struct type	*no_punct, *no_punctuation_min;
+#endif
+
 extern int gen_qc;
 
 int	eqc_timer = -1;
@@ -61,6 +65,11 @@ struct qc	*extract_qc(struct dg	*d)
 		assert(minus);
 		_0dlist = lookup_type("0-dlist");
 		assert(_0dlist);
+
+		no_punct = lookup_type("no_punct");
+		assert(no_punct);
+		no_punctuation_min = lookup_type("no_punctuation_min");
+		assert(no_punctuation_min);
 #endif
 		eqc_timer = new_timer("extract QC");
 	}
@@ -137,9 +146,11 @@ int	quickcheck(struct qc	*a, struct qc	*b)
 	if(i<qcs)return -1;
 
 #ifdef	HIDEOUS_HACK
+	// following are relative to erg qc as of aug 12th 2013...
 	struct dlist_hack { int dlist, list, last; }	hacks[1] = { {28,24,19} };
-	struct olist_hack { int list, opt; }			ohacks[1] = { {26,12} };
-	int					nhacks=1, nohacks=1;
+	struct olist_hack { int list, opt; }			ohacks[3] = { {26,12}, {11, 16}, {4, 47} };
+	int punct_slot = 30, lpunct_slot = 31, rpunct_slot = 14;
+	int					nhacks=1, nohacks=3;
 //	if(a->entries[20] == olist && b->entries[9]==minus)return -1;
 //	if(b->entries[20] == olist && a->entries[9]==minus)return -1;
 	for(i=0;i<nhacks;i++)
@@ -160,6 +171,10 @@ int	quickcheck(struct qc	*a, struct qc	*b)
 	}
 //	if(a->entries[10] == olist && b->entries[11]==minus)return -1;
 //	if(b->entries[10] == olist && a->entries[11]==minus)return -1;
+	/*if(a->entries[punct_slot] == no_punctuation_min && b->entries[lpunct_slot] && !glb(b->entries[lpunct_slot], no_punct))return -1;
+	if(a->entries[punct_slot] == no_punctuation_min && b->entries[rpunct_slot] && !glb(b->entries[rpunct_slot], no_punct))return -1;
+	if(b->entries[punct_slot] == no_punctuation_min && a->entries[lpunct_slot] && !glb(a->entries[lpunct_slot], no_punct))return -1;
+	if(b->entries[punct_slot] == no_punctuation_min && a->entries[rpunct_slot] && !glb(a->entries[rpunct_slot], no_punct))return -1;*/
 #endif
 
 	return 0;

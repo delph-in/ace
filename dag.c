@@ -258,6 +258,21 @@ char		**fnames;
 
 int	subsume_forward, subsume_backward;
 
+#ifndef	GEN_SUBSUMPTION_QC
+#define	ss_backtrace(a,b,k)  do {} while(0)
+#else
+#define ss_backtrace	real_ss_backtrace
+#endif
+
+real_ss_backtrace(struct dg	*a, struct dg	*b, char	*code)
+{
+	int i;
+	printf("%s -- `%s'#%d vs `%s'#%d flags %d %d\n", code, a->xtype->name, a->narcs, b->xtype->name, b->narcs, subsume_forward, subsume_backward);
+	for(i=0;i<a->narcs;i++)printf(" %s", fnames[a->label[i]]); printf("\n");
+	for(i=0;i<b->narcs;i++)printf(" %s", fnames[b->label[i]]); printf("\n");
+	printf("subsumption failure at path:  "); unify_backtrace();
+}
+
 // due to subgraph sharing, a node 'a' can appear in both inputs to subsume_dg1(a,b).
 // it is not automatically equivalent; different reentrancies can appear from the (nonidentical) rest of the dags into 'a'
 // e.g.:   x = [ A: #1=moo B: #2=moo C: #2=moo ]   and y = [ A: #2=moo B: #2=moo C: #3=moo ]
@@ -284,7 +299,11 @@ int	subsume_same_dg(struct dg	*a)
 	if(a->copy==a && FORWARD(a)==a)return 1;
 	if(a->copy)subsume_forward = 0;
 	if(FORWARD(a))subsume_backward = 0;
-	if(!subsume_forward && !subsume_backward)return 0;
+	if(!subsume_forward && !subsume_backward)
+	{
+		ss_backtrace(a, a, "same-dag: had been here from one side but not both");
+		return 0;
+	}
 	//if(a->copy || FORWARD(a))return 0;
 
 	a->copy = a;
@@ -341,6 +360,8 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	if(!types_identical)
 	{
 		struct type_hierarchy	*th = default_type_hierarchy();
+		int	old_subsume_forward = subsume_forward;
+		int	old_subsume_backward = subsume_backward;
 		if(b->xtype->name[0]=='"')
 		{
 			if(!descendent_of(th->strtype->tnum, a->xtype))subsume_forward = 0;
@@ -356,6 +377,14 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		else
 		{
 			if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
+		}
+
+		if(!subsume_forward && !subsume_backward)
+		{
+			ut1 = a->xtype;
+			ut2 = b->xtype;
+			ss_backtrace(a, b, (old_subsume_forward && old_subsume_backward)?"multi-dag: incompatible types":( old_subsume_forward?"multi-dag: needed forward but failed":"multi-dag: needed backward but failed" ));
+			return 0;
 		}
 	}
 
@@ -375,7 +404,13 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		//printf("not backward... (rhs = %p)\n", FORWARD(b));
 	}
 
-	if(!subsume_forward && !subsume_backward) { ut1 = a->xtype; ut2 = b->xtype; return 0; }
+	if(!subsume_forward && !subsume_backward)
+	{
+		ut1 = a->xtype;
+		ut2 = b->xtype;
+		ss_backtrace(a, b, "multi-dag: bad reentrancies");
+		return 0;
+	}
 
 	//printf("maybe %p [%s] <=> %p [%s]\n", a, a->xtype->name, b, b->xtype->name);
 
@@ -423,10 +458,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	}
 	else
 	{
-		/*printf(" `%s'#%d vs `%s'#%d flags %d %d\n", a->xtype->name, a->narcs, b->xtype->name, b->narcs, subsume_forward, subsume_backward);
-		for(i=0;i<a->narcs;i++)printf(" %s", fnames[a->label[i]]); printf("\n");
-		for(i=0;i<b->narcs;i++)printf(" %s", fnames[b->label[i]]); printf("\n");
-		unify_backtrace();*/
+		ss_backtrace(a, b, "multi-dag: incompatible arc set");
 		return 0;
 	}
 	return 1;

@@ -13,10 +13,12 @@
 extern int qc_size;
 int		qc_image_size;
 void	*qc_image;
+int		*qc_scope;
 
 struct qc_freezer
 {
 	int	qc_size, qc_image_size;
+	int	*qc_scope;
 	void	*qc_image;
 };
 
@@ -27,6 +29,8 @@ void	*freeze_qc()
 	f->qc_image_size = qc_image_size;
 	f->qc_image = slab_alloc(qc_image_size + 4 - (qc_image_size%4));
 	memcpy(f->qc_image, qc_image, qc_image_size);
+	f->qc_scope = slab_alloc(qc_size * sizeof(int));
+	memcpy(f->qc_scope, qc_scope, qc_size * sizeof(int));
 	return f;
 }
 
@@ -36,6 +40,22 @@ void	recover_qc(void	*qcf)
 	qc_size = f->qc_size;
 	qc_image_size = f->qc_image_size;
 	qc_image = f->qc_image;
+	qc_scope = f->qc_scope;
+}
+
+int	qc_contains(int	outer, int	inner)
+{
+	int	i;
+	if(inner >= outer && inner < qc_scope[outer])return 1;
+	return 0;
+}
+
+void	qc_end_scopes(int	n, int	*qc_depth, int	depth)
+{
+	int i;
+	for(i=0;i<n;i++)
+		if(qc_scope[i] == 0 && qc_depth[i] > depth)
+			qc_scope[i] = n;
 }
 
 int	compile_qc(char	*qccode_path)
@@ -74,7 +94,7 @@ int	compile_qc(char	*qccode_path)
 	fprintf(gcc, "	stack[sp] = d;\n");
 
 	char	line[10240];
-	int		lnum = 0;
+	int		lnum = 0, *qc_depth, depth = 0;
 	int		n_record = 0;
 	//char	*last_push = "/";
 	while(NULL != fgets(line, 10239, qccode))
@@ -85,6 +105,8 @@ int	compile_qc(char	*qccode_path)
 		if(1==sscanf(line, "QC_SIZE(%d)\n", &x))
 		{
 			qc_size = x;
+			qc_depth = calloc(sizeof(int),qc_size);
+			qc_scope = calloc(sizeof(int),qc_size);
 			continue;
 		}
 		char	*tok;
@@ -92,7 +114,11 @@ int	compile_qc(char	*qccode_path)
 		for(tok=strtok(line, " \t\n");tok;tok=strtok(NULL, " \t\n"))
 		{
 			if(!strcmp(tok, "POP"))
+			{
 				fprintf(gcc, "	--sp;\n");
+				depth--;
+				qc_end_scopes(n_record, qc_depth, depth);
+			}
 			else if(1 == sscanf(tok, "REC(%d)", &x))
 			{
 				if(x<0 || x>=qc_size)
@@ -102,6 +128,7 @@ int	compile_qc(char	*qccode_path)
 				}
 				fprintf(gcc, "	if(stack[sp]) entries[%d] = dg_type(stack[sp]);\n", x);
 				fprintf(gcc, "	else entries[%d] = NULL;\n", x);
+				qc_depth[n_record] = depth;
 				n_record++;
 				//struct type	*T = strcmp(last_push, "/")?most_general_type_for_feat(default_type_hierarchy(), lookup_fname(last_push)):lookup_type("sign");
 				//fprintf(stderr, "QC[%d] feature=%s type=%s subtypes=%d\n", x, last_push, T->name, T->ndescendents);
@@ -112,6 +139,7 @@ int	compile_qc(char	*qccode_path)
 				fprintf(gcc, "	if(stack[sp++])stack[sp] = noninline_dg_hop(stack[sp-1], %d);\n", l);
 				fprintf(gcc, "	else stack[sp] = NULL;");
 				//last_push = strdup(feat);
+				depth++;
 			}
 			else
 			{
@@ -121,6 +149,7 @@ int	compile_qc(char	*qccode_path)
 		}
 	}
 	fclose(qccode);
+	qc_end_scopes(n_record, qc_depth, -1);
 
 	assert(n_record == qc_size);
 

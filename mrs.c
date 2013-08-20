@@ -509,6 +509,7 @@ char	*read_mrs_string_or_line(FILE	*f, char	*line, int	maxlen)
 struct mrs	*read_mrs(FILE	*f)
 {
 	char	*buffer = read_mrs_string_or_line(f, NULL, 0);
+	if(!buffer)return NULL;
 	struct mrs	*m = parse_mrs(buffer);
 	free(buffer);
 	return m;
@@ -980,7 +981,7 @@ int mrs_subsumes2(struct mrs *in, struct mrs *out, int ici, int *vmap, char *use
 	{
 		oic = out->icons+i;
 		//printf("seeing if '%s' subsumes '%s'\n", ic->type, oic->type);
-		if(!icons_type_compatible(ic->type, oic->type))return 0;
+		if(!icons_type_compatible(ic->type, oic->type))continue;
 		memcpy(vm, vmap, sizeof(int)*in->vlist.nvars);
 		if(!var_subsume(ic->left, oic->left, vm, in->vlist.nvars))continue;
 		if(!var_subsume(ic->right, oic->right, vm, in->vlist.nvars))continue;

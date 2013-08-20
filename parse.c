@@ -76,6 +76,14 @@ static int	parse_process_edge(struct edge	*e)
 	static struct edge	**list = 0;
 	static int			alist = 0;
 
+	// XXX experimental chart-pruning-like idea
+	if(e->have == e->need && e->rule && !predict_1_rule_use(e->rule->name, e->from, e->to))
+	{
+		//printf("predicted we don't want #%d %s [%d - %d]\n",
+			//e->id, e->rule->name, e->from, e->to);
+		return 0;
+	}
+
 	if(e->daughters)
 		for(i=0;i<e->have;i++)
 			if(e->daughters[i]->frozen==1)
@@ -483,6 +491,10 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 
 	if(g_profiling)start_and_alloc_profiler(&chart_parsing_profiler, "chart parsing", parse_profiler, lexical_filtering_profiler);
 
+	// XXX far-fetched experiment...
+	//first_pass_parse(lexical_chart);
+	//return 1;
+
 	// lexemes have no packing restrictor applied to them thus far.
 	// make sure all copy()'s from here on out (until unpacking time) are restricting.
 	if(!inhibit_pack)enable_packing(1);
@@ -505,6 +517,9 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 		stop_timer(chart_setup_timer, 1);
 		return -2;
 	}
+
+	// XXX experimental chart-pruning-like idea
+	predict_rule_uses(nwords, lexical_chart);
 
 	cancel_parse = 0;
 	signal(SIGALRM, alarm_handler);
@@ -610,8 +625,8 @@ int	parse_line1(char	*line)
 	char	copy[10240];
 	int	nparse = 0;
 	int	nwords = 0, i, j;
-	int		*cfrom, *cto;
-	char	**words, *p, *q;
+	int		*cfrom = NULL, *cto = NULL;
+	char	**words = NULL, *p, *q;
 	extern int preprocess_only;
 
 	timer();
@@ -632,7 +647,8 @@ int	parse_line1(char	*line)
 	if(yy_mode)
 	{
 		strcpy(current_sentence, "(yy mode)");
-		return parse_yy(line);
+		nparse = parse_yy(line);
+		goto finished;
 	}
 
 	strcpy(current_sentence, "(preparing)");
@@ -693,9 +709,9 @@ finished:
 	if(g_profiling)stop_profilers_recursively(parse_profiler);
 	clear_mrs();
 	for(i=0;i<nwords;i++)free(words[i]);
-	free(words);
-	free(cfrom);
-	free(cto);
+	if(words)free(words);
+	if(cfrom)free(cfrom);
+	if(cto)free(cto);
 	return nparse;
 }
 

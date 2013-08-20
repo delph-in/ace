@@ -1,6 +1,8 @@
 #ifndef	_DAG_H
 #define	_DAG_H
 
+//#define	GEN_SUBSUMPTION_QC
+
 #include	<stdio.h>
 #include	<assert.h>
 #include	"type.h"

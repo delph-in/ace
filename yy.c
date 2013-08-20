@@ -170,5 +170,6 @@ int	parse_yy(char	*yy)
 				tc->start = tc->vertices[i];
 			else assert(!"YY mode: input token lattice had non-unique start vertex");
 		}
-	return parse_with_token_chart(tc, start);
+	int rv = parse_with_token_chart(tc, start);
+	if(rv <= 0)printf("SKIP: (yy mode)\n");
 }
