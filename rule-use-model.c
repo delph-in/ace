@@ -110,12 +110,13 @@ reset_ws(struct weightset	*ws, int	N)
 
 void	predict_rule_uses(int	N, struct lattice	*ll)
 {
-return;
+	return;
 	//if(!xsb)xsb = load_model("/tmp/xsb-manual.mod");
 	//if(!xsb)xsb = load_model("/tmp/xsb.mod");
 	//assert(xsb);
 	//if(!xcmp)xcmp = load_model("/tmp/xcmp.mod");
-	if(!xajvp)xajvp = load_model("/tmp/xajvp.mod");
+	//if(!xajvp)xajvp = load_model("/tmp/xajvp.mod");
+	if(!xajvp)xajvp = load_model("/tmp/xaj-manual.mod");
 	//assert(xsb && xcmp && xajvp);
 
 	//reset_ws(&xsbw, N);
