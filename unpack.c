@@ -779,6 +779,26 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 	return hyp;
 }
 
+struct hypothesis	*cheap_hypothesis(struct edge	*e)
+{
+	struct hypothesis	*h = slab_alloc(sizeof(*h));
+	bzero(h, sizeof(*h));
+	h->edge = e;
+	h->eid = e->id;
+	h->arity = e->have;
+	h->rhslist = slab_alloc(sizeof(void*)*h->arity);
+	int i;
+	for(i=0;i<h->arity;i++)
+	{
+		h->rhslist[i] = cheap_hypothesis(e->daughters[i]);
+		h->toklen += h->rhslist[i]->toklen;
+	}
+	h->dg = e->dg;
+	if(e->lex)h->toklen = e->lex->stemlen;
+	build_hypothesis_surface(h);
+	return h;
+}
+
 unsigned long long total_reconstructed_nodes;
 
 int instantiate_hypothesis(struct hypothesis *h)

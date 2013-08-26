@@ -66,3 +66,4 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 char	*hypothesis_to_dstring(struct hypothesis	*h);
 char	*hypothesis_to_labelled_tree_string(struct hypothesis	*h);
 char	*slab_escape(char	*str);
+struct hypothesis	*cheap_hypothesis(struct edge	*e);

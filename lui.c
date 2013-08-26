@@ -108,6 +108,15 @@ void	*lui_listener(void *foo)
 				fprintf(stderr, "NOTE: replying to LUI request to browse genchart level 2 on %d EIDs\n", neid);
 				lui_gen_chart_level2(cid, neid, eid);
 			}
+			else if(!strncmp(lp, "type ", 5))
+			{
+				char type[256], command[256] = "";
+				int fields = sscanf(lp, "type %s %s\n", type, command);
+				if(fields < 2) { fprintf(stderr, "LUI: bad 'type' command\n"); }
+				else if(!strcmp(command, "expansion"))
+					lui_type(type);
+				else fprintf(stderr, "LUI: '%s' viewer for types not implemented\n", command);
+			}
 			else if(!strcmp(lp, "")) {}
 			else if(!strncmp(lp, "unify ", 6))interactive_unify(lp);
 			else fprintf(stderr, "LUI: unknown `%s'\n", lp);
@@ -670,6 +679,21 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 	}
 }
 
+void	output_lui_edge_tree(struct edge	*e)
+{
+	struct hypothesis	*h = cheap_hypothesis(e);
+	fprintf(lui_write, "tree %d", chart_id);
+	lui_format_tree(h, NULL);
+	fprintf(lui_write, " \"Edge #%d\"\n", e->id);
+	fflush(lui_write);
+}
+
+void	output_lui_edge_entity(struct edge	*e)
+{
+	if(e->rule)lui_rule(e->rule->name);
+	else if(e->lex)lui_lex(e->lex->word);
+}
+
 void	browse_lui(int eid, char *what, char	*what2)
 {
 	int i, j, k, l;
@@ -691,6 +715,18 @@ void	browse_lui(int eid, char *what, char	*what2)
 			struct hypothesis	*h = lui_find_tree(eidstr);
 			if(h)output_lui_edge_mrs(h, what2);
 			else printf("no such LUI tree #%s\n", eidstr);
+		}
+		else if(!strcmp(what, "tree"))
+		{
+			struct edge	*e = lui_find_edge(eidstr);
+			if(e)output_lui_edge_tree(e);
+			else printf("no such LUI edge #%s\n", eidstr);
+		}
+		else if(!strcmp(what, "entity"))
+		{
+			struct edge	*e = lui_find_edge(eidstr);
+			if(e)output_lui_edge_entity(e);
+			else printf("no such LUI edge #%s\n", eidstr);
 		}
 		else fprintf(stderr, "LUI: don't know how to browse edge %d's `%s'\n", eid, what);
 	}
