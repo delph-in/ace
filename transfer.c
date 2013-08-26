@@ -947,6 +947,9 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 		printf("\n");
 	}*/
 
+	int	use_trigger_constraints = feature_exists("TRIGGER-CONSTRAINT");
+	//printf("use_trigger_constraints = %d\n", use_trigger_constraints);
+
 	// note: generate() has already built the ep->dg's for each input relation
 
 	if(semi_th && ALLOW_SEMI_MODE)
@@ -958,12 +961,9 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 		{
 			struct dg	*flags = dg_hop(trigger_rules[i]->dg, lookup_fname("FLAGS"));
 			struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
-//#define TRIGGER_CONSTRAINT	// todo: make this enable-able in config.tdl.  can't just leave it on because most grammars don't define this feature, and adding it at runtime causes problems.
-#ifdef	TRIGGER_CONSTRAINT
-			struct dg	*trigcons = dg_hop(flags, lookup_fname("TRIGGER-CONSTRAINT"));
-#else
 			struct dg	*trigcons = NULL;
-#endif
+			if(use_trigger_constraints)
+				trigcons = dg_hop(flags, lookup_fname("TRIGGER-CONSTRAINT"));
 			char	lexid[256];
 			sprintf(lexid, "%.*s", (int)strlen(trig->xtype->name)-2, trig->xtype->name+1);
 			if(temporary_expedient(lexid))

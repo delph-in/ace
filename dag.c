@@ -596,6 +596,14 @@ void	introduce_feature(int	label, int	type)
 
 int reload_restrictors = 1, restrictor_size = 0;
 
+int	feature_exists(char	*label)
+{
+	int i;
+	for(i=0;i<nfnames;i++)
+		if(!strcasecmp(fnames[i], label))return 1;
+	return 0;
+}
+
 int	lookup_fname(char	*label)
 {
 	int	i;
