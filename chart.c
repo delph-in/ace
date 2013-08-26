@@ -678,7 +678,7 @@ int	filter(struct edge	*a, struct edge	*b)
 		if(a->have == a->need-1)
 		{
 			// building a passive edge
-			if(rfrom && rto==chart_size-1)
+			if(rfrom==0 && rto==chart_size-1)
 			{
 				// spanning edge
 				extern char	*rule_root_utc;
