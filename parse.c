@@ -352,6 +352,7 @@ int	prepare_parse_chart(struct lattice	*lexical_chart)
 //int		wcap[1024];
 char	current_sentence[10240] = "(not initialized)";
 int didsent;
+int	show_probability = 0;
 
 void	(*parse_callback)(struct hypothesis	*hyp, struct mrs	*mrs) = NULL;
 
@@ -361,13 +362,13 @@ int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
 	struct dg	*root = hyp->dg, *sem;
 	extern char	*mrs_end;
 	extern int print_trees;
-	if(debug_level)printf("probability = %f:\n", prob);
 	if(trace>0)printf("edge #%d has a sentential unpacking\n", hyp->edge->id);
 	if(trace>1){print_dg(hyp->dg); printf("\n");}
 	if(!inhibit_results)
 	{
 		char	*sentence = current_sentence;
 		if(sentence && !question && !didsent){printf("SENT: %s\n", sentence);didsent=1;}
+		if(show_probability)printf("probability = %f\n", prob);
 		if(print_trees)
 		{
 			mrs_end = " ; ";

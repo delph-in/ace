@@ -25,6 +25,7 @@
 
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 extern int itsdb_dump_chart;
+extern int	show_probability;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
@@ -119,6 +120,7 @@ void	parse_args(int	argc, char	*argv[])
 		{"disable-subsumption-test", 0, &disable_subsumption_test, 1},
 		{"show-realization-trees", 0, &show_realization_trees, 1},
 		{"show-realization-mrses", 0, &show_realization_mrses, 1},
+		{"show-probability", 0, &show_probability, 1},
 		{"equivalence-packing", 0, &equivalence_packing_only, 1},
 		{"packed-edge-ids", 0, &use_packed_edge_ids, 1},
 		{"itsdb-forest", 0, &itsdb_dump_chart, 1},
