@@ -993,8 +993,11 @@ int	load_irregulars(char	*path)
 		// only record the first match in each direction for each (rule,string) pair.
 		// ?? why were we doing that?
 		// Dan (2013-08-19) says he wants the flexibility to specify multiple stems that a single irregular form might have come from, even by the same rule [cf: phenomena -> phenomena, phenomenon -> phenomena], and also multiple forms that might come from a single stem by the same rule [cf: fly -> flied, flew ; sink -> sank, sunk].
-		//if(!hash_find(or->irregs_stem_to_form, stem))
-		hash_add(or->irregs_stem_to_form, stem, form);
+
+		// for stem-to-form (generation direction), just keep first
+		if(!hash_find(or->irregs_stem_to_form, stem))
+			hash_add(or->irregs_stem_to_form, stem, form);
+		// for form-to-stem (parsing direction), keep all
 		//if(!hash_find(or->irregs_form_to_stem, form))
 		hash_add(or->irregs_form_to_stem, form, stem);
 	}
