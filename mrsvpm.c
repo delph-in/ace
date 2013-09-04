@@ -219,6 +219,12 @@ int	load_transfer_output_vpm(char	*path)
 	transfer_output_v = load_vpm(path);
 }
 
+int	load_transfer_bidir_vpm(char	*path)
+{
+	transfer_output_v = load_vpm(path);
+	transfer_input_v = invert_vpm(transfer_output_v);
+}
+
 void	print_vpm(struct vpm	*v)
 {
 	int i;

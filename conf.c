@@ -251,6 +251,12 @@ void	*freeze_conf()
 	c->icons_right_feature = icons_right_feature;
 	c->mrs_enable_icons = mrs_enable_icons;
 
+	c->deleted_daughters = freeze_block(deleted_daughters, restrictor_size);
+	c->parsing_packing = freeze_block(parsing_packing, restrictor_size);
+	c->generating_packing = freeze_block(generating_packing, restrictor_size);
+	c->restrictor_size = restrictor_size;
+	c->ep_drop = freeze_block(ep_drop, restrictor_size);
+
 	if(!g_transfer)
 	{
 		c->lex_stem_path = freeze_path(lex_stem_path);
@@ -284,12 +290,6 @@ void	*freeze_conf()
 		c->chart_dependencies_to = freeze_block(chart_dependencies_to, sizeof(struct path)*nchart_dependencies);
 		c->nchart_dependencies = nchart_dependencies;
 		c->reduce_chart_before_lexical_parsing = reduce_chart_before_lexical_parsing;
-
-		c->deleted_daughters = freeze_block(deleted_daughters, restrictor_size);
-		c->parsing_packing = freeze_block(parsing_packing, restrictor_size);
-		c->generating_packing = freeze_block(generating_packing, restrictor_size);
-		c->restrictor_size = restrictor_size;
-		c->ep_drop = freeze_block(ep_drop, restrictor_size);
 
 		c->enable_token_avms = enable_token_avms;
 		c->enable_simple_form_lexicon = enable_simple_form_lexicon;
@@ -336,6 +336,13 @@ void	recover_conf(void	*vc)
 	icons_right_feature = c->icons_right_feature;
 	mrs_enable_icons = c->mrs_enable_icons;
 
+	deleted_daughters = c->deleted_daughters;
+	parsing_packing = c->parsing_packing;
+	generating_packing = c->generating_packing;
+	restrictor_size = c->restrictor_size;
+	ep_drop = c->ep_drop;
+	reload_restrictors = (restrictor_size != nfnames);
+
 	if(!g_transfer)
 	{
 		lex_stem_path = c->lex_stem_path;
@@ -364,13 +371,6 @@ void	recover_conf(void	*vc)
 		lattice_mapping_input_path = c->lattice_mapping_input_path;
 		lattice_mapping_output_path = c->lattice_mapping_output_path;
 		lattice_mapping_context_path = c->lattice_mapping_context_path;
-
-		deleted_daughters = c->deleted_daughters;
-		parsing_packing = c->parsing_packing;
-		generating_packing = c->generating_packing;
-		restrictor_size = c->restrictor_size;
-		ep_drop = c->ep_drop;
-		reload_restrictors = (restrictor_size != nfnames);
 
 		enable_token_avms = c->enable_token_avms;
 		enable_simple_form_lexicon = c->enable_simple_form_lexicon;

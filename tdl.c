@@ -1769,15 +1769,19 @@ int load_grammar(char	*path)
 		load_quickcheck();
 		setup_rule_filter();
 		//prepare_qc_rules();
-
-		// make sure we have complete restrictor sets in case recent activity has added new features...
-		load_restrictors();
 	}
 	else
 	{
-		load_transfer_input_vpm(get_conf_file_path(confdir, "input-vpm"));
-		load_transfer_output_vpm(get_conf_file_path(confdir, "output-vpm"));
+		if(get_conf("input-vpm"))
+		{
+			load_transfer_input_vpm(get_conf_file_path(confdir, "input-vpm"));
+			load_transfer_output_vpm(get_conf_file_path(confdir, "output-vpm"));
+		}
+		else load_transfer_bidir_vpm(get_conf_file_path(confdir, "bidir-vpm"));
 	}
+
+	// make sure we have complete restrictor sets in case recent activity has added new features...
+	load_restrictors();
 
 #ifdef	POST
 	if(enable_post)
