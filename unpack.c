@@ -415,7 +415,7 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypagenda_it
 	struct hypothesis	*h = slab_alloc(sizeof(struct hypothesis));
 	int					i;
 
-	DEBUG("hypothesize %p at dec %p [%d %d] for edge #%d\n", h, dec, indices[0], indices[1], dec->edge->id);
+	DEBUG("hypothesize %p at dec %p [%d ...] for edge #%d\n", h, dec, indexlist[0], dec->edge->id);
 //	DEBUG(" ... ancestry: ");
 //	for(i=0;i<ancestry.nparent_types;i++){ DEBUG(" %s", ancestry.parent_types[i]); }
 //	DEBUG("\n");

@@ -303,15 +303,12 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 			qc = extract_qc_arg(u, -1);
 		}
 		e = slab_alloc(sizeof(struct edge));
-		e->unpack = 0;
+		bzero(e, sizeof(*e));
 		e->qc = qc;
 		e->dg = u;
 		e->ha_par = a->dg;
 		e->ha_dg = b->dg;
 		e->ha_arg = arg;
-		e->ha_use = 0;
-		e->frosted = 0;
-		e->frozen = 0;
 	}
 	else
 	{
@@ -364,15 +361,12 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 			qc = extract_qc_arg(u, a->rtl?(nneed-nhave-1):nhave);
 		}
 		e = slab_alloc(sizeof(struct edge));
-		e->unpack = 0;
+		bzero(e, sizeof(*e));
 		e->dg = u;
 		e->ha_par = dg;
 		e->ha_dg = b->dg;
 		e->ha_arg = arg;
-		e->ha_use = 0;
 		e->qc = qc;
-		e->frosted = 0;
-		e->frozen = 0;
 		//printf("active qc %p (copy of %p)\n", e->qc, qc);
 	}
 	//e->prio = a->prio+1;

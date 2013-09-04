@@ -60,9 +60,12 @@ void	add_agenda(struct edge	*e)
 	}
 
 	e->ntries = 0;
-	e->npack = 0;
-	e->pack = 0;
 	e->unpack = 0;
+	// we were zeroing these out until 2013-sept-4.
+	// that broke the new generalization packing trick, since we want to record some packing on generalized edges before they even make it into the agenda.
+	// hopefully not doing this doesn't break anything...  edge producers should really make sure their fields are set appropriately already!
+	//e->npack = 0;
+	//e->pack = 0;
 
 	if(g_mode == GENERATING)
 	{

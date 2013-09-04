@@ -87,9 +87,17 @@ int identical_orth_routes(struct edge *a, struct edge *b)
 
 static void record_packing(struct edge *host, struct edge *e)
 {
-	host->npack++;
-	host->pack = slab_realloc(host->pack, (host->npack-1)*sizeof(struct edge*), host->npack*sizeof(struct edge*));
-	host->pack[host->npack-1] = e;
+	int	newn = host->npack + e->npack + 1;
+	host->pack = slab_realloc(host->pack, host->npack*sizeof(struct edge*), newn*sizeof(struct edge*));
+	host->pack[host->npack++] = e;
+	if(e->npack)
+	{
+		//printf("record_packing: got an extra %d edges packed on pack-ee\n", e->npack);
+		memcpy(host->pack + host->npack, e->pack, sizeof(struct edge*)*e->npack);
+		host->npack += e->npack;
+		e->npack = 0;
+		e->pack = NULL;
+	}
 }
 
 static long long packcount = 0, packtry = 0, packqc = 0, packss = 0;
@@ -452,11 +460,25 @@ int	pack_edge(struct edge	*edge)
 					// replace 'h' by 'edge' in the chart before upward_kill() changes the chart around
 					c->p_edges[i] = edge;
 					PACKBUG("reverse packed #%d `%s' in #%d `%s'!\n", h->id, show_orth_leaves(h), edge->id, show_orth_leaves(edge));
+					PACKBUG(" ... and edge already had %d packers\n", edge->npack);
 					//printf("host: "); print_dg(edge->dg); printf("\n");
 					//printf("pack: "); print_dg(h->dg); printf("\n");
 					// promote what's packed on 'h' to be packed on 'edge'
-					edge->npack = h->npack;
-					edge->pack = h->pack;
+					if(!edge->npack)
+					{
+						edge->npack = h->npack;
+						edge->pack = h->pack;
+					}
+					else
+					{
+						// happens for generalization packing.
+						int	newnpack = edge->npack + h->npack;
+						struct edge	**newpack = slab_alloc(sizeof(struct edge*) * newnpack);
+						memcpy(newpack, edge->pack, sizeof(struct edge*) * edge->npack);
+						memcpy(newpack + edge->npack, h->pack, sizeof(struct edge*) * h->npack);
+						edge->npack = newnpack;
+						edge->pack = newpack;
+					}
 				}
 				else
 				{
@@ -530,10 +552,11 @@ int	pack_edge(struct edge	*edge)
 		ge->daughters = NULL;
 		// when we try to pack 'ge', we will retroactively pick up generalizable_host -- and maybe others.
 		//printf("hallucinated #%d which packs #%d and should pick up #%d\n", ge->id, edge->id, generalizable_host->id);
-		//printf("verifying that gdg subsumes #%d ->dg\n", edge->id);
-		//assert(1 == equivalent_dg(gdg, edge->dg, 1, 1, 0));
-		//printf("verifying that gdg subsumes #%d ->dg\n", generalizable_host->id);
-		//assert(1 == equivalent_dg(gdg, generalizable_host->dg, 1, 1, 0));
+		/*printf("verifying that gdg subsumes #%d ->dg\n", edge->id);
+		assert(1 == equivalent_dg(gdg, edge->dg, 1, 1, 0));
+		printf("verifying that gdg subsumes #%d ->dg\n", generalizable_host->id);
+		assert(1 == equivalent_dg(gdg, generalizable_host->dg, 1, 1, 0));
+		fflush(stdout);*/
 		add_agenda(ge);
 		return 1;	// report that 'edge' is packed.
 	}
@@ -562,24 +585,38 @@ struct edge	*compact_generalization_edge(struct edge	*g)
 {
 	int i, j;
 	// remove any other generalization edges G' that are packed on G; anything that was at one point packed on G' should have been promoted to packed directly on G when G' was picked up.
+	//printf("compacting g-edge #%d, which has %d packers\n", g->id, g->npack);
 	for(i=j=0;i<g->npack;i++)
 		if(g->pack[i]->daughters || g->pack[i]->lex)
+		{
 			g->pack[j++] = g->pack[i];
-		else assert(!g->pack[i]->npack);
+			//printf(" ... kept packed #%d\n", g->pack[i]->id);
+		}
+		else
+		{
+			if(g->pack[i]->npack)
+			{
+				fprintf(stderr, "g-edge #%d had a pack-ee g-edge #%d which had %d pack-ees\n", g->id, g->pack[i]->id, g->pack[i]->npack);
+				assert(!"not reached");
+			}
+		}
+	g->npack = j;
 
 	// there better be at least one (two, really?) real edge here...
 	assert(g->npack > 0);
 	struct edge	*x = g->pack[0];
 	x->pack = g->pack+1;
 	x->npack = g->npack-1;
-	g->pack = NULL;
-	g->npack = 0;
+	x->frozen = x->frosted = 0;	// edges picked up by generalization edges are frequently retroactively packed; when we pop it back out to the main chart, remove the frosting
+
+	// ... but do NOT modify g->pack or g->npack; edges built in g need to know how to unpack.
 	return x;
 }
 
 void	compact_generalization_edges()
 {
 	int i;
+	// first, take the generalization edges out of the chart, promoting their first real pack-ee
 	for(i=0;i<chart_size*chart_size;i++)
 	{
 		struct chart_cell	*c = &cells[i];
@@ -591,6 +628,27 @@ void	compact_generalization_edges()
 			{
 				// generalization edge
 				c->p_edges[j] = compact_generalization_edge(e);
+			}
+		}
+	}
+
+	// next, fix references to generalization edges to point instead to their first real pack-ee.
+	for(i=0;i<chart_size*chart_size;i++)
+	{
+		struct chart_cell	*c = &cells[i];
+		int j, k;
+		for(j=0;j<c->p_nedges;j++)
+		{
+			struct edge	*e = c->p_edges[j];
+			assert(! (e->daughters == NULL && !e->lex));
+			for(k=0;k<e->have;k++)
+			{
+				struct edge	*d = e->daughters[k];
+				if(d->daughters == NULL && !d->lex)
+				{
+					assert(d->npack > 0);
+					e->daughters[k] = d->pack[0];
+				}
 			}
 		}
 	}
