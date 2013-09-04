@@ -180,6 +180,7 @@ int	quickcheck(struct qc	*a, struct qc	*b)
 	return 0;
 }
 
+/*
 int	equiv_quickcheck(struct qc	*a, struct qc	*b, int *Fw, int *Bk)
 {
 	int	i;
@@ -203,6 +204,34 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b, int *Fw, int *Bk)
 	}
 	*Fw = fw; *Bk = bw;
 	return 0;
+}*/
+
+int	equiv_quickcheck(struct qc	*a, struct qc	*b, int *Fw, int *Bk, int	*Gz)
+{
+	int	i;
+	struct type	*ta, *tb, *g;
+	int	fw = 1, bw = 1, gz = 1;
+
+	for(i=0;i<qc_size;i++)
+	{
+		ta = a->entries[i];
+		tb = b->entries[i];
+
+		if(ta && tb && (ta!=tb))
+		{
+			g = glb(ta, tb);
+			if(g!=tb)fw = 0;
+			if(g!=ta)bw = 0;
+			if(g!=ta && g!=tb)gz = 0;
+		}
+		if(ta && !tb)fw = 0;
+		if(tb && !ta)bw = 0;
+		if(!fw && !bw && !gz)
+			break;
+	}
+	*Fw = fw; *Bk = bw;
+	*Gz = gz;
+	return (!fw && !bw && !gz)?1:0;
 }
 
 struct qc	*copy_qc(struct qc	*in)

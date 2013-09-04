@@ -1,3 +1,12 @@
+// to get back to normal: (from sept-2-2013)
+// turn off MODIFD generalization
+// turn off different-arity packing
+// turn on rule filter
+// subsumption test spends extra time now testing for generalizability
+
+// would like to get the VPs to pack for 'Kim devours the zebra beside Abrams.'
+
+
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
@@ -32,8 +41,14 @@ static int	same_cell_daughter(struct edge *par, struct edge *dtr)
 	if(par==dtr)return 1;
 	if(g_mode==GENERATING && !bitvec_equal(par->ep_span_bv, dtr->ep_span_bv, n_epsbv))return 0;
 	if(g_mode==PARSING && (par->from != dtr->from || par->to != dtr->to))return 0;
-	for(i=0;i<par->have;i++)
-		if(same_cell_daughter(par->daughters[i], dtr))return 1;
+	if(par->daughters)
+	{
+		for(i=0;i<par->have;i++)
+			if(same_cell_daughter(par->daughters[i], dtr))return 1;
+	}
+	// new condition sept-2-2013... don't we need this?
+	for(i=0;i<par->npack;i++)
+		if(same_cell_daughter(par->pack[i], dtr))return 1;
 	return 0;
 }
 
@@ -175,7 +190,7 @@ int	generalize_pack_edge(struct edge	*edge)
 	struct edge	*existing = c->p_edges[0];
 
 	int	ssd, fw=1, bk=1;
-	ssd = equivalent_dg(existing->dg, edge->dg, fw, bk);
+	ssd = equivalent_dg(existing->dg, edge->dg, fw, bk, 0);
 	if(ssd == 1 || ssd == 2)
 	{
 		// existing susumes new edge
@@ -241,7 +256,7 @@ block(struct edge	*e, int	freeze)
 		{
 			struct edge	*p = (l==-1)?P:P->pack[l];
 			for(j=0;j<p->have;j++)
-				if(p->daughters[j] == e)
+				if(p->daughters && p->daughters[j] == e)
 				{
 					if(l == -1)
 						block(p, 1);
@@ -263,16 +278,31 @@ block(struct edge	*e, int	freeze)
 	}
 }
 
+void	clear_carcs_and_copy(struct dg	*d)
+{
+	d = dereference_dg(d);
+	if(!d->carcs && !d->copy)return;
+	int i;
+	struct dg	**darcs = DARCS(d);
+	d->carcs = NULL;
+	d->copy = NULL;
+	for(i=0;i<d->narcs;i++)
+		clear_carcs_and_copy(darcs[i]);
+}
+
 int	pack_edge(struct edge	*edge)
 {
-/*	if(edge->to > edge->from + 1)	// pack under generalization for non lexical spans
+	/*if(edge->to > edge->from + 1)	// pack under generalization for non lexical spans
 		// the generalization system doesn't deal with lexical rule chain requirements yet
+		// also, cycles can emerge from unary rules. what to do there?
 		return generalize_pack_edge(edge);*/
 
 	struct chart_cell	*c = cells + edge->from*chart_size + edge->to;
 	struct edge			*h, **candidates;
 	int			i, ssd, ncandidates;
 	int			already_packed = 0;
+
+	struct edge	*generalizable_host = NULL;
 
 	int	would_pack_as_ssd = 0;
 
@@ -282,24 +312,33 @@ int	pack_edge(struct edge	*edge)
 
 	PACKBUG("trying to pack #%d `%s' somewhere\n", edge->id, show_orth_leaves(edge));
 
+	int	packing_active = (edge->have != edge->need)?1:0;
+
 	try_more:
 	candidates = (edge->have==edge->need)?c->p_edges:(edge->rule->rtl?c->ar_edges:c->al_edges);
 	ncandidates = (edge->have==edge->need)?c->p_nedges:(edge->rule->rtl?c->ar_nedges:c->al_nedges);
 	for(i=0;i<ncandidates && (h=candidates[i]);i++)
+	{
+		// sept-02-2013 -- we were refusing to pack edges of different arity.  was there a good reason?
+		//if( (h->need - h->have) == (edge->need - edge->have)    //h->have == edge->have && h->need == edge->need
 		if( h->have == edge->have && h->need == edge->need
 		&& (g_mode != GENERATING || bitvec_equal(h->ep_span_bv, edge->ep_span_bv, n_epsbv))
 			)
 		{
-			int	fw = 1, bk = 1;
+			// XXX shouldn't we require identical accessibility bitmaps?
+			int	fw = 1, bk = 1, gz = 1;
 			if(edge == h)continue;	// if we retroactively packed an existing passive into 'edge', then 'edge' is now in the chart, so be careful
 			// if nothing is subsumed by both rule schemata,
 			// then refinements of them cannot be in subsumption relations
-			if(edge->rule && h->rule)
-				if(!check_srf(edge->rule, h->rule))continue;
+			//if(edge->rule && h->rule)
+			//	if(!check_srf(edge->rule, h->rule))continue;
+
+			// active edges need to be looking the same direction to pack
+			if(packing_active && h->rule->rtl != edge->rule->rtl)continue;
 
 			packtry++;
 #ifndef	GEN_SUBSUMPTION_QC
-			if(!gen_qc && equiv_quickcheck(h->qc, edge->qc, &fw, &bk))continue;
+			if(!gen_qc && !packing_active && equiv_quickcheck(h->qc, edge->qc, &fw, &bk, &gz))continue;
 #endif
 			packqc++;
 
@@ -334,7 +373,16 @@ int	pack_edge(struct edge	*edge)
 			h->ntries++;
 #endif
 
-			ssd = equivalent_dg(h->dg, edge->dg, fw, bk);
+			//ssd = equivalent_dg(h->dg, edge->dg, fw, bk, 0);
+			ssd = equivalent_dg(h->dg, edge->dg, 1, 1, 0);
+			assert(!(ssd == -1 && !bk));
+			if(ssd == 3 || ssd == -3)
+			{
+				//printf("potential to pack #%d and #%d with generalization even though they don't stand in strict subsumption\n", h->id, edge->id);
+				ssd = 0;
+				generalizable_host = h;
+			}
+
 			if(equivalence_packing_only && ssd != 2)ssd = 0;
 			if(ssd)packss++;
 			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
@@ -383,7 +431,7 @@ int	pack_edge(struct edge	*edge)
 				record_packing(h, edge);
 				return 1;
 			}
-			else if((ssd == -1 || ssd == 2) && 1)
+			else if((ssd == -1 || ssd == 2) && 1 && !packing_active)
 			{
 				int was_frozen = h->frozen;
 				// retroactive packing
@@ -444,7 +492,52 @@ int	pack_edge(struct edge	*edge)
 				// keep going!
 			}
 		}
+	}
 	if(already_packed)return 2;
+
+	// failed to pack under strict subsumption.
+	if(generalizable_host && edge->have==edge->need && g_mode == PARSING)
+	{
+		// but did find a host that could pack with 'edge' under slight generalizations
+		int	ssd = equivalent_dg(edge->dg, generalizable_host->dg, 1, 1, 1);
+		struct edge	*from;
+		if(ssd == 3)from = edge;
+		else if(ssd == -3)from = generalizable_host;
+		else
+		{
+			fprintf(stderr, "relationship between edge and recorded candidate generalization host = %d\n", ssd);
+			assert(!"no generalized subsumption when I thought there was");
+		}
+		//printf("generalization packing: got ssd = %d\n", ssd);
+		clear_carcs_and_copy(from->dg);
+		// XXX need to arrange for features inappropriate to the generalized types to be dropped.
+		struct dg	*gdg = finalize_tmp(from->dg, 0);
+
+		//printf("#%d's dag:\n", edge->id);print_dg(edge->dg);printf("\n");
+		//printf("#%d's dag:\n", generalizable_host->id);print_dg(generalizable_host->dg);printf("\n");
+		//printf("new dag:\n");print_dg(gdg);printf("\n");
+
+		struct edge	*ge = slab_alloc(sizeof(*ge));
+		memcpy(ge, from, sizeof(*ge));
+		ge->id = next_eid();
+		ge->used = 0;
+		ge->dg = gdg;
+		ge->qc = extract_qc(gdg);
+		ge->npack = 1;
+		ge->pack = slab_alloc(sizeof(struct edge*));
+		ge->pack[0] = edge;
+		ge->lex = NULL;
+		ge->daughters = NULL;
+		// when we try to pack 'ge', we will retroactively pick up generalizable_host -- and maybe others.
+		//printf("hallucinated #%d which packs #%d and should pick up #%d\n", ge->id, edge->id, generalizable_host->id);
+		//printf("verifying that gdg subsumes #%d ->dg\n", edge->id);
+		//assert(1 == equivalent_dg(gdg, edge->dg, 1, 1, 0));
+		//printf("verifying that gdg subsumes #%d ->dg\n", generalizable_host->id);
+		//assert(1 == equivalent_dg(gdg, generalizable_host->dg, 1, 1, 0));
+		add_agenda(ge);
+		return 1;	// report that 'edge' is packed.
+	}
+
 	return 0;
 }
 
@@ -458,5 +551,47 @@ void packing_report()
 	{
 		fprintf(stderr, "NOTE: %lld subsumption tests; qc filters %.1f%% leaving %lld, of which ss passes %.1f%% = %lld\n",
 			packtry, 100 - 100*(float)packqc/packtry, packqc, 100*(float)packss/packqc, packss);
+	}
+}
+
+// once forest creation is complete,
+// take generalization edges G that pack edges [x,y,z] and replace them with 
+// a real edge X that packs [y, z].
+// it doesn't matter (?) whether X actually subsumes y and z -- we're just representing choice points now.
+struct edge	*compact_generalization_edge(struct edge	*g)
+{
+	int i, j;
+	// remove any other generalization edges G' that are packed on G; anything that was at one point packed on G' should have been promoted to packed directly on G when G' was picked up.
+	for(i=j=0;i<g->npack;i++)
+		if(g->pack[i]->daughters || g->pack[i]->lex)
+			g->pack[j++] = g->pack[i];
+		else assert(!g->pack[i]->npack);
+
+	// there better be at least one (two, really?) real edge here...
+	assert(g->npack > 0);
+	struct edge	*x = g->pack[0];
+	x->pack = g->pack+1;
+	x->npack = g->npack-1;
+	g->pack = NULL;
+	g->npack = 0;
+	return x;
+}
+
+void	compact_generalization_edges()
+{
+	int i;
+	for(i=0;i<chart_size*chart_size;i++)
+	{
+		struct chart_cell	*c = &cells[i];
+		int j;
+		for(j=0;j<c->p_nedges;j++)
+		{
+			struct edge	*e = c->p_edges[j];
+			if(e->daughters == NULL && !e->lex)
+			{
+				// generalization edge
+				c->p_edges[j] = compact_generalization_edge(e);
+			}
+		}
 	}
 }

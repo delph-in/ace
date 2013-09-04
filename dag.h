@@ -65,7 +65,7 @@ struct dg	*add_dg_hop(struct dg	*d, int	label, struct dg	*value);
 struct dg	*add_dg_feature(struct dg	*d, char	*label, struct dg	*value);
 struct dg	*add_dg_path(struct dg	*d, int	*path, int	len, struct dg	*target);
 int		init_fnames();
-int		equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk);
+int		equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk, int	leave_marks);
 void		setup_extra_type_dgs();
 void		setup_carcs_stack();
 struct dg	*wellform_dg(struct dg	*dg);

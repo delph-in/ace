@@ -258,6 +258,8 @@ char		**fnames;
 
 int	subsume_forward, subsume_backward;
 
+int	gsubsume_forward, gsubsume_backward;
+
 #ifndef	GEN_SUBSUMPTION_QC
 #define	ss_backtrace(a,b,k)  do {} while(0)
 #else
@@ -272,6 +274,12 @@ real_ss_backtrace(struct dg	*a, struct dg	*b, char	*code)
 	for(i=0;i<b->narcs;i++)printf(" %s", fnames[b->label[i]]); printf("\n");
 	printf("subsumption failure at path:  "); unify_backtrace();
 }
+
+//#define	SS_GET_SCRATCH(d)	FORWARD(d)
+//#define	SS_SET_SCRATCH(d,v)	_set_forward(d, v)
+
+#define	SS_GET_SCRATCH(d)	((struct dg*)((d)->carcs))
+#define	SS_SET_SCRATCH(d,v)	do { (d)->carcs = (struct darc*)(v); } while(0)
 
 // due to subgraph sharing, a node 'a' can appear in both inputs to subsume_dg1(a,b).
 // it is not automatically equivalent; different reentrancies can appear from the (nonidentical) rest of the dags into 'a'
@@ -292,22 +300,23 @@ int	subsume_same_dg(struct dg	*a)
 	{
 		a->copy = 0;
 		a->carcs = 0; a->ncarcs = 0;
-		_set_forward(a, NULL);
+		SS_SET_SCRATCH(a, NULL);
 		a->gen = generation;
+		a->type = a->xtype;
+		a->forwarded = 0;
 	}
 
-	if(a->copy==a && FORWARD(a)==a)return 1;
-	if(a->copy)subsume_forward = 0;
-	if(FORWARD(a))subsume_backward = 0;
-	if(!subsume_forward && !subsume_backward)
+	if(a->copy==a && SS_GET_SCRATCH(a)==a)return 1;
+	if(a->copy) { if(subsume_forward)ss_backtrace(a,a, "same-dag: can't subsume forward"); subsume_forward = 0; gsubsume_forward = 0; }
+	if(SS_GET_SCRATCH(a)) { if(subsume_backward)ss_backtrace(a,a, "same-dag: can't subsume backward"); subsume_backward = 0; gsubsume_backward = 0; }
+	if(!gsubsume_forward && !gsubsume_backward)
 	{
 		ss_backtrace(a, a, "same-dag: had been here from one side but not both");
 		return 0;
 	}
-	//if(a->copy || FORWARD(a))return 0;
 
 	a->copy = a;
-	_set_forward(a, a);
+	SS_SET_SCRATCH(a, a);
 
 	arcs = DARCS(a);
 	for(i=0;i<a->narcs;i++)
@@ -343,40 +352,64 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		//printf("reset lhs\n");
 		a->copy = 0;
 		a->carcs = 0; a->ncarcs = 0;
-		_set_forward(a, NULL);
+		SS_SET_SCRATCH(a, NULL);
 		a->gen = generation;
+		a->type = a->xtype;
+		a->forwarded = 0;
 	}
 	if(b->gen!=generation)
 	{
 		//printf("reset rhs\n");
 		b->copy = 0;
 		b->carcs = 0; b->ncarcs = 0;
-		_set_forward(b, NULL);
+		SS_SET_SCRATCH(b, NULL);
 		b->gen = generation;
+		b->type = b->xtype;
+		b->forwarded = 0;
 	}
 
 	int	types_identical = (a->xtype == b->xtype) || (a->xtype->tnum==-1 && b->xtype->tnum==-1 && !strcmp(a->xtype->name, b->xtype->name));
 
+	struct type	*lower = a->xtype;
+
 	if(!types_identical)
 	{
+		lower = glb(a->xtype, b->xtype);
+
 		struct type_hierarchy	*th = default_type_hierarchy();
 		int	old_subsume_forward = subsume_forward;
 		int	old_subsume_backward = subsume_backward;
+		int	local_ss = 0;
 		if(b->xtype->name[0]=='"')
 		{
 			if(!descendent_of(th->strtype->tnum, a->xtype))subsume_forward = 0;
+			else local_ss = 1;
 		}
 		else
 		{
 			if(!descendent_of(b->xtype->tnum, a->xtype))subsume_forward = 0;
+			else local_ss = 1;
 		}
 		if(a->xtype->name[0]=='"')
 		{
 			if(!descendent_of(th->strtype->tnum, b->xtype))subsume_backward = 0;
+			else local_ss = 1;
 		}
 		else
 		{
 			if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
+			else local_ss = 1;
+		}
+		if(!local_ss)gsubsume_backward = gsubsume_forward = 0;
+		else
+		{
+			assert(a->xtype==lower || b->xtype==lower);
+			struct type	*upper = (lower==a->xtype)?b->xtype:a->xtype;
+			a->type = b->type = upper;
+			//fprintf(stderr, "generalized %p and %p to %s\n", a, b, upper->name);
+			ut1 = a->xtype;
+			ut2 = b->xtype;
+			ss_backtrace(a, b, "tentatively generalized");
 		}
 
 		if(!subsume_forward && !subsume_backward)
@@ -384,27 +417,54 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			ut1 = a->xtype;
 			ut2 = b->xtype;
 			ss_backtrace(a, b, (old_subsume_forward && old_subsume_backward)?"multi-dag: incompatible types":( old_subsume_forward?"multi-dag: needed forward but failed":"multi-dag: needed backward but failed" ));
-			return 0;
+			if(!gsubsume_forward && !gsubsume_backward)
+				return 0;
+		}
+		else if(old_subsume_forward && !subsume_forward)
+		{
+			ut1 = a->xtype;
+			ut2 = b->xtype;
+			ss_backtrace(a, b, "multi-dag: ruled out forward subsumption");
+		}
+		else if(old_subsume_backward && !subsume_backward)
+		{
+			ut1 = a->xtype;
+			ut2 = b->xtype;
+			ss_backtrace(a, b, "multi-dag: ruled out backward subsumption");
 		}
 	}
 
-	if(a->copy == b && FORWARD(b) == a)return 1;
+	if(a->copy == b && SS_GET_SCRATCH(b) == a)return 1;
 
 	if(!a->copy)a->copy = b;
 	else if(a->copy != b)
 	{
+		if(subsume_forward || gsubsume_forward)
+		{
+			ut1 = a->xtype;
+			ut2 = b->xtype;
+			ss_backtrace(a, b, "multi-dag: ruled out forward subsumption due to reentrancies");
+		}
 		subsume_forward = 0;
+		gsubsume_forward = 0;
 		//printf("not forward... (lhs = %p)\n", a->copy);
 	}
 
-	if(!FORWARD(b))_set_forward(b, a);
-	else if(FORWARD(b) != a)
+	if(!SS_GET_SCRATCH(b))SS_SET_SCRATCH(b, a);
+	else if(SS_GET_SCRATCH(b) != a)
 	{
+		if(subsume_backward || gsubsume_backward)
+		{
+			ut1 = a->xtype;
+			ut2 = b->xtype;
+			ss_backtrace(a, b, "multi-dag: ruled out backward subsumption due to reentrancies");
+		}
 		subsume_backward = 0;
-		//printf("not backward... (rhs = %p)\n", FORWARD(b));
+		gsubsume_backward = 0;
+		//printf("not backward... (rhs = %p)\n", SS_GET_SCRATCH(b));
 	}
 
-	if(!subsume_forward && !subsume_backward)
+	if(!gsubsume_forward && !gsubsume_backward)
 	{
 		ut1 = a->xtype;
 		ut2 = b->xtype;
@@ -428,8 +488,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			upathl--;
 		}
 	}
-	else if(subsume_forward && a->narcs<=b->narcs) // b is subtype of a, so has strict superset of features
+	else if(b->xtype==lower && a->narcs<=b->narcs) // b is subtype of a, so has strict superset of features
 	{
+		if(subsume_backward)ss_backtrace(a, b, "ruled out backward due to lower type/feature set");
+		subsume_backward = 0;
+		if(a->narcs < b->narcs)gsubsume_backward = 0;	// TODO: work out how to generalize-pack when feature sets are different
 		for(i=j=0;i<b->narcs;i++)
 		{
 			if(j>=a->narcs)break;
@@ -442,8 +505,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			}
 		}
 	}
-	else if(subsume_backward && b->narcs<=a->narcs) // a is subtype of b, so has strict superset of features
+	else if(a->xtype==lower && b->narcs<=a->narcs) // a is subtype of b, so has strict superset of features
 	{
+		if(subsume_forward)ss_backtrace(a, b, "ruled out forward due to lower type/feature set");
+		subsume_forward = 0;
+		if(b->narcs < a->narcs)gsubsume_forward = 0; // TODO: work out how to generalize-pack when feature sets are different
 		for(i=j=0;i<a->narcs;i++)
 		{
 			if(j>=b->narcs)break;
@@ -458,13 +524,17 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	}
 	else
 	{
+		subsume_forward = 0;
+		subsume_backward = 0;
+		gsubsume_forward = 0;
+		gsubsume_backward = 0;
 		ss_backtrace(a, b, "multi-dag: incompatible arc set");
 		return 0;
 	}
 	return 1;
 }
 
-int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk)
+int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk, int	leave_marks)
 {
 	int	res;
 	extern unsigned int	generation;
@@ -480,12 +550,17 @@ int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk)
 	ut1 = ut2 = NULL;
 	subsume_forward = Fw;
 	subsume_backward = Bk;
+	gsubsume_forward = 1;
+	gsubsume_backward = 1;
 	res = subsume_dg1(a, b);
-	generation++;
-	if(generation==MAX_GEN)
+	if(!leave_marks)
 	{
-		fprintf(stderr, "generation counter overflowed!\n");
-		exit(-1);
+		generation++;
+		if(generation==MAX_GEN)
+		{
+			fprintf(stderr, "generation counter overflowed!\n");
+			exit(-1);
+		}
 	}
 
 	//fprintf(stderr, "subs %p %p = %d %d %d\n", a, b, res, subsume_forward, subsume_backward);
@@ -497,7 +572,7 @@ int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk)
 	if(res && subsume_forward)
 			fprintf(stderr, "NOTE: >= subsumption\n");*/
 
-	if(res)
+	//if(res)
 	{
 		//if(subsume_forward && subsume_backward)return 1;
 		//else return 0;
@@ -505,6 +580,8 @@ int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk)
 		if(subsume_forward && subsume_backward)return 2;
 		if(subsume_forward)return 1;
 		if(subsume_backward)return -1;
+		if(gsubsume_forward)return 3;
+		if(gsubsume_backward)return -3;
 	}
 	return 0;
 	//return res;
@@ -616,7 +693,7 @@ int	lookup_fname(char	*label)
 	fnames[i] = strdup(label);
 	introduce = realloc(introduce, sizeof(int) * nfnames);
 	introduce[i] = -1;
-	if(!g_transfer)
+	//if(!g_transfer)
 	{
 		reload_restrictors = 1;
 		if(nfnames >= MAX_FEATURES) { fprintf(stderr, "ERROR: new feature '%s' is %d'th\n", label, MAX_FEATURES); exit(-1); }
@@ -713,7 +790,7 @@ void load_restrictors()
 {
 	int		i;
 	extern int g_mode, g_transfer;
-	if(g_transfer)return;
+	//if(g_transfer)return;
 	assert(g_mode == -1);
 
 	if(deleted_daughters)free(deleted_daughters);
