@@ -9,7 +9,9 @@ extern int max_unpack_megabytes;
 //#define	MAX_TRANSFER_CHUNKS	2560
 #define	MAX_TRANSFER_CHUNKS	(max_unpack_megabytes)
 //#define	DEBUG	printf
-#define	DEBUG(...)	do { } while(0)
+//#define	DEBUG(...)	do { } while(0)
+
+#define	DEBUG(fmt...)	do { if(debug_transfer)printf(fmt); } while(0)
 
 #include	"unicode.h"
 #include	"transfer.h"
@@ -26,6 +28,8 @@ extern struct type_hierarchy	*semi_th, *main_th;
 extern int inhibit_vpm;
 
 extern int	instloc_feature;
+
+int	debug_transfer = 0;
 
 //int	saved_ntcopies = 0;
 //struct tcopy	*saved_tcopies = NULL;
@@ -987,12 +991,49 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 				}
 				trigger(lexid, trigcons);
 			}
-			return 1;	// don't care to hear about more alignments; it's triggered.
+			if(trigcons)return 0;	// might find more alignments with different constraints
+			else return 1;	// don't care to hear about more alignments; it's triggered.
 		}
 		align_transfer_rule(trigger_rules[i], mrsin, found_alignment);
 	}
 }
 
+void debug_run_one_trigger_rule(struct mrs	*m, char	*rname, int detail)
+{
+	int i, j;
+	for(i=0;i<ntrigger_rules;i++)
+		if(!strcasecmp(trigger_rules[i]->name, rname))break;
+	if(i==ntrigger_rules)
+	{
+		fprintf(stderr, "no such trigger rule `%s'\n", rname);
+		return;
+	}
+	struct transfer_rule	*R = trigger_rules[i];
+
+	int	found_alignment(int	*alignment, int	*hcalignment)
+	{
+		struct dg	*flags = dg_hop(R->dg, lookup_fname("FLAGS"));
+		struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
+		char	lexid[256];
+		sprintf(lexid, "%.*s", (int)strlen(trig->xtype->name)-2, trig->xtype->name+1);
+		printf("rule %s matches EPs:", R->name);
+		for(j=0;j<R->input.neps + R->context.neps;j++)
+			printf(" %s", m->rels[alignment[j]].pred);
+		printf("    -> %s\n", lexid);
+		if(temporary_expedient(lexid))
+			printf("  but that's on the temporary expedient, so skipping!\n");
+	}
+	debug_transfer = detail;
+	align_transfer_rule(R, m, found_alignment);
+	debug_transfer = 0;
+}
+
+void	debug_run_trigger_rules(struct mrs	*m)
+{
+	int	i;
+	for(i=0;i<ntrigger_rules;i++)
+		debug_run_one_trigger_rule(m, trigger_rules[i]->name, 0);
+}
 
 
 
@@ -1457,6 +1498,8 @@ int	transfer(struct mrs	*m)
 		struct mrs	*out = apply_transfer_output_vpm(results[i]);
 		print_mrs(out);
 	}
+	printf("\n");
+	fflush(stdout);
 	fprintf(stderr, "NOTE: %d transfer results\t", n);
 	print_slab_stats();
 	clear_mrs();

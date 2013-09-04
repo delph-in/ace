@@ -313,6 +313,8 @@ handle_lui_colon_command(char	*line)
 		show_glb(line+3);
 	if(line[1]=='c')
 		show_last_parse_chart();
+	if(!strncmp(line, ":trigger", 8))
+		debug_trigger_rules(line+8);
 }
 
 struct job_stats	main_input_loop(FILE	*fin)

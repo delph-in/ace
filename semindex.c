@@ -750,7 +750,7 @@ void semantic_lookup(struct mrs	*mrs)
 					// we don't need a constrained version.
 					return;
 				}
-				int res = equivalent_dg(trigcons[i], cons,1,1);
+				int res = equivalent_dg(trigcons[i], cons,1,1,0);
 				if(res == 2 || res == 1)
 				{
 					// a previous rule triggered a more general constraint.
@@ -805,4 +805,24 @@ void semantic_lookup(struct mrs	*mrs)
 	if(triggers)free(triggers);
 
 	if(debug_level)printf("added %d grammar entities\n", count);
+}
+
+debug_trigger_rules(char	*args)
+{
+	if(g_mode != GENERATING)
+	{
+		fprintf(stderr, "trigger debugger: not in generation mode!\n");
+		return -1;
+	}
+	extern struct mrs	*current_internal_input_mrs;
+	struct mrs	*m = current_internal_input_mrs;
+	if(!m) { fprintf(stderr, "give me an MRS first.\n"); return -1; }
+
+	if(*args==' ')
+	{
+		char	*name = args+1;
+		printf("trying to apply trigger rule '%s' to last input\n", name);
+		debug_run_one_trigger_rule(m, name, 1);
+	}
+	else debug_run_trigger_rules(m);
 }
