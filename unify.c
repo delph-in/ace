@@ -16,10 +16,21 @@ void enable_trim(int trim);
 
 extern int	g_loaded;
 
+int	in_slash, slash_fname, xarg_fname, sind_fname, mod_fname;
+
+static inline int slash_restricted(int l)
+{
+	return 0;
+	if(l == xarg_fname)return 1;
+	if(l == sind_fname)return 1;
+	if(l == mod_fname)return 1;
+	return 0;
+}
+
 //#define SHOULD_TRIM(label)			(copy_restrictor && copy_restrictor[label])
 // it is possible for glb constraints to pull features back in that our packing-restrictor'd rule and lexeme AVMs do not contain, so apply the packing restrictor when copying as well.
-#define SHOULD_TRIM(label)			((copy_restrictor && copy_restrictor[label]) || (unify_restrictor && unify_restrictor[label]))
-#define PACKING_RESTRICTOR(label)	(unify_restrictor && unify_restrictor[label])
+#define PACKING_RESTRICTOR(label)	(unify_restrictor && (unify_restrictor[label] || (in_slash && slash_restricted(label))))
+#define SHOULD_TRIM(label)			((copy_restrictor && copy_restrictor[label]) || PACKING_RESTRICTOR(label))
 
 // global generation counter for invalidating quasi-destructive operations
 unsigned int	generation = 10;
@@ -191,7 +202,7 @@ extern struct darc	*carcstack;
 	copytraverse++;
 #endif
 	dg = dereference_dg(dg_underef);
-	if(!dg)return 0;
+	if(!dg)return NULL;
 	forwarded = (dg != dg_underef);
 
 	if(dg->gen != generation)
@@ -298,10 +309,12 @@ extern struct darc	*carcstack;
 #ifdef	COPY_PATHS
 			assert(copypathp < MAX_COPY_PATH);
 			copypath[copypathp++] = *olptr;
+			if(*olptr == slash_fname)in_slash++;
 #endif
 			*alptr = *olptr;
 			*aptr = copy_dg_with_comp_arcs_ss(*optr, &ch);
 #ifdef	COPY_PATHS
+			if(*olptr == slash_fname)in_slash--;
 			copypathp--;
 #endif
 
@@ -352,10 +365,12 @@ extern struct darc	*carcstack;
 #ifdef	COPY_PATHS
 		assert(copypathp < MAX_COPY_PATH);
 		copypath[copypathp++] = copylabel;
+		if(copylabel == slash_fname)in_slash++;
 #endif
 		*alptr = copylabel;
 		*aptr = copy_dg_with_comp_arcs_ss(copyme, &ch);
 #ifdef	COPY_PATHS
+		if(copylabel == slash_fname)in_slash--;
 		copypathp--;
 #endif
 
@@ -502,10 +517,12 @@ struct dg	*copy_dg_with_comp_arcs(struct dg	*dg)
 #ifdef	COPY_PATHS
 		assert(copypathp < MAX_COPY_PATH);
 		copypath[copypathp++] = copylabel;
+		if(copylabel == slash_fname)in_slash++;
 #endif
 		*alptr = copylabel;
 		*aptr = copy_dg_with_comp_arcs(copyme);
 #ifdef	COPY_PATHS
+		if(copylabel == slash_fname)in_slash--;
 		copypathp--;
 #endif
 
@@ -824,6 +841,10 @@ void	setup_extra_type_dgs()
 		extra_substcons = copy_dg(substcons->dg);
 		anti_synsem = lookup_type("anti_synsem");
 		extra_anti_synsem = copy_dg(anti_synsem->dg);
+		xarg_fname = lookup_fname("XARG");
+		sind_fname = lookup_fname("--SIND");
+		mod_fname = lookup_fname("MOD");
+		slash_fname = lookup_fname("SLASH");
 	}
 	commit_slab();
 }

@@ -732,7 +732,7 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 			if(e->to != to)continue;
 			//printf("checking for eq with %p\n", e);
 			//printf("which is:\n");print_dg(lattice_dg(e));printf("\n");
-			if(equivalent_dg(out_dg[i], lattice_dg(e), 1, 1) == 2)break;
+			if(equivalent_dg(out_dg[i], lattice_dg(e), 1, 1, 0) == 2)break;
 		}
 		if(j<from->nfollowers)
 		{

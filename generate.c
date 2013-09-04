@@ -193,15 +193,24 @@ int	gen_process_edge(struct edge	*e)
 	unsigned long long	*previously_inaccessible = e->inaccessible_vars_bv;	// use as scratch space
 
 	//printf("process #%d\n", e->id);
-	for(i=0;i<e->have;i++)
+	if(e->daughters)
 	{
-		if(e->daughters[i]->frozen==1)
+		// genuine edge
+		for(i=0;i<e->have;i++)
 		{
-			//printf("not processing edge #%d ; daughter #%d is frozen\n", e->id, e->daughters[i]->id);
-			return 0;
+			if(e->daughters[i]->frozen==1)
+			{
+				//printf("not processing edge #%d ; daughter #%d is frozen\n", e->id, e->daughters[i]->id);
+				return 0;
+			}
+			bitvec_or(e->daughters[i]->accessible_vars_bv, previously_accessible, previously_accessible, n_avsbv);
+			bitvec_or(e->daughters[i]->inaccessible_vars_bv, previously_inaccessible, previously_inaccessible, n_avsbv);
 		}
-		bitvec_or(e->daughters[i]->accessible_vars_bv, previously_accessible, previously_accessible, n_avsbv);
-		bitvec_or(e->daughters[i]->inaccessible_vars_bv, previously_inaccessible, previously_inaccessible, n_avsbv);
+	}
+	else
+	{
+		// generalization edge
+		// ... for now, the accessibility bitmaps are inherited from one of the edges that this generalizes over. it seems to me we should be requiring that two edges have identical accessibility bitmaps to let them pack -- but we don't seem to be requiring that yet. hmm.
 	}
 
 	if(e->have == e->need && enable_index_accessibility_filtering)

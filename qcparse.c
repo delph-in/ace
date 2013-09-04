@@ -470,8 +470,8 @@ int	qcpacked(struct qcedge	*e)
 		//if((h->need - h->have) != (e->need - e->have))continue;
 		// active edges need to be looking the same way
 		//if(h->have != h->need && h->rule->rule->rtl != e->rule->rule->rtl)continue;
-		int	fw = 1, bw = 1;
-		equiv_quickcheck(e->qc, h->qc, &fw, &bw);
+		int	fw = 1, bw = 1, gz = 1;
+		equiv_quickcheck(e->qc, h->qc, &fw, &bw, &gz);
 		if(fw)
 		{
 			//printf("forward\n");
@@ -525,6 +525,18 @@ void print_qc_vector(struct qc	*q)
 
 struct profiler	*qc_profiler = NULL;
 
+void	generalize_qcpack(struct qcedge	*e)
+{
+	struct qccc *cell = &qcchart[e->from * qcchartsize + e->to];
+	// e is not subsumed by anything in 'cell'.
+	// pick an edge minimally different from e and produce a generalized edge
+	int	i, mindiff = 100000, mindiffi = 0;
+	for(i=0;i<cell->nedges;i++)
+	{
+		struct qcedge	*p = cell->edges[i];
+	}
+}
+
 void	qcprocess(struct qcedge	*e)
 {
 	if(qc_has_frosted_daughter(e))return;
@@ -537,6 +549,14 @@ void	qcprocess(struct qcedge	*e)
 		//printf(" ... packed\n");
 		return;
 	}
+
+	/*struct qccc *cell = &qcchart[e->from * qcchartsize + e->to];
+	if(cell->nedges >= QC_EDGE_LIMIT)
+	{
+		generalize_qcpack(e);
+		return;
+	}*/
+
 	/*printf("QC %s edge #%d", (e->have==e->need)?"passive":((e->have==0)?"epsilon":"active"), e->id);
 	if(e->rule)
 	{
