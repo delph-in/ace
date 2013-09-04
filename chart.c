@@ -22,6 +22,35 @@ int	nofragments = 0;
 
 int	enable_generalize_edge_top_types = 0;
 
+static inline generalize_certain_paths(struct dg	*d, int	hyper)
+{
+	static struct type	*synsemtype = NULL, *modifdtype = NULL;
+	static struct type *signtype = 0;
+	if(!synsemtype)synsemtype = lookup_type("synsem");
+	if(!modifdtype)modifdtype = lookup_type("xmod_min");
+	if(!signtype)signtype = lookup_type("sign");
+
+	static int	synsem_f = -1, modifd_f = -1;
+	if(synsem_f == -1)synsem_f = lookup_fname("SYNSEM");
+	if(modifd_f == -1)modifd_f = lookup_fname("MODIFD");
+
+	struct dg	*ss = dg_hop(d, synsem_f);
+	struct dg	*m = ss?dg_hop(ss, modifd_f):NULL;
+
+	d->type = signtype;
+	if(!hyper)d->xtype = signtype;
+	/*if(ss)
+	{
+		ss->type = synsemtype;
+		if(!hyper)ss->xtype = synsemtype;
+	}*/
+	/*if(m)
+	{
+		m->type = modifdtype;
+		if(!hyper)m->xtype = modifdtype;
+	}*/
+}
+
 int	inhibit_results = 0;
 extern int inhibit_pack;
 
@@ -216,9 +245,6 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 	nneed = a->need;
 	if(nhave == nneed)
 	{
-		static struct type *signtype = 0;
-		if(!signtype)signtype = lookup_type("sign");
-
 		// building passive
 		if(a->dg && b->dg && !spanning && !force_noha && 0)
 		{
@@ -226,7 +252,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 			hyperactive = 1;
 			__qc_use_heap = 1;
 			if(enable_generalize_edge_top_types)
-				dg->type = signtype;
+				generalize_certain_paths(dg, 1);
 			hqc = extract_qc_arg(dg, -1);
 			__qc_use_heap = 0;
 			forget_tmp();
@@ -273,7 +299,7 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 #endif
 			if(!u)return -1;	// cycles might happen, check for them.
 			if(enable_generalize_edge_top_types)
-				u->type = u->xtype = signtype;
+				generalize_certain_paths(u, 0);
 			qc = extract_qc_arg(u, -1);
 		}
 		e = slab_alloc(sizeof(struct edge));
@@ -665,7 +691,7 @@ int	filter(struct edge	*a, struct edge	*b)
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
 
-	int rf = (b->rule && !check_rf(a->rule, b->rule, arg));
+	int rf = 0;//(b->rule && !check_rf(a->rule, b->rule, arg));
 
 	// don't allow span-only rules to finish on a non-span
 	if(nofragments && a->rule->frag_only)return 0;
