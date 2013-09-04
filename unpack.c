@@ -97,7 +97,12 @@ void score_hypothesis(struct hypothesis *h)
 				int j;
 				for(j=0;j<subcui->ndecs;j++)
 				{
-					assert(subcui->decs[j].is_scored);
+					// if we short-circuit know that there are no unifiable hypotheses
+					// of a decomposition, we might have never called new_hypothesis() for that decomposition, and thus in turn have never scored the decomposition.
+					// leaving the Z terms out for that decomposition doesn't seem wrong to me just now?
+					if(subcui->decs[j].is_scored == 0)
+						continue;
+
 					//fprintf(stderr, "read dec %p Z %f\n", subcui->decs+j, subcui->decs[j].all_unpackings_z);
 					sub_z += subcui->decs[j].all_unpackings_z;
 				}
@@ -145,6 +150,13 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 {
 	int	n = 1, i, j, orign;
 	struct decomposition *dec, *d;
+
+	if(!edge->lex && !edge->daughters)
+	{
+		// generalization edge; has no unpackings itself
+		*Ndecompositions = 0;
+		return NULL;
+	}
 
 	ndecomposed++;
 	if(edge->frozen && !edge->frosted)
@@ -829,7 +841,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 		build_hypothesis_surface(h);
 
 	extern int	dont_unspecialize;
-	int	unspecialize = (g_mode == GENERATING) && (!dont_unspecialize);
+	int	unspecialize = (g_mode == PARSING) || ((g_mode == GENERATING) && (!dont_unspecialize));
 	if(unspecialize || !inhibit_pack)
 	{
 		if(!arity)
@@ -1400,12 +1412,17 @@ extern int do_itsdb;
 				// for each potentially root packed edge...
 				struct edge *e = (j==-1)?edge:edge->pack[j];
 				if(e->frozen && !e->frosted)continue;
+				if(!e->daughters)continue;	// generalization edge
 				if(!is_root(e->dg))continue;
 				struct context_unpack_info	*cui = get_edge_cui(e, root_ancestry);
 				int k;
 				for(k=0;k<cui->ndecs;k++)
 				{
-					assert(cui->decs[k].is_scored);
+					// if we discovered that there are no unifiable
+					// instantiations of this decomposition, is_scored may never have been set.
+					// rare -- but it can happen.  not counting the Z terms for those ghost readings doesn't seem wrong -- in fact it seems like an improvement.
+					if(cui->decs[k].is_scored == 0)
+						continue;
 					Z += cui->decs[k].all_unpackings_z;
 					//fprintf(stderr, "root edge #%d dec %p %d / %d score %f\n",
 					//	e->id, cui->decs+k, k+1, cui->ndecs, cui->decs[k].all_unpackings_z);
