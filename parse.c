@@ -101,7 +101,7 @@ static int	parse_process_edge(struct edge	*e)
 	}
 #endif
 
-	if(!inhibit_pack && e->have == e->need)
+	if(!inhibit_pack && e->have == e->need)	// why not pack actives too?
 	{
 		static int packtimer = -1;
 		if(packtimer==-1)packtimer = new_timer("packing");
@@ -548,6 +548,8 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 		}
 		if(parse_process_edge(edge))break;
 	}
+
+	compact_generalization_edges();
 
 	enable_packing(0);
 
