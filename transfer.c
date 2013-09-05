@@ -354,6 +354,7 @@ struct transfer_rule	*freeze_transfer_rule(struct transfer_rule	*tr)
 	fr->name = freeze_string(tr->name);
 	fr->dg = freeze_dg(tr->dg);
 	fr->output_override = freeze_dg(tr->output_override);
+	fr->optional = tr->optional;
 	//fr->ncopy = tr->ncopy;
 	//fr->copy = freeze_block(tr->copy, sizeof(int)*fr->ncopy);
 	return fr;
@@ -1237,7 +1238,7 @@ int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, int	*h
 
 int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int first_route_only)
 {
-	//printf("rule %s\n", tr->name);
+	//printf("rule %s -- optional %d\n", tr->name, tr->optional);
 	int	i, nresult = 0, nfires = 0;
 	struct mrs	**result = NULL;
 	int	pack_start = ts->n;
