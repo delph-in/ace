@@ -631,7 +631,12 @@ again:
 	put_more_on_agenda(A, hyp->dec, hyp->indexlist, hyp->ancestry);
 
 	checkup(hyp);
-	if(hyp->dg == (void*)1)goto again;
+	if(hyp->dg == (void*)1)
+	{
+		//printf("checkup failed for edge #%d hypothesis: ", hyp->eid);
+		//print_hypothesis(hyp, printf, 0); printf("\n");
+		goto again;
+	}
 
 	// 'hyp' is the next ranking item in the relevant edge's cache for this ancestry; record it.
 	struct context_unpack_info	*cui = get_edge_cui(hyp->edge, hyp->ancestry);
@@ -865,10 +870,11 @@ int instantiate_hypothesis(struct hypothesis *h)
 			for(i=0;i<arity;i++)
 				if(unify_dg_tmp(h->rhslist[i]->dg, rdg, i))
 				{
-					//printf("when combining edges #%d and #%d under rule %s\n",
-					//	h->edge->id, h->rhslist[i]->edge->id, h->edge->rule->name);
-					//unify_backtrace();
+					/*printf("when combining edges #%d and #%d under rule %s\n",
+						h->edge->id, h->rhslist[i]->edge->id, h->edge->rule->name);
+					unify_backtrace();
 					forget_tmp();
+					print_hypothesis(h, printf, 0); printf("\n\n");*/
 					h->dg = (void*)1;
 					return -1;
 				}

@@ -375,6 +375,24 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	if(SS_GET_SCRATCH(a) || b->copy)
 		dont_generalize_at_all = 1;
 
+	/*
+	// XXX experiment to see whether refusing to generalize "GENRE" and "HEAD"
+	// can significantly reduce unpacking workload.
+	// root-cell edges can look like they meet a root condition but their unpackings don't actually...
+	static int	genre_feat = -1, head_feat = -1;
+	if(genre_feat == -1)
+	{
+		if(feature_exists("GENRE"))genre_feat = lookup_fname("GENRE");
+		else genre_feat = -2;
+		if(feature_exists("HEAD"))head_feat = lookup_fname("HEAD");
+		else head_feat = -2;
+	}
+	if(upathl && (upath[upathl-1]==genre_feat || upath[upathl-1]==head_feat))
+	{
+		//printf("declining to consider generalizing %s + %s\n", a->xtype->name, b->xtype->name);
+		dont_generalize_at_all = 1;
+	}*/
+
 	int	types_identical = (a->xtype == b->xtype) || (a->xtype->tnum==-1 && b->xtype->tnum==-1 && !strcmp(a->xtype->name, b->xtype->name));
 
 	struct type	*lower = a->xtype;

@@ -16,6 +16,7 @@
 
 #define PACKBUG(fmt,...) do {} while(0)
 //#define PACKBUG printf
+//#define	show_orth_leaves(x...)	"?"
 
 #define	ENABLE_GENERALIZATION
 
@@ -770,6 +771,14 @@ void	compact_generalization_edges()
 			{
 				struct edge	*e = (l==-1)?E:E->pack[l];
 				assert(! (e->daughters == NULL && !e->lex));
+				if(e->frozen && !e->frosted)
+				{
+					// if we run out of RAM during forest creation,
+					// we might fail to pick up a frozen edge.
+					// don't worry about vapid generalization daughters on those;
+					// they'll be ignored anyway.
+					continue;
+				}
 				for(k=0;k<e->have;k++)
 				{
 					struct edge	*d = e->daughters[k];
