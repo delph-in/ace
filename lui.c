@@ -436,7 +436,10 @@ void	output_lui_dg_id(struct dg	*dg, char *wtitle, int	id)
 	dup2(lui_wfd, 1);
 
 	fprintf(lui_write, "avm %d ", id); fflush(lui_write);
+	extern int quoted_number_types;
+	quoted_number_types = 1;
 	print_dg(dg); fflush(stdout);
+	quoted_number_types = 0;
 	fprintf(lui_write, " \"%s\"\n", wtitle?wtitle:"ACE DAG"); fflush(lui_write);
 
 	close(1);

@@ -187,6 +187,8 @@ static void print_copy_path(char	*name)
 
 #define	FROZENLY_UNSHARABLE(x)	FROZEN(x)
 
+int discard_inappropriate_types_during_copy = 0;
+
 static struct dg	*copy_dg_with_comp_arcs_ss(struct dg	*dg_underef, char	*chret)
 {
 extern struct darc	*carcstack;
@@ -269,10 +271,33 @@ extern struct darc	*carcstack;
 	get_slabstate(&state);
 
 	int	na = dg->narcs+dg->ncarcs;
-	for(i=0;i<dg->narcs;i++)
-		if(SHOULD_TRIM(dg->label[i]))na--;
-	for(i=0;i<dg->ncarcs;i++)
-		if(SHOULD_TRIM(dg->carcs[i].label))na--;
+	if(!discard_inappropriate_types_during_copy || copypathp==0)	// copypathp==0 for the root level of the dag; don't want to discard down to 'sign'
+	{
+		for(i=0;i<dg->narcs;i++)
+			if(SHOULD_TRIM(dg->label[i]))na--;
+		for(i=0;i<dg->ncarcs;i++)
+			if(SHOULD_TRIM(dg->carcs[i].label))na--;
+	}
+	else
+	{
+		// count intersection of dg->label and dg->xtype->dg->label
+		assert(!dg->ncarcs);
+		na = 0;
+		if(dg->narcs)
+		{
+			short	*typelabels = dg->type->dg->label;
+			int		ntypelabels = dg->type->dg->narcs;
+			for(i=0;i<dg->narcs;i++)
+			{
+				if(SHOULD_TRIM(dg->label[i]))continue;
+				while(ntypelabels > 0 && *typelabels < dg->label[i])
+					{ typelabels++; ntypelabels--; }
+				if(ntypelabels <= 0)break;	// nothing more to copy
+				if(*typelabels != dg->label[i])continue;
+				na++;
+			}
+		}
+	}
 
 	//int	ab = (na-2 + 3)/4 * 4;
 	int		ab = DAG_EXTRA_LABELS_SIZE_FOR_COUNT(na);
@@ -293,37 +318,96 @@ extern struct darc	*carcstack;
 	st = 0;
 	if(!dg->ncarcs)
 	{
-		for(i=0;i<dg->narcs;i++)
+		if(!discard_inappropriate_types_during_copy || copypathp==0)
 		{
-			if(SHOULD_TRIM(*olptr))
+			for(i=0;i<dg->narcs;i++)
 			{
-				optr++;
+				if(SHOULD_TRIM(*olptr))
+				{
+					optr++;
+					olptr++;
+					st=1;
+					continue;
+				}
+				//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
+				//		fnames[aptr->label], newcopy->xtype->name, optr->dest);
+				ch = 0;
+
+	#ifdef	COPY_PATHS
+				assert(copypathp < MAX_COPY_PATH);
+				copypath[copypathp++] = *olptr;
+				if(*olptr == slash_fname)in_slash++;
+	#endif
+				*alptr = *olptr;
+				*aptr = copy_dg_with_comp_arcs_ss(*optr, &ch);
+	#ifdef	COPY_PATHS
+				if(*olptr == slash_fname)in_slash--;
+				copypathp--;
+	#endif
+
+				if(ch)st = 1;
+				if(!*aptr)return 0;
+				alptr++;
+				aptr++;
 				olptr++;
-				st=1;
-				continue;
+				optr++;
 			}
-			//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
-			//		fnames[aptr->label], newcopy->xtype->name, optr->dest);
-			ch = 0;
+		}
+		else if(dg->narcs)
+		{
+			assert(!dg->ncarcs);
+			// slightly fancier: merge-intersect with dg->type->dg->labels
+			short	*typelabels = dg->type->dg->label;
+			int		ntypelabels = dg->type->dg->narcs;
+			int	ngot = 0;
+			for(i=0;i<dg->narcs;i++)
+			{
+				if(SHOULD_TRIM(*olptr))
+				{
+					optr++;
+					olptr++;
+					st=1;
+					continue;
+				}
+				while(ntypelabels > 0 && *typelabels < *olptr)
+					{ typelabels++; ntypelabels--; }
+				if(ntypelabels <= 0)break;	// nothing more to copy
+				if(*typelabels != *olptr)
+				{
+					olptr++;
+					optr++;
+					continue;
+				}
+				ngot++;
+				//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
+				//		fnames[aptr->label], newcopy->xtype->name, optr->dest);
+				ch = 0;
 
-#ifdef	COPY_PATHS
-			assert(copypathp < MAX_COPY_PATH);
-			copypath[copypathp++] = *olptr;
-			if(*olptr == slash_fname)in_slash++;
-#endif
-			*alptr = *olptr;
-			*aptr = copy_dg_with_comp_arcs_ss(*optr, &ch);
-#ifdef	COPY_PATHS
-			if(*olptr == slash_fname)in_slash--;
-			copypathp--;
-#endif
+	#ifdef	COPY_PATHS
+				assert(copypathp < MAX_COPY_PATH);
+				copypath[copypathp++] = *olptr;
+				if(*olptr == slash_fname)in_slash++;
+	#endif
+				*alptr = *olptr;
+				*aptr = copy_dg_with_comp_arcs_ss(*optr, &ch);
+	#ifdef	COPY_PATHS
+				if(*olptr == slash_fname)in_slash--;
+				copypathp--;
+	#endif
 
-			if(ch)st = 1;
-			if(!*aptr)return 0;
-			alptr++;
-			aptr++;
-			olptr++;
-			optr++;
+				if(ch)st = 1;
+				if(!*aptr)return 0;
+				alptr++;
+				aptr++;
+				olptr++;
+				optr++;
+			}
+			assert(ngot == na);
+			if(na < dg->narcs)
+			{
+				//printf("when copying %s -> %s, discarded from %d to %d arcs\n", dg->xtype->name, newcopy->xtype->name, dg->narcs, newcopy->narcs);
+				st = 1;
+			}
 		}
 	}
 	else for(j=0,i=0;i<dg->narcs || j<dg->ncarcs;) // mergesort
@@ -1404,6 +1488,7 @@ static void flat_print_dg(struct dg	*d)
 print_within_generation(struct dg	*d) { flat_print_dg(d); }
 
 int	dag_print_style = 0;
+int	quoted_number_types = 0;
 
 static int	snrprint_dg(char	*str, int	maxlen, struct dg	*d)
 {
@@ -1427,26 +1512,50 @@ static int	snrprint_dg(char	*str, int	maxlen, struct dg	*d)
 		}
 	}
 
-	//printf("(%p) ", d);
+	char	*tname_prefix="", *tname_suffix="";
+	char	*tname = (d->gen==generation?d->type:d->xtype)->name;
+	char	cl;
+	if(tname[0]=='"' && (cl = tname[strlen(tname)-1])!='"')
+	{
+		if(cl!='$')
+		{
+			// funny types 'foo get internally stored as "foo
+			tname_prefix="'";
+			tname++;
+		}
+		else
+		{
+			// regex types ^foo$ get internally stored as "foo$
+			tname_prefix = "^";
+			tname++;
+		}
+	}
+	else
+	{
+		if(quoted_number_types)
+		{
+			char	*p = tname;
+			while(*p && isdigit(*p))p++;
+			if(!*p)
+			{
+				tname_prefix = "\"";
+				tname_suffix = "\"";
+			}
+		}
+	}
+
+
 	if(!d->narcs)
 	{
-		char	*tname = (d->gen==generation?d->type:d->xtype)->name;
-		char	cl;
-		if(tname[0]=='"' && (cl = tname[strlen(tname)-1])!='"')
-		{
-			if(cl!='$')
-				tmp = snprintf(str, maxlen, "'%s", tname+1);	// funny types 'foo get internally stored as "foo
-			else tmp = snprintf(str, maxlen, "^%s", tname+1);	// regex types ^foo$ get internally stored as "foo$
-		}
-		else tmp = snprintf(str, maxlen, "%s", tname);
+		tmp = snprintf(str, maxlen, "%s%s%s", tname_prefix, tname, tname_suffix);
 		if(str)str += tmp; maxlen -= tmp; len += tmp;
 		if(maxlen<0)maxlen=0;
 	}
 	else
 	{
 		if(dag_print_style==0)
-			tmp = snprintf(str, maxlen, "#D[%s", (d->gen==generation?d->type:d->xtype)->name);
-		else tmp = snprintf(str, maxlen, "%s [", (d->gen==generation?d->type:d->xtype)->name);
+			tmp = snprintf(str, maxlen, "#D[%s%s%s", tname_prefix, tname, tname_suffix);
+		else tmp = snprintf(str, maxlen, "%s%s%s [", tname_prefix, tname, tname_suffix);
 		if(str)str += tmp; maxlen -= tmp; len += tmp;
 		if(maxlen<0)maxlen=0;
 		arcs = DARCS(d);

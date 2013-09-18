@@ -131,8 +131,8 @@ static char	*the_itsdb_error;
 
 void itsdb_error(char	*error)
 {
-	extern int do_itsdb;
-	if(!do_itsdb)return;
+	extern int do_itsdb, tsdb_notes;
+	if(!do_itsdb && !tsdb_notes)return;
 	if(the_itsdb_error)
 	{
 		char	*e2 = malloc(strlen(the_itsdb_error) + strlen(error) + 10);

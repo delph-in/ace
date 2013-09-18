@@ -841,7 +841,11 @@ int instantiate_hypothesis(struct hypothesis *h)
 		build_hypothesis_surface(h);
 
 	extern int	dont_unspecialize;
-	int	unspecialize = (g_mode == PARSING) || ((g_mode == GENERATING) && (!dont_unspecialize));
+	// it's tempting to think we need to unspecialize when we're doing generalization in-situ on parse edges.
+	// that's because modifying the result of a rule (e.g. to make the top type 'sign') can modify the lexical dag by subgraph sharing.
+	// but if we unspecialize, be *sure* to put the token information back in -- and it's not available right now (is it?).
+	// so for now, don't generalize anything except the top type of a sign -- that can't hurt anything.
+	int	unspecialize = /*(g_mode == PARSING) || */((g_mode == GENERATING) && (!dont_unspecialize));
 	if(unspecialize || !inhibit_pack)
 	{
 		if(!arity)

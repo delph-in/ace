@@ -328,6 +328,8 @@ int	subsume_same_dg(struct dg	*a)
 	return 1;
 }
 
+int	uindifflist = 0;
+
 // on input, assume a and b both have noncurrent generation
 // on output, 'copy' pointers are used, so don't try to copy them until next generation
 int	subsume_dg1(struct dg	*a, struct dg	*b)
@@ -368,6 +370,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		b->forwarded = 0;
 	}
 
+	int	dont_generalize_at_all = 0;
+	// if a has been used as part of b or b has been used as part of a, refuse to generalize.
+	if(SS_GET_SCRATCH(a) || b->copy)
+		dont_generalize_at_all = 1;
+
 	int	types_identical = (a->xtype == b->xtype) || (a->xtype->tnum==-1 && b->xtype->tnum==-1 && !strcmp(a->xtype->name, b->xtype->name));
 
 	struct type	*lower = a->xtype;
@@ -400,12 +407,44 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
 			else local_ss = 1;
 		}
-		if(!local_ss)gsubsume_backward = gsubsume_forward = 0;
+		if(dont_generalize_at_all)
+		{
+			if(b->xtype == lower)gsubsume_backward = 0;
+			if(a->xtype == lower)gsubsume_forward = 0;
+		}
+		if(!local_ss)
+		{
+			/*if(1)//a->narcs==0 && b->narcs==0)
+			{
+				// this code is for generalizing to a type more general than either a or b,
+				// in controlled conditions.  it finds some interesting ideas,
+				// but it seems that when you have to do this, other parts of the dag are
+				// overwhelmingly uncooperative and we just can't make
+				// the generalization edge very often.
+				// see if we can pick a type that tightly generalizes them
+				struct type	*upper = lub(a->xtype, b->xtype);
+				if(upper->ndaughters==2 &&
+					((a->xtype == upper->daughters[0] && b->xtype == upper->daughters[1])
+					|| (a->xtype == upper->daughters[1] && b->xtype == upper->daughters[0]))
+					&& a->narcs == b->narcs && a->narcs == upper->dg->narcs)
+				{
+					if(gsubsume_forward)a->type = upper;
+					if(gsubsume_backward)b->type = upper;
+					ut1 = a->xtype;
+					ut2 = b->xtype;
+					ss_backtrace(a, b, "tentatively extra-generalized");
+					printf("generalized %s and %s to %s\n", a->xtype->name, b->xtype->name, upper->name);
+				}
+				else gsubsume_backward = gsubsume_forward = 0;
+			}
+			else */gsubsume_backward = gsubsume_forward = 0;
+		}
 		else
 		{
 			assert(a->xtype==lower || b->xtype==lower);
 			struct type	*upper = (lower==a->xtype)?b->xtype:a->xtype;
-			a->type = b->type = upper;
+			if(gsubsume_forward)a->type = upper;
+			if(gsubsume_backward)b->type = upper;
 			//fprintf(stderr, "generalized %p and %p to %s\n", a, b, upper->name);
 			ut1 = a->xtype;
 			ut2 = b->xtype;
@@ -474,6 +513,22 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 
 	//printf("maybe %p [%s] <=> %p [%s]\n", a, a->xtype->name, b, b->xtype->name);
 
+	int	local_indifflist = 0;
+	static struct type	*difflist = NULL;
+	if(!difflist)difflist = lookup_type(g_diff_list_type);
+	if(a->xtype->name[0]!='"' && descendent_of(a->xtype->tnum, difflist))local_indifflist = 1;
+	if(b->xtype->name[0]!='"' && descendent_of(b->xtype->tnum, difflist))local_indifflist = 1;
+	if(local_indifflist)uindifflist++;
+
+	// there are certain cases where we don't want to apply generalization packing with different arc sets, even if we could.
+	// 1. the toppath, since copying an edge generalized to 'sign' with the appropriateness restrictor will kill off too much
+	// 2. difflists, since generalizing turns out to be capable of washing out the difference between empty and nonempty SLASHes
+	int	dont_generalize_arcs = dont_generalize_at_all;
+	if(upathl == 0)dont_generalize_arcs = 1;
+	else if(uindifflist)dont_generalize_arcs = 1;
+	// uncomment this line to never generalize over different arc sets:
+	//dont_generalize_arcs = 1;
+
 	aarcs = DARCS(a);
 	barcs = DARCS(b);
 	if(types_identical && a->narcs==b->narcs)
@@ -492,7 +547,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	{
 		if(subsume_backward)ss_backtrace(a, b, "ruled out backward due to lower type/feature set");
 		subsume_backward = 0;
-		if(a->narcs < b->narcs)gsubsume_backward = 0;	// TODO: work out how to generalize-pack when feature sets are different
+		if(a->narcs < b->narcs && dont_generalize_arcs)gsubsume_backward = 0;
 		for(i=j=0;i<b->narcs;i++)
 		{
 			if(j>=a->narcs)break;
@@ -509,7 +564,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	{
 		if(subsume_forward)ss_backtrace(a, b, "ruled out forward due to lower type/feature set");
 		subsume_forward = 0;
-		if(b->narcs < a->narcs)gsubsume_forward = 0; // TODO: work out how to generalize-pack when feature sets are different
+		if(b->narcs < a->narcs && dont_generalize_arcs)gsubsume_forward = 0;
 		for(i=j=0;i<a->narcs;i++)
 		{
 			if(j>=b->narcs)break;
@@ -531,6 +586,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		ss_backtrace(a, b, "multi-dag: incompatible arc set");
 		return 0;
 	}
+	if(local_indifflist)uindifflist--;
 	return 1;
 }
 
@@ -547,6 +603,7 @@ int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk, int	leave_marks)
 	}
 
 	upathl = 0;
+	uindifflist = 0;
 	ut1 = ut2 = NULL;
 	subsume_forward = Fw;
 	subsume_backward = Bk;
@@ -562,6 +619,7 @@ int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk, int	leave_marks)
 			exit(-1);
 		}
 	}
+	upathl = 0;
 
 	//fprintf(stderr, "subs %p %p = %d %d %d\n", a, b, res, subsume_forward, subsume_backward);
 

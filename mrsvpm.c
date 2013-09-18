@@ -368,6 +368,8 @@ char	*vpm_map(char	*vartype, char	**input, struct vpm_context	*ctx, int	output_s
 		dbg = 1;
 	}*/
 
+	//printf("input[0] = %s\n", input[0]);
+
 	for(i=0;i<ctx->nrules;i++)
 	{
 		struct vpm_rule	*r = ctx->rules+i;

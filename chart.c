@@ -22,6 +22,10 @@ int	nofragments = 0;
 
 int	enable_generalize_edge_top_types = 0;
 
+// this is a bit dangerous -- subgraph sharing can mean that this edits parts of other edges,
+// including lexical edges, which causes bugs in unpacking.
+// if we decide in the future to try the SYNSEM and MODIFD generalization ideas again,
+// go back to unpack.c and turn unspecialization on again (with token information).
 static inline generalize_certain_paths(struct dg	*d, int	hyper)
 {
 	static struct type	*synsemtype = NULL, *modifdtype = NULL;

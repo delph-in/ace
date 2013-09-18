@@ -84,6 +84,7 @@ int reestimate_token_cto(struct token	*tok)
 	extern char	current_sentence[];
 
 	wchar_t	*wtok = towide(tok->string);
+	// the following doesn't work in YY mode... since current_sentence is not available.
 	wchar_t	*wsent = towide(current_sentence);
 	int	slen = wcslen(wsent), tlen = wcslen(wtok);
 	assert(tok->cfrom < slen);
@@ -210,7 +211,10 @@ output_forest(struct chart_cell	*cell, struct lattice	*tokens)
 		}
 	}
 	// output an edge for each token
-	improve_token_lattice_characterization(tokens);
+	extern int yy_mode;
+	// if we have a reliable input string (i.e. we used repp), we can sometimes improve on the CFROM/CTO produced by token mapping.
+	// this is useful for the treebanking tool...
+	if(!yy_mode)improve_token_lattice_characterization(tokens);
 	for(i=0;i<tokens->nedges;i++)
 	{
 		struct lattice_edge	*le = tokens->edges[i];

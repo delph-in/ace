@@ -84,13 +84,40 @@ static int	parse_process_edge(struct edge	*e)
 		return 0;
 	}
 
+	// block() prevents in-chart edges built on frozen edges from playing further.
+	// edges that were on the agenda at that time need to be block'd here.
+	// also block cases where the daughter is a generalized edge all of whose pack-ees have been vaniquished (as block() does)
+	// question: should this test be moved to pack_edge()?  not unless we call pack_edge() on both active and passives, maybe?
 	if(e->daughters)
 		for(i=0;i<e->have;i++)
+		{
 			if(e->daughters[i]->frozen==1)
 			{
 				//printf("NOT giving edge #%d a chance to try to pack; daughter[%d] = edge #%d was frozen\n", e->id, i, e->daughters[i]->id);
 				return 0;
 			}
+			if(!e->daughters[i]->daughters && !e->daughters[i]->lex && !e->daughters[i]->npack)
+				return 0;
+		}
+	int	jj;
+	// reduce list of prepacked edges by the same technique
+	for(j=jj=0;j<e->npack;j++)
+	{
+		struct edge	*p = e->pack[j];
+		assert(p->daughters || p->lex);	// can't have a prepacked generalization edge; should have been flattened if so.
+		for(i=0;i<p->have;i++)
+		{
+			if(p->daughters[i]->frozen==1)
+			{
+				//printf("NOT giving edge #%d a chance to try to pack; daughter[%d] = edge #%d was frozen\n", e->id, i, e->daughters[i]->id);
+				continue;
+			}
+			if(!p->daughters[i]->daughters && !p->daughters[i]->lex && !p->daughters[i]->npack)
+				continue;
+		}
+		e->pack[jj++] = p;
+	}
+	e->npack = jj;
 
 #ifdef	LEVEL_TIMER
 	if(!e->lex && (e->to-e->from != level))
