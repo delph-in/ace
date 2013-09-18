@@ -1031,3 +1031,17 @@ void	final_chart_stats()
 #endif
 	if(gen_qc)gqc_result();
 }
+
+// useful function for calling from the debugger...
+int edge_is_in_chart(struct edge	*e)
+{
+	struct chart_cell	*c = cells + e->from*chart_size + e->to;
+	int i, j;
+	for(i=0;i<c->p_nedges;i++)
+	{
+		if(e == c->p_edges[i])printf("yes, directly\n");
+		for(j=0;j<c->p_edges[i]->npack;j++)
+			if(c->p_edges[i]->pack[j] == e)printf("indirectly, packed on #%d\n", c->p_edges[i]->id);
+	}
+	fflush(stdout);
+}

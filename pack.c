@@ -268,6 +268,7 @@ int block(struct edge	*e, int	freeze, int	remove)
 		if(freeze) { e->frozen = 1; e->frosted = 0; }
 		else { e->frozen = 1; e->frosted = 1; }
 	}
+	else if(remove)e->frozen = 1;	// mark as frozen so that edges built on this that are still on the agenda get discarded
 	// for each of `e's parents:
 	struct chart_cell	*c = cells + e->from*chart_size + e->to;
 	int i, j, l;
