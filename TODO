@@ -162,6 +162,12 @@ ideas:
 - now that post-model-path config option exists, Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 DONE:
+0.9.17
+	- added generalization packing -- 30% or so speedup on Cathedral and Bazaar
+	- a lot of new LUI functionality
+	- allow multiple irregular forms for the same stem and the same rule
+	- caveat: we run out of RAM while unpacking a lot now, if run under arbiter.
+0.9.16
 	- make derivation edge IDs represent unique subtrees, rather than chart edges -- unless --packed-edge-ids is given
 0.9.15
 	- fixed tdl loader bug (%lines not ignored in #|comments|#)
