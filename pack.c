@@ -20,6 +20,7 @@
 
 #define	ENABLE_GENERALIZATION
 
+extern int disable_generalization;
 extern int debug_level;
 extern unsigned int	generation;
 
@@ -606,7 +607,7 @@ int	pack_edge(struct edge	*edge)
 
 	// failed to pack under strict subsumption.
 #ifdef	ENABLE_GENERALIZATION
-	if(edge->have == edge->need && g_mode == PARSING && !edge->north_routes)
+	if(edge->have == edge->need && g_mode == PARSING && !edge->north_routes && !disable_generalization)
 	{
 		// we kept a list of edges whose quickcheck suggested they may generalize
 		for(i=0;!generalizable_host && i<ngeneralization_candidates;i++)

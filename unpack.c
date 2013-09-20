@@ -873,8 +873,8 @@ int instantiate_hypothesis(struct hypothesis *h)
 					/*printf("when combining edges #%d and #%d under rule %s\n",
 						h->edge->id, h->rhslist[i]->edge->id, h->edge->rule->name);
 					unify_backtrace();
-					forget_tmp();
 					print_hypothesis(h, printf, 0); printf("\n\n");*/
+					forget_tmp();
 					h->dg = (void*)1;
 					return -1;
 				}

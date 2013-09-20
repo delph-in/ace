@@ -33,6 +33,8 @@ int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 int show_gen_chart = 0;
 int timeout_seconds = 0;
 
+int	disable_generalization = 0;
+
 int	dont_unspecialize = 0;
 
 int	output_edge_vectors = 0;
@@ -117,6 +119,7 @@ void	parse_args(int	argc, char	*argv[])
 	}
 
 	struct option long_options[] = {
+		{"disable-generalization", 0, &disable_generalization, 1},
 		{"disable-subsumption-test", 0, &disable_subsumption_test, 1},
 		{"show-realization-trees", 0, &show_realization_trees, 1},
 		{"show-realization-mrses", 0, &show_realization_mrses, 1},
