@@ -9,6 +9,7 @@
 #include	"rule.h"
 #include	"freeze.h"
 
+int disable_generalization = 0;
 int disable_subsumption_test = 0;
 int tsdb_notes = 0;
 int timeout_seconds = 0;
