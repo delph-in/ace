@@ -689,7 +689,10 @@ int	filter(struct edge	*a, struct edge	*b)
 	if(a->rtl)arg = a->need - a->have - 1;
 	else arg = a->have;
 
-	int rf = 0;//(b->rule && !check_rf(a->rule, b->rule, arg));
+	int rf = 0;
+	if((a->have==0||a->daughters||a->lex) && (b->daughters||b->lex))
+		rf = (b->rule && !check_rf(a->rule, b->rule, arg));
+	//int rf = 0;//(b->rule && !check_rf(a->rule, b->rule, arg));
 
 	// don't allow span-only rules to finish on a non-span
 	if(nofragments && a->rule->frag_only)return 0;
