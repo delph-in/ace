@@ -435,7 +435,7 @@ int	pack_edge(struct edge	*edge)
 
 			if(!fw && !bk)
 			{
-				if(gz)save_generalization_candidate(h);
+				if(gz && !h->frozen)save_generalization_candidate(h);
 				continue;
 			}
 
@@ -461,8 +461,11 @@ int	pack_edge(struct edge	*edge)
 			{
 				//printf("potential to pack #%d and #%d with generalization even though they don't stand in strict subsumption\n", h->id, edge->id);
 				ssd = 0;
-				generalizable_host = h;
-				packg++;
+				if(!h->frozen)
+				{
+					generalizable_host = h;
+					packg++;
+				}
 			}
 
 			if(equivalence_packing_only && ssd != 2)ssd = 0;
@@ -643,6 +646,7 @@ int	pack_edge(struct edge	*edge)
 
 			struct edge	*ge = slab_alloc(sizeof(*ge));
 			memcpy(ge, from, sizeof(*ge));
+			ge->frozen = ge->frosted = 0;
 			ge->id = next_eid();
 			ge->used = 0;
 			ge->dg = gdg;
