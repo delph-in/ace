@@ -32,6 +32,8 @@ void	arbiter_set_version(char	*res)
 
 int	arbiter_request_memory()//char	*purpose)
 {
+	extern char	*master_addr;
+	if(!master_addr || !strcmp(master_addr, "-"))return 0;	// if no arbiter, always decline additional memory
 	char	*purpose = "for work";
 	arbiter_granted_more_memory = 0;
 	read_from_arbiter();
@@ -46,7 +48,7 @@ int	arbiter_request_memory()//char	*purpose)
 		usleep(100000);
 		read_from_arbiter();
 	}
-	if(arbiter_granted_more_memory)return 1;
+	if(arbiter_granted_more_memory)return 1; // arbiter allocated us more RAM. how nice. :-)
 	if(cancel_parse)return 0;
 }
 

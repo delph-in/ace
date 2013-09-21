@@ -916,19 +916,11 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 			if(trace>1)printf("build_edge found a cycle\n");
 			return 0;
 		}
-		if(noldslabs >= max_chart_megabytes)
+		if(noldslabs >= max_chart_megabytes && !arbiter_request_memory())
 		{
-			extern char *master_addr;
-			if(!(master_addr && strcmp(master_addr, "-") && 1==arbiter_request_memory()))
-			{
-				fprintf(stderr, "NOTE: terminating search, too much RAM\n");
-				itsdb_error("ran out of RAM while building forest");
-				return -1;	// give up :(
-			}
-			else
-			{
-				// arbiter allocated us more RAM. how nice. :-)
-			}
+			fprintf(stderr, "NOTE: terminating search, too much RAM\n");
+			itsdb_error("ran out of RAM while building forest");
+			return -1;	// give up :(
 		}
 		return 1;
 	}

@@ -588,7 +588,7 @@ struct hypothesis *process_hypagenda(struct hypagenda_item **A)
 	struct hypagenda_item	**W, *l, *r;
 	int					arity, i, j;
 
-	if(noldslabs >= max_unpack_megabytes)
+	if(noldslabs >= max_unpack_megabytes && !arbiter_request_memory())
 		longjmp(out_of_memory_jump, 2);
 
 	//printf("agenda:\n");
@@ -1503,7 +1503,7 @@ extern int do_itsdb;
 			else DEBUG("... wasn't root after unpacking\n");
 		}
 		else g_checkup++;	// mark that we need to look for subfailures before hypothesizing
-		if(noldslabs >= max_unpack_megabytes)
+		if(noldslabs >= max_unpack_megabytes && !arbiter_request_memory())
 			longjmp(out_of_memory_jump, 1);
 	}
 resume_after_oom:

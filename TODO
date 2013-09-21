@@ -1,7 +1,5 @@
 TODO:
 
-- make ace ask arbiter for more memory when running out during unpacking
-
 - make hardcoded path in instantiate_gle() configurable?
 
 - ace bugs:
@@ -47,6 +45,8 @@ TODO:
 			- implementation: alter unify_and_build1() to use QC vectors exclusively and not build/unify/copy DAGs at all (on first pass); alter filter() to discard edges that aren't subsumed by a pass1 edge during second pass
 				- could also try (full-grammar) unpacking directly from the QC forest
 				- question as to whether lexical parsing should always be full-grammar, or should be QC-only on the first pass
+			+ actually built a large portion of this -- enough to do the first-pass parse with just QC
+			+ experimented with this a lot while Dan was here... very difficult to create a QC skeleton that is restrictive enough to get some meaningful filtering benefit for the 2nd pass, while still being fast enough to be practical.
 
 - (optionally?) apply mrs-deleted-roles only to post-parsing/post-generation MRS extraction; NOT to transfer-internal extractions
 	- berthold says the apply-it-everywhere behavior matches LKB
@@ -69,42 +69,13 @@ TODO:
 - release.sh:
 	- should look at version.h *in the checked-out copy* and make sure it matches the commandline
 - auto regression tests:
-	- should include NorSource, GG and JaCY
+	- should include NorSource [massifcentral-pos testsuite], HaG [hausa.items testsuite] and JaCY [what testsuite?]
 		- ideally would like confirmation from respective grammarians that ace does the right thing (some version of ACE, some version of the grammar), so that knowing that answers haven't changed is useful
 	- should include some transfer grammar as well
 		- need a tool to test results... do tsdb profiles even store transfer results? probably...
 
 - transfer: what is the correct interpretation of the logical identity of variables attached to a +copy+'d EP?
 - transfer: should variables that are QEQ be unifiable? (trigger rules: we believe 'yes'. berthold wants 'yes' for fixup rules too.)
-
-fully automated regression testing of both parsing and generation
-	notes:
-		+ this works and is invaluable
-		- we limit unpacking to some number of MB and 1000 results
-			- comparison tool should be aware of that somehow
-				- e.g. diffs in # of results when we run out of RAM are acceptable
-			- diffs after first 1000 results aren't detected... unfortunate.
-	grammars:
-		ERG: mrs, csli, hike
-		HaG: hausa.items
-		GG: mrs, babel
-			- tried adding 'mrs' to the mix.
-				- parsing: ok.
-				- generating: the "gold" mrs profile included with GG is sufficiently out of date that generation is impossible.
-					- no "decisions" data, so an update may be tricky.
-					- but maybe a tree match update could succeed?
-					- problem: logon deustch 'mrs' profile has items numbered as multiples of 10, but gg gold 'mrs' profile has them as multiples of 1... sigh.
-		JaCY: ?
-		NorSource: massifcentral-pos ... LKB and ACE agree (jul-26-2012) modulo LKB bugs
-
-berthold wants
-	- *updating* an ace tsdb profile -- doesn't work, apparently?
-		- reason: ace uses packed edge IDs in derivations, [incr tsdb()] assumes that edges with the same ID dominate the same tree, hence have the same AVM
-	- LUI support
-		-generator trees
-		+full chart
-		-partial chart
-		-simple MRS
 
 ideas:
 	- properly support lettersets with nonascii characters
@@ -166,7 +137,7 @@ DONE:
 	- added generalization packing -- 30% or so speedup on Cathedral and Bazaar
 	- a lot of new LUI functionality
 	- allow multiple irregular forms for the same stem and the same rule
-	- caveat: we run out of RAM while unpacking a lot now, if run under arbiter.
+	- ask arbiter for more memory when running out during unpacking
 0.9.16
 	- make derivation edge IDs represent unique subtrees, rather than chart edges -- unless --packed-edge-ids is given
 0.9.15
@@ -300,6 +271,7 @@ DONE:
 
 - potentially use POS tagger to prune lexical ambiguity
 	- but POS tagger makes mistakes...
+	- note... this is Bec Dridan's übertagging proposal. she got it to work fairly well.
 
 - preprocessor characterization problem:
 	... hole for 'n'
@@ -312,9 +284,6 @@ DONE:
 	 `(.) +n't' -> `\1n't' yields ` I don't know. '
 
 
-+ debug: I believe there are 15 747 724 136 275 002 577 605 653 961 181 555 468 044 717 914 527 116 709 366 231 425 076 185 631 031 296 296 protons in the universe and the same number of electrons.
-	+ currently, that results in a "too much RAM" error. that seems reasonable.
-
 delete deleted daughters from daughters of rule, since they can't ever be present in unified-in daughters
 
 figure out why unpacking is so much slower than PET (sometimes 10x slower!)
@@ -326,8 +295,6 @@ figure out why unpacking is so much slower than PET (sometimes 10x slower!)
 	- maybe some other aspects of unpacking are slow? not clear yet.
 
 learn something from head-corner strategy
-
-ignore punctuation-chars for jacy
 
 try to prove/analyze interesting things at grammar compile time
 	- *intelligently* auto pick quickcheck paths
@@ -344,3 +311,28 @@ optimize lexicon storage; maybe use provided lexdb schema
 maybe support lexdb
 
 make STEM actually be updated by ortho rules; apparently some grammars depend on it.
+
+fully automated regression testing of both parsing and generation
+	notes:
+		+ this works and is invaluable
+		+ we limit unpacking to some number of MB and 1000 results
+			+ comparison tool should be aware of that somehow
+				+ e.g. diffs in # of results when we run out of RAM are acceptable
+			... diffs after first 1000 results aren't detected... unfortunate.
+	grammars:
+		+ ERG: mrs, csli, hike
+		+ GG: mrs, babel
+		- HaG: hausa.items
+		- JaCY: ?
+		- NorSource: massifcentral-pos ... LKB and ACE agree (jul-26-2012) modulo LKB bugs
+
+berthold wants
+	+ *updating* an ace tsdb profile -- doesn't work, apparently?
+		+ reason: ace uses packed edge IDs in derivations, [incr tsdb()] assumes that edges with the same ID dominate the same tree, hence have the same AVM
+		+ fixed; default is now to create new edge IDs for derivation outputs.  can get the real edge IDs with --packed-edge-ids
+	+ LUI support
+		+generator trees
+		+full chart
+		-partial chart
+			?? what did I mean by this?
+		+simple MRS
