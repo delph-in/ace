@@ -43,7 +43,7 @@ void	setup_glb_lut();
 int	add_type_only(char	*name, int	npar, struct type	**par);
 void	number_strings();
 int		load_types();
-void	wellform(struct dg	*d, char	*typename);
+int	wellform(struct dg	*d, char	*typename);
 void	print_glb_stats();
 struct type	*temporary_string_type(char *string);
 struct dg	*type_dg(char		*name);

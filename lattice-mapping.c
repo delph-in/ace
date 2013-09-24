@@ -363,7 +363,8 @@ struct lattice_rule_set	*load_lattice_rules(char	*tdl_status)
 	struct lattice_rule_set	*rs = calloc(sizeof(*rs),1);
 	int	callback(char	*name, struct dg	*dg)
 	{
-		struct lattice_rule	*r = study_lattice_rule(name, wellform_dg(dg));
+		assert( (dg = wellform_dg(dg)) != NULL );
+		struct lattice_rule	*r = study_lattice_rule(name, dg);
 		if(!r)return -1;
 		rs->nrules++;
 		rs->rules = realloc(rs->rules, sizeof(struct lattice_rule*)*rs->nrules);

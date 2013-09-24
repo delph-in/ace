@@ -65,7 +65,8 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 		while(1)sleep(1);
 		exit(-1);
 	}
-	wellform(dg, lex->word);
+	int wellform_result = wellform(dg, lex->word);
+	assert(wellform_result == 0);
 
 	return dg;
 }
@@ -332,8 +333,9 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 	//printf("expanded `%s':\n", l->word);
 	//print_dg(dg);printf("\n");
 
-	return wellform_dg(dg);
-	//return dg;
+	dg = wellform_dg(dg);
+	assert(dg != NULL);
+	return dg;
 }
 
 struct lexeme	*get_lex_by_name(char *name)
@@ -500,8 +502,6 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 {
 	struct dg	*fulldg;
 
-	//wellform(dg, name);
-
 	fulldg = unify_dg_noss(dg, t->dg, -1);
 	if(!fulldg)
 	{
@@ -519,7 +519,8 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 	// then wellformed unification would guarantee that fulldg was already wellformed.
 	// however, 'dg' is usually far from wellformed,
 	// and wellform-ing it is no cheaper than wellforming fulldg.
-	wellform(fulldg, name);
+	int wellform_result = wellform(fulldg, name);
+	assert(wellform_result == 0);
 
 	add_lexeme(name, dg, t, fulldg);
 
@@ -528,7 +529,8 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 
 int	study_generic_le(char	*name, struct dg	*dg)
 {
-	wellform(dg, name);
+	int wellform_result = wellform(dg, name);
+	assert(wellform_result == 0);
 	//printf("generic_le '%s'\n", name);
 	struct lexeme	*l = make_lexeme(name, dg, dg->xtype, dg);
 	ngeneric_les++;

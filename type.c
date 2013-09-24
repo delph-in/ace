@@ -420,12 +420,13 @@ int	type_has_been_updated(struct type	*t)
 }
 
 // make children well-formed
-void	wellform(struct dg	*d, char	*typename)
+int	wellform(struct dg	*d, char	*typename)
 {
 	int		i;
 	struct type	*t;
 	extern char	**fnames;
 	struct dg	**arcs = DARCS(d);
+	extern int g_mode, debug_level;
 
 	for(i=0;i<d->narcs;i++)
 	{
@@ -440,12 +441,16 @@ void	wellform(struct dg	*d, char	*typename)
 			arcs[i]->gen = generation;
 		}
 		wfpath[wfpl++] = d->label[i];
-		wellform(arcs[i], typename);
+		int wellform_result = wellform(arcs[i], typename);
+		if(wellform_result != 0)return -1;
 		t = most_general_type_for_dg(arcs[i]);
 		if(!t)
 		{
-			fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", arcs[i]->xtype->name);
-			exit(-1);
+			if(debug_level || g_mode==-1)
+			{
+				fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", arcs[i]->xtype->name);
+			}
+			return -1;
 		}
 		if(t != arcs[i]->xtype || (wellforming_th && type_has_been_updated(t)))
 		{
@@ -456,28 +461,34 @@ void	wellform(struct dg	*d, char	*typename)
 			printf("\n");*/
 			if(!descendent_of(t->tnum, arcs[i]->xtype))
 			{
-				fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i]->xtype->name, t->name);
-				fprintf(stderr, "	while processing `%s'\n", typename);
-				exit(-1);
+				if(debug_level || g_mode==-1)
+				{
+					fprintf(stderr, "unexpected well-formedness constraint forces dag `%s' to become more general type `%s'!\n", arcs[i]->xtype->name, t->name);
+					fprintf(stderr, "	while processing `%s'\n", typename);
+				}
+				return -1;
 			}
 			top_unifies_wellform++;
 			if(unify_dg_infrom(arcs[i], copy_dg(t->dg)))
 			{
-				int j;
-				fprintf(stderr, "entity `%s' failed well-formedness constraint!\n", typename?typename:"(unknown)");
-				fprintf(stderr, "at path: ");
-				for(j=0;j<wfpl;j++)
-					fprintf(stderr, "%s ", fnames[wfpath[j]]);
-				fprintf(stderr, "\n");
-				fprintf(stderr, "reason: unable to unify with type `%s'\n", t->name);
-#ifdef	UNIFY_PATHS
-				funify_backtrace(stderr);
-#endif
-				fprintf(stderr, "partly unified dag fragment from entity to be wellformed:\n");
-				fprint_dg(stderr, arcs[i]);fprintf(stderr, "\n");
-				fprintf(stderr, "dag type to be wellformed:\n");
-				fprint_dg(stderr, t->dg);fprintf(stderr, "\n");
-				exit(-1);
+				if(debug_level || g_mode==-1)
+				{
+					int j;
+					fprintf(stderr, "entity `%s' failed well-formedness constraint!\n", typename?typename:"(unknown)");
+					fprintf(stderr, "at path: ");
+					for(j=0;j<wfpl;j++)
+						fprintf(stderr, "%s ", fnames[wfpath[j]]);
+					fprintf(stderr, "\n");
+					fprintf(stderr, "reason: unable to unify with type `%s'\n", t->name);
+	#ifdef	UNIFY_PATHS
+					funify_backtrace(stderr);
+	#endif
+					fprintf(stderr, "partly unified dag fragment from entity to be wellformed:\n");
+					fprint_dg(stderr, arcs[i]);fprintf(stderr, "\n");
+					fprintf(stderr, "dag type to be wellformed:\n");
+					fprint_dg(stderr, t->dg);fprintf(stderr, "\n");
+				}
+				return -1;
 			}
 			if(wellforming_th)
 				mark_as_updated();
@@ -487,6 +498,7 @@ void	wellform(struct dg	*d, char	*typename)
 		}
 		wfpl--;
 	}
+	return 0;
 }
 
 int	constrain_glbs_and_wellformedness()
@@ -525,7 +537,8 @@ int	constrain_glbs_and_wellformedness()
 		//printf("well-forming `%s', current dag:\n", default_th->types[i]->name);
 		//print_dg(default_th->types[i]->dg); printf("\n");
 		now_wellforming_type(default_th->types[i]);
-		wellform(default_th->types[i]->dg, default_th->types[i]->name);
+		int wellform_result = wellform(default_th->types[i]->dg, default_th->types[i]->name);
+		assert(wellform_result == 0);
 		descbytes += default_th->types[i]->ndescendents * sizeof(short);
 		//printf("after wellforming, final dag:\n");
 		//print_dg(default_th->types[i]->dg); printf("\n");

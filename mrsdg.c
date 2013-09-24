@@ -488,7 +488,11 @@ static void	semi_reformat_mrs_var(struct mrs_var	*var, int	forward)
 	if(var->semi_dg)return;
 	if(var->is_const)
 	{
-		if(!var->dg)dagify_mrs_var(var, NULL);
+		if(!var->dg)
+		{
+			int dagify_result = dagify_mrs_var(var, NULL);
+			assert(dagify_result == 0);
+		}
 		var->semi_dg = var->dg;
 		return;
 	}
@@ -556,7 +560,7 @@ void	semi_reformat_mrs(struct mrs	*m, int	forward)
 	set_default_type_hierarchy(tmp);
 }
 
-void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
+int	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 {
 	struct dg	*dg;
 	struct mrs_var *var;
@@ -569,6 +573,7 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 		var = evar;
 		dg = dagify_mrs_var1(var, skolem);
 		evar->dg = wellform_dg(dg);
+		if(evar->dg == NULL)return -1;
 	}
 	else
 	{
@@ -578,9 +583,10 @@ void	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 		evar->dg = atomic_dg(get_top()->name);
 		evar->dg->type = evar->dg->xtype = temporary_string_type(freeze_string(string));
 	}
+	return 0;
 }
 
-void dagify_mrs_ep(struct mrs_ep *ep)
+int dagify_mrs_ep(struct mrs_ep *ep)
 {
 	struct dg	*dg = atomic_dg("relation");	// XXX should this be configurable?
 	int			i;
@@ -600,6 +606,8 @@ void dagify_mrs_ep(struct mrs_ep *ep)
 		}
 	}
 	ep->dg = wellform_dg(dg);
+	if(ep->dg == NULL)return -1;
+	return 0;
 }
 
 struct dg	*dagify_rels_from_eps(int neps, struct mrs_ep	*eps[])

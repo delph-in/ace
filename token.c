@@ -94,6 +94,7 @@ void	build_token_dag(struct token	*t)
 	dg = dg_path_add(dg, token_postags_path, build_pos_tags_list(t->npostags, t->postags));
 	dg = dg_path_add(dg, token_posprobs_path, build_pos_prbs_list(t->npostags, t->postags));
 	dg = wellform_dg(dg);
+	assert(dg != NULL);
 	t->dg = dg;
 	//printf("token '%s' pos '%s'\n", t->string, t->postag);
 }

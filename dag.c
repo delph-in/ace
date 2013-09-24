@@ -670,8 +670,9 @@ struct dg	*wellform_dg(struct dg	*dg)
 	struct dg	*wfee;
 	// slight trick: wellform() only applies to stuff inside its argument, not to the top level.
 	wfee = atomic_dg(top_type); wfee = add_dg_hop(wfee, 1, dg);
-	wellform(wfee, "mrs variable");
-	return dg_hop(wfee, 1);
+	int result = wellform(wfee, "mrs variable");
+	if(result == 0)return dg_hop(wfee, 1);
+	else return NULL;
 }
 
 struct type	*most_general_type_for_feat(struct type_hierarchy	*th, int	feat)

@@ -376,13 +376,17 @@ int	generate(struct mrs	*mrs)
 	}
 	for(i=0;i<mrs->vlist.nvars;i++)
 	{
-		dagify_mrs_var(mrs->vlist.vars[i], skar[i]);
+		int dagify_result = dagify_mrs_var(mrs->vlist.vars[i], skar[i]);
+		if(dagify_result != 0)goto illformed;
 		//printf("dag for %s: \n", mrs->vlist.vars[i]->name);
 		//print_dg(mrs->vlist.vars[i]->dg);
 		//printf("\n");
 	}
 	for(i=0;i<mrs->nrels;i++)
-		dagify_mrs_ep(mrs->rels+i);
+	{
+		int dagify_result = dagify_mrs_ep(mrs->rels+i);
+		if(dagify_result != 0)goto illformed;
+	}
 	if(debug_level)printf("mrs-to-dg %.4f\n", timer());
 
 	if(g_profiling)start_and_alloc_profiler(&fixup_profiler, "fixup", generation_profiler, NULL);
@@ -555,6 +559,13 @@ int	generate(struct mrs	*mrs)
 		}
 		if(show_gen_chart)
 			lui_gen_chart(fixed_up_mrs);
+	}
+
+	if(0)
+	{
+		illformed:
+		itsdb_error("illformed input MRS");
+		fprintf(stderr, "WARNING: illformed input MRS\n");
 	}
 
 	if(tsdb_notes)tsdb_parse_note_end();

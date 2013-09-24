@@ -314,7 +314,8 @@ int	study_rule(char	*name, struct dg	*dg)
 	int	num = 0;
 	struct dg	*p;
 
-	wellform(dg, name);
+	int wellform_result = wellform(dg, name);
+	assert(wellform_result == 0);
 
 	p = dg_hop(dg, 0);	// ARGS
 	while(p)
@@ -357,7 +358,8 @@ int	study_lrule(char	*name, struct dg	*dg)
 	struct dg	*p;
 	extern char	*g_orth_def;
 
-	wellform(dg, name);
+	int wellform_result = wellform(dg, name);
+	assert(wellform_result == 0);
 
 	p = dg_hop(dg, 0);	// ARGS
 	while(p)

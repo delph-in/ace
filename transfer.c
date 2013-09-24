@@ -274,7 +274,8 @@ int	study_trigger_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	//printf("loading trigger rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
-	wellform(dg, "transfer rule");
+	int wellform_result = wellform(dg, "transfer rule");
+	assert(wellform_result == 0);
 	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg, output_override);
 	if(!tr)return -1;
 	trigger_rules = realloc(trigger_rules, sizeof(struct transfer_rule*)*(ntrigger_rules+1));
@@ -286,7 +287,8 @@ int	study_fixup_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	//printf("loading fixup rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
-	wellform(dg, "transfer rule");
+	int wellform_result = wellform(dg, "transfer rule");
+	assert(wellform_result == 0);
 	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg, output_override);
 	if(!tr)return -1;
 	fixup_rules = realloc(fixup_rules, sizeof(struct transfer_rule*)*(nfixup_rules+1));
@@ -298,7 +300,8 @@ int	study_cleanup_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	//printf("loading cleanup rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
-	wellform(dg, "transfer rule");
+	int wellform_result = wellform(dg, "transfer rule");
+	assert(wellform_result == 0);
 	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg, output_override);
 	if(!tr)return -1;
 	cleanup_rules = realloc(cleanup_rules, sizeof(struct transfer_rule*)*(ncleanup_rules+1));
@@ -310,7 +313,8 @@ int	study_transfer_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 {
 	//printf("loading transfer rule '%s'\n", name);
 	//printf("	dg type '%s'\n", dg->xtype->name);
-	wellform(dg, "transfer rule");
+	int wellform_result = wellform(dg, "transfer rule");
+	assert(wellform_result == 0);
 	struct transfer_rule	*tr = dg_to_transfer_rule(name, dg, output_override);
 	if(!tr)return -1;
 	transfer_rules = realloc(transfer_rules, sizeof(struct transfer_rule*)*(ntransfer_rules+1));
@@ -1386,14 +1390,20 @@ struct mrs	*reformat_mrs_for_transfer(struct mrs	*m)
 	int i;
 	for(i=0;i<m->vlist.nvars;i++)
 		if(!m->vlist.vars[i]->dg)
-			dagify_mrs_var(m->vlist.vars[i], NULL);
+		{
+			int dagify_result = dagify_mrs_var(m->vlist.vars[i], NULL);
+			assert(dagify_result == 0);
+		}
 		else
 		{
 			m->vlist.vars[i]->dg = p_dereference_dg(m->vlist.vars[i]->dg);
 			m->vlist.vars[i]->dg->gen = 0;	// if gen ==1 we stand a chance of dg_to_mrs_var() not extracting a new struct mrs_var, and worse still, the variable not making it onto the new_vlist.
 		}
 	for(i=0;i<m->nrels;i++)
-		dagify_mrs_ep(m->rels+i);
+	{
+		int dagify_result = dagify_mrs_ep(m->rels+i);
+		assert(dagify_result == 0);
+	}
 
 	struct mrs_vlist	new_vlist;
 
