@@ -1596,10 +1596,15 @@ int	snprint_dg(char	*str, int	maxlen, struct dg	*d)
 	return len;
 }
 
-void	print_dg(struct dg	*d)
+void	fprint_dg(FILE	*f, struct dg	*d)
 {
 	int	len = snprint_dg(NULL, 0, d);
 	char	*p = malloc(len+1);
 	snprint_dg(p, len+1, d);
-	fwrite(p, len, 1, stdout);
+	fwrite(p, len, 1, f);
+}
+
+void	print_dg(struct dg	*d)
+{
+	fprint_dg(stdout, d);
 }

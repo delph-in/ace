@@ -779,19 +779,21 @@ int	lookup_fname(char	*label)
 }
 
 #ifdef	UNIFY_PATHS
-void	unify_backtrace()
+void	funify_backtrace(FILE	*f)
 {
 	int	i;
 
-	fflush(stdout);
-	fprintf(stdout, "unify failed at path: ");
-	for(i=0;i<upathl;i++)fprintf(stdout, "%s ", fnames[upath[i]]);
-	fprintf(stdout, "\n");
-	fflush(stdout);
-	if(uglb) fprintf(stdout, "    inside glb constraint for `%s' depth %d\n", uglb->name, upathgl);
+	fflush(f);
+	fprintf(f, "unify failed at path: ");
+	for(i=0;i<upathl;i++)fprintf(f, "%s ", fnames[upath[i]]);
+	fprintf(f, "\n");
+	fflush(f);
+	if(uglb) fprintf(f, "    inside glb constraint for `%s' depth %d\n", uglb->name, upathgl);
 	if(ut1 && ut2)
-		fprintf(stdout, "  might have been trying to unify types %s + %s\n", ut1->name, ut2->name);
+		fprintf(f, "  might have been trying to unify types %s + %s\n", ut1->name, ut2->name);
 }
+
+void	unify_backtrace() { funify_backtrace(stdout); }
 
 char	*stringify_unify_failure_path()
 {

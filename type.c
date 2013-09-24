@@ -471,12 +471,12 @@ void	wellform(struct dg	*d, char	*typename)
 				fprintf(stderr, "\n");
 				fprintf(stderr, "reason: unable to unify with type `%s'\n", t->name);
 #ifdef	UNIFY_PATHS
-				unify_backtrace();
+				funify_backtrace(stderr);
 #endif
-				printf("partly unified dag fragment from entity to be wellformed:\n");
-				print_dg(arcs[i]);printf("\n");
-				printf("dag type to be wellformed:\n");
-				print_dg(t->dg);printf("\n");
+				fprintf(stderr, "partly unified dag fragment from entity to be wellformed:\n");
+				fprint_dg(stderr, arcs[i]);fprintf(stderr, "\n");
+				fprintf(stderr, "dag type to be wellformed:\n");
+				fprint_dg(stderr, t->dg);fprintf(stderr, "\n");
 				exit(-1);
 			}
 			if(wellforming_th)
