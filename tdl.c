@@ -1157,9 +1157,17 @@ int	lexify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 	extern int	study_lexeme(char	*name, struct dg	*dg, struct type	*t);
 
 	amp = strchr(rhs, '&');
-	if(!amp) { fprintf(stderr, "lexeme `%s': no & found\n", lhs); return -1; }
-	*amp = 0;
-	dag = trim_string(amp+1);
+	if(!amp)
+	{
+		//fprintf(stderr, "lexeme `%s': no & found\n", lhs); return -1;
+		dag = strdup("[ ]");
+	}
+	else
+	{
+		*amp = 0;
+		dag = trim_string(amp+1);
+	}
+
 	type = trim_string(rhs);
 
 	dg = dagify(dag, 0);
@@ -1362,9 +1370,16 @@ int	mtrify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 	char	*type, *amp, *dag;
 
 	amp = strchr(rhs, '&');
-	if(!amp) { fprintf(stderr, "transfer rule `%s': no & found\n", lhs); return -1; }
-	*amp = 0;
-	dag = trim_string(amp+1);
+	if(!amp)
+	{
+		//fprintf(stderr, "transfer rule `%s': no & found\n", lhs); return -1;
+		dag = strdup("[ ]");
+	}
+	else
+	{
+		*amp = 0;
+		dag = trim_string(amp+1);
+	}
 	type = trim_string(rhs);
 	struct dg	*tydg = type_dg(type);
 	if(!tydg) { fprintf(stderr, "transfer rule `%s' has nonextant type `%s'\n", lhs, type); return -1; }

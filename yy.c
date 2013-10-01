@@ -151,6 +151,7 @@ int	parse_yy(char	*yy)
 	int i, j;
 	char	notstart[tc->nvertices];
 	bzero(notstart, sizeof(notstart));
+	if(!tc->nvertices)goto skip;
 	tc->start = tc->end = NULL;
 	for(i=0;i<tc->nvertices;i++)
 	{
@@ -171,5 +172,9 @@ int	parse_yy(char	*yy)
 			else assert(!"YY mode: input token lattice had non-unique start vertex");
 		}
 	int rv = parse_with_token_chart(tc, start);
-	if(rv <= 0)printf("SKIP: (yy mode)\n");
+	if(rv <= 0)
+	{
+		skip:;
+		printf("SKIP: (yy mode)\n");
+	}
 }

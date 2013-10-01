@@ -358,7 +358,9 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	{
 		ltopf = lookup_fname("LTOP");
 		indexf = lookup_fname("INDEX");
-		xargf = lookup_fname("XARG");
+		if(feature_exists("XARG"))
+			xargf = lookup_fname("XARG");
+		else xargf = -1;
 		relsf = lookup_fname("RELS");
 		hconsf = lookup_fname("HCONS");
 	}
@@ -392,7 +394,8 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 		}
 		else mrs->ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
 		mrs->index = dg_to_mrs_var(dg_hop(hook, indexf), &mrs->vlist);
-		mrs->xarg = dg_to_mrs_var(dg_hop(hook, xargf), &mrs->vlist);
+		if(xargf != -1)mrs->xarg = dg_to_mrs_var(dg_hop(hook, xargf), &mrs->vlist);
+		else mrs->xarg = NULL;
 	}
 //	static int	rel_timer = -1;
 //	if(rel_timer == -1)rel_timer = new_timer("extract EPs");
