@@ -37,6 +37,8 @@ PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o)
 HIDDENPICOBJS=pic/timer.o
 APPOBJ=${OBJ} main.o post/post.o timer.o
 
+all: ace libace.so libace.a
+
 ace: ${APPOBJ}
 	${CC} ${EXPORT_DYNAMIC_CFLAG} ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm ${BOOST_REGEX_LIBS} -ldl ${LDFLAGS}
 
@@ -47,9 +49,11 @@ post/post.o:
 	${MAKE} -C post
 
 ${PICOBJS} : pic/%.o: %.c
+	mkdir -p pic
 	${CC} ${CFLAGS} -fPIC -c $< -o $@
 
 ${HIDDENPICOBJS} : pic/%.o: %.c
+	mkdir -p pic
 	${CC} ${CFLAGS} -fvisibility=hidden -fPIC -c $< -o $@
 
 libace.so: ${PICOBJS} ${HIDDENPICOBJS} post/post.o
@@ -57,7 +61,7 @@ libace.so: ${PICOBJS} ${HIDDENPICOBJS} post/post.o
 	gcc -shared ${PICOBJS} ${HIDDENPICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS} -ldl -lutil
 # note: -lutil cannot be compiled statically into a shared library, because the bozos that built it didn't use -fPIC...
 
-libace.a: libace.o ${OBJ}
+libace.a: ${PICOBJS} ${HIDDENPICOBJS} post/post.o
 	rm -f libace.a
 	ar cru libace.a ${PICOBJS} ${HIDDENPICOBJS} post/post.o
 	ranlib libace.a
