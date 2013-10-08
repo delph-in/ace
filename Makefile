@@ -40,7 +40,7 @@ APPOBJ=${OBJ} main.o post/post.o timer.o
 all: ace libace.so libace.a
 
 ace: ${APPOBJ}
-	${CC} ${EXPORT_DYNAMIC_CFLAG} ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm ${BOOST_REGEX_LIBS} -ldl ${LDFLAGS}
+	${CC} ${LDFLAGS} ${EXPORT_DYNAMIC_CFLAG} ${CFLAGS} ${APPOBJ} -o ace ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -lpthread -lm ${BOOST_REGEX_LIBS} -ldl
 
 static: ${APPOBJ}
 	${CC} -Wl,--dynamic-list=dylist.txt ${CFLAGS} ${APPOBJ} -Wl,-Bstatic -static ${POST_LIBS} ${REPP_LIBS} ${DELPHIN_LIBS} -static -lpthread -lm -L ~/local/lib/ -lboost_regex -lstdc++ -la -ldl -o ace.static
