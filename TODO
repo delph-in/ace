@@ -1,7 +1,6 @@
 TODO:
 
-+ YY-mode has a fatal error when blank line is given
-	+fixed
+- can run out of skolem constants if a grammar doesn't supply very many strings; work around this. maybe just fabricate our own skolem constants anyway?
 
 - make hardcoded path in instantiate_gle() configurable?
 
@@ -138,6 +137,8 @@ ideas:
 
 DONE:
 0.9.17
+	- fixed fatal error with blank lines for YY mode
+	- TDL input allows type-only definitions of instances (MTRs and lexemes)
 	- added generalization packing -- 30% or so speedup on Cathedral and Bazaar
 	- a lot of new LUI functionality
 	- allow multiple irregular forms for the same stem and the same rule
