@@ -249,6 +249,11 @@ int	parse_token_avm(struct hash	*taghash, struct dg	*d, char	**S)
 	// must freeze_string() because if the type becomes a new temporary string, it will point at the argument...
 	d = dereference_dg(d);
 	d->type = d->xtype = lookup_type(freeze_string(typename));
+	if(!d->type)
+	{
+		fprintf(stderr, "token structure had nonexistant type '%s'\n", typename);
+		return -1;
+	}
 	**S = delim;
 	skip_space(S);
 
@@ -276,7 +281,8 @@ int	parse_token_avm(struct hash	*taghash, struct dg	*d, char	**S)
 		}
 		struct dg	*dest = atomic_dg(top_type);
 		d = add_dg_hop(d, fnum, dest);
-		parse_token_avm(taghash, dest, S);
+		if(0 != parse_token_avm(taghash, dest, S))
+			return -1;
 		skip_space(S);
 	}
 
@@ -377,7 +383,19 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 				char	*cpy = strdup(tt->tokens[i]), *c = cpy;
 				struct hash	*taghash = hash_new("tags");
 				tok->dg = atomic_dg(top_type);
-				parse_token_avm(taghash, tok->dg, &c);
+				int parse_result = parse_token_avm(taghash, tok->dg, &c);
+				if(parse_result != 0)
+				{
+					if(error)
+					{
+						bzero(error,sizeof(*error));
+						error->type = reconsIncompatibleToken;
+						error->node = t;
+						error->comment = strdup("malformed token structure");
+					}
+					return NULL;
+				}
+				//printf("token dag is:\n"); print_dg(tok->dg); printf("\n");
 				hash_free(taghash);
 				free(cpy);
 				tpl[i] = tl+i;
