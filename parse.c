@@ -553,7 +553,7 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	signal(SIGALRM, alarm_handler);
 
 	if(timeout_seconds > 0)
-		alarm(timeout_seconds);	// XXX make this commandline configurable, and apply it to unpacking too
+		alarm(timeout_seconds);
 
 	stop_timer(chart_setup_timer, 1);
 	static int chart_parsing_timer = -1;

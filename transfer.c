@@ -4,6 +4,7 @@
 #include	<stdlib.h>
 #include	<sys/time.h>
 #include	<assert.h>
+#include	<signal.h>
 
 extern int max_unpack_megabytes;
 //#define	MAX_TRANSFER_CHUNKS	2560
@@ -30,6 +31,15 @@ extern int inhibit_vpm;
 extern int	instloc_feature;
 
 int	debug_transfer = 0;
+
+int	cancel_transfer;
+
+void	alarm_handler2(int	sig)
+{
+	fprintf(stderr, "NOTE: cancelling transfer, taking too long\n");
+	itsdb_error("timeout");
+	cancel_transfer = 1;
+}
 
 //int	saved_ntcopies = 0;
 //struct tcopy	*saved_tcopies = NULL;
@@ -136,11 +146,14 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 	}
 	else
 	{
-		extern int inhibit_vpm;
+		extern int inhibit_vpm, invent_ltop;
 		inhibit_vpm++;
+		int old_invent_ltop = invent_ltop;
+		invent_ltop = 0;
 		desc->mrs = cont_to_mrs(desc->dg);
 		desc->mrs = copy_mrs(desc->mrs);
 		patch_variable_types(desc->mrs);
+		invent_ltop = old_invent_ltop;
 		inhibit_vpm--;
 	}
 	erase_instlocs(desc->mrs);	// kill off all reentrancies between INSTLOCs.
@@ -766,6 +779,25 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	}
 	allow_unify_swapping = 1;
 
+	struct dg	*old_var_dg[mrs->vlist.nvars];
+	// get the location of every old var in the unified mrs/rule dag conglomeration
+	for(i=0;i<mrs->vlist.nvars;i++)
+		old_var_dg[i] = dereference_dg(mrs->vlist.vars[i]->dg);
+
+	// verify that no two variables dereference to the same DG;
+	// we used to use INSTLOCs to cause unification failures in such cases,
+	// but it's expensive to allocate so many INSTLOCs...
+	int j;
+	for(i=0;i<mrs->vlist.nvars;i++)
+		for(j=0;j<i;j++)
+			if(!mrs->vlist.vars[i]->is_const || !mrs->vlist.vars[i]->is_const)
+				if(old_var_dg[i] == old_var_dg[j])
+				{
+					//printf("match failed: %s%d & %s%d\n", mrs->vlist.vars[i]->type, i, mrs->vlist.vars[j]->type, j);
+					forget_tmp();
+					return -1;	// failure; two distinct input variables got unified together
+				}
+
 	if(count == total && hccount == hctotal)
 	{
 		// unification is complete; test the EQUAL and SUBSUME conditions
@@ -836,7 +868,7 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 			return -1;
 		}
 		*/
-		
+
 		// don't forget_tmp() if we succeeded with the match and it was a complete match.
 		return 0;
 	}
@@ -862,6 +894,7 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 			int	did_filter = 0;
 			int	filtercb(int	*filtalign, int *filthcalign) { did_filter = 1; return 1; }	// return of 1 indicates we don't care about more alignments; one is enough to say it was filtered.
 			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, hcplace, tr->input.nhcons + tr->context.nhcons + tr->filter.nhcons, hcalignment, filtercb, 1);
+			forget_tmp();
 			if(did_filter)
 			{
 				//printf("FILTER fired for rule '%s'.\n", tr->name);
@@ -1115,11 +1148,11 @@ void	skolemize_mrs(struct mrs	*m, int	equate_qeqs)
 	}
 }
 
-void	skolemize_for_transfer(struct mrs	*m)
+/*void	skolemize_for_transfer(struct mrs	*m)
 {
 	skolem_counter = 0;
 	skolemize_mrs(m, EQUATE_QEQS_FOR_TRANSFER);
-}
+}*/
 
 void	skolemize_for_generation(struct mrs	*m)
 {
@@ -1127,7 +1160,7 @@ void	skolemize_for_generation(struct mrs	*m)
 	skolemize_mrs(m, 1);
 }
 
-void	unskolemize_for_transfer(struct mrs	*m)
+/*void	unskolemize_for_transfer(struct mrs	*m)
 {
 	int	i;
 
@@ -1136,20 +1169,7 @@ void	unskolemize_for_transfer(struct mrs	*m)
 	if(m->ltop)destroy_existing_instlocs(m->ltop->dg);
 	if(m->index)destroy_existing_instlocs(m->index->dg);
 	if(m->xarg)destroy_existing_instlocs(m->xarg->dg);
-
-	/*// untweak the INSTLOC fields of the mrs variables
-
-	for(i=0;i<m->vlist.nvars;i++)
-	{
-		struct dg	*dg = m->vlist.vars[i]->dg;
-		if(!dg)continue;	// invented LTOP, INDEX, XARG
-		if(m->vlist.vars[i]->is_const)continue;
-
-		struct dg	*iloc = dg_hop(dg, instloc_feature);
-		assert(iloc != NULL);
-		iloc->type = iloc->xtype = get_top();
-	}*/
-}
+}*/
 
 check_mrs_var_is_on_vlist(struct mrs_var	*v, struct mrs_vlist	*vl)
 {
@@ -1246,7 +1266,7 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 	int	i, nresult = 0, nfires = 0;
 	struct mrs	**result = NULL;
 	int	pack_start = ts->n;
-	for(i=0;i<ts->n;i++)
+	for(i=0;i<ts->n && !cancel_transfer;i++)
 	{
 		extern int noldslabs;
 		if(noldslabs >= MAX_TRANSFER_CHUNKS)
@@ -1334,14 +1354,14 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 	if(semi_th && ALLOW_SEMI_MODE)
 		semi_reformat_mrs(m, 0);
 
-	skolemize_for_transfer(m);
+	//skolemize_for_transfer(m);
 
 	struct transfer_mrs_set	ts;
 	ts.n = 1;
 	ts.mrs = slab_alloc(sizeof(*m));
 	ts.mrs[0] = m;
 
-	for(i=0;i<nrules;i++)
+	for(i=0;i<nrules && !cancel_transfer;i++)
 	{
 		if(g_profiling)
 		{
@@ -1363,13 +1383,13 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 			stop_profiler(transfer_rule_profilers[i], nfires);
 	}
 
-	unskolemize_for_transfer(m);
+	//unskolemize_for_transfer(m);
 
 	// since we copy every output mrs, the following will actually work
 	// and will lead to less confusion for consumers
 	for(i=0;i<ts.n;i++)
 	{
-		unskolemize_for_transfer(ts.mrs[i]);
+		//unskolemize_for_transfer(ts.mrs[i]);
 		make_reliable_vnums(ts.mrs[i]);
 	}
 
@@ -1501,6 +1521,14 @@ int	transfer(struct mrs	*m)
 	m = reformat_mrs_for_transfer(m);
 	//printf("reformatted mrs:\n");
 	//print_mrs(m);
+
+	cancel_transfer = 0;
+	signal(SIGALRM, alarm_handler2);
+
+	extern int timeout_seconds;
+	if(timeout_seconds > 0)
+		alarm(timeout_seconds);
+
 	struct mrs	**results = NULL;
 	int	n = transfer_mrs(ntransfer_rules, transfer_rules, m, &results, 0);
 	int i;

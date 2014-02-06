@@ -25,7 +25,7 @@ extern int inhibit_vpm;
 void	compute_variable_mapping(struct mrs	*min, struct mrs_vlist	*new_vars, struct dg	**old_var_dg, struct mrs_var	**new_var_map)
 {
 	// see if any of the new variables are old variables in disguise.
-	// for truly new variables, issue a new INSTLOC.
+	// for truly new variables, issue a new INSTLOC. -- or don't, these days.
 	bzero(new_var_map, sizeof(struct mrs_var*)*min->vlist.nvars);
 	int i, j;
 	for(i=0;i<new_vars->nvars;i++)
@@ -41,8 +41,8 @@ void	compute_variable_mapping(struct mrs	*min, struct mrs_vlist	*new_vars, struc
 			v->semi_dg = vdg;	// ?? or should it be vdg = v->semi_dg?
 		vdg = dereference_dg(vdg);
 
-		struct dg	*iloc = dg_hop(vdg, instloc_feature);
-		assert(iloc != NULL);
+		//struct dg	*iloc = dg_hop(vdg, instloc_feature);
+		//assert(iloc != NULL);
 
 		// old_var_dg[]-based method of figuring out whether it's an old variable
 		int	noldvars = 0;
@@ -52,13 +52,13 @@ void	compute_variable_mapping(struct mrs	*min, struct mrs_vlist	*new_vars, struc
 				new_var_map[j] = v;
 				noldvars++;
 			}
-		if(!noldvars)
+		/*if(!noldvars)
 		{
 			// it may need to have an INSTLOC allocated
 			char	*ilt = iloc->xtype->name;
 			if(*ilt != '"')
 				iloc->xtype = iloc->type = transfer_next_skolem_constant();
-		}
+		}*/
 
 /*
 		// INSTLOC-based method of figuring out whether it's an old variable...
@@ -118,7 +118,7 @@ void	compute_variable_mapping(struct mrs	*min, struct mrs_vlist	*new_vars, struc
 	}
 }
 
-void	transfer_result_dg_to_mrs(struct transfer_rule	*tr, struct mrs_vlist	*new_vars, struct dg	**copy_ep_out_dgs, struct mrs_ep	*new_eps, struct dg	**copy_hc_hi, struct dg	**copy_hc_lo, struct mrs_var	**copy_hc_hi_v, struct mrs_var	**copy_hc_lo_v)
+void	transfer_result_dg_to_mrs(struct transfer_rule	*tr, struct mrs_vlist	*new_vars, struct dg	**copy_ep_out_dgs, struct mrs_ep	*new_eps, struct dg	**copy_hc_hi, struct dg	**copy_hc_lo, struct mrs_var	**copy_hc_hi_v, struct mrs_var	**copy_hc_lo_v, struct mrs	*mout, struct dg	*copy_ltop, struct dg	*copy_index, struct dg	*copy_xarg)
 {
 	int i;
 
@@ -150,6 +150,11 @@ void	transfer_result_dg_to_mrs(struct transfer_rule	*tr, struct mrs_vlist	*new_v
 		copy_hc_hi_v[i] = dg_to_mrs_var(copy_hc_hi[i], new_vars);
 		copy_hc_lo_v[i] = dg_to_mrs_var(copy_hc_lo[i], new_vars);
 	}
+
+	mout->ltop = dg_to_mrs_var(copy_ltop, new_vars);
+	mout->index = dg_to_mrs_var(copy_index, new_vars);
+	mout->xarg = copy_xarg?dg_to_mrs_var(copy_xarg, new_vars):NULL;
+
 	for(i=0;i<new_vars->nvars;i++)
 		new_vars->vars[i]->dg->copy = NULL;	// make sure dg_to_mrs_var in future passes doesn't return this by mistake
 	inhibit_vpm = 0;
@@ -157,10 +162,14 @@ void	transfer_result_dg_to_mrs(struct transfer_rule	*tr, struct mrs_vlist	*new_v
 
 void	transfer_top_level_variables(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, struct mrs_var	*(*map_variable)(struct mrs_var	*vin))
 {
+/*
 	// XXX shouldn't this be looking at tr->output.mrs->ltop etc?
+	// yes, it should. Dan sent a complaint about this behavior being broken Nov-14-2013.
 	mout->ltop = map_variable(min->ltop);
 	mout->index = map_variable(min->index);
 	mout->xarg = map_variable(min->xarg);
+	// these duties are now carried out by transfer_result_dg_to_mrs()
+*/
 }
 
 void	transfer_hcons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, int	*hcalignment, struct mrs_var	**copy_hc_hi_v, struct mrs_var	**copy_hc_lo_v, struct mrs_var	*(*map_variable)(struct mrs_var	*vin))
@@ -435,6 +444,10 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		copy_hc_lo[i] = find_copied(tr->output.mrs->hcons[i].lo->dg, 1);
 	}
 
+	struct dg	*copy_ltop = find_copied(tr->output.mrs->ltop->dg, 1);
+	struct dg	*copy_index = find_copied(tr->output.mrs->index->dg, 1);
+	struct dg	*copy_xarg = tr->output.mrs->xarg?find_copied(tr->output.mrs->xarg->dg, 1):NULL;
+
 	// we have now copied everything that we will copy;
 	// figure out where old variables' dags got copied to
 	for(i=0;i<min->vlist.nvars;i++)
@@ -456,18 +469,18 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	struct mrs_ep	new_eps[tr->output.neps];
 	struct mrs_vlist	new_vars;
 	bzero(&new_vars, sizeof(new_vars));
-	struct mrs_var	*vpbuffer[64];
+	struct mrs_var	*vpbuffer[1024];
 	new_vars.vars = vpbuffer;
-
-	transfer_result_dg_to_mrs(tr, &new_vars, copy_ep_out_dgs, new_eps, copy_hc_hi, copy_hc_lo, copy_hc_hi_v, copy_hc_lo_v);
-
-	// figure out what new variable each old variable maps to, if any, and assign skolem constants to new varibles
-	struct mrs_var	*new_var_map[min->vlist.nvars];
-	compute_variable_mapping(min, &new_vars, old_var_dg, new_var_map);
 
 	// put it all together into a result 'struct mrs'
 	struct mrs	*mout = slab_alloc(sizeof(*mout));
 	bzero(mout, sizeof(*mout));
+
+	transfer_result_dg_to_mrs(tr, &new_vars, copy_ep_out_dgs, new_eps, copy_hc_hi, copy_hc_lo, copy_hc_hi_v, copy_hc_lo_v, mout, copy_ltop, copy_index, copy_xarg);
+
+	// figure out what new variable each old variable maps to, if any [, and assign skolem constants to new varibles -- no longer?]
+	struct mrs_var	*new_var_map[min->vlist.nvars];
+	compute_variable_mapping(min, &new_vars, old_var_dg, new_var_map);
 
 	int ncarried_input_variables = 0;
 	char	input_variable_is_carried[1024];//min->vlist.nvars];
