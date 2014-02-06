@@ -187,8 +187,8 @@ void	print_lexical_chart(struct lattice	*tc)
 	{
 		struct lattice_edge	*e = tc->edges[i];
 		struct edge	*t = e->edge;
-		printf("lexical le %p vtx [%d-%d] lexeme '%s'\n",
-			e, e->from->id, e->to->id, t->lex->word);
+		printf("lexical edge #%d le %p vtx [%d-%d] lexeme '%s'\n",
+			t->id, e, e->from->id, e->to->id, t->lex->word);
 	}
 }
 

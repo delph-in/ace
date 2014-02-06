@@ -225,7 +225,8 @@ void	output_lui_chart(struct lattice	*token_lattice)
 		e->unpack = (void*)0x1;
 		if(e->rule)
 		{
-			struct dg *rn = dg_hop(e->rule->dg, lookup_fname("RNAME"));
+			struct dg *rn = feature_exists("RNAME")?
+				dg_hop(e->rule->dg, lookup_fname("RNAME")):NULL;
 			char *symb = strdup(rn?rn->xtype->name:e->rule->name);
 			if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
 			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, symb, e->rule->name);
@@ -983,7 +984,8 @@ extern int inhibit_pack;
 		}
 		if(e->rule)
 		{
-			struct dg *rn = dg_hop(e->rule->dg, lookup_fname("RNAME"));
+			struct dg *rn = feature_exists("RNAME")?
+				dg_hop(e->rule->dg, lookup_fname("RNAME")):NULL;
 			char *symb = strdup(rn?rn->xtype->name:e->rule->name);
 			if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
 			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, symb, e->rule->name);

@@ -47,7 +47,8 @@ extern int	mrs_enable_icons;
 extern int	icons_left_feature, icons_right_feature;
 
 extern struct path	rels_list_path, hcons_list_path, icons_list_path, hook_path;
-struct path	recursive_label_path_in_sign, recursive_label_path_in_label;
+extern struct path	recursive_label_path_in_sign, recursive_label_path_in_label;
+extern struct path	label_path;
 
 struct dg	*dg_path(struct dg	*dg, struct path	p);
 struct dg	*dg_path_add(struct dg	*dg, struct path	p, struct dg	*add);

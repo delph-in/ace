@@ -69,6 +69,8 @@ struct edge
 	int			ntries;
 	int			npack;
 	struct edge	**pack;
+
+	double	max_inside_score, max_score;
 };
 
 struct chart_cell
