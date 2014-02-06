@@ -750,6 +750,12 @@ int pred_subsumes(char *in, char *out)
 	struct type_hierarchy	*th = default_type_hierarchy();
 	struct type *tin, *tout;
 	if(!strcasecmp(in, out))return 1;
+	extern int semindex_ignore_quotes;
+	if(semindex_ignore_quotes)
+	{
+		if(in[0]=='"' && out[0]!='"' && !strncasecmp(in+1, out, strlen(out)) && strlen(in) == strlen(out)+2)return 1;
+		if(out[0]=='"' && in[0]!='"' && !strncasecmp(out+1, in, strlen(in)) && strlen(out) == strlen(in)+2)return 1;
+	}
 	if(g_mrs_test_demand_equality)return 0;
 	if(in[0]=='"')return 0;	// strings don't subsume anything but themself
 	tin = lookup_type(in);

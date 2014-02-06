@@ -60,6 +60,7 @@ struct semindex_pred_node
 
 struct semindex_pred_node	*lookup_semindex(char *predn, int alloc);
 void						add_relative_to_spn(struct semindex_pred_node *rel, struct semindex_pred_node *node);
+int	semindex_ignore_quotes = 1;
 
 static struct hash	*sindex;
 
@@ -360,7 +361,8 @@ int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
 {
 	char						*carg = ep_has_carg(ep);
 	struct semindex_pred_node	*node = lookup_semindex(ep->pred, 0), *cnode;
-	int							i, count = 0;
+	int							i, count = 0, altquoted = 0;
+	char	alt_pred[1024];
 
 	//printf("activating '%s' with carg '%s'\n", ep->pred, carg);
 
@@ -368,6 +370,7 @@ int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
 	if(node)
 	{
 		int local_count = 0;
+		revisit:
 		for(i=0;i<node->nrelatives;i++)
 		{
 			// note: generating with GG requires adding signs with *less* specific predicates, which can be constrained by other signs.
@@ -385,6 +388,14 @@ int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
 		local_count += activate_semindex_node(node, ep, Rest);
 		count += local_count;
 		//printf("local activated count = %d\n", local_count);
+	}
+	if(semindex_ignore_quotes && strlen(ep->pred)<1020 && !altquoted)
+	{
+		if(ep->pred[0]=='"')sprintf(alt_pred, "%.*s", (int)strlen(ep->pred)-2, ep->pred+1);
+		else sprintf(alt_pred, "\"%s\"", ep->pred);
+		node = lookup_semindex(alt_pred, 0);
+		altquoted = 1;
+		if(node)goto revisit;
 	}
 	if(carg)
 	{

@@ -581,10 +581,12 @@ int	dagify_mrs_var(struct mrs_var	*evar, struct dg	*skolem)
 	else
 	{
 		// dagify a const? hmm.
-		char	string[strlen(evar->name)+10];
-		sprintf(string, "%.*s", (int)(strlen(evar->name)-2), evar->name+1);
+		//char	string[strlen(evar->name)+10];
+		//sprintf(string, "%.*s", (int)(strlen(evar->name)-2), evar->name+1);
 		evar->dg = atomic_dg(get_top()->name);
-		evar->dg->type = evar->dg->xtype = temporary_string_type(freeze_string(string));
+		//evar->dg->type = evar->dg->xtype = temporary_string_type(freeze_string(string));
+		// we want to keep the quotes, actually...
+		evar->dg->type = evar->dg->xtype = lookup_type(evar->name);
 	}
 	return 0;
 }
@@ -594,7 +596,17 @@ int dagify_mrs_ep(struct mrs_ep *ep)
 	struct dg	*dg = atomic_dg("relation");	// XXX should this be configurable?
 	int			i;
 
-	dg = add_dg_feature(dg, "PRED", atomic_dg(ep->pred));
+	struct type	*predtype = lookup_type(ep->pred);
+	if(!predtype)
+	{
+		char	*strpred = slab_alloc_unaligned(strlen(ep->pred)+3);
+		sprintf(strpred, "\"%s\"", ep->pred);
+		predtype = lookup_type(strpred);
+		assert(predtype != NULL);	// temporary string types are auto-added; should never fail.
+	}
+	struct dg	*preddg = atomic_dg(top_type);
+	preddg->type = preddg->xtype = predtype;
+	dg = add_dg_feature(dg, "PRED", preddg);
 	dg = add_dg_feature(dg, "LBL", ep->lbl->dg);
 	for(i=0;i<ep->nargs;i++)
 	{

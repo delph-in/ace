@@ -137,6 +137,9 @@ ideas:
 - now that post-model-path config option exists, Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 DONE:
+0.9.18
+	- make transfer not use INSTLOC for matching
+	- make generation insensitive to presense/absense of "" on input EPs
 0.9.17
 	- fixed fatal error with blank lines for YY mode
 	- TDL input allows type-only definitions of instances (MTRs and lexemes)
