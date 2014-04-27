@@ -373,13 +373,22 @@ int	constrain_type(char	*name, struct dg	*dg)
 {
 	struct type	*type = lookup_type(name);
 
+	assert(dg != NULL);
 	if(!type)
 	{
 		fprintf(stderr, "type: tried to constrain type `%s' which doesn't exist yet\n", name);
 		return -1;
 	}
 	if(!dg)type->dg = atomic_dg(name);
-	else type->dg = copy_dg(dg);
+	else
+	{
+		type->dg = copy_dg(dg);
+		if(!type->dg)
+		{
+			fprintf(stderr, "type: cyclic dag specified for type `%s'\n", name);
+			return -1;
+		}
+	}
 
 	type->dg->type = type->dg->xtype = type;
 
@@ -449,6 +458,7 @@ int	wellform(struct dg	*d, char	*typename)
 			if(debug_level || g_mode==-1)
 			{
 				fprintf(stderr, "well-formedness: no type is compatible with features and type of `%s'\n", arcs[i]->xtype->name);
+				fprintf(stderr, "	while processing `%s'\n", typename);
 			}
 			return -1;
 		}
