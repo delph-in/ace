@@ -760,6 +760,7 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 	}
 
 	// third step: remove input edge structures
+	// first reduce all the possible-maps (while input_ids[] is stable)
 	for(i=0;i<r->ninput;i++)
 	{
 		for(j=0;j<r->noutput;j++)
@@ -767,6 +768,14 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 				break;
 		if(j<r->noutput)continue;
 		update_possible_map_remove(lat, input_ids[i], r);
+	}
+	// next actually remove the edges from the lattice (which can change input_ids[])
+	for(i=0;i<r->ninput;i++)
+	{
+		for(j=0;j<r->noutput;j++)
+			if(save_le[j] == inputs[i])
+				break;
+		if(j<r->noutput)continue;
 		remove_lattice_edge(lat, inputs[i]);
 		did_remove++;
 	}
@@ -1084,6 +1093,7 @@ void	update_possible_map_add(struct lattice	*lat, int	id, struct lattice_edge	*e
 void	update_possible_map_remove(struct lattice	*lat, int	id, struct lattice_rule	*r)
 {
 	if(!possible_map)return;
+	assert(id>=0 && id<lat->nedges);
 	int	rowsize = (r->ninput + r->ncontext);
 	char	*dead_row = &possible_map[0 + rowsize*id];
 	int		rows_after_dead_row = lat->nedges - (id+1);
