@@ -652,7 +652,7 @@ void	preprocess_line(char	*string, int	*Nwords, char	***Words, int	**CFrom, int	
 
 int	parse_line1(char	*line)
 {
-	char	copy[10240];
+	char	*copy;
 	int	nparse = 0;
 	int	nwords = 0, i, j;
 	int		*cfrom = NULL, *cto = NULL;
@@ -695,7 +695,7 @@ int	check_mbs(char	*mbs);
 		return -1;
 	}
 
-	strcpy(copy, line);
+	copy = strdup(line);
 
 	preprocess_line(copy, &nwords, &words, &cfrom, &cto);
 	if(preprocess_only)
@@ -712,10 +712,10 @@ int	check_mbs(char	*mbs);
 		goto finished;
 	}
 
-	if(nwords>1000)
+	if(nwords>200)
 	{
-		fprintf(stderr, "NOTE: 0 readings, too many words (1000+)\n");
-		itsdb_error("too many words (1000+ before token mapping)");
+		fprintf(stderr, "NOTE: 0 readings, too many words (200+)\n");
+		itsdb_error("too many words (200+ before token mapping)");
 		if(!inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
 		goto finished;
 	}
@@ -742,6 +742,7 @@ finished:
 	if(words)free(words);
 	if(cfrom)free(cfrom);
 	if(cto)free(cto);
+	free(copy);
 	return nparse;
 }
 
