@@ -395,7 +395,7 @@ void interactive_unify(char	*command)
 	assert(end != NULL);
 	*end++ = 0;
 
-	//printf("should unify part of %s with part of %s\n", left_id, right_id);
+	//fprintf(stderr, "should unify part of %s with part of %s\n", left_id, right_id);
 	struct dg	*left_dg = lui_find_dg(left_id);
 	struct dg	*right_dg = lui_find_dg(right_id);
 	struct dg	*original_right_dg = right_dg;
@@ -459,7 +459,10 @@ void	output_lui_dg_id_with_failure(struct dg	*dg, char *wtitle, int	id, struct p
 	dup2(lui_wfd, 1);
 
 	fprintf(lui_write, "avm %d ", id); fflush(lui_write);
+	extern int quoted_number_types;
+	quoted_number_types = 1;
 	print_dg(dg); fflush(stdout);
+	quoted_number_types = 0;
 	extern int upathl, upath[];
 	extern struct type	*ut1, *ut2, *uglb;
 	fprintf(lui_write, " \"%s\" [ #U[%s 1 [", wtitle?wtitle:"ACE DAG", uglb?"constraint":"type");
