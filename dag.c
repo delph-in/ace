@@ -700,7 +700,7 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 		{
 			fprintf(stderr, "ERROR: tried to wellform a dag containing feature `%s', "
 					"which was never introduced in the type heirarchy\n", fnames[d->label[i]]);
-			exit(-1);
+			return NULL;
 		}
 		ty = th->types[k];
 		/*if(k>intro)
@@ -715,10 +715,11 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 		{
 			struct type *nup;
 			nup = glb(up, ty);
-			if(!up)
+			if(!nup)
 			{
 				fprintf(stderr, "type inference:  no glb for `%s' and `%s'\n", up->name, ty->name);
-				exit(-1);
+				for(i=0;i<d->narcs;i++)fprintf(stderr, "  %s	appropriate to %s\n", fnames[d->label[i]], th->types[introduce[d->label[i]]]->name);
+				return NULL;
 			}
 			up = nup;
 		}
