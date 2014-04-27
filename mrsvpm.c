@@ -91,6 +91,7 @@ struct vpm	*load_vpm(char	*path)
 	if(!f)
 	{
 		perror(path);
+		exit(-1);
 		return NULL;
 	}
 	vpm.filename = freeze_string(path);
@@ -118,6 +119,7 @@ struct vpm	*load_vpm(char	*path)
 		{
 			syntax:
 			fprintf(stderr, "vpm: syntax error on line %d, LHS op RHS expected\n", lnum);
+			exit(-1);
 			return NULL;
 		}
 
@@ -173,6 +175,7 @@ struct vpm	*load_vpm(char	*path)
 			{
 				fprintf(stderr, "vpm: syntax error on line %d, %d/%d context but %d/%d rule\n",
 					lnum, ctx->ninput, ctx->noutput, iop, nargs-iop-1);
+				exit(-1);
 				return NULL;
 			}
 			r.direction = directionality;
