@@ -406,3 +406,11 @@ int	load_labels()
 	}
 	return 0;
 }
+
+void	lui_instance(char	*name)
+{
+	struct dg *d = find_instance(name);
+	if(d)
+		output_lui_dg(d, name);
+	else printf("no such\n");
+}

@@ -308,6 +308,8 @@ handle_lui_colon_command(char	*line)
 		lui_rule(line+3);
 	if(line[1]=='l' && line[2]==' ')
 		lui_lex(line+3);
+	if(line[1]=='i' && line[2]==' ')
+		lui_instance(line+3);
 	if(line[1]=='t' && line[2]==' ')
 		lui_type(line+3);
 	if(line[1]=='h' && line[2]==' ')
