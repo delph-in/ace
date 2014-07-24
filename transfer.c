@@ -33,6 +33,7 @@ extern int	instloc_feature;
 int	debug_transfer = 0;
 
 int	cancel_transfer;
+char	*transfer_config_path = NULL;
 
 void	alarm_handler2(int	sig)
 {
@@ -257,6 +258,7 @@ struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg, struct dg	*
 	tr->optional = optdg?(!strcmp(optdg->xtype->name, "+")):0;
 	tr->dg = dg;
 	tr->output_override = output_override;
+	tr->disabled = 0;
 	warn_about_equals(tr);
 	/*int i;
 	for(i=0;i<saved_ntcopies;i++)
@@ -372,6 +374,7 @@ struct transfer_rule	*freeze_transfer_rule(struct transfer_rule	*tr)
 	fr->dg = freeze_dg(tr->dg);
 	fr->output_override = freeze_dg(tr->output_override);
 	fr->optional = tr->optional;
+	fr->disabled = 0;
 	//fr->ncopy = tr->ncopy;
 	//fr->copy = freeze_block(tr->copy, sizeof(int)*fr->ncopy);
 	return fr;
@@ -495,6 +498,25 @@ void	recover_transfer(void	*transfer)
 	clear_slab();
 	clear_mrs();
 	//printf("recover: %s\n", non_idiom_root);
+
+	if(g_transfer && transfer_config_path)
+	{
+		FILE	*f = fopen(transfer_config_path,"r");
+		if(!f){perror(transfer_config_path);exit(-1);}
+		char	line[1024];
+		for(i=0;i<ntransfer_rules;i++)
+			transfer_rules[i]->disabled = 1;
+		while(fgets(line,1023,f))
+		{
+			char	*name = trim_string(line);
+			for(i=0;i<ntransfer_rules;i++)
+			{
+				if(!strcmp(name,transfer_rules[i]->name))
+					transfer_rules[i]->disabled = 0;
+			}
+		}
+		fclose(f);
+	}
 }
 
 struct mrs_ep_desc	place_in_transfer_rule(struct transfer_rule	*tr, int	pl)
@@ -1363,6 +1385,7 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 
 	for(i=0;i<nrules && !cancel_transfer;i++)
 	{
+		if(rules[i]->disabled)continue;
 		if(g_profiling)
 		{
 			if(!transfer_rule_profilers)

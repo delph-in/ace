@@ -67,6 +67,8 @@ int	disable_subsumption_test = 0;
 int report_labels = 0;
 extern int equivalence_packing_only;
 
+extern char	*transfer_config_path;
+
 int	max_chart_megabytes = 1200, max_unpack_megabytes = 1500;
 int preexisting_lui_fd = -1;
 int input_from_lui = 0;
@@ -145,6 +147,8 @@ void	parse_args(int	argc, char	*argv[])
 		{"tnt-max-tags", 1, NULL, TNT_MAX_TAGS_OPTION},
 #define	TIMEOUT_OPTION			1006
 		{"timeout", 1, NULL, TIMEOUT_OPTION},
+#define	TRANSFER_CONFIG_OPTION	1007
+		{"transfer-config", 1, NULL, TRANSFER_CONFIG_OPTION},
 		{NULL,0,NULL,0}
 		};
 
@@ -192,6 +196,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	TNT_MODEL_OPTION:	enable_tnt = 1; tnt_model_path = optarg; break;
 		case	TNT_MAX_TAGS_OPTION: tnt_max_tags = atoi(optarg); break;
 		case	TIMEOUT_OPTION: timeout_seconds = atoi(optarg); break;
+		case	TRANSFER_CONFIG_OPTION: transfer_config_path = optarg; break;
 		case	0:	continue;	// auto-handled long option
 	} }
 	if(optind<argc-1)goto usage;

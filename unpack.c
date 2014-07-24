@@ -199,6 +199,7 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 		dec[i].nsi = 0;
 		dec[i].asi = 0;
 		dec[i].is_scored = 0;
+		dec[i].failed = dec[i].checked = 0;
 	}
 
 	n = 0;
@@ -481,7 +482,7 @@ static inline void checkup(struct hypothesis *h)
 		for(i=0;i<h->arity;i++)
 		{
 			checkup(h->rhslist[i]);
-			if(h->rhslist[i]->dg == (void*)1)
+			if(h->rhslist[i]->dg == (void*)1 || h->dec->failed)
 			{
 				h->dg = (void*)1;
 				return;
@@ -839,7 +840,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 		if(0 != instantiate_hypothesis(h->rhslist[i]))
 		{
 			h->dg = (void*)1;
-			DEBUG("edge #%d fail on daughter %d\n", h->edge->id, i);
+			DEBUG("edge #%d fail on daughter %d = #%d\n", h->edge->id, i, h->rhslist[i]->edge->id);
 			return -1;
 		}
 	if(!h->string)
@@ -870,12 +871,27 @@ int instantiate_hypothesis(struct hypothesis *h)
 			for(i=0;i<arity;i++)
 				if(unify_dg_tmp(h->rhslist[i]->dg, rdg, i))
 				{
-					/*printf("when combining edges #%d and #%d under rule %s\n",
-						h->edge->id, h->rhslist[i]->edge->id, h->edge->rule->name);
-					unify_backtrace();
-					print_hypothesis(h, printf, 0); printf("\n\n");*/
+					//printf("when combining edges #%d and #%d under rule %s\n",
+					//	h->edge->id, h->rhslist[i]->edge->id, h->edge->rule->name);
+					//unify_backtrace();
+					//print_hypothesis(h, printf, 0); printf("\n\n");
 					forget_tmp();
 					h->dg = (void*)1;
+					/*if(!(h->dec->checked & (1<<i)))
+					{
+						// experiment to see whether the un-reconstructed edges fit...
+						int k;
+						struct edge	*d = h->dec->rhs[i];
+						int res = unify_dg_tmp(d->dg, rdg, i);
+						forget_tmp();
+						if(res != 0)
+						{
+							//printf(" experiment found a local failure: #%d[%d] != #%d\n", h->edge->id, i, d->id);
+							h->dec->failed |= 1<<i;
+						}
+						else h->dec->failed &= ~(1<<i);
+						h->dec->checked |= 1<<i;
+					}*/
 					return -1;
 				}
 			if(g_mode == GENERATING)

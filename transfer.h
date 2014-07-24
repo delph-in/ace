@@ -48,6 +48,7 @@ struct transfer_rule
 	/*int	ncopy;
 	int	*copy;
 	char	*output_copy_map;*/
+	int	disabled;
 };
 
 extern int g_transfer;

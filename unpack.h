@@ -11,6 +11,9 @@ struct decomposition
 	float	local_score;
 	double	all_unpackings_z;
 	int		is_scored;
+
+	int		checked;	// bitfield for whether local unification has been verified
+	int		failed;		// bitfield for whether local unification verification failed
 };
 
 struct hypothesis
