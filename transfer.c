@@ -32,6 +32,8 @@ extern int	instloc_feature;
 
 int	debug_transfer = 0;
 
+int	transfer_enable_qeq_bridge = 1;
+
 int	cancel_transfer;
 char	*transfer_config_path = NULL;
 
@@ -673,6 +675,19 @@ int satisfiable_hconses(struct transfer_rule	*tr, int idx, int	need, struct mrs	
 	return 0;
 }
 
+int	transfer_qeq_bridge(struct mrs	*m, struct mrs_var	*x, struct mrs_var	*y)
+{
+	int i;
+	if(!transfer_enable_qeq_bridge)return 0;
+	for(i=0;i<m->nhcons;i++)
+		if(m->hcons[i].type == hcons_qeq)
+		{
+			if(m->hcons[i].hi == x && m->hcons[i].lo == y)return 1;
+			if(m->hcons[i].hi == y && m->hcons[i].lo == x)return 1;
+		}
+	return 0;
+}
+
 int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total, int	hccount, int	*hcalignment, int	hctotal, int is_filter)
 {
 	int	i;
@@ -813,9 +828,9 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	for(i=0;i<mrs->vlist.nvars;i++)
 		for(j=0;j<i;j++)
 			if(!mrs->vlist.vars[i]->is_const || !mrs->vlist.vars[i]->is_const)
-				if(old_var_dg[i] == old_var_dg[j])
+				if(old_var_dg[i] == old_var_dg[j] && !transfer_qeq_bridge(mrs, mrs->vlist.vars[i], mrs->vlist.vars[j]))
 				{
-					//printf("match failed: %s%d & %s%d\n", mrs->vlist.vars[i]->type, i, mrs->vlist.vars[j]->type, j);
+					//printf("match failed [%s]: %s%d & %s%d\n", tr->name, mrs->vlist.vars[i]->type, i, mrs->vlist.vars[j]->type, j);
 					forget_tmp();
 					return -1;	// failure; two distinct input variables got unified together
 				}
@@ -1182,7 +1197,7 @@ void	skolemize_for_generation(struct mrs	*m)
 	skolemize_mrs(m, 1);
 }
 
-/*void	unskolemize_for_transfer(struct mrs	*m)
+void	unskolemize_for_transfer(struct mrs	*m)
 {
 	int	i;
 
@@ -1191,7 +1206,7 @@ void	skolemize_for_generation(struct mrs	*m)
 	if(m->ltop)destroy_existing_instlocs(m->ltop->dg);
 	if(m->index)destroy_existing_instlocs(m->index->dg);
 	if(m->xarg)destroy_existing_instlocs(m->xarg->dg);
-}*/
+}
 
 check_mrs_var_is_on_vlist(struct mrs_var	*v, struct mrs_vlist	*vl)
 {
@@ -1406,13 +1421,13 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 			stop_profiler(transfer_rule_profilers[i], nfires);
 	}
 
-	//unskolemize_for_transfer(m);
+	unskolemize_for_transfer(m);
 
 	// since we copy every output mrs, the following will actually work
 	// and will lead to less confusion for consumers
 	for(i=0;i<ts.n;i++)
 	{
-		//unskolemize_for_transfer(ts.mrs[i]);
+		unskolemize_for_transfer(ts.mrs[i]);
 		make_reliable_vnums(ts.mrs[i]);
 	}
 

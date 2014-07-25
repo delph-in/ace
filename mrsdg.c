@@ -482,6 +482,7 @@ struct dg	*dagify_mrs_var1(struct mrs_var	*var, struct dg	*skolem)
 		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
 	}
 	if(!skolem)skolem = copy_dg(default_type_hierarchy()->top->dg);
+	//else printf("skolemizing %s%d as %s\n", var->type, var->vnum, skolem->xtype->name);
 	dg = add_dg_hop(dg, instloc_feature, skolem);
 	return dg;
 }
