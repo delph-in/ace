@@ -688,6 +688,26 @@ int	transfer_qeq_bridge(struct mrs	*m, struct mrs_var	*x, struct mrs_var	*y)
 	return 0;
 }
 
+int	transfer_missing_roles(struct mrs_ep_desc	*rule, struct mrs_ep	*ep)
+{
+	int	i;
+	for(i=0;i<rule->dg->narcs;i++)
+	{
+		extern char	*ep_drop;
+		extern char	**fnames;
+		if(ep_drop[rule->dg->label[i]])continue;
+		char	*label = fnames[rule->dg->label[i]];
+		if(!strcmp(label, "PRED"))continue;
+		if(!strcmp(label, "LBL"))continue;
+		if(!mrs_find_ep_role(ep, label))
+		{
+			//printf("CAUGHT: %s has no %s\n", ep->pred, label);
+			return 1;
+		}
+	}
+	return 0;
+}
+
 int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total, int	hccount, int	*hcalignment, int	hctotal, int is_filter)
 {
 	int	i;
@@ -763,6 +783,7 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	{
 		struct mrs_ep	*ep = &mrs->rels[align[i]];
 		struct mrs_ep_desc	de = place_in_transfer_rule(tr, i);
+		if(transfer_missing_roles(&de, ep)) { forget_tmp(); allow_unify_swapping = 1; return -1; }
 		//if(0 != unify_dg_tmp(ep->dg, de.dg, -1))
 		if(0 != unify_dg_tmp(de.dg, ep->dg, -1))
 		{
@@ -827,7 +848,7 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	int j;
 	for(i=0;i<mrs->vlist.nvars;i++)
 		for(j=0;j<i;j++)
-			if(!mrs->vlist.vars[i]->is_const || !mrs->vlist.vars[i]->is_const)
+			if(!mrs->vlist.vars[i]->is_const || !mrs->vlist.vars[j]->is_const)
 				if(old_var_dg[i] == old_var_dg[j] && !transfer_qeq_bridge(mrs, mrs->vlist.vars[i], mrs->vlist.vars[j]))
 				{
 					//printf("match failed [%s]: %s%d & %s%d\n", tr->name, mrs->vlist.vars[i]->type, i, mrs->vlist.vars[j]->type, j);
