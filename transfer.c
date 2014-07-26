@@ -783,7 +783,9 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	{
 		struct mrs_ep	*ep = &mrs->rels[align[i]];
 		struct mrs_ep_desc	de = place_in_transfer_rule(tr, i);
-		if(transfer_missing_roles(&de, ep)) { forget_tmp(); allow_unify_swapping = 1; return -1; }
+		// in general, transfer rules *are* allowed to match when a specified role isn't present on the target EP...
+		// when SUBSUME or EQUAL are used, then the role must actually be present.
+		//if(transfer_missing_roles(&de, ep)) { forget_tmp(); allow_unify_swapping = 1; return -1; }
 		//if(0 != unify_dg_tmp(ep->dg, de.dg, -1))
 		if(0 != unify_dg_tmp(de.dg, ep->dg, -1))
 		{

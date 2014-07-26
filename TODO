@@ -138,7 +138,6 @@ ideas:
 
 DONE:
 0.9.19
-	- more transfer bug fixes; prevent matching EPs with missing roles
 	- add configuration:  transfer-qeq-bridge := true.  (by default)
 0.9.18
 	- make transfer not use INSTLOC for matching
