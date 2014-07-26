@@ -137,6 +137,9 @@ ideas:
 - now that post-model-path config option exists, Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 DONE:
+0.9.19
+	- more transfer bug fixes; prevent matching EPs with missing roles
+	- add configuration:  transfer-qeq-bridge := true.  (by default)
 0.9.18
 	- make transfer not use INSTLOC for matching
 	- make generation insensitive to presense/absense of "" on input EPs

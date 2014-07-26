@@ -55,6 +55,8 @@ int			freezer_megabytes = 256;
 
 struct path	recursive_label_path_in_sign, recursive_label_path_in_label;
 
+extern int	transfer_enable_qeq_bridge;
+
 struct dg	*dg_path(struct dg	*dg, struct path	p)
 {
 	int i;
@@ -216,6 +218,7 @@ struct conf
 				recursive_label_path_in_label;
 
 	char	*transfer_input_relation_prefix;
+	int		transfer_enable_qeq_bridge;
 };
 
 struct path	freeze_path(struct path	p)
@@ -256,6 +259,7 @@ void	*freeze_conf()
 	c->generating_packing = freeze_block(generating_packing, restrictor_size);
 	c->restrictor_size = restrictor_size;
 	c->ep_drop = freeze_block(ep_drop, restrictor_size);
+	c->transfer_enable_qeq_bridge = transfer_enable_qeq_bridge;
 
 	if(!g_transfer)
 	{
@@ -342,6 +346,7 @@ void	recover_conf(void	*vc)
 	restrictor_size = c->restrictor_size;
 	ep_drop = c->ep_drop;
 	reload_restrictors = (restrictor_size != nfnames);
+	transfer_enable_qeq_bridge = c->transfer_enable_qeq_bridge;
 
 	if(!g_transfer)
 	{
@@ -499,6 +504,8 @@ int	load_conf()
 		icons_left_feature = lookup_fname(get_conf("icons-left")?:"IC-LEFT");
 		icons_right_feature = lookup_fname(get_conf("icons-right")?:"IC-RIGHT");
 	}
+
+	transfer_enable_qeq_bridge = get_conf_bool("transfer-qeq-bridge", 1);
 
 	recover_conf(freeze_conf());
 }
