@@ -1032,7 +1032,7 @@ struct lexeme	*get_leaf_lex(struct hypothesis	*hyp)
 	return hyp->edge->lex;
 }
 
-void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...), int	labelled)
+void print_hypothesis_from(struct hypothesis *hyp, int (*print)(const char *fmt,...), int	labelled, int	_from)
 {
 	void	print_tree0(struct hypothesis *hyp, int from, char	**genwordforms)
 	{
@@ -1127,12 +1127,17 @@ void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...),
 	//struct slab_state	st;
 	//get_slabstate(&st);	// the slab_escape() nonsense for escaping token structures shouldn't stay with us forever!
 	// actually, it should since we're caching them now
-	print_tree0(hyp, 0, NULL);
+	print_tree0(hyp, _from, NULL);
 	//set_slabstate(&st);
 	stop_timer(timer, 1);
 }
 
-char	*hypothesis_to_dstring(struct hypothesis	*h)
+void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...), int	labelled)
+{
+	print_hypothesis_from(hyp, print, labelled, 0);
+}
+
+char	*hypothesis_to_dstring_from(struct hypothesis	*h, int	_from)
 {
 	char	*derivation = malloc(10240);
 	int		dalen = 10240, dlen = 0;
@@ -1155,8 +1160,13 @@ char	*hypothesis_to_dstring(struct hypothesis	*h)
 		dlen += l;
 		return l;
 	}
-	print_hypothesis(h, dprintf, 0);
+	print_hypothesis_from(h, dprintf, 0, _from);
 	return derivation;
+}
+
+char	*hypothesis_to_dstring(struct hypothesis	*h)
+{
+	return hypothesis_to_dstring_from(h, 0);
 }
 
 char	*hypothesis_to_labelled_tree_string(struct hypothesis	*h)

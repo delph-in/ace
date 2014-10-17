@@ -67,6 +67,7 @@ struct mrs;
 int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs, double	probability), int nbest);
 struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_ancestry	ancestry, struct hypagenda_item	**customAgenda);
 char	*hypothesis_to_dstring(struct hypothesis	*h);
+char	*hypothesis_to_dstring_from(struct hypothesis	*h, int	_from);
 char	*hypothesis_to_labelled_tree_string(struct hypothesis	*h);
 char	*slab_escape(char	*str);
 struct hypothesis	*cheap_hypothesis(struct edge	*e);

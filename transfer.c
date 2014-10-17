@@ -1320,12 +1320,53 @@ int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	return 0;
 }
 
+// this is slowish. faster idea: when a particular transfer operation is started, make a hash set of the pred values that have actually been seen.
+int	pred_present(struct mrs	*m, struct type	*pred)
+{
+	int	i;
+	static int	pred_fnum = -1;
+	if(pred_fnum == -1)pred_fnum = lookup_fname("PRED");
+	for(i=0;i<m->nrels;i++)
+	{
+		struct mrs_ep	*ep = &m->rels[i];
+		struct dg	*ep_p = dg_hop(ep->dg, pred_fnum);
+		assert(ep_p);
+		if(glb(ep_p->xtype, pred))return 1;
+	}
+	return 0;
+}
+
+// return 1 if all context/input pred values can be matched, 0 otherwise
+int	tr_quickcheck(struct transfer_rule	*tr, struct mrs	*min)
+{
+	static int	pred_fnum = -1;
+	if(pred_fnum == -1)pred_fnum = lookup_fname("PRED");
+	int	nplaces = tr->input.neps + tr->context.neps;
+	int	i;
+	for(i=0;i<nplaces;i++)
+	{
+		struct mrs_ep_desc	epd = place_in_transfer_rule(tr, i);
+		struct dg	*de_p = dg_hop(epd.dg, pred_fnum);
+		if(!pred_present(min, de_p->xtype))return 0;
+		// don't bother with regex's; they're typically quite general and will match most MRSes somewhere. the question is whether they match in the right variable pattern, which we won't discover here anyway.
+		// they're also relatively rare (hypothesis).
+	}
+	return 1;
+}
+
 int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int first_route_only)
 {
 	//printf("rule %s -- optional %d\n", tr->name, tr->optional);
 	int	i, nresult = 0, nfires = 0;
 	struct mrs	**result = NULL;
 	int	pack_start = ts->n;
+	for(i=0;i<ts->n;i++)
+		if(tr_quickcheck(tr, ts->mrs[i]))break;
+	if(i==ts->n)
+	{
+		//printf("quickly rejected: %s\n", tr->name);
+		return 0;
+	}
 	for(i=0;i<ts->n && !cancel_transfer;i++)
 	{
 		extern int noldslabs;
@@ -1356,7 +1397,9 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 			nfires++;
 			return first_route_only;
 		}
-		align_transfer_rule(tr, min, found_alignment);
+		if(tr_quickcheck(tr, min))
+			align_transfer_rule(tr, min, found_alignment);
+		//else printf("quickly rejected for one candidate only: %s\n", tr->name);
 		if(nalignments == 0 || tr->optional)
 		{
 			// make a copy of 'min', so we don't have to worry about structure sharing in subsumption tests

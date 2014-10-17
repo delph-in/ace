@@ -518,14 +518,6 @@ char		*external_to_internal_var_type(char	*ex)
 	return convert_mrs_var_type(parser_vinv, ex);
 }
 
-make_reliable_vnums(struct mrs	*m)
-{
-	// when multiple MRSes share mrs_var structures, the ->vnum fields are hard to interpret, since they are supposed to be indices into the ->vlist.vars[] array of a particular MRS that the variable appears in.
-	int i;
-	for(i=0;i<m->vlist.nvars;i++)
-		m->vlist.vars[i]->vnum = i;
-}
-
 // produce a copy of 'min' on the slab, with converted MRS variables
 struct mrs	*convert_mrs_with_vpm(struct mrs	*min, struct vpm	*vpm)
 {

@@ -17,12 +17,22 @@
 #define slab_alloc(len)	malloc(len)
 #define	slab_realloc(ptr,olen,len) realloc(ptr,len)
 #define	slab_free(ptr)	free(ptr)
+#define freeze_string(s)	strdup(s)
+#define	restore_stderr()	do {} while(0)
 int mrs_enable_icons = 0;
 #else
 #define	slab_free(ptr)
 #endif
 
 // mrs IO
+
+make_reliable_vnums(struct mrs	*m)
+{
+	// when multiple MRSes share mrs_var structures, the ->vnum fields are hard to interpret, since they are supposed to be indices into the ->vlist.vars[] array of a particular MRS that the variable appears in.
+	int i;
+	for(i=0;i<m->vlist.nvars;i++)
+		m->vlist.vars[i]->vnum = i;
+}
 
 void	free_mrs_var(struct mrs_var	*v)
 {

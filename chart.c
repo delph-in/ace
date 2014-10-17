@@ -55,6 +55,8 @@ static inline generalize_certain_paths(struct dg	*d, int	hyper)
 	}*/
 }
 
+callable_generalize_certain_paths(struct dg	*d) { generalize_certain_paths(d,0); }
+
 int	inhibit_results = 0;
 extern int inhibit_pack;
 

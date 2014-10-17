@@ -571,6 +571,8 @@ int	main(int	argc, char	*argv[])
 			report_profiler(generation_profiler);
 			report_profiler(transfer_profiler);
 		}
+		if(g_mode == TRANSFER)
+			report_profiler(transfer_profiler);
 	}
 	if(debug_level)freport_timers(stderr);
 	if(lui_mode)
