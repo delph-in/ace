@@ -26,6 +26,7 @@ int	inhibit_vpm = 0;
 
 int	invent_ltop;
 extern char	*top_hcons_type;
+extern int reset_memorized_types;
 
 // dag to mrs conversion
 
@@ -141,7 +142,7 @@ struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist)
 	if(!dg)return NULL;
 	dg = dereference_dg(dg);
 
-	if(!semarg)
+	if(!semarg || reset_memorized_types)
 		assert(semarg = lookup_type(semarg_type));
 
 	if(dg->gen != 1 || !dg->copy || ((struct mrs_var*)dg->copy)->dg!=dg)
@@ -288,6 +289,7 @@ void	dg_to_mrs_hc(struct dg *dg, struct mrs_vlist *vlist, struct mrs_hcons	*hc)
 	static struct type *qeq, *geq, *leq;
 
 	dg = dereference_dg(dg);
+	if(reset_memorized_types>0)hargf=-1;
 	if(hargf==-1)
 	{
 		hargf = lookup_fname("HARG");
@@ -480,6 +482,7 @@ struct dg	*dagify_mrs_var1(struct mrs_var	*var, struct dg	*skolem)
 			p = p2?(p2+1):0;
 		} while(p);
 		dg = (struct dg*)add_dg_path(dg, path, len, atomic_dg(vtype));
+		free(str);
 	}
 	if(!skolem)skolem = copy_dg(default_type_hierarchy()->top->dg);
 	//else printf("skolemizing %s%d as %s\n", var->type, var->vnum, skolem->xtype->name);

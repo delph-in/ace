@@ -29,6 +29,7 @@ extern struct type_hierarchy	*semi_th, *main_th;
 extern int inhibit_vpm;
 
 extern int	instloc_feature;
+extern int reset_memorized_types;
 
 int	debug_transfer = 0;
 
@@ -50,7 +51,7 @@ void	alarm_handler2(int	sig)
 int	is_semarg_type(struct type	*x);
 int equal_semarg_types(struct type	*x, struct type	*y);
 
-void	check_pred_re(struct mrs_ep_desc	*ep)
+void	check_pred_re(struct mrs_ep_desc	*ep, int	washout)
 {
 	struct dg	*pred = dg_hop(ep->dg, lookup_fname("PRED"));
 	if(!pred)return;
@@ -59,13 +60,14 @@ void	check_pred_re(struct mrs_ep_desc	*ep)
 	if(tn[1] != '~')return;
 	// looks like we have a regular expression on our hands
 	extern struct type	*strtype;
-	pred->type = pred->xtype = get_top();//strtype;
+	if(washout)pred->type = pred->xtype = get_top();//strtype;
 	char	*re = malloc(strlen(tn));
 	strcpy(re, tn+2);
 	re[strlen(tn+2)-1] = 0;
 	ep->pred_re = towide(re);
 	//printf("discovered pred RE '%S'\n", ep->pred_re);
 
+	bzero(&ep->re,sizeof(ep->re));
 	int	err = regcomp(&ep->re, ep->pred_re, REGEX_FLAGS);
 	if(err)
 	{
@@ -125,7 +127,7 @@ erase_instlocs(struct mrs	*m)
 			{
 				// regardless of whether INSTLOC was present.
 				// replace it with a brand-new *string* dg.
-				add_dg_hop(v->dg, instloc_feature, new_instloc(0));
+				add_dg_hop(v->dg, instloc_feature, new_instloc(1));
 			}
 		}
 	}
@@ -143,7 +145,7 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 	if(semi_th && ALLOW_SEMI_MODE)
 	{
 		desc->mrs = cont_to_mrs(desc->dg);
-		desc->mrs = copy_mrs(desc->mrs);
+		desc->mrs = slab_copy_mrs(desc->mrs, 0);
 		// new-fangled system: convert our "internal" TFSes to SEMI-compliant TFSes
 		semi_reformat_mrs(desc->mrs, 1);
 	}
@@ -154,7 +156,7 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 		int old_invent_ltop = invent_ltop;
 		invent_ltop = 0;
 		desc->mrs = cont_to_mrs(desc->dg);
-		desc->mrs = copy_mrs(desc->mrs);
+		desc->mrs = slab_copy_mrs(desc->mrs, 0);
 		patch_variable_types(desc->mrs);
 		invent_ltop = old_invent_ltop;
 		inhibit_vpm--;
@@ -169,7 +171,7 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 	//struct dg	*rels = dg_hop(dg, lookup_fname("RELS"));
 	//struct dg	*list = dg_hop(rels, lookup_fname("LIST"));
 	while(list) { if(dg_hop(list, lookup_fname("FIRST")))desc->neps++; list = dg_hop(list, lookup_fname("REST")); }
-	desc->eps = malloc(sizeof(struct mrs_ep_desc)*desc->neps);
+	desc->eps = slab_alloc(sizeof(struct mrs_ep_desc)*desc->neps);
 	desc->neps=0;
 	//list = dg_hop(rels, lookup_fname("LIST"));
 	list = dg_path(dg, rels_list_path);
@@ -179,7 +181,7 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 		if(!epdg)break;
 		desc->eps[desc->neps].pred_re = NULL;
 		desc->eps[desc->neps].dg = epdg;
-		check_pred_re(&desc->eps[desc->neps]);
+		check_pred_re(&desc->eps[desc->neps], 0);
 		desc->neps++;
 		list = dg_hop(list, lookup_fname("REST"));
 		//printf("rule %s . %s %d = \n", tr->name, feature, desc->neps-1);
@@ -193,6 +195,14 @@ int	process_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr, 
 	//printf("after processing rule '%s' part '%s' we have:\n", tr->name, feature);
 	//print_dg(dg); printf("\n");
 
+	return 0;
+}
+
+int	thaw_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr)
+{
+	int i;
+	for(i=0;i<desc->neps;i++)
+		check_pred_re(&desc->eps[i], 1);
 	return 0;
 }
 
@@ -377,6 +387,7 @@ struct transfer_rule	*freeze_transfer_rule(struct transfer_rule	*tr)
 	fr->output_override = freeze_dg(tr->output_override);
 	fr->optional = tr->optional;
 	fr->disabled = 0;
+	freeze_transfer_rule_more(fr);
 	//fr->ncopy = tr->ncopy;
 	//fr->copy = freeze_block(tr->copy, sizeof(int)*fr->ncopy);
 	return fr;
@@ -418,9 +429,20 @@ void	*freeze_transfer()
 	return fz;
 }
 
-int	thaw_transfer_rule(struct transfer_rule	*tr)
+thaw_transfer_rule(struct transfer_rule	*tr)
 {
-	//printf("thawing rule '%s'\n", tr->name);
+	//printf("thaw %s\n", tr->name);
+	//print_dg(tr->dg);
+	//printf("\n");
+	thaw_transfer_rule_part(&tr->input, tr);
+	thaw_transfer_rule_part(&tr->context, tr);
+	thaw_transfer_rule_part(&tr->filter, tr);
+	thaw_transfer_rule_part(&tr->output, tr);
+}
+
+int	freeze_transfer_rule_more(struct transfer_rule	*tr)
+{
+	//printf("freezing rule '%s'\n", tr->name);
 	//print_dg(tr->dg);
 	//printf("\n\n");
 
@@ -433,8 +455,10 @@ int	thaw_transfer_rule(struct transfer_rule	*tr)
 	if(0 != process_transfer_rule_part(&tr->output, tr, "OUTPUT"))
 		return -1;
 
-	tr->eq = calloc(sizeof(struct dg*), 10);
-	tr->ss = calloc(sizeof(struct dg*), 10);
+	tr->eq = slab_alloc(sizeof(struct dg*)*10);
+	tr->ss = slab_alloc(sizeof(struct dg*)*10);
+	bzero(tr->eq, sizeof(struct dg*)*10);
+	bzero(tr->ss, sizeof(struct dg*)*10);
 	tr->neq = tr->nss = 0;
 	static int	eqpath[5]={-1}, sspath[5]={-1};
 	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", 0);
@@ -443,11 +467,13 @@ int	thaw_transfer_rule(struct transfer_rule	*tr)
 	//print_dg(eql); printf("\n");
 	while(eql && dg_hop(eql, 1))
 	{
+		assert(tr->neq < 10);
 		tr->eq[tr->neq++] = dg_hop(eql, 1);
 		eql = dg_hop(eql, 2);
 	}
 	while(ssl && dg_hop(ssl, 1))
 	{
+		assert(tr->nss < 10);
 		tr->ss[tr->nss++] = dg_hop(ssl, 1);
 		ssl = dg_hop(ssl, 2);
 	}
@@ -468,6 +494,10 @@ void	recover_transfer(void	*transfer)
 {
 	int	i;
 	struct transfer_freezer	*fz = transfer;
+	/*printf("sizeof mrs = %d\n", sizeof(struct mrs));
+	printf("sizeof mrs_desc = %d\n", sizeof(struct mrs_desc));
+	printf("sizeof mrs_ep_desc = %d\n", sizeof(struct mrs_ep_desc));
+	printf("sizeof regex_t = %d\n", sizeof(regex_t));*/
 	clear_slab();
 	if(g_mode == GENERATING)
 	{
@@ -534,7 +564,7 @@ struct mrs_ep_desc	place_in_transfer_rule(struct transfer_rule	*tr, int	pl)
 int	is_semarg_type(struct type	*x)
 {
 	static struct type *semarg = NULL;
-	if(!semarg)assert(semarg = lookup_type(semarg_type));
+	if(!semarg || reset_memorized_types)assert(semarg = lookup_type(semarg_type));
 	if(x->name[0]=='"')return 0;
 	return descendent_of(x->tnum, semarg);
 }

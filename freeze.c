@@ -283,6 +283,8 @@ static void freezer_note(char *designation)
 	else printf(" %s: %.1fG", designation, ((float)size+512*1024*1024)/(1024*1024*1024));
 }
 
+int	reset_memorized_types = 0;
+
 int	freeze_grammar()
 {
 	int		i, j;
@@ -301,12 +303,16 @@ int	freeze_grammar()
 
 extern struct type_hierarchy	*main_th, *semi_th;
 	G->main_th = freeze_type_hierarchy(main_th);
+	main_th = G->main_th;
+	set_default_type_hierarchy(main_th);
 	G->semi_th = freeze_type_hierarchy(semi_th);
+	semi_th = G->semi_th;
 	ft_th = G->semi_th;
 	patch_type_hierarchy(G->semi_th);
 	ft_th = G->main_th;
 	patch_type_hierarchy(G->main_th);
 	freezer_note("types");
+	reset_memorized_types = 1;
 
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->dg);
 	for(i=0;i<nrules;i++)patch_dg(rules[i]->packdg);

@@ -462,8 +462,6 @@ load_syntax_conf()
 
 	ortho_max_rules = get_conf_int("ortho-max-rules", 7);
 	ortho_warn_max_rules = get_conf_bool("ortho-warn-on-max-rules", 1);
-
-	freezer_megabytes = get_conf_int("freezer-megabytes", 256);
 }
 
 int	load_conf()
@@ -471,6 +469,8 @@ int	load_conf()
 	g_transfer = get_conf_bool("transfer", 0);
 	if(g_transfer)load_transfer_conf();
 	else load_syntax_conf();
+
+	freezer_megabytes = get_conf_int("freezer-megabytes", 256);
 
 	top_type = get_conf("top-type")?:"*top*";
 	instloc_feature = lookup_fname(get_conf("skolem-feature")?:"INSTLOC");
