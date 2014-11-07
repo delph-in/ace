@@ -666,7 +666,6 @@ int	parse_line1(char	*line)
 	{
 		if(parse_profiler)stop_profilers_recursively(parse_profiler);
 		start_and_alloc_profiler(&parse_profiler, "parsing", NULL, NULL);
-		start_and_alloc_profiler(&preprocess_profiler, "REPP", parse_profiler, NULL);
 	}
 
 	last_token_chart = NULL;
@@ -697,6 +696,8 @@ int	check_mbs(char	*mbs);
 
 	copy = strdup(line);
 
+	if(g_profiling)
+		start_and_alloc_profiler(&preprocess_profiler, "REPP", parse_profiler, NULL);
 	preprocess_line(copy, &nwords, &words, &cfrom, &cto);
 	if(preprocess_only)
 	{

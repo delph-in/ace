@@ -10,6 +10,8 @@
 #include	"lattice-mapping.h"
 #include	"timer.h"
 
+int	yy_rule_mode = 0;
+
 static void	skip_whitespace(char	**P)
 {
 	while(**P == ' ' || **P == '\t' || **P == '\n')
@@ -95,32 +97,51 @@ struct token	yy_read_token(char	**yy, int	*vfrom, int	*vto)
 	expect(yy, ',');
 	*vto = read_int(yy);
 	expect(yy, ',');
-	expect(yy, '<');
-	T.cfrom = read_int(yy);
-	expect(yy, ':');
-	T.cto = read_int(yy);
-	expect(yy, '>');
-	expect(yy, ',');
+	if(peek(yy)=='<')
+	{
+		expect(yy, '<');
+		T.cfrom = read_int(yy);
+		expect(yy, ':');
+		T.cto = read_int(yy);
+		expect(yy, '>');
+		expect(yy, ',');
+	}
+	else
+	{
+		T.cfrom = T.cto = -1;
+	}
 	read_int(yy);	// ?
 	expect(yy, ',');
 	T.string = read_string(yy);
+	if(peek(yy)=='"')	// another string...
+		read_string(yy);	// e.g. surface form for the SRG
 	expect(yy, ',');
 	read_int(yy);	// ?
 	expect(yy, ',');
-	read_string(yy);	// ?
-	expect(yy, ',');
-	while(peek(yy) == '"')
+	char	*rule = read_string(yy);	// ?
+	if(yy_rule_mode)
 	{
-		char	*tag = read_string(yy);
-		double	prob = read_double(yy);	// probability
-		T.npostags++;
-		T.postags = slab_realloc(T.postags, sizeof(struct postag)*(T.npostags-1), sizeof(struct postag)*T.npostags);
-		T.postags[T.npostags-1].tag = tag;
-		char	str[64]; sprintf(str, "%f", prob);
-		T.postags[T.npostags-1].prob = freeze_string(str);
+		static_ochart(&T, rule);
+		while(peek(yy)=='"')extend_static_ochart(&T, read_string(yy));
+	}
+	if(peek(yy)==',')
+	{
+		// POS tag list
+		expect(yy, ',');
+		while(peek(yy) == '"')
+		{
+			char	*tag = read_string(yy);
+			double	prob = read_double(yy);	// probability
+			T.npostags++;
+			T.postags = slab_realloc(T.postags, sizeof(struct postag)*(T.npostags-1), sizeof(struct postag)*T.npostags);
+			T.postags[T.npostags-1].tag = tag;
+			char	str[64]; sprintf(str, "%f", prob);
+			T.postags[T.npostags-1].prob = freeze_string(str);
+		}
 	}
 	expect(yy, ')');
-	build_token_dag(&T);
+	if(enable_token_avms)
+		build_token_dag(&T);
 	return T;
 }
 
@@ -177,4 +198,5 @@ int	parse_yy(char	*yy)
 		skip:;
 		printf("SKIP: (yy mode)\n");
 	}
+	return rv;
 }

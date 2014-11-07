@@ -1618,6 +1618,12 @@ struct mrs	*cleanup_mrs(struct mrs	*m)
 {
 	if(!ncleanup_rules)return m;
 	// we shouldn't have to reformat() m; it should have come straight off of a DAG.
+	// caveat: the ->ltop may have been manufactured.
+	if(!m->ltop->dg)
+	{
+		int dagify_result = dagify_mrs_var(m->ltop, NULL);
+		assert(dagify_result == 0);
+	}
 	//m = reformat_mrs_for_transfer(m);
 	//printf("reformatted mrs:\n");
 	//print_mrs(m);

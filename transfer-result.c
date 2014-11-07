@@ -427,6 +427,7 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		if(rule_dg->gen != generation)rule_dg = NULL;
 		else rule_dg = rule_dg->copy;	// see where it moved during copying -- might not have been copied
 		assert(rule_dg || !must_exist);
+		if(rule_dg)assert(rule_dg->xtype);
 		return rule_dg;
 	}
 

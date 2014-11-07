@@ -74,6 +74,7 @@ int preexisting_lui_fd = -1;
 int input_from_lui = 0;
 
 int	tsdb_notes = 0;	// if 1, print NOTEs with `parse' relation data and `run' relation data
+extern int	yy_rule_mode;
 
 extern float timer();
 
@@ -132,6 +133,7 @@ void	parse_args(int	argc, char	*argv[])
 		{"report-labels", 0, &report_labels, 1},
 		{"input-from-lui", 0, &input_from_lui, 1},
 		{"show-gen-chart", 0, &show_gen_chart, 1},
+		{"yy-rules", 0, &yy_rule_mode, 1},
 		{"tsdb-notes", 0, &tsdb_notes, 1},
 #define	MAX_UNPACK_MEGABYTES_OPTION	1000
 		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},
@@ -359,6 +361,7 @@ struct job_stats	main_input_loop(FILE	*fin)
 			{
 				if(!lui_mode)clear_slab();
 				num_results = parse_line(line);
+				st.count++;
 			}
 			//double et = stop_timer(tid, 1);
 			//printf("%f seconds\n", et);
@@ -385,6 +388,7 @@ struct job_stats	main_input_loop(FILE	*fin)
 				if(g_mode == GENERATING)
 					num_results = generate(mrs);
 				else num_results = transfer(mrs);
+				st.count++;
 				free_mrs(mrs);
 			}
 		}
@@ -392,7 +396,6 @@ struct job_stats	main_input_loop(FILE	*fin)
 			{ if(num_results==-1)fprintf(stderr, "NOTE: ignore\n"); }
 		else if(num_results>0)st.success++;
 		else if(num_results==0)st.fail++;
-		if(num_results>=0)st.count++;
 		fflush(stderr);
 	}
 	if(fin==stdin)stdin_time += timer();

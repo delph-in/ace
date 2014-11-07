@@ -28,6 +28,7 @@ static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 
 #include	"token.h"
 
+extern int yy_rule_mode;
 int				norules;
 struct orule	**orules;
 
@@ -142,33 +143,36 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		//printf("edge %d\n", i);
 		struct lattice_edge	*lat_e = tc->edges[i];
 		struct token	*t = lat_e->token;
-		t->oc = slab_alloc(sizeof(struct ochart));
-		bzero(t->oc, sizeof(struct ochart));
-		// compute a lowercase version of t->string
-		char	*low = mbsdowncase(t->string);
-		// compute all possible stems, with dynamic programming
-		add_ochart_edge(0, t->oc, low, 0, 0);
-		free(low);
-		// enumerate all possible ways of reaching each possible stem
-		for(j=0;j<t->oc->nedges;j++)
-			unfold_oroutes(t->oc->edges[j], t->oc->edges[j], 0, 0);
-//#ifdef	SHOW_ORTH_ROUTE_COUNTS
-		extern int trace;
-		if(trace > 1)
+		if(!t->oc)
 		{
+			t->oc = slab_alloc(sizeof(struct ochart));
+			bzero(t->oc, sizeof(struct ochart));
+			// compute a lowercase version of t->string
+			char	*low = mbsdowncase(t->string);
+			// compute all possible stems, with dynamic programming
+			add_ochart_edge(0, t->oc, low, 0, 0);
+			free(low);
+			// enumerate all possible ways of reaching each possible stem
 			for(j=0;j<t->oc->nedges;j++)
+				unfold_oroutes(t->oc->edges[j], t->oc->edges[j], 0, 0);
+//#ifdef	SHOW_ORTH_ROUTE_COUNTS
+			extern int trace;
+			if(trace > 1)
 			{
-				printf("%s -> %s [%d ways]\n", t->string, t->oc->edges[j]->form, t->oc->edges[j]->north_routes);
-//#ifdef	SHOW_ORTH_ROUTES
-				for(k=0;k<t->oc->edges[j]->north_routes;k++)
+				for(j=0;j<t->oc->nedges;j++)
 				{
-					struct orth_route *r = t->oc->edges[j]->orth_routes+k;
-					int					l;
-					printf("	");
-					for(l=0;l<r->len;l++)printf(" %s", rules[r->rules[l]]->name);
-					printf("\n");
-				}
+					printf("%s -> %s [%d ways]\n", t->string, t->oc->edges[j]->form, t->oc->edges[j]->north_routes);
+//#ifdef	SHOW_ORTH_ROUTES
+					for(k=0;k<t->oc->edges[j]->north_routes;k++)
+					{
+						struct orth_route *r = t->oc->edges[j]->orth_routes+k;
+						int					l;
+						printf("	");
+						for(l=0;l<r->len;l++)printf(" %s", rules[r->rules[l]]->name);
+						printf("\n");
+					}
 //#endif
+				}
 			}
 		}
 //#endif
@@ -510,13 +514,14 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 		{
 			// pack into this edge; the forms possible from here have already been explored.
 			add_oparent(chart->edges[i], parent, rule);
+			//printf(".. `%s' is old (arrived via %s)\n", form, rule?rule->rule->name:"START");
 			return;
 		}
 
 	wchar_t	*wform = towide(form);
 	int forml = wcslen(wform);
 
-	//printf(".. `%s' is new\n", form);
+	//printf(".. `%s' is new (arrived via %s)\n", form, rule?rule->rule->name:"START");
 	// completely new edge; add it to the chart
 	chart->nedges++;
 	chart->edges = slab_realloc(chart->edges, sizeof(struct ochart_edge*)*(chart->nedges-1), sizeof(struct ochart_edge)*chart->nedges);
@@ -577,6 +582,48 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 	return;
 }
 
+static_ochart(struct token	*t, char	*rule)
+{
+	t->oc = slab_alloc(sizeof(struct ochart));
+	bzero(t->oc, sizeof(struct ochart));
+	t->oc->nedges = 1;
+	t->oc->edges = slab_alloc(sizeof(struct ochart_edge*));
+	t->oc->edges[0] = slab_alloc(sizeof(struct ochart_edge));
+	struct ochart_edge	*e = t->oc->edges[0];
+	bzero(e,sizeof(*e));
+	e->form = mbsdowncase(t->string);
+	e->north_routes = 1;
+	e->orth_routes = slab_alloc(sizeof(struct orth_route));
+	struct orth_route	*r = &e->orth_routes[0];
+	r->len = 0;
+	r->rules = NULL;
+	extend_static_ochart(t, rule);
+}
+
+extend_static_ochart(struct token	*t, char	*rule)
+{
+	assert(t->oc && t->oc->nedges==1);
+	struct ochart_edge	*e = t->oc->edges[0];
+	assert(e->north_routes==1);
+	struct orth_route	*r = &e->orth_routes[0];
+	r->len += 1;
+	r->rules = slab_realloc(r->rules, (r->len-1)*sizeof(int), r->len*sizeof(int));
+	char	*sp = rule;
+	if(*sp=='$' && sp[1]!=' ' && sp[1])sp++;
+	struct rule	*R = lookup_rule(sp);
+	if(!R)
+	{
+		fprintf(stderr, "ERROR: yy-mode input requested non-existant rule %s\n", sp);
+		exit(-1);
+	}
+	if(!R->orth)
+	{
+		fprintf(stderr, "ERROR: yy-mode input requested rule %s which is not orthographemic\n", sp);
+		exit(-1);
+	}
+	r->rules[r->len-1] = R->rnum;
+	//printf(" ... DEBUG ... ok: token '%s' will need rule %s = %d\n", t->string, R->name, R->rnum);
+}
 
 char	*lgroups[256];
 
@@ -690,6 +737,8 @@ char	*inflect(struct orule	*or, char	*str)
 	wchar_t	*wstr = towide(str);
 	char	*res=0;
 	int		i, strl = wcslen(wstr);
+
+	if(yy_rule_mode)return freeze_string(str);	// never try to do orthographemics when an external processor is doing it
 
 	//printf("inflect '%S' using '%s'\n", wstr, or->rule->name);
 
