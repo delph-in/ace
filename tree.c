@@ -24,14 +24,14 @@ int	print_tokens = 1;
 
 static void	skip_space(char	**S)
 {
-	while(isspace(**S))(*S)++;
+	while(!(0x80&**S) && isspace(**S))(*S)++;
 }
 
 static char	*read_symbol(char	**S)
 {
 	skip_space(S);
 	char	*tok = *S;
-	while(!isspace(**S) && **S!=')' && **S!='"' && **S!='(' && **S!='[' && **S!=']' && **S!=0)(*S)++;
+	while((0x80&**S || !isspace(**S)) && **S!=')' && **S!='"' && **S!='(' && **S!='[' && **S!=']' && **S!=0)(*S)++;
 	return tok;
 }
 
@@ -63,7 +63,7 @@ static int read_number(char	**S)
 		if(*q=='-')n=-1;
 		q++;
 	}
-	while(isdigit(*q))
+	while(!(0x80&*q) && isdigit(*q))
 	{
 		n *= 10;
 		n += *q - '0';
@@ -226,7 +226,7 @@ static struct tree	*string_to_tree1(char	**S)
 
 	struct tree	*returnme = NULL;
 
-	if(isdigit(*s))
+	if(!(0x80&*s) && isdigit(*s))
 	{
 		// rule or lexeme node
 		int	edge_number = read_number(&s);	// edge ID
