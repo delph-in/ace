@@ -1,8 +1,8 @@
 PREFIX=/usr/local
 
 # comment out these two lines if you don't want to include [incr tsdb()] support
-#DELPHIN_CFLAGS=-isystem ${LOGONROOT}/lingo/lkb/include -DTSDB
-#DELPHIN_LIBS=-L ${LOGONROOT}/lingo/lkb/lib/linux.x86.64 -Wl,-Bstatic -litsdb -lpvm3 -Wl,-Bdynamic
+DELPHIN_CFLAGS=-isystem ${LOGONROOT}/lingo/lkb/include -DTSDB
+DELPHIN_LIBS=-L ${LOGONROOT}/lingo/lkb/lib/linux.x86.64 -Wl,-Bstatic -litsdb -lpvm3 -Wl,-Bdynamic
 
 POST_CFLAGS=-I post/ -DPOST
 POST_LIBS=-Wl,-Bstatic -lutil -Wl,-Bdynamic	# for openpty for calling out to tnt (which uses fully buffered stdio)
@@ -10,7 +10,7 @@ POST_LIBS=-Wl,-Bstatic -lutil -Wl,-Bdynamic	# for openpty for calling out to tnt
 REPP_LIBS=-Wl,-Bstatic -lrepp -Wl,-Bdynamic
 #REPP_CFLAGS=-I ${REPP_DIR}/include/
 
-BOOST_REGEX_LIBS=-Wl,-Bstatic -lboost_regex -Wl,-Bdynamic -lstdc++
+BOOST_REGEX_LIBS=-Wl,-Bstatic -lboost_regex -lstdc++ -Wl,-Bdynamic
 
 #CPU=-m32
 CC=gcc
@@ -27,7 +27,7 @@ CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -falign-loops=32 -funroll-loo
 
 EXPORT_DYNAMIC_CFLAG=-Wl,--export-dynamic
 
-include MacOSX.config
+#include MacOSX.config
 
 CFLAGS+=${DELPHIN_CFLAGS} ${POST_CFLAGS} ${REPP_CFLAGS}
 
@@ -56,12 +56,9 @@ ${HIDDENPICOBJS} : pic/%.o: %.c
 	mkdir -p pic
 	${CC} ${CFLAGS} -fvisibility=hidden -fPIC -c $< -o $@
 
-pic:
-	mkdir -p pic
-
-libace.so: pic ${PICOBJS} ${HIDDENPICOBJS} post/post.o
-	rm -f libace.dylib
-	gcc -dynamiclib ${PICOBJS} ${HIDDENPICOBJS} post/post.o -o libace.dylib -lrepp ${DELPHIN_LIBS} -ldl -lutil -lboost_regex
+libace.so: ${PICOBJS} ${HIDDENPICOBJS} post/post.o
+	rm -f libace.so
+	gcc -shared ${PICOBJS} ${HIDDENPICOBJS} post/post.o -Wl,-soname,libace.so -o libace.so -lrepp ${DELPHIN_LIBS} -ldl -lutil
 # note: -lutil cannot be compiled statically into a shared library, because the bozos that built it didn't use -fPIC...
 
 libace.a: ${PICOBJS} ${HIDDENPICOBJS} post/post.o
@@ -71,7 +68,7 @@ libace.a: ${PICOBJS} ${HIDDENPICOBJS} post/post.o
 
 install: ace libace.so libace.a
 	cp ace ${PREFIX}/bin/
-	cp libace.dylib ${PREFIX}/lib/libace.dylib
+	cp libace.so ${PREFIX}/lib/
 	cp libace.a ${PREFIX}/lib/
 	mkdir -p ${PREFIX}/include/ace
 	cp *.h ${PREFIX}/include/ace/
