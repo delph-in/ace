@@ -652,7 +652,7 @@ void	preprocess_line(char	*string, int	*Nwords, char	***Words, int	**CFrom, int	
 
 int	parse_line1(char	*line)
 {
-	char	*copy;
+	char	*copy = NULL;
 	int	nparse = 0;
 	int	nwords = 0, i, j;
 	int		*cfrom = NULL, *cto = NULL;
@@ -743,7 +743,7 @@ finished:
 	if(words)free(words);
 	if(cfrom)free(cfrom);
 	if(cto)free(cto);
-	free(copy);
+	if(copy)free(copy);
 	return nparse;
 }
 

@@ -44,6 +44,7 @@ double	*unknown_tprob(char	*word, int	first)
 	SPIKE("JJ", 0.75);
 	SPIKE("RB", 0.25);
 	SPIKE("VB", 0.5);
+	//SPIKE("VBP", 0.5);
 	if(len>0 && word[0]>='A' && word[0]<='Z')
 	{
 		if(!first)

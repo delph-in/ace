@@ -861,8 +861,17 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 	{
 		for(j=0;j<out->nprops;j++)
 			if(!strcasecmp(in->props[i].name, out->props[j].name))break;
-		if(j==out->nprops)return 0;
-		if(!prop_subsumes(in->props[i].value, out->props[j].value))return 0;
+		if(j==out->nprops)
+		{
+			DEBUG("missing property %s\n", in->props[i].name);
+			return 0;
+		}
+		if(!prop_subsumes(in->props[i].value, out->props[j].value))
+		{
+			DEBUG("incompatible property %s [%s vs %s]\n",
+				in->props[i].name, in->props[i].value, out->props[j].value);
+			return 0;
+		}
 	}
 	if(g_mrs_test_demand_equality && in->nprops != out->nprops)
 		return 0;
