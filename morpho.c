@@ -636,7 +636,13 @@ void	set_lgroup(int	group, wchar_t	*letters)
 	}
 	lgroups[group] = calloc(256, sizeof(char));
 	while(*letters)	// XXX taking the low 8 bits of a wchar_t is *not* the right way of storing the letter set :-P
+	{
+		if(((int)*letters) > 255)
+		{
+			fprintf(stderr, "WARNING: ACE does not correctly support nonascii character %C in inflection letter set\n", *letters);
+		}
 		lgroups[group][255 & ((int)*letters++)] = 1;
+	}
 }
 
 /*wchar_t	*wcsdup(wchar_t	*str)
@@ -646,13 +652,13 @@ void	set_lgroup(int	group, wchar_t	*letters)
 	return memcpy(w, str, (len+1)*sizeof(wchar_t));
 }*/
 
-wchar_t	*wcsdup_esc(wchar_t	*str)
+wchar_t	*wcsdup_esc_lower(wchar_t	*str)
 {
 	int len = wcslen(str);
 	wchar_t	*w = malloc((len+1)*sizeof(wchar_t)), *p, *r = w;
 	for(p=str;*p;p++)
 		if(*p=='\\' && p[1])*r++ = *++p;
-		else *r++ = *p;
+		else *r++ = towlower(*p);
 	*r = 0;
 	return w;
 }
@@ -713,7 +719,7 @@ void	setup_morpho(char	*line)
 	}
 	letter = *wide;
 	if(wide[1] != ' ' && wide[1] != '\t')goto synt;
-	set_lgroup(letter, trim_wcs(wcsdup_esc(wide+2)));
+	set_lgroup(letter, trim_wcs(wcsdup_esc_lower(wide+2)));
 }
 
 int	appropriate_letter(int	let, int	group)
@@ -944,9 +950,9 @@ void	setup_orule(struct orule	*or, char	*def)
 		or->nsub++;
 		or->sub = realloc(or->sub, sizeof(struct orule_sub)*or->nsub);
 		sub = or->sub + or->nsub-1;
-		sub->pat = wcsdup_esc(wdef);
+		sub->pat = wcsdup_esc_lower(wdef);
 		sub->patl = wcslen(sub->pat);
-		sub->rep = wcsdup_esc(wsp);
+		sub->rep = wcsdup_esc_lower(wsp);
 		sub->repl = wcslen(sub->rep);
 
 		wdef = trim_wcs(next);

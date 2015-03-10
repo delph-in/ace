@@ -547,7 +547,8 @@ int capi_print_chart(struct lattice	*tokens, struct lattice	*lexical_chart, int	
 	}
 
 	// output pseudo-edges for the token chart
-	improve_token_lattice_characterization(tokens);
+	extern int yy_mode;
+	if(!yy_mode)improve_token_lattice_characterization(tokens);
 	int	ntokedges = 0;
 	for(i=0;i<tokens->nedges;i++)
 	{
