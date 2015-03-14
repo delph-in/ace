@@ -2,9 +2,9 @@ TODO:
 
 - can run out of skolem constants if a grammar doesn't supply very many strings; work around this. maybe just fabricate our own skolem constants anyway?
 
-- make hardcoded path in instantiate_gle() configurable?
-
 - ace bugs:
+	+ ERG 1214 has a new asterisk prefix rule written with \* in the rule; ACE sees this as the same as *, which is the special character for an empty pattern in an inflection rule.  result: the rule applies incorrectly all the time in generation, since it's only constrained by its orthographemic effect, and ACE thinks that part is vacuous.
+		solution: store the special meaning '*' as empty string instead of '*'
 	+ ace fails to process inflectional patterns with capitals in them... halkomelem grammar prefix 'PLUR-' doesn't match.
 		+ downcase inflection patterns on reading them...
 	+ ace demands that transfer rules have an '& [ ... ]' clause. the MMT transfer grammars don't, typically... silly, but no reason not to support that.
@@ -138,6 +138,7 @@ ideas:
 - now that post-model-path config option exists, Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 DONE:
+	- make orthographemic rules with literal *'s in them work properly
 0.9.19
 	- add configuration:  transfer-qeq-bridge := true.  (by default)
 0.9.18
