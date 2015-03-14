@@ -48,7 +48,6 @@ extern struct lexeme	**lexemes, **generic_les;
 extern struct orule	**orules;
 extern char		**fnames;
 extern int		*introduce;
-extern char		*lgroups[256];
 
 extern unsigned int generation;
 
@@ -65,7 +64,7 @@ struct grammar
 	struct generic_le_info	*generic_le_infos;
 	struct orule	**orules;
 	char		**fnames;
-	char		*lgroups[256];
+	void	*morpho_globals;
 	int		*introduce;
 	void	*rule_filter;
 	void	*semindex;
@@ -351,10 +350,6 @@ extern struct type_hierarchy	*main_th, *semi_th;
 	for(i=0;i<nfnames;i++)fnames[i] = freeze_string(fnames[i]);
 	introduce = freeze_block(introduce, sizeof(int) * nfnames);
 
-	for(i=0;i<256;i++)
-		if(lgroups[i])
-			lgroups[i] = freeze_block(lgroups[i], 256);
-
 	G->rule_filter = freeze_rule_filter();
 	freezer_note("\n miscellaneous");
 
@@ -393,7 +388,7 @@ extern struct type_hierarchy	*main_th, *semi_th;
 	G->repp = freeze_repp();
 	G->instances = freeze_instances();
 	G->introduce = introduce;
-	for(i=0;i<256;i++)G->lgroups[i] = lgroups[i];
+	G->morpho_globals = freeze_morpho_globals();
 	G->qc = freeze_qc();
 	freezer_note("miscellaneous");
 	G->semindex = freeze_semantic_index();
@@ -533,11 +528,7 @@ extern void	*post_generation_mapping_rules;
 	post_generation_mapping_rules = G->post_generation_mapping_rules;
 	compile_lattice_rule_set(post_generation_mapping_rules);
 
-	for(i=0;i<256;i++)
-	{
-		lgroups[i] = G->lgroups[i];
-		//if(lgroups[i])printf("lgroup[%c] = %s\n", i, lgroups[i]);
-	}
+	thaw_morpho_globals(G->morpho_globals);
 
 	if(debug_level)
 		fprintf(stderr, "NOTE: %d types, %d lexemes, %d rules, %d orules, %d instances, %d strings, %d features\n",

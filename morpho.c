@@ -625,23 +625,52 @@ extend_static_ochart(struct token	*t, char	*rule)
 	//printf(" ... DEBUG ... ok: token '%s' will need rule %s = %d\n", t->string, R->name, R->rnum);
 }
 
-char	*lgroups[256];
+struct letterset	*lsets[256];
 
-void	set_lgroup(int	group, wchar_t	*letters)
+struct morpho_globals	*freeze_morpho_globals()
+{
+	struct morpho_globals	*mg = slab_alloc(sizeof(*mg));
+	int i;
+	for(i=0;i<256;i++)
+	{
+		mg->lsets[i] = NULL;
+		if(lsets[i])
+		{
+			mg->lsets[i] = freeze_block(lsets[i], sizeof(struct letterset));
+			mg->lsets[i]->higher = freeze_block(lsets[i]->higher, sizeof(wchar_t)*lsets[i]->nhigher);
+		}
+	}
+	return mg;
+}
+
+thaw_morpho_globals(struct morpho_globals	*mg)
+{
+	memcpy(lsets, mg->lsets, sizeof(lsets));
+}
+
+void	set_letterset(int	group, wchar_t	*letters)
 {
 	//printf("letter group %c = {%S}\n", group, letters);
-	if(lgroups[group])
+	if(group < 0 || group > 255)
 	{
-		fprintf(stderr, "WARNING: redefining letter group `%c' (overwriting previous definition)\n", group);
+		fprintf(stderr, "ERROR: ACE does not support letter sets with non-8-bit names\n");
+		exit(-1);
 	}
-	lgroups[group] = calloc(256, sizeof(char));
-	while(*letters)	// XXX taking the low 8 bits of a wchar_t is *not* the right way of storing the letter set :-P
+	if(lsets[group])
 	{
+		fprintf(stderr, "WARNING: redefining letter set `%c' (overwriting previous definition)\n", group);
+	}
+	lsets[group] = calloc(sizeof(struct letterset), 1);
+	while(*letters)
+	{
+		assert((int)*letters >= 0);
 		if(((int)*letters) > 255)
 		{
-			fprintf(stderr, "WARNING: ACE does not correctly support nonascii character %C in inflection letter set\n", *letters);
+			lsets[group]->higher = realloc(lsets[group]->higher, sizeof(wchar_t)*(lsets[group]->nhigher+1));
+			lsets[group]->higher[lsets[group]->nhigher++] = *letters;
 		}
-		lgroups[group][255 & ((int)*letters++)] = 1;
+		else lsets[group]->lower[(int)*letters] = 1;
+		letters++;
 	}
 }
 
@@ -719,23 +748,29 @@ void	setup_morpho(char	*line)
 	}
 	letter = *wide;
 	if(wide[1] != ' ' && wide[1] != '\t')goto synt;
-	set_lgroup(letter, trim_wcs(wcsdup_esc_lower(wide+2)));
+	set_letterset(letter, trim_wcs(wcsdup_esc_lower(wide+2)));
 }
 
-int	appropriate_letter(int	let, int	group)
+int	appropriate_letter(wchar_t	let, int	group)
 {
 	// new move jul-15-2012: case insensitive matching
 	let =towlower(let);
 
-	let = ((unsigned int)let) & 255;	// XXX for now we're only looking about 8 bits of wchar_t for letter groups
 	if(group>255 || group<0)return 0;
-	if(!lgroups[group])
+	if(!lsets[group])
 	{
-		fprintf(stderr, "morpho: no such letter group as `%c'\n", group);
+		fprintf(stderr, "ERROR: morpho: no such letter set as `%c'\n", group);
 		exit(-1);
 	}
-	else if(lgroups[group][let])return 1;
-	else return 0;
+	assert((int)let >= 0);
+	if(let > 255)
+	{
+		int i;
+		for(i=0;i<lsets[group]->nhigher;i++)
+			if(lsets[group]->higher[i]==let)return 1;
+		return 0;
+	}
+	else return lsets[group]->lower[(int)let]?1:0;
 }
 
 char	*inflect(struct orule	*or, char	*str)
@@ -774,11 +809,12 @@ char	*inflect(struct orule	*or, char	*str)
 
 int	invert_ipat_prefix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, wchar_t	*stem)
 {
-	int	let, lclear = 0;
+	int	lclear = 0;
 	int	ri = 0, fi = 0;
-	wchar_t	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
+	wchar_t	*rstem = stem, *rpat = pat, *rrep = rep, let, letters[256];
 
-	if(repl==1 && rep[0]=='*')ri++;	// trivially match
+	//if(repl==1 && rep[0]=='*')ri++;	// trivially match
+	if(repl==0)ri++;		// trivially match
 	else do
 	{
 		let = form[fi++];
@@ -788,7 +824,7 @@ int	invert_ipat_prefix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 			if(!lclear){bzero(letters, 256*sizeof(wchar_t));lclear=1;}
 			if(appropriate_letter(let, rep[++ri]))
 			{
-				assert((int)rep[ri] < 256);
+				assert((int)rep[ri]>=0 && (int)rep[ri]<256);
 				if(letters[(int)rep[ri]] == 0)
 					letters[(int)rep[ri]] = let;
 				else if(let != letters[(int)rep[ri]])
@@ -805,12 +841,13 @@ int	invert_ipat_prefix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 	{
 		match:
 		// success!
-		if(*pat!='*') while(*pat)
+		/*if(*pat!='*') */while(*pat)
 		{
 			if(*pat != '!')
 				*stem++ = *pat++;
 			else
 			{
+				assert((int)pat[1]>=0 && (int)pat[1]<256);
 				*stem++ = letters[(int)pat[1]];
 				pat+=2;
 			}
@@ -822,13 +859,16 @@ int	invert_ipat_prefix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 	else return -1;
 }
 
+// see if `form' matches `rep'; if so, figure out what the uninflected form is, using `pat'.
+// this is also used (in generation) with rep and pat reversed, to produce inflected forms.
 int	invert_ipat_suffix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, wchar_t	*stem)
 {
-	int	let, lclear = 0;
+	int	lclear = 0;
 	int	len = forml-1, len2 = repl-1;
-	wchar_t	*rstem = stem, *rpat = pat, *rrep = rep, letters[256];
+	wchar_t	*rstem = stem, *rpat = pat, *rrep = rep, let, letters[256];
 
-	if(repl==1 && rep[0]=='*')len2--;	// trivially match
+	//if(repl==1 && rep[0]=='*')len2--;	// trivially match
+	if(repl==0)len2--;	// trivially match
 	else if(len>=0 && len2>=0) do
 	{
 		let = form[len--];
@@ -839,7 +879,7 @@ int	invert_ipat_suffix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 			if(appropriate_letter(let, rep[len2]))
 			{
 				//printf("`%c' is appropriate for `%c'\n", let, rep[len2]);
-				assert((int)rep[len2] < 256);
+				assert((int)rep[len2]>0 && (int)rep[len2]<256);
 				if(letters[(int)rep[len2]] == 0)
 					letters[(int)rep[len2]] = let;
 				else if(let != letters[(int)rep[len2]])
@@ -858,13 +898,13 @@ int	invert_ipat_suffix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 		// success!
 		wcsncpy(stem, form, len+1);
 		stem += len+1;
-		if(*pat!='*') while(*pat)
+		/*if(*pat!='*') */while(*pat)
 		{
 			if(*pat != '!' || !pat[1])
 				*stem++ = *pat++;
 			else
 			{
-				assert((int)pat[1] < 256);
+				assert((int)pat[1]>=0 && (int)pat[1]<256);
 				*stem++ = letters[(int)pat[1]];
 				pat+=2;
 			}
@@ -950,9 +990,11 @@ void	setup_orule(struct orule	*or, char	*def)
 		or->nsub++;
 		or->sub = realloc(or->sub, sizeof(struct orule_sub)*or->nsub);
 		sub = or->sub + or->nsub-1;
-		sub->pat = wcsdup_esc_lower(wdef);
+		if(wdef[0]=='*' && wdef[1]==0)sub->pat = wcsdup(L"");
+		else sub->pat = wcsdup_esc_lower(wdef);
 		sub->patl = wcslen(sub->pat);
-		sub->rep = wcsdup_esc_lower(wsp);
+		if(wsp[0]=='*' && wsp[1]==0)sub->rep = wcsdup(L"");
+		else sub->rep = wcsdup_esc_lower(wsp);
 		sub->repl = wcslen(sub->rep);
 
 		wdef = trim_wcs(next);

@@ -1,33 +1,20 @@
 TODO:
 
-- can run out of skolem constants if a grammar doesn't supply very many strings; work around this. maybe just fabricate our own skolem constants anyway?
+- current release cycle:
+	- regression test (contentful change: handling of '*' in orules, handling of nonascii characters in lettersets)
 
 - ace bugs:
-	+ ERG 1214 has a new asterisk prefix rule written with \* in the rule; ACE sees this as the same as *, which is the special character for an empty pattern in an inflection rule.  result: the rule applies incorrectly all the time in generation, since it's only constrained by its orthographemic effect, and ACE thinks that part is vacuous.
-		solution: store the special meaning '*' as empty string instead of '*'
-	+ ace fails to process inflectional patterns with capitals in them... halkomelem grammar prefix 'PLUR-' doesn't match.
-		+ downcase inflection patterns on reading them...
-	+ ace demands that transfer rules have an '& [ ... ]' clause. the MMT transfer grammars don't, typically... silly, but no reason not to support that.
-		+ pretend '& []' is present when it is missing -- for transfer rules and lexemes.
-	+ the dag-to-mrs cache is used both by transfer and by parse-result processing, but with different values of inhibit_vpm.  we need to straighten that out.
-		- when idiom testing is being applied, we could in theory be getting VPM'd variables out when we don't want to
-		- after idiom testing is applied, we are in practice getting non-VPM'd variables out when we actually want VPM'd ones (parse "Abrams kept barking." with erg-1111...)
-		- for now, we'll just clear the variable cache after applying idiom testing.  that will slow down mrs extraction some, but getting it right is worth it.
-			- we might be able to keep two separate caches, if we think hard?
-				- clearing both before and after causes a latent crash on:
-					There are many possible starting points to reach the top of the 1775 meter high Rendalssølen.
-					it's not clear why this causes a crash, but we actually don't need to clear before, since reformat_mrs_for_transfer() takes a similar precaution.
-	- from berthold
-		- PET/ACE/LKB parsing differences on tsnlp test suite
-			- LKB and PET disagree in about 90 items
-			- ACE and PET disagree in about 110 items
-			- LKB and ACE disagree in about 50 items
-		- make QEQs equatable for transfer... should make a config option
-		- index accessibility filtering and subsumption packing are actually subtly incompatible. shows up in GG -- override frozen edge warnings in unpack.c for now.
+	- fix recursive labeling to check for cycles or empty SLASH difflists
+	- can run out of skolem constants if a grammar doesn't supply very many strings; work around this. maybe just fabricate our own skolem constants anyway?
+	- index accessibility filtering and subsumption packing are actually subtly incompatible. shows up in GG -- override frozen edge warnings in unpack.c for now.
 	- *possible* theoretical bug...
 		- the index accessibility filter identifies variables by their INSTLOC.  the two variables in a QEQ have the same INSTLOC, when cheap-scoping is on (e.g. all common grammars?).  that means when we collect_vars() we could mis-identify them.  if < x qeq y >, then suppose there were an edge A with x accessible and y not yet mentioned.  if R(A) makes x inaccessible, we may declare y inaccessible too.  then if other parts of the semantics reference y, R(A) will be wrongly rejected.
 		- on the other hand, it's not clear that this can actually happen.  if R(A) makes x inaccessible and y has not been mentioned yet, then there's no way for the < x qeq y > HCONS element to be built, right?
 		- conversely (and more plausibly), x will likely stay accessible long after y is made inaccessible.  unfortunately, we won't be able to notice that y was made inaccessible, because x looks the same.  result: edges may pass the filter that could have been rejected!
+
+things that would be nice:
+
+- add übertagging
 
 - find a way to not have to recurse down parts of the dag that are predictably sharable (e.g. are out of generation and are self-contained)
 	- I tried this in the past and decided it was too hard.  why?
@@ -79,26 +66,16 @@ TODO:
 	- should include some transfer grammar as well
 		- need a tool to test results... do tsdb profiles even store transfer results? probably...
 
-- transfer: what is the correct interpretation of the logical identity of variables attached to a +copy+'d EP?
-- transfer: should variables that are QEQ be unifiable? (trigger rules: we believe 'yes'. berthold wants 'yes' for fixup rules too.)
-
 ideas:
-	- properly support lettersets with nonascii characters
-	- fix recursive labeling to check for cycles or empty SLASH difflists
+	+ the dag-to-mrs cache is used both by transfer and by parse-result processing, but with different values of inhibit_vpm.  we need to straighten that out.
+		- when idiom testing is being applied, we could in theory be getting VPM'd variables out when we don't want to
+		- after idiom testing is applied, we are in practice getting non-VPM'd variables out when we actually want VPM'd ones (parse "Abrams kept barking." with erg-1111...)
+		- for now, we'll just clear the variable cache after applying idiom testing.  that will slow down mrs extraction some, but getting it right is worth it.
+			- we might be able to keep two separate caches, if we think hard?
+				- clearing both before and after causes a latent crash on:
+					There are many possible starting points to reach the top of the 1775 meter high Rendalssølen.
+					it's not clear why this causes a crash, but we actually don't need to clear before, since reformat_mrs_for_transfer() takes a similar precaution.
 	- [mode to?] make output more script-friendly
-	- automatic time profile of a grammar
-		+ parsing: pretty thorough
-		generation:
-			+ fixup rule application
-				+ each rule
-			- semantic index lookup
-				- trigger rule application
-					- each rule
-			- main generation
-			- unpacking
-				- MRS extraction
-				- subsumption checking
-				- idiom checking?
 	- unifying and copying:
 		- unifying: Glenn shows a way to completely avoid the ->carcs list, which sounds nice.
 			- unfortunately, it requires us to choose a particular order in unification, so we don't get to try not to forward into frozen dags necessarily -- that means less structure sharing is possible and memory usage goes up.
@@ -106,7 +83,7 @@ ideas:
 			- currently glenn's scheme doesn't work for ACE, because:
 				unifying a passive edge (some subtype of `sign') (with no ARCS feature present due to deleted-daughters) with a daughter position in a rule (type `sign' typically, with an ARCS feature intact): the passive edge's root dag node is technically not wellformed.  it has the more specific type, so it should be the forwarding target, but there's nowhere to store the ARGS feature
 					- actually, comparing numbers of arcs shows identical arities so we try forwarding to the rule position, which has ARGS, but doesn't have C-CONT, a feature introduced on the passive edge.
-				- possible solution: when trimming ARGS, leave a *top* node placeholder.  that would preserve the appropriateness of features to a type, but would violate the appropriateness off types to a feature.
+				- possible solution: when trimming ARGS, leave a *top* node placeholder.  that would preserve the appropriateness of features to a type, but would violate the appropriateness of types to a feature.
 				- other possible solution: implement Glenn's fallback search
 		- copying: to determine that a node X is shareable, we need to determine that X has not been changed, and that everything reachable from X has not been changed.
 			- in principal this could involve traversing a large section of the graph just to decide not to copy it
@@ -138,7 +115,9 @@ ideas:
 - now that post-model-path config option exists, Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 DONE:
+	- properly support lettersets with nonascii characters
 	- make orthographemic rules with literal *'s in them work properly
+	- downcase patterns in orthographemic rules (to avoid spurious failure to match)
 0.9.19
 	- add configuration:  transfer-qeq-bridge := true.  (by default)
 0.9.18
@@ -282,10 +261,6 @@ DONE:
 
 -----
 
-- potentially use POS tagger to prune lexical ambiguity
-	- but POS tagger makes mistakes...
-	- note... this is Bec Dridan's übertagging proposal. she got it to work fairly well.
-
 - preprocessor characterization problem:
 	... hole for 'n'
 	... hole for '''
@@ -332,20 +307,10 @@ fully automated regression testing of both parsing and generation
 			+ comparison tool should be aware of that somehow
 				+ e.g. diffs in # of results when we run out of RAM are acceptable
 			... diffs after first 1000 results aren't detected... unfortunate.
+		- these days we could record forests and compare those too
 	grammars:
 		+ ERG: mrs, csli, hike
 		+ GG: mrs, babel
 		- HaG: hausa.items
 		- JaCY: ?
 		- NorSource: massifcentral-pos ... LKB and ACE agree (jul-26-2012) modulo LKB bugs
-
-berthold wants
-	+ *updating* an ace tsdb profile -- doesn't work, apparently?
-		+ reason: ace uses packed edge IDs in derivations, [incr tsdb()] assumes that edges with the same ID dominate the same tree, hence have the same AVM
-		+ fixed; default is now to create new edge IDs for derivation outputs.  can get the real edge IDs with --packed-edge-ids
-	+ LUI support
-		+generator trees
-		+full chart
-		-partial chart
-			?? what did I mean by this?
-		+simple MRS

@@ -26,6 +26,19 @@ struct orule
 	}	*irregs_f, *irregs_s;*/
 };
 
+// letterset membership is represented by a lookup table for 8-bit characters and a list for other chars
+struct letterset
+{
+	char	lower[256];	
+	int		nhigher;
+	wchar_t	*higher;
+};
+
+struct morpho_globals
+{
+	struct letterset	*lsets[256];
+};
+
 extern int		norules;
 extern struct orule	**orules;
 
@@ -39,5 +52,6 @@ int		load_lrules();
 void	add_orule(struct rule	*rule, char	*def);
 
 struct orule	*freeze_orule(struct orule	*orin);
+struct morpho_globals	*freeze_morpho_globals();
 
 #endif
