@@ -813,9 +813,7 @@ int	invert_ipat_prefix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 	int	ri = 0, fi = 0;
 	wchar_t	*rstem = stem, *rpat = pat, *rrep = rep, let, letters[256];
 
-	//if(repl==1 && rep[0]=='*')ri++;	// trivially match
-	if(repl==0)ri++;		// trivially match
-	else do
+	if(ri<repl && fi<forml) do
 	{
 		let = form[fi++];
 		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
@@ -867,9 +865,7 @@ int	invert_ipat_suffix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 	int	len = forml-1, len2 = repl-1;
 	wchar_t	*rstem = stem, *rpat = pat, *rrep = rep, let, letters[256];
 
-	//if(repl==1 && rep[0]=='*')len2--;	// trivially match
-	if(repl==0)len2--;	// trivially match
-	else if(len>=0 && len2>=0) do
+	if(len>=0 && len2>=0) do
 	{
 		let = form[len--];
 		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
