@@ -1377,7 +1377,7 @@ int	tr_quickcheck(struct transfer_rule	*tr, struct mrs	*min)
 	{
 		struct mrs_ep_desc	epd = place_in_transfer_rule(tr, i);
 		struct dg	*de_p = dg_hop(epd.dg, pred_fnum);
-		if(!pred_present(min, de_p->xtype))return 0;
+		if(de_p && !pred_present(min, de_p->xtype))return 0;
 		// don't bother with regex's; they're typically quite general and will match most MRSes somewhere. the question is whether they match in the right variable pattern, which we won't discover here anyway.
 		// they're also relatively rare (hypothesis).
 	}
