@@ -48,6 +48,30 @@ struct dg
 	unsigned short	label[1];
 } __attribute__((packed));
 
+/* idea... threadsafe 8-byte dg nodes
+struct dg8
+{
+	int	type:16;
+	int	temp:16;	// dgtmp style; generation and verification pointer lives in dgtmp.
+	int	narcs:16;
+	int	label[1]:16;
+} __attribute__((packed));
+
+// multithreaded access... need a separate dgtmp structure per thread. allocate temp id once, stays allocated until all threads are done with it, then recycled.
+// so: array of NxM dgtmp's ; N is max # of IDs needed; M is number of threads.
+// say, each thread might be using 1000 at a time (unifying a rule with 2 dtrs could be 300 nodes each easily)
+// if 48 threads, = 48k dg nodes in use, so need 48k IDs, so need 48k*48 ~ 2.5m dgtmp structures, each of which is ~32 bytes = 75mb or so. not unreasonable at all. for lower thread counts like 8, only need 8k IDs -> 64k dgtmp structures -> ~2MB  or so.
+// temp ids need to be refcounted...
+// temp ID management is a potential bottleneck
+// each thread gets its own range that it controls allocation from
+// but: when arriving at a dg, need to atomically verify no valid temp exists and allocate a new one, and verifying temp is invalid is nontrivial.
+// lazy concurrancy?  read 'temp', perform check; if appears to be invalid, allocate a new one and atomically install it provided the invalid one is still there. -> didn't overwrite anyone else's valid ID and now have a valid one to use -- unless another thread just installed a valid tmp with the same ID as the old one. solution to that corner case: prohibit reallocating same temp ID to same node without another temp ID between.
+// generations? each thread gets its own.
+// generation resets? easier than current: iterate down dgtmp arrays.
+// recycling temp IDs? that's hard. have to guarantee no other thread is currently using this ID.
+// also hard to know whether an ID is valid (for some other thread) or can safely be replaced
+*/
+
 // basic dag operations
 int		unify_dg_infrom(struct dg	*dg1, struct dg	*dg2);
 struct dg	*unify_dg(struct dg	*a, struct dg	*b, int	arg);

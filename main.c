@@ -32,6 +32,8 @@ char	*sentence_path = 0, *master_addr = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 int show_gen_chart = 0;
 int timeout_seconds = 0;
+int	enable_ubertagging = 0;
+extern double	ubertagging_threshold;
 
 int	disable_generalization = 0;
 
@@ -151,8 +153,16 @@ void	parse_args(int	argc, char	*argv[])
 		{"timeout", 1, NULL, TIMEOUT_OPTION},
 #define	TRANSFER_CONFIG_OPTION	1007
 		{"transfer-config", 1, NULL, TRANSFER_CONFIG_OPTION},
+#define	UBERTAG_OPTION			1008
+		{"ubertagging", 2,NULL, UBERTAG_OPTION},
+		{"uebertagging", 2,NULL, UBERTAG_OPTION},
+		{"übertagging", 2,NULL, UBERTAG_OPTION},
 		{NULL,0,NULL,0}
 		};
+
+#define	REQUIRE_POSITIVE(option)	do { if(atoi(optarg)<1) { \
+									fprintf(stderr, "ERROR: option %s requires a positive integer\n", option); \
+									exit(-1); } } while(0);
 
 	int	gorv;
 	while(1)
@@ -175,7 +185,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'q':	question = 1;			break;
 		case	'X':	exhaustive = 0;			break;
 		case	'1':	best_only = 1;			break;
-		case	'n':	best_only = atoi(optarg);	break;
+		case	'n':	best_only = atoi(optarg);	REQUIRE_POSITIVE("-n"); break;
 		case	'r':	use_roots = optarg;	if(strstr(use_roots, "root_frag"))nofragments = 0;	break;
 		case	'l':	lui_mode = 1;			break;
 		case	'f':	mrs_line_breaks = '\n';		break;
@@ -191,14 +201,23 @@ void	parse_args(int	argc, char	*argv[])
 		case	'i':	g_profiling = 1;		break;
 		case	'?':	goto usage;
 
-		case	MAX_UNPACK_MEGABYTES_OPTION:	max_unpack_megabytes = atoi(optarg);	break;
-		case	MAX_CHART_MEGABYTES_OPTION:		max_chart_megabytes = atoi(optarg);		break;
+		case	MAX_UNPACK_MEGABYTES_OPTION:	max_unpack_megabytes = atoi(optarg);	REQUIRE_POSITIVE("--max-unpack-megabytes"); break;
+		case	MAX_CHART_MEGABYTES_OPTION:		max_chart_megabytes = atoi(optarg);		REQUIRE_POSITIVE("--max-chart-megabytes"); break;
 		case	GENERATION_SERVER_OPTION:	generation_server_lang = optarg;	break;
-		case	LUI_FD_OPTION:	preexisting_lui_fd = atoi(optarg);	break;
+		case	LUI_FD_OPTION:	preexisting_lui_fd = atoi(optarg);	REQUIRE_POSITIVE("--lui-fd"); break;
 		case	TNT_MODEL_OPTION:	enable_tnt = 1; tnt_model_path = optarg; break;
-		case	TNT_MAX_TAGS_OPTION: tnt_max_tags = atoi(optarg); break;
-		case	TIMEOUT_OPTION: timeout_seconds = atoi(optarg); break;
+		case	TNT_MAX_TAGS_OPTION: tnt_max_tags = atoi(optarg); REQUIRE_POSITIVE("--tnt-max-tags"); break;
+		case	TIMEOUT_OPTION: timeout_seconds = atoi(optarg); REQUIRE_POSITIVE("--timeout"); break;
 		case	TRANSFER_CONFIG_OPTION: transfer_config_path = optarg; break;
+		case	UBERTAG_OPTION:
+			if(optarg)ubertagging_threshold = atof(optarg);
+			if(ubertagging_threshold<=0 || ubertagging_threshold >1)
+			{
+				fprintf(stderr, "ERROR: übertagging threshold must be greater than 0 and not more than 1\n");
+				exit(-1);
+			}
+			enable_ubertagging = 1;
+			break;
 		case	0:	continue;	// auto-handled long option
 	} }
 	if(optind<argc-1)goto usage;
@@ -473,6 +492,10 @@ void	initialize_engine()
 	//check_unary_chains();
 	//decompose_rules();
 	clear_slab();
+
+	extern void *the_ubertagger;
+	if(enable_ubertagging && !the_ubertagger)
+		fprintf(stderr, "WARNING: cannot enable übertagging; no model present in this grammar image.\n");
 }
 
 void	report_stats(struct job_stats	stats)

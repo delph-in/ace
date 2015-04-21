@@ -111,8 +111,6 @@ struct path	make_path(int count, ...)
 	return p;
 }
 
-extern char	*get_conf(char	*lhs);
-
 struct path slab_string_to_path(char	*str)
 {
 	struct path	p;

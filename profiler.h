@@ -22,6 +22,7 @@ extern struct profiler	*lexical_lookup_profiler;
 extern struct profiler		*orth_profiler;
 extern struct profiler	*lexical_parsing_profiler;
 extern struct profiler	*lexical_filtering_profiler;
+extern struct profiler	*ubertagging_profiler;
 extern struct profiler	*chart_parsing_profiler;
 extern struct profiler	  *packing_profiler;
 extern struct profiler	*unpacking_profiler;

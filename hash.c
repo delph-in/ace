@@ -183,11 +183,18 @@ size_t	hash_memory_usage(struct hash	*ht)
 	int	i;
 	len += sizeof(struct hash_bucket*) * ht->size;
 	len += sizeof(struct hash_bucket) * ht->entries;
-	for(i=0;i<ht->size;i++)
+	if(ht->has_flk)
 	{
-		struct hash_bucket	*b;
-		for(b = ht->buckets[i];b;b=b->next)
-			len += strlen(b->key) + 1;
+		len += ht->has_flk * ht->entries;
+	}
+	else
+	{
+		for(i=0;i<ht->size;i++)
+		{
+			struct hash_bucket	*b;
+			for(b = ht->buckets[i];b;b=b->next)
+				len += strlen(b->key) + 1;
+		}
 	}
 	len += strlen(ht->name) + 1;
 	return len;
@@ -226,4 +233,14 @@ struct hash	*hash_copy(struct hash	*ht, void*	(*alloc)(size_t	len))
 	nh->name = freeze_string(ht->name);
 
 	return nh;
+}
+
+struct hash	*freeze_string_hash(struct hash	*h)
+{
+	struct hash_bucket *walk;
+	int	i;
+	for(i=0;i<h->size;i++)
+		for(walk=h->buckets[i];walk;walk=walk->next)
+			walk->value = freeze_string(walk->value);
+	return freeze_hash(h);
 }

@@ -1608,3 +1608,20 @@ void	print_dg(struct dg	*d)
 {
 	fprint_dg(stdout, d);
 }
+
+int	dg_size1(struct dg	*d)
+{
+	if(d->gen == generation)return 0;
+	d->gen = generation;
+	struct dg	**arcs = DARCS(d);
+	int	i, count = 1;
+	for(i=0;i<d->narcs;i++)
+		count += dg_size1(arcs[i]);
+	return count;
+}
+
+int	dg_size(struct dg	*d)
+{
+	bump_generation();
+	return dg_size1(d);
+}

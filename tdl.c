@@ -20,6 +20,7 @@
 #include	"post.h"
 #endif
 #include	"version.h"
+#include	"ubertag.h"
 
 int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
 int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
@@ -72,14 +73,20 @@ int	constrain_type(char	*name, struct dg	*dg);
 
 int	enable_out_of_order = 0;
 
-char	*get_conf(char	*lhs)
+struct tdl_line	*get_conf_line(char	*lhs)
 {
 	char	key[256];
 	sprintf(key, "%s %s", "config", lhs);
 	long	had = (long)hash_find(tdl_hash, key);
 
-	if(had != 0)return tdllines[had-1].rhs;
-	else return 0;
+	if(had != 0)return &tdllines[had-1];
+	else return NULL;
+}
+
+char	*get_conf(char	*lhs)
+{
+	struct tdl_line	*tdl = get_conf_line(lhs);
+	return tdl?tdl->rhs:NULL;
 }
 
 char	*get_conf_unq(char	*lhs)
@@ -96,11 +103,32 @@ char	*get_conf_unq(char	*lhs)
 	else return q;
 }
 
-char	*get_conf_file_path(char	*dir, char	*lhs)
+char	*get_conf_parent_dir(char	*lhs)
+{
+	struct tdl_line	*tdl = get_conf_line(lhs);
+	assert(tdl);
+
+	char	*dir = strdup(tdl->filename);
+	if(strrchr(dir, '/') > dir)
+		*strrchr(dir, '/') = 0;
+	else
+	{
+		free(dir);
+		dir = strdup(".");
+	}
+	return dir;
+}
+
+char	*get_conf_file_path(char	*lhs)
 {
 	char	*u = get_conf_unq(lhs), *p = 0;
 	if(!u)return NULL;
+
+	char	*dir = get_conf_parent_dir(lhs);
+	//printf("should get path for %s; might be relative to %s\n", u, dir);
+
 	assert(-1 != asprintf(&p, "%s/%s", dir, u));
+	free(dir);
 	return p;
 }
 
@@ -1490,7 +1518,6 @@ void	load_cleanup_rules(char	*path)
 }
 
 char	*grammar_dir;
-char	*confdir;
 
 int	load_grammar_top(char *toptdl)
 {
@@ -1689,7 +1716,7 @@ int	load_semi(char	*path)
 
 int	load_quickcheck()
 {
-	char	*qccode_path = get_conf_file_path(confdir, "quickcheck-code");
+	char	*qccode_path = get_conf_file_path("quickcheck-code");
 	if(!qccode_path)
 	{
 		char	*qcinst_name = get_conf("quickcheck-instance");
@@ -1731,10 +1758,6 @@ int load_grammar(char	*path)
 	extern int g_mode;
 
 	g_mode = -1;
-	confdir = strdup(path);
-	if(strrchr(confdir, '/') > confdir)
-		*strrchr(confdir, '/') = 0;
-	else confdir = ".";
 
 	clear_slab();
 	tdl_hash = hash_new("tdl type definitions");
@@ -1746,38 +1769,38 @@ int load_grammar(char	*path)
 
 	init_fnames();
 	load_conf();
-	load_version(get_conf_file_path(confdir, "version"));
+	load_version(get_conf_file_path("version"));
 
 	if(!g_transfer)
 	{
-		load_preprocessor(confdir);
+		load_preprocessor();
 
 		// before grammar loading so the semindex knows how to build
-		load_expedients(get_conf_file_path(confdir, "generation-ignore-signs"));
-		load_expedients(get_conf_file_path(confdir, "generation-ignore-lexemes"));
-		load_expedients(get_conf_file_path(confdir, "generation-ignore-rules"));
+		load_expedients(get_conf_file_path("generation-ignore-signs"));
+		load_expedients(get_conf_file_path("generation-ignore-lexemes"));
+		load_expedients(get_conf_file_path("generation-ignore-rules"));
 	}
 
-	load_grammar_top(get_conf_file_path(confdir, "grammar-top"));
+	load_grammar_top(get_conf_file_path("grammar-top"));
 
 	if(!g_transfer)
 	{
-		load_triggers(get_conf_file_path(confdir, "generation-trigger-rules"));
-		load_fixup_rules(get_conf_file_path(confdir, "generation-fixup-rules"));
-		load_cleanup_rules(get_conf_file_path(confdir, "cleanup-rules"));
-		load_idioms(get_conf_file_path(confdir, "idiom-rules"));
+		load_triggers(get_conf_file_path("generation-trigger-rules"));
+		load_fixup_rules(get_conf_file_path("generation-fixup-rules"));
+		load_cleanup_rules(get_conf_file_path("cleanup-rules"));
+		load_idioms(get_conf_file_path("idiom-rules"));
 
-		load_parser_vpm(get_conf_file_path(confdir, "variable-property-mapping"));
+		load_parser_vpm(get_conf_file_path("variable-property-mapping"));
 
-		int do_load_mem() { load_mem(get_conf_file_path(confdir, "maxent-model")); return 0; }
+		int do_load_mem() { load_mem(get_conf_file_path("maxent-model")); return 0; }
 		run_task("loading maxent model", do_load_mem);
 
-		char	*semi_path = get_conf_file_path(confdir, "semantic-interface");
+		char	*semi_path = get_conf_file_path("semantic-interface");
 		if(semi_path)load_semi(semi_path);
 
 		// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...
 		tdl_push_status("tree-node-label");
-		load_tdl(get_conf_file_path(confdir, "parse-node-labels"));
+		load_tdl(get_conf_file_path("parse-node-labels"));
 		tdl_pop_status();
 		if(load_labels())exit(-1);
 
@@ -1789,10 +1812,10 @@ int load_grammar(char	*path)
 	{
 		if(get_conf("input-vpm"))
 		{
-			load_transfer_input_vpm(get_conf_file_path(confdir, "input-vpm"));
-			load_transfer_output_vpm(get_conf_file_path(confdir, "output-vpm"));
+			load_transfer_input_vpm(get_conf_file_path("input-vpm"));
+			load_transfer_output_vpm(get_conf_file_path("output-vpm"));
 		}
-		else load_transfer_bidir_vpm(get_conf_file_path(confdir, "bidir-vpm"));
+		else load_transfer_bidir_vpm(get_conf_file_path("bidir-vpm"));
 	}
 
 	// make sure we have complete restrictor sets in case recent activity has added new features...
@@ -1801,7 +1824,7 @@ int load_grammar(char	*path)
 #ifdef	POST
 	if(enable_post)
 	{
-		char	*post_model_path = get_conf_file_path(confdir, "post-model-path");
+		char	*post_model_path = get_conf_file_path("post-model-path");
 		if(!post_model_path)post_model_path = "post/english-postagger.hmm";
 		//post_train_from("../post/brown.train.txt");
 		int post_load_result = post_load_from_text_dump(post_model_path);
@@ -1816,6 +1839,9 @@ int load_grammar(char	*path)
 		}
 	}
 #endif
+
+	if(get_conf("ubertag-emission-path") || get_conf("übertag-emission-path"))
+		run_task("loading übertagger", load_ubertagging);
 
 	// make sure none of the grammar is auto-freed when the first parse is over
 	free_tdl();

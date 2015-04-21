@@ -3,6 +3,7 @@
 #include	<string.h>
 #include	<signal.h>
 #include	<time.h>
+#include	<math.h>
 
 #include	"chart.h"
 #include	"rule.h"
@@ -15,6 +16,8 @@
 #include	"lexical-parse.h"
 #include	"timer.h"
 #include	"profiler.h"
+
+double	ubertagging_threshold = 0.0001;
 
 void	itsdb_dump_tokens(char	*name, char	*countname, struct lattice	*tokens);
 int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, int	status, int	tforest);
@@ -517,7 +520,14 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	apply_lexical_filtering(lexical_chart);
 	if(trace)printf("finished lexical filtering\n");
 
-	if(g_profiling)start_and_alloc_profiler(&chart_parsing_profiler, "chart parsing", parse_profiler, lexical_filtering_profiler);
+#include	"ubertag.h"
+extern struct ubertagger	*the_ubertagger;
+extern int	enable_ubertagging;
+	if(g_profiling)start_and_alloc_profiler(&ubertagging_profiler, "übertagging", parse_profiler, lexical_filtering_profiler);
+	if(the_ubertagger && enable_ubertagging)
+		ubertag_lattice(the_ubertagger, lexical_chart, log(ubertagging_threshold));
+
+	if(g_profiling)start_and_alloc_profiler(&chart_parsing_profiler, "chart parsing", parse_profiler, ubertagging_profiler);
 
 	// XXX far-fetched experiment...
 	//first_pass_parse(lexical_chart);

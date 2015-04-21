@@ -1115,11 +1115,13 @@ int	load_lrules()
 load_all_irregulars()
 {
 	int	hits = 0;
+	char	*dir;
+	if(get_conf("irregular-forms"))dir = get_conf_parent_dir("irregular-forms");
+	else dir = get_conf_parent_dir("grammar-top");
 	int callback(char	*path)
 	{
-		extern char	*confdir;
-		char	*mypath = malloc(strlen(confdir) + strlen(path) + 8);
-		sprintf(mypath, "%s/%s", confdir, path);
+		char	*mypath = malloc(strlen(dir) + strlen(path) + 8);
+		sprintf(mypath, "%s/%s", dir, path);
 		//printf("real path to irregulars file: %s\n", mypath);
 		show_task_name("reading irregular forms");
 		printf("from %s\n", path);
@@ -1134,17 +1136,8 @@ load_all_irregulars()
 	}
 	iterate_conf_list("irregular-forms", callback);
 	if(!hits) callback("../irregs.tab");
+	free(dir);
 	return 0;
-}
-
-struct hash	*freeze_string_hash(struct hash	*h)
-{
-	struct hash_bucket *walk;
-	int	i;
-	for(i=0;i<h->size;i++)
-		for(walk=h->buckets[i];walk;walk=walk->next)
-			walk->value = freeze_string(walk->value);
-	return freeze_hash(h);
 }
 
 struct orule	*freeze_orule(struct orule	*orin)

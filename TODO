@@ -1,8 +1,5 @@
 TODO:
 
-- current release cycle:
-	- regression test (contentful change: handling of '*' in orules, handling of nonascii characters in lettersets)
-
 - ace bugs:
 	- fix recursive labeling to check for cycles or empty SLASH difflists
 	- can run out of skolem constants if a grammar doesn't supply very many strings; work around this. maybe just fabricate our own skolem constants anyway?
@@ -14,7 +11,13 @@ TODO:
 
 things that would be nice:
 
-- add übertagging
+- reduce .dat file size
+	- improve 'simple lexemes' facility; only getting 62% currently
+	- store maxent model more efficiently; it takes 67MB currently
+
+- robust parsing: allow guidance from a dependency parser or PCFG parser; something like:
+	external guidance suggests edge X is very probable, but ERG does not allow it
+	-> shoehorn it in with robust unification
 
 - find a way to not have to recurse down parts of the dag that are predictably sharable (e.g. are out of generation and are self-contained)
 	- I tried this in the past and decided it was too hard.  why?
@@ -25,6 +28,10 @@ things that would be nice:
 			- X&Y is self-contained if X and Y both are... plus some other situations.
 
 - reduce dag node size -- already got rid of 'forward'; can also get rid of 'copy' (merge with 'carcs').
+	- complications:
+		1. subsumption test uses 'copy' and 'carcs'; can use type/forward instead of 'carcs' but will need to verify that this doesn't cause additional trouble.
+		2. transfer reads 'carcs' -- but appears to do so before copy()/finalize_tmp() is called, so the copy/carcs slot would have a carcs interpretation then, so all is well still
+		3. copy() uses both 'carcs' and 'copy'; but once 'carcs' has been read, it can be overwritten as 'copy'; just need to be able to flag which interpretation is active.
 	- could also trade in 8-byte pointers for 2-byte indices into a table, probably -- but the extra indirection may be expensive. for 'type', every dag node being unified would get one. for 'copy', every node being copied would get one... becomes like the previous dgtmp experiment.  which in hindsight wasn't such a terrible thing...
 
 - idea: do an initial parse with a cheaper (strictly less strict) grammar, see what edges are connected to roots, and use that as a top-down filter on a second pass with the full grammar.
@@ -115,6 +122,9 @@ ideas:
 - now that post-model-path config option exists, Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 DONE:
+	- add ubertagging
+	- make file references from config files relative to config subfiles (e.g. if :include'd from a different directory)
+0.9.20
 	- properly support lettersets with nonascii characters
 	- make orthographemic rules with literal *'s in them work properly
 	- downcase patterns in orthographemic rules (to avoid spurious failure to match)

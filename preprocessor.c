@@ -45,14 +45,16 @@ void	preprocess_line(char	*mbstring, int	*Nwords, char	***Words, int	**CFrom, in
 	assert(result == 0);
 }
 
-void	load_preprocessor(char	*confdir)
+void	load_preprocessor()
 {
-	char	*path = get_conf_file_path(confdir, "preprocessor");
+	char	*path = get_conf_file_path("preprocessor");
 	if(!path)return;
+	char	*dir = get_conf_parent_dir("preprocessor");
 	load_repp(path);
 	int	repp_module_callback(char	*path) {
 		char	*modpath;
-		asprintf(&modpath, "%s/%s", confdir, path);
+		asprintf(&modpath, "%s/%s", dir, path);
 		return load_repp_module_from_file(modpath); }
 	iterate_conf_list("preprocessor-modules", repp_module_callback);
+	free(dir);
 }

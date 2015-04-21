@@ -106,6 +106,7 @@ struct profiler	*lexical_lookup_profiler;
 struct profiler		*orth_profiler;
 struct profiler	*lexical_parsing_profiler;
 struct profiler	*lexical_filtering_profiler;
+struct profiler	*ubertagging_profiler;
 struct profiler	*chart_parsing_profiler;
 struct profiler	  *packing_profiler;
 struct profiler	*unpacking_profiler;

@@ -16,7 +16,8 @@ int	process_tdl_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	
 
 char	*get_conf(char	*lhs);
 char	*get_conf_unq(char	*lhs);
-char	*get_conf_file_path(char	*dir, char	*lhs);
+char	*get_conf_file_path(char	*lhs);
+char	*get_conf_parent_dir(char	*lhs);
 
 char	*get_lisp_parameter(char	*name);
 void	load_lisp(char	*path);

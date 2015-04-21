@@ -20,6 +20,7 @@
 #include	"lattice-mapping.h"
 #include	"hash.h"
 #include	"version.h"
+#include	"ubertag.h"
 
 extern void		**oldslabs;
 extern int		noldslabs, aoldslabs, currslabsize;
@@ -80,6 +81,7 @@ struct grammar
 	void	*post_generation_mapping_rules;
 	void	*transfer;
 	void	*qc;
+	void	*ubertagger;
 };
 
 extern void	*slab_alloc(int	len);
@@ -396,6 +398,8 @@ extern struct type_hierarchy	*main_th, *semi_th;
 	freezer_note("sem-index");
 	G->stochmodel = freeze_stochastic_model();
 	freezer_note("stochastic-model");
+	G->ubertagger = freeze_ubertagger();
+	if(G->ubertagger)freezer_note("ubertagger");
 
 	int l = snprintf(G->message, sizeof(G->message)-1, "frozen grammar file: ace |%s| grammar |%s;;%s|",
 		ACE_VERSION, grammar_dir, grammar_version);
@@ -512,6 +516,7 @@ extern struct type_hierarchy	*main_th, *semi_th;
 	recover_semantic_index(G->semindex);
 	recover_transfer(G->transfer);
 	recover_stochastic_model(G->stochmodel);
+	recover_ubertagger(G->ubertagger);
 
 #ifdef	POST
 	if(enable_post)
