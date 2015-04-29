@@ -604,6 +604,7 @@ void	print_mrs_var(struct mrs_var	*var)
 
 int	snprint_mrs_var_marked(char	*str, int	len, struct mrs_var	*var, char	*marked)
 {
+	if(!var)return safe_snprintf(str, len, "NULL");
 	if(marked && marked[var->vnum])
 		return safe_snprintf(str, len, "%s%d", var->type, var->vnum);
 	if(marked)marked[var->vnum] = 1;

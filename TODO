@@ -1,7 +1,6 @@
 TODO:
 
 - ace bugs:
-	- crash when icons-left and icons-right are misconfigured (snprint_mrs_var called on a NULL variable)
 	- fix recursive labeling to check for cycles or empty SLASH difflists
 	- can run out of skolem constants if a grammar doesn't supply very many strings; work around this. maybe just fabricate our own skolem constants anyway?
 	- index accessibility filtering and subsumption packing are actually subtly incompatible. shows up in GG -- override frozen edge warnings in unpack.c for now.
