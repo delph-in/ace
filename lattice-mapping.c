@@ -471,12 +471,13 @@ struct re_match_set
 	regmatch_t	**matches;
 };
 
-void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	*mats)
+void	replace_backrefs(struct dg	*d, struct dg	*rd, struct lattice_rule	*r, struct re_match_set	*mats)
 {
 	d = dereference_dg(d);
 	if(d->xtype->name[0]=='"')
 	{
 		if(!strstr(d->xtype->name, "${"))return;
+		if(d->xtype != rd->xtype)return;	// things that look like backrefs that don't appear in the *rule* came from copying coincidentally backref-like material from inputs or contexts.
 		char	*backref, *last = d->xtype->name, *patchto, *backref_end;
 		wchar_t	build[1024]=L"", *buildp = build;
 		char	expr[128];
@@ -590,7 +591,11 @@ void	replace_backrefs(struct dg	*d, struct lattice_rule	*r, struct re_match_set	
 		int	i;
 		struct dg	**da = DARCS(d);
 		for(i=0;i<d->narcs;i++)
-			replace_backrefs(da[i], r, mats);
+		{
+			struct dg	*rda = dg_hop(rd, d->label[i]);
+			if(rda) replace_backrefs(da[i], rda, r, mats);
+			// else no replacement; this branch is not present in the rule, so it can't contain backrefs
+		}
 	}
 }
 
@@ -639,7 +644,10 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 	// first step: iterate through all the out_dg's and replace backreferences
 	int i, j;
 	for(i=0;i<r->noutput;i++)
-		replace_backrefs(out_dg[i], r, mats);
+	{
+		struct dg	*rout_dg = lattice_rule_spot(r, i+r->ninput+r->ncontext);
+		replace_backrefs(out_dg[i], rout_dg, r, mats);
+	}
 	// second step: build and insert edge structures for the new tokens
 	// determining the from/to vertices for each output edge is a bit tricky
 

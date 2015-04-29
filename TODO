@@ -1,6 +1,7 @@
 TODO:
 
 - ace bugs:
+	- crash when icons-left and icons-right are misconfigured (snprint_mrs_var called on a NULL variable)
 	- fix recursive labeling to check for cycles or empty SLASH difflists
 	- can run out of skolem constants if a grammar doesn't supply very many strings; work around this. maybe just fabricate our own skolem constants anyway?
 	- index accessibility filtering and subsumption packing are actually subtly incompatible. shows up in GG -- override frozen edge warnings in unpack.c for now.
@@ -12,12 +13,41 @@ TODO:
 things that would be nice:
 
 - reduce .dat file size
-	- improve 'simple lexemes' facility; only getting 62% currently
 	- store maxent model more efficiently; it takes 67MB currently
+	- improve 'simple lexemes' facility; only getting 62% currently, and ERG-specific
+		- erg: 39k lexemes, 24k simple; 10MB worth of lexeme dags in .dat file
+			average of 256 bytes per lexeme... in .tdl it's just 134 bytes for a typical lexeme
+			name, type, orth, pred, onset
+			struct lexeme = 44 bytes + stemlist = 8 more typically, + 8 byte pointer in lexemes[] = 60 bytes per lexeme not counting any strings or string types
+			+ typical 10? bytes for name = 70
+			-> expect roughly 2.8M of 'struct lexeme'; actual = 3.1M. ok.
+			+ orth type and pred type
+			struct type = 56 bytes + name + entry in strings[] = 75
+			-> roughly 6M of 'struct type's for lexicon
+			15k non-simple lexemes -> 650 bytes of dag each -> roughly 13 nodes
+				root, orth, first, rest, synsem, lkeys, keyrel, carg, phon, onset = 10 nodes on typical lexeme
+				plausible.
+				6k of these are n_-_pn_le
+				2k particulate verbs
+				most of the rest are MWE's -- why arent those simple? could be easily
+		- automatic templates by lextype?
+
+- speed up lexical instantiation; GLEs are currently built and unified with each token, but something quickcheck-like could rule out almost all cases (token trait and pos)
 
 - robust parsing: allow guidance from a dependency parser or PCFG parser; something like:
 	external guidance suggests edge X is very probable, but ERG does not allow it
 	-> shoehorn it in with robust unification
+
+- robust parsing: after forest construction fails to find a root edge, try top-down prediction
+	- at each rule, assume all but 1 daughter is fully well-formed, hence exists in the (bottom-up) chart
+	- top-down constraint + existing daughter(s) give new constraint for smaller cell, recurse
+	- packing; eventually terminate, with a whole new chart full of predicted (but nonexistant) edges
+	- inside/outside decoding to find tree with best maxent score subject to constraint that only one unification will fail (hence needs to be robust)
+		- in reality, information from that robust unification may cause more failures higher up in the tree
+		- compute best outside score available at each prediction edge
+		- for each real edge in that cell, compute total score = outside + inside + scores of features completed by gluing those edges together
+		- no top-down packing: best outside score available at prediction edge X = outside score of X's parent + inside score of X's real daughters + scores of features completed by extending X's parent to X
+		- with packing... just maximize over packing contexts
 
 - find a way to not have to recurse down parts of the dag that are predictably sharable (e.g. are out of generation and are self-contained)
 	- I tried this in the past and decided it was too hard.  why?
@@ -124,6 +154,7 @@ ideas:
 DONE:
 	- add ubertagging
 	- make file references from config files relative to config subfiles (e.g. if :include'd from a different directory)
+	- bug fix; token mapping regex capture group references were being hallucinated in inputs contining ${; thanks Matic!
 0.9.20
 	- properly support lettersets with nonascii characters
 	- make orthographemic rules with literal *'s in them work properly
