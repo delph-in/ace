@@ -16,10 +16,13 @@
 #include	"freeze.h"
 
 #define	LOGZERO	((double)-9E99)
-#define	SMOOTH_EMISSION	(-20)//(-1000)
+#define	SMOOTH_EMISSION		(-20)//(-1000)
+#define	SMOOTH_TRANSITION	(-20)//(-1000)
 
 //#define	DEBUG(x...)	do { printf(x); } while(0)
 #define	DEBUG(x...)
+
+int	enable_ubertagging = 0;
 
 void	ut_normalize_emission(char	*em_mbs)
 {
@@ -279,6 +282,7 @@ ut_load_tx(struct ubertagger	*ut, char	*txpath)
 	if(!f){perror(txpath);exit(-1);}
 
 	ut->trans = calloc(sizeof(struct ut_transition_set),ut->ntags);
+	ut->trans[ut->unk_tag].unigram_score = SMOOTH_TRANSITION;
 
 	//ut->transition_trigram = hash_new("ut-3gram");
 	//ut->transition_trigram->has_flk = 6;
@@ -395,6 +399,7 @@ struct ubertagger	*load_ubertagger(char	*expath, char	*txpath, char	*genmappath)
 	ut->tag_hash = hash_new("ut-tags");
 	ut->start_tag = ut_lookup_tag(ut, "<S>", 1);
 	ut->end_tag = ut_lookup_tag(ut, "<E>", 1);
+	ut->unk_tag = ut_lookup_tag(ut, "<U>", 1);
 	//printf("loading %s\n", expath);
 	ut_load_ex(ut,expath);
 	//printf("loading %s\n", txpath);
@@ -525,6 +530,7 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 	int	i, j;
 	int	a,b;
 	int		tags[ll->nedges];
+	char	*tagnames[ll->nedges];
 	int		npreceding_tags[ll->nedges];
 	int		*preceding_tags[ll->nedges];
 	double	*preceding_tag_scores[ll->nedges];
@@ -532,11 +538,15 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 	double	emission[ll->nedges];
 	double	forward_sum[ll->nvertices];
 	double	forward_sum_end = 0;
+	// especially since plr are ignored in tag names, multiple lexical edges can have identical tags.
+	// only want to score each tag once in the lattice, to avoid biasing computations.
+	int	is_duplicate[ll->nedges];
 	// first, fetch tag ID numbers for each tag_token and initialize forward scores to LOGZERO
 	for(i=0;i<ll->nedges;i++)
 	{
 		struct lattice_edge	*e = ll->edges[i];
 		char	*tagname = ut_get_lextag(ut, e->edge,0);
+		tagnames[i] = tagname;
 		struct edge	*lexedge = ut_get_lexedge(e->edge);
 		struct token	*tok0 = (struct token*)lexedge->daughters[0];
 		struct dg	*class = dg_hop(tok0->dg, lookup_fname("+CLASS"));
@@ -583,7 +593,19 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 		}
 		ut_normalize_emission(emission_string);
 		tags[i] = ut_lookup_tag(ut, tagname, 0);
-		if(tags[i]==-1)tags[i] = ut->start_tag;	// XXX hack
+		if(tags[i]==-1)tags[i] = ut->unk_tag;
+		is_duplicate[i] = 0;
+		for(j=0;j<i;j++)
+		{
+			if(tags[j]==tags[i] && ll->edges[i]->from==ll->edges[j]->from && ll->edges[i]->to==ll->edges[j]->to)
+			{
+				// identical tag numbers isn't good enough for UNK;
+				// tagnames could still differ. want a separate path through
+				// the lattice active for each tagname.
+				if(tags[i]!=ut->unk_tag || !strcmp(tagnames[j],tagnames[i]))
+					is_duplicate[i] = j+1;
+			}
+		}
 		emission[i] = ut_score_ex(ut, tags[i], emission_string, classcase);
 		DEBUG("looked up %s => %d	//	emit |%s| with score %f\n", tagname, (tags[i]==ut->start_tag)?-1:tags[i], emission_string, emission[i]);
 		free(emission_string);
@@ -606,6 +628,7 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 	{
 		struct lattice_edge	*e = ll->edges[i];
 		struct lattice_vertex	*v = e->to;
+		if(is_duplicate[i])continue;
 		for(j=0;j<v->nfollowers;j++)
 		{
 			struct lattice_edge	*f = v->followers[j];
@@ -641,7 +664,7 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 		}
 		else forward_sum[i] = 0;*/
 		// look forward from 'v'
-		for(a=0;a<ll->nedges;a++) if(ll->edges[a]->to==v)
+		for(a=0;a<ll->nedges;a++) if(!is_duplicate[a] && ll->edges[a]->to==v)
 		{
 			// 'a' loops over all edges ending at 'v'
 			for(j=0;j<v->nfollowers;j++)
@@ -649,6 +672,7 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 				struct lattice_edge	*be = v->followers[j];
 				for(b=0;b<ll->nedges;b++)if(ll->edges[b]==be)break;	// FIXME this is inefficient; squanders advantage from ->followers
 				assert(b<ll->nedges);
+				if(is_duplicate[b])continue;
 				// 'b' loops over all edges following 'v'
 				// a->v->b is a tag bigram; sum into b's probabilities for all possible preceding tags T (so t a b is the tag sequence)
 				int t, ti;
@@ -673,6 +697,7 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 	{
 		struct lattice_edge	*e = ll->edges[i];
 		if(e->to != ll->end)continue;
+		if(is_duplicate[i])continue;
 		double	e_score = LOGZERO;
 		for(j=0;j<npreceding_tags[i];j++)
 		{
@@ -704,6 +729,7 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 		//printf("back-reached vertex %d\n", i);
 		for(b=0;b<ll->nedges;b++) if(ll->edges[b]->to==v)
 		{
+			if(is_duplicate[b])continue;
 			struct lattice_edge	*Y = ll->edges[b];
 			int	Yt = tags[b];
 			for(j=0;j<npreceding_tags[b];j++)
@@ -715,7 +741,7 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 				{
 					backward[b][Xt] = LOGZERO;
 					int z;
-					for(z=0;z<ll->nedges;z++) if(ll->edges[z]->from==v)
+					for(z=0;z<ll->nedges;z++) if(!is_duplicate[z] && ll->edges[z]->from==v)
 					{
 						int	Zt = tags[z];
 						double	score = ut_score_tx(ut, Xt, Yt, Zt) + emission[z] + backward[z][Yt];
@@ -735,9 +761,12 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 	// in p'tic, multiply by P(observations up to Y) [=sum of forewards at Y->to] and divide by P(all observations) [=sum of forewards at ll->end]
 
 	int	new_nedges = 0;
-	for(i=0;i<ll->nedges;i++)
+	int	i_true;
+	// look at all lexical edges including duplicates, but score by the first equivalent representative
+	for(i_true=0;i_true<ll->nedges;i_true++)
 	{
 		double	e_total = LOGZERO;
+		i = is_duplicate[i_true]?(is_duplicate[i_true]-1):i_true;
 		for(j=0;j<npreceding_tags[i];j++)
 		{
 			double	fw = preceding_tag_scores[i][preceding_tags[i][j]];
@@ -748,11 +777,11 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 			//	printf("%s %s	=> %f + %f =	%f\n", ut->tags[preceding_tags[i][j]], ut->tags[tags[i]], fw, bw, p_x_y);
 			e_total = logsumexp(e_total, p_x_y);
 		}
-		DEBUG("%s	%s	=>	%f	=>	%f\n", ll->edges[i]->edge->lex->word, ut->tags[tags[i]], e_total, exp(e_total));
+		DEBUG("%s	%s	=>	%f	=>	%f\n", ll->edges[i_true]->edge->lex->word, ut->tags[tags[i]], e_total, exp(e_total));
 		if(e_total >= thresh)
 		{
 			DEBUG("	KEEP\n");
-			ll->edges[new_nedges++] = ll->edges[i];
+			ll->edges[new_nedges++] = ll->edges[i_true];
 		}
 		else DEBUG("	DISCARD\n");
 	}
@@ -762,6 +791,7 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 		free(backward[i]);
 		free(preceding_tags[i]);
 		free(preceding_tag_scores[i]);
+		free(tagnames[i]);
 	}
 	ll->nedges = new_nedges;
 }

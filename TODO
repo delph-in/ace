@@ -61,6 +61,8 @@ things that would be nice:
 		1. subsumption test uses 'copy' and 'carcs'; can use type/forward instead of 'carcs' but will need to verify that this doesn't cause additional trouble.
 		2. transfer reads 'carcs' -- but appears to do so before copy()/finalize_tmp() is called, so the copy/carcs slot would have a carcs interpretation then, so all is well still
 		3. copy() uses both 'carcs' and 'copy'; but once 'carcs' has been read, it can be overwritten as 'copy'; just need to be able to flag which interpretation is active.
+		4. when applying a GLB constraint, we use copy_dg_no_comp_arcs() mid-generation on a dag that might have already been unified with something (!), with the intent of getting a copy of the *original* dag.  this uses the ->copy slot.  either need to stop doing that, or guarantee that the dags we pull that trick on don't have any carcs.  unifier prefers not to add carcs to frozen dags, which helps.  is there a case where the system is forced to unify1(two frozen dags)? yes. so, can be forced to add ->carcs to a type dag brought in on GLB duty.
+			.. so, can't play the game anymore of grabbing the grammar's copy of the type dag and copying later if we need another instance. unclear how big of a slowdown...
 	- could also trade in 8-byte pointers for 2-byte indices into a table, probably -- but the extra indirection may be expensive. for 'type', every dag node being unified would get one. for 'copy', every node being copied would get one... becomes like the previous dgtmp experiment.  which in hindsight wasn't such a terrible thing...
 
 - idea: do an initial parse with a cheaper (strictly less strict) grammar, see what edges are connected to roots, and use that as a top-down filter on a second pass with the full grammar.
@@ -151,6 +153,7 @@ ideas:
 - now that post-model-path config option exists, Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 DONE:
+0.9.21
 	- add ubertagging
 	- make file references from config files relative to config subfiles (e.g. if :include'd from a different directory)
 	- bug fix; token mapping regex capture group references were being hallucinated in inputs contining ${; thanks Matic!

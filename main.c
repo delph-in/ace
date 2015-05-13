@@ -32,7 +32,7 @@ char	*sentence_path = 0, *master_addr = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
 int show_gen_chart = 0;
 int timeout_seconds = 0;
-int	enable_ubertagging = 0;
+extern int	enable_ubertagging;
 extern double	ubertagging_threshold;
 
 int	disable_generalization = 0;

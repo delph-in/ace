@@ -42,7 +42,7 @@ struct ubertagger
 {
 	int		ntags;
 	char	**tags;
-	int		start_tag, end_tag;
+	int		start_tag, end_tag, unk_tag;
 	struct hash	*tag_hash;
 	int		nclasscases;
 	char	**classcases;

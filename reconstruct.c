@@ -339,7 +339,6 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 			lkb_carg = strdup(lkb_carg);
 		}
 		struct lexeme	*l = get_lex_by_name_hash(uln);
-		free(lname);
 		if(!l)
 		{
 			if(reconstruction_noise_level)
@@ -351,8 +350,10 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 				error->node = t;
 				error->comment = strdup(uln);
 			}
+			free(lname);
 			return NULL;
 		}
+		free(lname);
 		struct dg	*d = lexical_dg(l, NULL);
 		if(do_reconstruct_tokens)
 		{
