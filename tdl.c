@@ -1111,8 +1111,9 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str)
 		}
 		// up to 0.9.21 this was copy_dg(lhs) and copy_dg(rhs); why? will I regret skipping that?
 		// answer: copying aggressively was reducing the need for p_dereference_dg() calls other places.
-		//if(0 != unify_dg_infrom(res = copy_dg(lhs), copy_dg(rhs)))
-		if(0 != unify_dg_infrom(res = lhs, rhs))
+		// also, there's a mysterious crash in lexical lookup on OSX (but not linux) without it
+		if(0 != unify_dg_infrom(res = copy_dg(lhs), copy_dg(rhs)))
+		//if(0 != unify_dg_infrom(res = lhs, rhs))
 		{
 			fprintf(stderr, "tdl: requested unification failed\n");
 #ifdef	UNIFY_PATHS
