@@ -543,11 +543,13 @@ struct type	*find_type(char	*name, int	constrain)
 					tdl->processed = 1;
 					if(constrain)
 					{
+						struct type	*tmp = _current_building_type;
 						if(dagify_tdl_line(tdl->lhs, tdl->rhs, constrain_type))
 						{
 							fprintf(stderr, "tdl: error constraining occured near line %d\n", tdl->lnum);
 							return 0;
 						}
+						_current_building_type = tmp;
 					}
 					else if(typify_tdl_line(tdl->lhs, tdl->rhs, 0))
 					{
@@ -747,7 +749,7 @@ static int patch_coreferences(struct dagify_record	*R, struct dg	*target)
 	return 0;
 }
 
-static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*building_type);
+static struct dg	*rdagify(struct dagify_record	*R, char	*str);
 static struct dg	*dlistify(struct dagify_record	*R, char	*str);
 
 static struct dg	*listify(struct dagify_record	*R, char	*str, struct dg	**last)
@@ -840,7 +842,7 @@ static struct dg	*listify(struct dagify_record	*R, char	*str, struct dg	**last)
 			{
 				if(last) fprintf(stderr, "tdl: WARNING -- '.' list cons notation used in a diff-list!\n");
 				R->current_path[R->current_pathlen++] = 2;	// REST
-				nlp = rdagify(R, str, 0);
+				nlp = rdagify(R, str);
 				R->current_pathlen--;
 				if(!nlp)return 0;
 				*str = 0;	// make sure we break
@@ -862,7 +864,7 @@ static struct dg	*listify(struct dagify_record	*R, char	*str, struct dg	**last)
 
 		//printf("list item `%s'\n", item);
 		R->current_path[R->current_pathlen++] = 1;	// FIRST
-		idg = rdagify(R, item, 0);
+		idg = rdagify(R, item);
 		R->current_pathlen--;
 		if(!idg)
 		{
@@ -1047,7 +1049,7 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 			depth++;
 			label = dot+1;
 		} while(dot);
-		value = rdagify(R, vptr, 0);
+		value = rdagify(R, vptr);
 		R->current_pathlen-=depth;
 		if(!value)
 		{
@@ -1066,7 +1068,7 @@ static struct dg	*structify(struct dagify_record	*R, char	*str)
 	return dg;
 }
 
-static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*building_type)
+static struct dg	*rdagify(struct dagify_record	*R, char	*str)
 {
 	int	bracket = 0, inquote = 0;
 	char	*ptr;
@@ -1092,23 +1094,25 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 		*ptr = 0;
 		lhs = structify(R, str);
 		if(!lhs)return 0;
-		rhs = rdagify(R, ptr+1, building_type);
+		rhs = rdagify(R, ptr+1);
 		if(!rhs)return 0;
 		lhs = dereference_dg(lhs);
 		rhs = dereference_dg(rhs);
-		if(building_type)
+		/*if(building_type)
 		{
 			lhs->type = rhs->type = building_type;
 			lhs->xtype = rhs->xtype = building_type;
-		}
+		}*/
 		if(loud_noises)
 		{
-			if(building_type)printf("building %s!\n", building_type->name);
+			//if(building_type)printf("building %s!\n", building_type->name);
 			printf("lhs: "); print_dg(lhs); printf("\n");
 			printf("rhs: "); print_dg(rhs); printf("\n");
 		}
-		_current_building_type = building_type;
-		if(0 != unify_dg_infrom(res = copy_dg(lhs), copy_dg(rhs)))
+		// up to 0.9.21 this was copy_dg(lhs) and copy_dg(rhs); why? will I regret skipping that?
+		// answer: copying aggressively was reducing the need for p_dereference_dg() calls other places.
+		//if(0 != unify_dg_infrom(res = copy_dg(lhs), copy_dg(rhs)))
+		if(0 != unify_dg_infrom(res = lhs, rhs))
 		{
 			fprintf(stderr, "tdl: requested unification failed\n");
 #ifdef	UNIFY_PATHS
@@ -1116,7 +1120,6 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 #endif
 			printf("lhs: "); print_dg(lhs); printf("\n");
 			printf("rhs: "); print_dg(rhs); printf("\n");
-			_current_building_type = NULL;
 			return 0;
 		}
 		res = p_dereference_dg(res);
@@ -1124,7 +1127,6 @@ static struct dg	*rdagify(struct dagify_record	*R, char	*str, struct type	*build
 		{
 			printf("res: "); print_dg(res); printf("\n");
 		}
-		_current_building_type = NULL;
 		return res;
 	}
 	else return structify(R, str);
@@ -1138,10 +1140,16 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 
 	bzero(&R, sizeof(R));
 
-	dg = rdagify(&R, str, building_type);
+	_current_building_type = building_type;
+	dg = rdagify(&R, str);
 	if(!dg)
 	{
+		_current_building_type = NULL;
 		return 0;
+	}
+	if(building_type)
+	{
+		dg->type = dg->xtype = building_type;
 	}
 	//printf(" pre-coref: "); print_dg(dg); printf("\n");
 
@@ -1153,6 +1161,7 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 #endif
 		dg = NULL;
 	}
+	_current_building_type = NULL;
 	dg = p_dereference_dg(dg);
 
 	for(i=0;i<R.ncorefs;i++)
@@ -1417,7 +1426,7 @@ int	mtrify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 
 	struct dagify_record	R;
 	bzero(&R, sizeof(R));
-	struct dg	*main_dg = rdagify(&R, dag, NULL);
+	struct dg	*main_dg = rdagify(&R, dag);
 	if(!main_dg)return -1;
 
 	//printf("main dg before type or bleaching:\n"); print_dg(main_dg);printf("\n");

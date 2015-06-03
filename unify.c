@@ -675,9 +675,7 @@ int	unify_dg_infrom(struct dg	*dg1, struct dg	*dg2)
 				{
 					//printf(" ... _current_building_type = %s\n", _current_building_type->name);
 					//printf(" ... going to try to go constrain that type while in the middle of unifying for this one...!\n");
-					struct type	*tmp = _current_building_type;
 					find_type(t->name, 1);
-					_current_building_type = tmp;
 				}
 				else
 				{

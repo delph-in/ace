@@ -399,6 +399,7 @@ void	gqc_result()
 int	qc_count_strings(struct dg	*qc)
 {
 	int	i, n=0;
+	qc = p_dereference_dg(qc);
 	struct dg	**arcs = DARCS(qc);
 	if(qc->xtype->name[0]=='"')n++;
 	for(i=0;i<qc->narcs;i++)
@@ -408,6 +409,7 @@ int	qc_count_strings(struct dg	*qc)
 
 void	recursive_write_qccode(struct dg	*qc, FILE	*f, int	count)
 {
+	qc = p_dereference_dg(qc);
 	if(qc->xtype->name[0]=='"')
 	{
 		int	k = atoi(qc->xtype->name+1);
