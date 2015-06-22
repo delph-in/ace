@@ -211,7 +211,7 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 				disable_all_roots();
 				char	*root;
 				for(root=strtok(rhs," \t\n");root;root=strtok(NULL," \t\n"))
-					enable_root((*root='$')?(root+1):root);
+					enable_root((*root=='$')?(root+1):root);
 			}
 		}
 	}
