@@ -130,6 +130,26 @@ void	*freeze_instances()
 	return in;
 }
 
+void	disable_all_roots()
+{
+	int	i;
+	for(i=0;i<ninstances;i++)instances[i].root_flag = 0;
+}
+
+void	enable_root(char	*name)
+{
+	int	i;
+	for(i=0;i<ninstances;i++)
+		if(!strcasecmp(name, instances[i].name))
+			break;
+	if(i<ninstances)instances[i].root_flag = (unsigned)-1;
+	else
+	{
+		fprintf(stderr, "roots: no such instance as `%s' available\n", name);
+		exit(-1);
+	}
+}
+
 void	recover_instances(void	*ptr)
 {
 	struct instances	*in = ptr;
@@ -141,18 +161,9 @@ void	recover_instances(void	*ptr)
 		int i;
 		char *p;
 		for(i=0;i<ninstances;i++)instances[i].root_flag = 0;
+		disable_all_roots();
 		for(p=strtok(use_roots, " ");p;p=strtok(0, " "))
-		{
-			for(i=0;i<ninstances;i++)
-				if(!strcasecmp(p, instances[i].name))
-					break;
-			if(i<ninstances)instances[i].root_flag = (unsigned)-1;
-			else
-			{
-				fprintf(stderr, "roots: no such instance as `%s' available\n", p);
-				exit(-1);
-			}
-		}
+			enable_root(p);
 	}
 
 	if(!g_transfer)

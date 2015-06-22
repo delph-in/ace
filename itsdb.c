@@ -182,7 +182,7 @@ tsdb_parse_note_end()
 }
 
 static int process_item(int i_id, const char *i_input, int parse_id, 
-		int edges, int nanalyses, int nderivations, int interactive, const char	*who_knows_what_this_argument_is)
+		int edges, int nanalyses, int nderivations, int interactive, const char	*custom)
 {
 	extern int total_edges, real_edges, passive_edges;
 	int readings;
@@ -197,6 +197,24 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	inhibit_results = 1;
 	best_only = nanalyses;//nderivations;
 	tsdb_i_id = i_id;
+
+	if(custom && *custom)
+	{
+		assert(strlen(custom)<1024);
+		char	Lhs[1024], Rhs[1024];
+		if(2==sscanf(custom,"%[^:]:=%[^.].", Lhs, Rhs))
+		{
+			char	*lhs = trim_string(Lhs);
+			char	*rhs = trim_string(Rhs);
+			if(!strcasecmp(lhs,"start-symbols"))
+			{
+				disable_all_roots();
+				char	*root;
+				for(root=strtok(rhs," \t\n");root;root=strtok(NULL," \t\n"))
+					enable_root((*root='$')?(root+1):root);
+			}
+		}
+	}
 
 	top_copies = top_unifies_wellform = top_unifies = 0;
 
