@@ -21,7 +21,7 @@ void	print_current_sentence(int	sig)
 
 	int	r;
 	
-	r = write(saved_termerr, "DEADLY SIGNAL! sent = `", strlen("DEADLY SIGNAL! sent = `"));
+	r = write(saved_termerr, "ERROR: DEADLY SIGNAL! sent = `", strlen("DEADLY SIGNAL! sent = `"));
 	r = write(saved_termerr, current_sentence, strlen(current_sentence));
 	r = write(saved_termerr, "'\n", 2);
 	shutdown_net();
@@ -64,7 +64,14 @@ void	connect_to_master(char	*hostname)
 {
 	int	sout;
 
-	sout = conn(hostname, PORT);
+	char	*colon = strchr(hostname, ':');
+	int	port = PORT;
+	if(colon)
+	{
+		*colon = 0;
+		port = atoi(colon+1);
+	}
+	sout = conn(hostname, port);
 	//printf("connected.\n");
 
 	saved_termerr = dup(2);
