@@ -363,6 +363,8 @@ int	pack_edge(struct edge	*edge)
 	int			i, ssd, ncandidates;
 	int			already_packed = 0;
 
+	//if(g_mode==PARSING && edge->neps==-1)return 0;	// for now, never pack Dublin edges.
+
 	struct edge	*generalizable_host = NULL;
 
 	int	would_pack_as_ssd = 0;
@@ -435,7 +437,7 @@ int	pack_edge(struct edge	*edge)
 
 			if(!fw && !bk)
 			{
-				if(gz && !h->frozen)save_generalization_candidate(h);
+				if(gz && !h->frozen && !(g_mode==PARSING && h->neps==-1))save_generalization_candidate(h);
 				continue;
 			}
 
@@ -478,6 +480,8 @@ int	pack_edge(struct edge	*edge)
 			{
 				// forward packing
 				// h subsumes edge
+				if(g_mode==PARSING && edge->neps==-1)
+					continue;	// don't let dublin edges be packed into other edges
 				if(same_cell_daughter(edge, h))
 				{
 					// h is a descendent of edge
@@ -531,6 +535,11 @@ int	pack_edge(struct edge	*edge)
 					// this should never be reached.
 					assert(!"not reached");
 					//printf("blocked same-cell-daughter packing\n");
+					continue;
+				}
+				if(g_mode==PARSING && h->neps==-1)
+				{
+					// h is a Dublin robust parse tree guide; there is already a full tree in the agenda built on it which we don't really want to cancel or generalize more.
 					continue;
 				}
 				if(!already_packed)
@@ -610,7 +619,7 @@ int	pack_edge(struct edge	*edge)
 
 	// failed to pack under strict subsumption.
 #ifdef	ENABLE_GENERALIZATION
-	if(edge->have == edge->need && g_mode == PARSING && !edge->north_routes && !disable_generalization)
+	if(edge->have == edge->need && g_mode == PARSING && !edge->north_routes && !disable_generalization && edge->neps!=-1)
 	{
 		// we kept a list of edges whose quickcheck suggested they may generalize
 		for(i=0;!generalizable_host && i<ngeneralization_candidates;i++)

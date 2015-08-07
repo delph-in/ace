@@ -70,4 +70,4 @@ char	*hypothesis_to_dstring(struct hypothesis	*h);
 char	*hypothesis_to_dstring_from(struct hypothesis	*h, int	_from);
 char	*hypothesis_to_labelled_tree_string(struct hypothesis	*h);
 char	*slab_escape(char	*str);
-struct hypothesis	*cheap_hypothesis(struct edge	*e);
+struct hypothesis	*cheap_hypothesis(struct edge	*e, int	with_dg);

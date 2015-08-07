@@ -55,7 +55,7 @@ static inline generalize_certain_paths(struct dg	*d, int	hyper)
 	}*/
 }
 
-callable_generalize_certain_paths(struct dg	*d) { generalize_certain_paths(d,0); }
+callable_generalize_certain_paths(struct dg	*d) { if(enable_generalize_edge_top_types)generalize_certain_paths(d,0); }
 
 int	inhibit_results = 0;
 extern int inhibit_pack;
@@ -71,7 +71,6 @@ extern int	question, exhaustive;
 int		edge_id;
 
 extern int	*nused, *nhactive, *nactive, *npassive, *nrecomb, *natries, *nptries, used_total, pused_total;
-extern int noldslabs;
 
 char	*show_orth_leaves(struct edge	*e);
 static void	hyperactive_excursion(struct edge	*e);
@@ -437,6 +436,22 @@ int	build_edge(struct edge	*a, struct edge	*b, int	arg, struct dg	*dg, struct ed
 	e->npack=0;
 	e->pack=0;
 
+	extern int enable_dublin;
+	if(g_mode==PARSING && enable_dublin && e->have<e->need)
+	{
+		// mark active edges as 'dublin' (neps=-1) if they might spawn a dublin passive edge
+		if((a->neps==-1 || a->have==0) && b->neps==-1)
+		{
+			//printf("possibly building an active edge that could spawn dublin edge...\n");
+			if(dublin_tree_contains(e->rule->name, -1,-1, b->rule?b->rule->name:b->lex->word, b->from, b->to))
+			{
+				if(trace>1)printf("active edge #%d has the potential to spawn a redundant dublin edge\n", e->id);
+				e->neps=-1;
+			}
+			//else printf("but %s[%d-%d] over %s[%d-%d] is not in dublin tree\n",e->rule->name, e->from, e->to, b->rule?b->rule->name:b->lex->word, b->from, b->to);
+		}
+	}
+
 	if(trace)
 	{
 		if(g_mode == GENERATING)
@@ -723,6 +738,18 @@ int	filter(struct edge	*a, struct edge	*b)
 				// non-spanning edge
 				if(a->rule->span_only) return 0;
 			}
+			if((a->neps==-1 || a->have==0) && b->neps==-1)
+			{
+				// building a passive edge that might come from the dublin tree...
+				//printf("possibly building a passive that is in dublin...\n");
+				if(dublin_tree_contains(a->rule->name, rfrom, rto, b->rule?b->rule->name:b->lex->word, b->from, b->to))
+				{
+					if(trace>1)
+						printf("not using rule '%s'[%d-%d] since dublin already has it\n", a->rule->name, rfrom, rto);
+					return 0;	// this passive edge already exists in the dublin tree
+				}
+				//else printf("but it wasn't in dublin\n");
+			}
 		}
 		else
 		{
@@ -918,7 +945,7 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 			if(trace>1)printf("build_edge found a cycle\n");
 			return 0;
 		}
-		if(noldslabs >= max_chart_megabytes && !arbiter_request_memory())
+		if((slab_usage() / (1024*1024)) >= max_chart_megabytes && !arbiter_request_memory())
 		{
 			fprintf(stderr, "NOTE: terminating search, too much RAM\n");
 			itsdb_error("ran out of RAM while building forest");

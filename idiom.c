@@ -63,6 +63,9 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 	if(!non_idiom_root)
 		return 1; // hack to make idiom analyses succeed if non_idiom_root is not declared
 
+	extern int enable_dublin;
+	if(enable_dublin)return 1;	// hack to skip idiom check when we are operating in "dublin" robust mode
+
 	static struct profiler	*idiom_profiler = NULL;
 	if(g_profiling)start_and_alloc_profiler(&idiom_profiler, "idiom check", unpacking_profiler, NULL);
 	//printf("non_idiom_root = %s\n", non_idiom_root);

@@ -29,7 +29,6 @@ extern int max_unpack_megabytes;
 //#define	MAX_UNPACK_CHUNKS	70000
 //#define	MAX_UNPACK_CHUNKS	7000
 //#define	MAX_UNPACK_CHUNKS	1500
-extern int noldslabs;
 
 extern int debug_level, inhibit_pack;
 
@@ -163,6 +162,7 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	{
 		// shouldn't get here because we delete frozen edges from the chart
 		// and don't build on top of them
+		fflush(stdout);
 		fprintf(stderr, "ERROR: tried to decompose frozen edge #%d\n", edge->id);
 		exit(-1);
 	}
@@ -173,7 +173,8 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 		struct edge	*d = edge->daughters[i];
 		if(d->frozen && !d->frosted)
 		{
-			fprintf(stderr, "ERROR: tried to decompose edge with frozen daughter #%d\n", d->id);
+			fflush(stdout);
+			fprintf(stderr, "ERROR: tried to decompose edge #%d with frozen daughter #%d\n", edge->id, d->id);
 			exit(-1);
 		}
 		// count non-frozen alternatives for this daughter
@@ -187,10 +188,14 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	extern int currslabsize;
 	if(len >= currslabsize)
 	{
-		fprintf(stderr, "NOTE: couldn't allocate %d decompositions, giving up\n",n);
-		longjmp(out_of_memory_jump, 3);
+		d = dec = mega_slab(len, max_unpack_megabytes);
+		if(!d)
+		{
+			fprintf(stderr, "NOTE: couldn't allocate %d decompositions, giving up\n",n);
+			longjmp(out_of_memory_jump, 3);
+		}
 	}
-	d = dec = slab_alloc(len);
+	else d = dec = slab_alloc(len);
 
 	for(i=0;i<n;i++)
 	{
@@ -589,7 +594,7 @@ struct hypothesis *process_hypagenda(struct hypagenda_item **A)
 	struct hypagenda_item	**W, *l, *r;
 	int					arity, i, j;
 
-	if(noldslabs >= max_unpack_megabytes && !arbiter_request_memory())
+	if((slab_usage() / (1024*1024)) >= max_unpack_megabytes && !arbiter_request_memory())
 		longjmp(out_of_memory_jump, 2);
 
 	//printf("agenda:\n");
@@ -797,7 +802,7 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 	return hyp;
 }
 
-struct hypothesis	*cheap_hypothesis(struct edge	*e)
+struct hypothesis	*cheap_hypothesis(struct edge	*e, int	with_dg)
 {
 	struct hypothesis	*h = slab_alloc(sizeof(*h));
 	bzero(h, sizeof(*h));
@@ -808,10 +813,10 @@ struct hypothesis	*cheap_hypothesis(struct edge	*e)
 	int i;
 	for(i=0;i<h->arity;i++)
 	{
-		h->rhslist[i] = cheap_hypothesis(e->daughters[i]);
+		h->rhslist[i] = cheap_hypothesis(e->daughters[i], with_dg);
 		h->toklen += h->rhslist[i]->toklen;
 	}
-	h->dg = e->dg;
+	if(with_dg)h->dg = e->dg;
 	if(e->lex)h->toklen = e->lex->stemlen;
 	build_hypothesis_surface(h);
 	return h;
@@ -868,6 +873,12 @@ int instantiate_hypothesis(struct hypothesis *h)
 		{
 			total_reconstructed_nodes++;
 			struct dg *rdg = h->edge->rule->dg;
+			if(g_mode == PARSING && h->edge->neps==-1)
+			{
+				//printf("using robust unification to reconstruct #%d: %s\n",
+				//	h->edge->id, h->edge->rule?h->edge->rule->name:h->edge->lex->word);
+				enable_robust_unification();
+			}
 			for(i=0;i<arity;i++)
 				if(unify_dg_tmp(h->rhslist[i]->dg, rdg, i))
 				{
@@ -892,8 +903,10 @@ int instantiate_hypothesis(struct hypothesis *h)
 						else h->dec->failed &= ~(1<<i);
 						h->dec->checked |= 1<<i;
 					}*/
-					return -1;
+					break;
 				}
+			if(g_mode == PARSING && h->edge->neps==-1)disable_robust_unification();
+			if(i<arity)return -1;
 			if(g_mode == GENERATING)
 			{
 				int cant_share = 0;
@@ -1529,10 +1542,42 @@ extern int do_itsdb;
 			else DEBUG("... wasn't root after unpacking\n");
 		}
 		else g_checkup++;	// mark that we need to look for subfailures before hypothesizing
-		if(noldslabs >= max_unpack_megabytes && !arbiter_request_memory())
+		if((slab_usage() / (1024*1024)) >= max_unpack_megabytes && !arbiter_request_memory())
 			longjmp(out_of_memory_jump, 1);
 	}
-resume_after_oom:
+resume_after_oom:;
+	if(!count)
+	{
+		struct edge	*dublin_last_ditch_root_edge();
+		struct edge	*last_ditch = dublin_last_ditch_root_edge();
+		struct hypothesis	*last_ditch_h = last_ditch?cheap_hypothesis(last_ditch,0):NULL;
+		if(last_ditch_h)
+		{
+			if(0 == instantiate_hypothesis(last_ditch_h))
+			{
+				struct mrs	*m = NULL;
+				if(want_mrs)
+				{
+					extern int ncleanup_rules, inhibit_vpm;
+					if(ncleanup_rules > 0)inhibit_vpm++;
+					start_timer(mrs_timer);
+					m = extract_mrs(last_ditch_h->dg);
+					stop_timer(mrs_timer, 1);
+					if(ncleanup_rules > 0)
+					{
+						inhibit_vpm--;
+						m = cleanup_mrs(m);	// both for parsing and generation
+						//m = internal_to_external_mrs(m);
+					}
+				}
+	#define	LAST_DITCH_PROBABILITY	1E-10
+				fprintf(stderr, "NOTE: using dublin tree as last ditch offering\n");
+				process(last_ditch_h, m, LAST_DITCH_PROBABILITY);
+				count++;
+			}
+			else fprintf(stderr, "NOTE: couldn't instantiate dublin hypothesis\n");
+		}
+	}
 	if(debug_level)
 	{
 		printf("%d hyps / %d reconstructed / %d readings\n", nhyp, ninsthyps, count);

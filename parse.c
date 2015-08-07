@@ -347,7 +347,12 @@ void	halftime_analysis()
 		printf("	left sibling could be %s\n", rules[i]->name);
 }
 
-int	prepare_parse_chart(struct lattice	*lexical_chart)
+//int		wcap[1024];
+char	current_sentence[10240] = "(not initialized)";
+int didsent;
+int	show_probability = 0;
+
+int	prepare_parse_chart(struct lattice	*token_chart, struct lattice	*lexical_chart)
 {
 	sort_lattice(lexical_chart);
 
@@ -371,6 +376,9 @@ int	prepare_parse_chart(struct lattice	*lexical_chart)
 		add_agenda(le->edge);
 	}
 
+	// optionally add edges from a robust shallow parse tree
+	if(!yy_mode)dublin_robustness(lexical_chart, current_sentence);
+
 	// put syntax rules into agenda
 	//if(rtried)free(rtried);
 	//rtried = calloc(sizeof(int),nrules);
@@ -378,11 +386,6 @@ int	prepare_parse_chart(struct lattice	*lexical_chart)
 
 	return nwords;
 }
-
-//int		wcap[1024];
-char	current_sentence[10240] = "(not initialized)";
-int didsent;
-int	show_probability = 0;
 
 void	(*parse_callback)(struct hypothesis	*hyp, struct mrs	*mrs) = NULL;
 
@@ -537,7 +540,7 @@ extern int	enable_ubertagging;
 	// make sure all copy()'s from here on out (until unpacking time) are restricting.
 	if(!inhibit_pack)enable_packing(1);
 	// setup the main parse chart
-	int nwords = prepare_parse_chart(lexical_chart);
+	int nwords = prepare_parse_chart(token_chart, lexical_chart);
 	if(nwords < 0)
 	{
 		fprintf(stderr, "NOTE: negative lexical chart length\n");
