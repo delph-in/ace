@@ -85,7 +85,7 @@ void	*lui_listener(void *foo)
 				else browse_lui(eid, what, what2);
 			}
 			else if(!strncmp(lp, "version ", 8)) {}
-			else if(strstr(lp, " forget")) {}
+			else if(strstr(lp, " forget"))lui_forget(lp);
 			else if(!strncmp(lp, "parse ", 6))parse_from_lui(lp+6);
 			else if(!strncmp(lp, "genchart ", 9))
 			{
@@ -131,6 +131,8 @@ void	*lui_listener(void *foo)
 	lui_rfd = -1;
 	return 0;
 }
+
+lui_forget(char	*command) { }
 
 void quit_lui()
 {
@@ -202,7 +204,7 @@ void	output_lui_chart(struct lattice	*token_lattice)
 
 	if(g_mode == GENERATING)
 		chart_size++;
-	fprintf(lui_write, "chart %d %d \"%s\"", ++chart_id, chart_size-1, current_sentence);
+	fprintf(lui_write, "chart %d %d \"%s\"", ++chart_id, chart_size-1, slab_escape(current_sentence));
 	char	covermap[chart_size];
 	bzero(covermap, chart_size);
 	//int	leid = -1;
@@ -213,7 +215,7 @@ void	output_lui_chart(struct lattice	*token_lattice)
 		{
 			struct lattice_edge	*e = token_lattice->edges[i];
 			if(e->from->id != j)continue;
-			fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -(i+1), -(i+1), e->from->id, e->to->id, e->token->string);
+			fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -(i+1), -(i+1), e->from->id, e->to->id, slab_escape(e->token->string));
 			//leid--;
 			break;
 		}
@@ -552,7 +554,7 @@ void lui_format_tree(struct hypothesis *h, char *surf)
 	if(!surf && e->lex)surf = h->string;
 	if(!arity)
 		fprintf(lui_write, " #T[%d \"%s\" \"%s\" %d %s",
-			lui_register_tree(h), label, surf, h->eid, sign);
+			lui_register_tree(h), label, slab_escape(surf), h->eid, sign);
 	else
 	{
 		fprintf(lui_write, " #T[%d \"%s\" %s %d %s",
@@ -729,7 +731,7 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 
 void	output_lui_edge_tree(struct edge	*e)
 {
-	struct hypothesis	*h = cheap_hypothesis(e);
+	struct hypothesis	*h = cheap_hypothesis(e, 1);
 	fprintf(lui_write, "tree %d", chart_id);
 	lui_format_tree(h, NULL);
 	fprintf(lui_write, " \"Edge #%d\"\n", e->id);
@@ -821,14 +823,14 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 	}
 	count = iterate_cell_root_hypotheses(c, iter, best_only);
 	//printf("got %d results\n", count);
-	fprintf(lui_write, "group %d \"%s\"\n", count, sent);
+	fprintf(lui_write, "group %d \"%s\"\n", count, slab_escape(sent));
 
 	int show_tree(struct hypothesis	*hyp, struct mrs	*mrs)
 	{
 		if(require_mrs && !mrs_subsumes(require_mrs, mrs))return 0;
 		fprintf(lui_write, "tree %d", chart_id);
 		lui_format_tree(hyp, NULL);
-		fprintf(lui_write, " \"%s\"\n", sent);
+		fprintf(lui_write, " \"%s\"\n", slab_escape(sent));
 		//printf("lui wrote a tree\n");
 		return 1;
 	}
