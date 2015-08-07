@@ -23,6 +23,8 @@
 #include	"timer.h"
 #include	"profiler.h"
 
+#include	"linenoise.h"
+
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 extern int itsdb_dump_chart;
 extern int	show_probability;
@@ -157,6 +159,8 @@ void	parse_args(int	argc, char	*argv[])
 		{"ubertagging", 2,NULL, UBERTAG_OPTION},
 		{"uebertagging", 2,NULL, UBERTAG_OPTION},
 		{"übertagging", 2,NULL, UBERTAG_OPTION},
+#define	LICENSE_INFO_OPTION		1009
+		{"license-info", 0, NULL, LICENSE_INFO_OPTION},
 		{NULL,0,NULL,0}
 		};
 
@@ -173,7 +177,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'V':	printf("ACE version %s\n", ACE_VERSION);
 						printf("compiled at " __TIME__ " on "  __DATE__ "\n");
 						exit(0);
-		case	'h':	usage: printf("usage: %s [-l | -n COUNT] [-R] [-f] [-e] [-g grammar-to-load] [-G grammar-to-save] [sentences-file]\n", prog); exit(0);
+		case	'h':	usage: printf("usage: %s [-l | -n COUNT] [-R] [-f] [-e] [-g grammar-to-load] [-G grammar-to-save] [sentences-file] [--license-info] \n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
 		case	'y':	yy_mode = 1; break;
 		case	'g':	load_grammar_path = optarg;	break;
@@ -217,6 +221,9 @@ void	parse_args(int	argc, char	*argv[])
 				exit(-1);
 			}
 			enable_ubertagging = 1;
+			break;
+		case	LICENSE_INFO_OPTION:
+			show_long_license_info();
 			break;
 		case	0:	continue;	// auto-handled long option
 	} }
@@ -331,13 +338,13 @@ handle_lui_colon_command(char	*line)
 	int	l = strlen(line);
 	if(l>3 && line[l-1]=='\n')line[l-1] = 0;
 	if(line[1]=='r' && line[2]==' ')
-		lui_rule(line+3);
+		lui_rule(line+3, 1);
 	if(line[1]=='l' && line[2]==' ')
-		lui_lex(line+3);
+		lui_lex(line+3, 1);
 	if(line[1]=='i' && line[2]==' ')
-		lui_instance(line+3);
+		lui_instance(line+3, 1);
 	if(line[1]=='t' && line[2]==' ')
-		lui_type(line+3);
+		lui_type(line+3, 1);
 	if(line[1]=='h' && line[2]==' ')
 		show_heirarchy(line+3);
 	if(line[1]=='g' && line[2]==' ')
@@ -359,29 +366,50 @@ struct job_stats	main_input_loop(FILE	*fin)
 //		configure_rules_head_driven();
 
 	if(tsdb_notes)tsdb_run_note();
+	char	linenoise_history_path[10240];
+	if(getenv("HOME"))sprintf(linenoise_history_path, "%s/.ace_history", getenv("HOME"));
+	else sprintf(linenoise_history_path, "/home/%s/.ace_history", getlogin());
+	if(lui_mode)
+	{
+		linenoiseHistoryLoad(linenoise_history_path);
+		extern void lui_linenoise_completion(const char*, linenoiseCompletions*);
+		linenoiseSetCompletionCallback(lui_linenoise_completion);
+	}
 
 	gettimeofday(&tv1, 0);
 	while(!die && !feof(fin))
 	{
 		int num_results;
-		char	line[10240];
+		char	line[10240], *lineptr;
 		if(g_mode == PARSING)
 		{
 			if(fin==stdin)timer();
-			if(!fgets(line, 10240, fin))break;
+			if(lui_mode)
+			{
+				lineptr = linenoise("");
+				if(!lineptr)break;
+				linenoiseHistoryAdd(lineptr);
+				linenoiseHistorySave(linenoise_history_path);
+			}
+			else
+			{
+				if(!fgets(line, 10240, fin))break;
+				lineptr = line;
+			}
 			if(fin==stdin)stdin_time += timer();
 			//start_timer(tid);
-			if(lui_mode && line[0]==':')
+			if(lui_mode && lineptr[0]==':')
 			{
-				handle_lui_colon_command(line);
+				handle_lui_colon_command(lineptr);
 				num_results = -2;
 			}
 			else
 			{
 				if(!lui_mode)clear_slab();
-				num_results = parse_line(line);
+				num_results = parse_line(lineptr);
 				st.count++;
 			}
+			if(lui_mode)free(lineptr);
 			//double et = stop_timer(tid, 1);
 			//printf("%f seconds\n", et);
 		}
