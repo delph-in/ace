@@ -23,6 +23,7 @@ struct tree
 
 struct tree	*string_to_tree(char	*str);
 struct tree	*find_subtree_with_crange(struct tree	*t, int	from, int	to);
+struct tree	*find_subtree_with_trange(struct tree	*t, int	from, int	to);
 void	free_tree(struct tree	*t);
 
 #endif

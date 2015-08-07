@@ -352,6 +352,23 @@ struct tree	*find_subtree_with_crange(struct tree	*t, int	from, int	to)
 	return t;
 }
 
+struct tree	*find_subtree_with_trange(struct tree	*t, int	from, int	to)
+{
+	if(t->tfrom==from && t->tto==to)return t;
+
+	//printf("looking for subtree [%d-%d] in tree [%d-%d]\n", from, to, t->tfrom, t->tto);
+
+	int i;
+	for(i=0;i<t->ndaughters;i++)
+	{
+		struct tree	*d = t->daughters[i];
+		if(d->tfrom >= to || d->tto <= from)
+			continue;
+		return find_subtree_with_trange(d, from, to);
+	}
+	return t;
+}
+
 void	free_tree(struct tree	*t)
 {
 	int	i;
