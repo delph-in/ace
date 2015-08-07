@@ -26,6 +26,10 @@ int		currslabsize;
 void	*slab, *last;
 int	slabu;
 
+int	nmegaslabs;
+long long	megaslab_usage;
+void	**megaslabs;
+
 extern void	*freeze_point, *freeze_next;
 extern int	freeze_fd;
 
@@ -38,22 +42,23 @@ struct type	*uglb;
 struct type	*ut1, *ut2;
 #endif
 
-long long slab_usage() { return (long long)(noldslabs-1)*SLAB_SIZE + slabu; }
+long long slab_usage() { return (long long)(noldslabs-1)*SLAB_SIZE + slabu + megaslab_usage; }
 
 int	slab_size_in_bytes()
 {
-	return (noldslabs-1)*SLAB_SIZE + slabu;
+	return (noldslabs-1)*SLAB_SIZE + slabu + megaslab_usage;
 }
 
 void	print_slab_stats()
 {
-	fprintf(stderr, "RAM: %dk\n", (noldslabs-1)*1024 + slabu/1024);
+	fprintf(stderr, "RAM: %lldk\n", ((long long)noldslabs-1)*1024 + slabu/1024 + megaslab_usage/1024);
 }
 
 void	next_slab();
 
 void	commit_slab()
 {
+	assert(!nmegaslabs);
 	if(freeze_next)
 	{
 		printf("freezing %.1fM to file map %p\n", (float)slabu/1024/1024, freeze_point);
@@ -78,6 +83,7 @@ void	clear_slab()
 		noldslabs = 0;
 		last = slab = freeze_next;
 		slabu = 0;
+		assert(!nmegaslabs);
 	}
 	else
 	{
@@ -100,6 +106,10 @@ void	clear_slab()
 		noldslabs = 0;
 		next_slab();
 		currslabsize = SLAB_SIZE;
+		for(i=0;i<nmegaslabs;i++)
+			free(megaslabs[i]);
+		nmegaslabs = 0;
+		megaslab_usage = 0;
 	}
 }
 
@@ -133,6 +143,16 @@ void	next_slab()
 	slab = oldslabs[noldslabs-1];
 	slabu = 0;
 	last = slab;
+}
+
+void	*mega_slab(long long	size, int	maxmb)
+{
+	if((slab_usage() + size) / (1024*1024) > maxmb)return NULL;
+	nmegaslabs++;
+	megaslab_usage += size;
+	megaslabs = realloc(megaslabs, sizeof(void*)*nmegaslabs);
+	megaslabs[nmegaslabs-1] = malloc(size);
+	return megaslabs[nmegaslabs-1];
 }
 
 void	*slab_realloc(void	*ptr, int	oldlen, int	newlen)

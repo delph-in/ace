@@ -152,6 +152,7 @@ static inline void	set_slabstate(struct slab_state	*s)
 }
 
 static inline	void	*slab_alloc(int	len) __attribute__ ((malloc));
+void	*mega_slab(long long	size, int	maxmb);
 void	*slab_alloc_unaligned(int	len);
 
 static inline void	slab_warm_cache()
