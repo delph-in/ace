@@ -28,6 +28,7 @@
 int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 extern int itsdb_dump_chart;
 extern int	show_probability;
+extern int	enable_dublin;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
@@ -83,6 +84,9 @@ extern int	yy_rule_mode;
 extern float timer();
 
 int	parse_line(char	*line);
+extern char	*csaw_grammar_path;
+
+char	*override_maxent_path = NULL;
 
 FILE	*open_sentence_source()
 {
@@ -159,7 +163,11 @@ void	parse_args(int	argc, char	*argv[])
 		{"ubertagging", 2,NULL, UBERTAG_OPTION},
 		{"uebertagging", 2,NULL, UBERTAG_OPTION},
 		{"übertagging", 2,NULL, UBERTAG_OPTION},
-#define	LICENSE_INFO_OPTION		1009
+#define	DUBLIN_OPTION	1009
+		{"dublin", 2, NULL, DUBLIN_OPTION},
+#define	MAXENT_OPTION	1010
+		{"maxent", 2, NULL, MAXENT_OPTION},
+#define	LICENSE_INFO_OPTION		1011
 		{"license-info", 0, NULL, LICENSE_INFO_OPTION},
 		{NULL,0,NULL,0}
 		};
@@ -222,9 +230,9 @@ void	parse_args(int	argc, char	*argv[])
 			}
 			enable_ubertagging = 1;
 			break;
-		case	LICENSE_INFO_OPTION:
-			show_long_license_info();
-			break;
+		case	DUBLIN_OPTION: csaw_grammar_path = optarg; enable_dublin = 1; break;
+		case	MAXENT_OPTION: override_maxent_path = optarg; break;
+		case	LICENSE_INFO_OPTION: show_long_license_info(); break;
 		case	0:	continue;	// auto-handled long option
 	} }
 	if(optind<argc-1)goto usage;
@@ -462,7 +470,11 @@ void	initialize_engine()
 	init_glb_cache();
 
 	if(!save_grammar_path)
+	{
 		load_frozen_grammar(load_grammar_path);
+		if(csaw_grammar_path)csaw_init(load_grammar_path, csaw_grammar_path);
+		if(override_maxent_path)load_mem(override_maxent_path);
+	}
 	else
 	{
 		struct timeval	tv1, tv2;
@@ -486,6 +498,7 @@ void	initialize_engine()
 		gettimeofday(&tv2, 0);
 		tv2.tv_sec -= tv1.tv_sec;
 		tv2.tv_usec -= tv1.tv_usec;
+		if(override_maxent_path)load_mem(override_maxent_path);
 		fprintf(stderr, "loaded grammar in %.5fs\n", (float)tv2.tv_sec + (float)tv2.tv_usec/1000000);
 
 		close(fd);

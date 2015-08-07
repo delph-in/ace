@@ -40,6 +40,7 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl_unused, struct sco
 	float ret = 0;
 	//char	*key = rtl?rhs2:rhs1;
 	char	hkey[512];
+	int	space = 511;
 
 	void visitor(struct maxent_feature *feat)
 	{
@@ -55,16 +56,16 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl_unused, struct sco
 
 	int	ngp;
 	char	*hkp = hkey;
-	hkp += sprintf(hkey, "%s:%s:%s", lhs, rhs1?:"", rhs2?:"");//key?:"");
+	hkp += snprintf(hkey, 511 - (hkp-hkey), "%s:%s:%s", lhs, rhs1?:"", rhs2?:"");//key?:"");
 	for(ngp=0;ngp<=anc->nparent_types;ngp++)
 	{
-		if(ngp) hkp += sprintf(hkp, ":%s", anc->parent_types[ngp-1]);
+		if(ngp) hkp += snprintf(hkp, 511 - (hkp-hkey), ":%s", anc->parent_types[ngp-1]);
 		MAXENT_NOISE("scoring key = %s\n", hkey);
 		hash_visit_key(mem, hkey, (void(*)(void*))visitor);
 	}
 	if(anc->rooted)
 	{
-		hkp += sprintf(hkp, ":^");
+		hkp += snprintf(hkp, 511 - (hkp-hkey), ":^");
 		MAXENT_NOISE("scoring key = %s\n", hkey);
 		hash_visit_key(mem, hkey, (void(*)(void*))visitor);
 	}
@@ -102,6 +103,8 @@ void record_maxent_feature(char *head, char *rhs[2], float score, int	ngp, char	
 	hash_add(mem, strdup(key), feat);
 }
 
+static int	maxent_lnum = 0;
+
 static char	*parse_word(char	**P)
 {
 	char	*p = *P, *ret;
@@ -116,7 +119,15 @@ static char	*parse_word(char	**P)
 		p++;
 	}
 	if(*p==' '){*p=0;p++;}
-	else assert(!quoted);
+	else
+	{
+		if(quoted)
+		{
+			fprintf(stderr, "maxent: problem reading line %d of .mem file; quoted value not terminated properly?\n", maxent_lnum);
+			exit(-1);
+		}
+		assert(!quoted);
+	}
 	*P = p;
 	return *ret?ret:0;
 }
@@ -133,17 +144,19 @@ int load_mem(char *fname)
 	f = fopen(fname, "r");
 	if(!f) { perror(fname); return -1; }
 
-	if(mem)
-		fprintf(stderr, "NOTE: overwriting pre-existing max-ent model with `%s'\n", fname);
+	/*if(mem)
+		fprintf(stderr, "NOTE: overwriting pre-existing max-ent model with `%s'\n", fname);*/
 	mem = hash_new("maxent model");
 
 	DEBUG("loading maxent file from '%s'\n", fname);
+	maxent_lnum = 0;
 
 //struct timeval tv, tv2;
 //gettimeofday(&tv, NULL);
 //double tfgets = 0;
 	while(fgets(line, 1024, f))
 	{
+		maxent_lnum++;
 		// XXX this measurement was wrong...
 		// need to reset `tv' before each fgets()
 		//gettimeofday(&tv2, NULL);
