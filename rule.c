@@ -340,8 +340,17 @@ struct rule	*get_rule_by_name(char	*name)
 void	lui_rule(char	*name)
 {
 	struct rule	*r = get_rule_by_name(name);
-	if(!r) { fprintf(stderr, "no such rule '%s'\n", name); return; }
-	output_lui_dg(r->dg, name);
+	if(r)output_lui_dg(r->dg, name);
+	else
+	{
+		int i;
+		start_lui_dg_list();
+		for(i=0;i<nrules;i++)
+			if(strstr(rules[i]->name, name))
+				lui_dg_list(rules[i]->name, rules[i]->dg);
+		if(0==stop_lui_dg_list("matching rules"))
+			printf("no such rule `%s'\n", name);
+	}
 }
 
 void	print_rule(char	*name)

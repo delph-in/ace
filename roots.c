@@ -9,6 +9,8 @@
 #include	"rule.h"
 #include	"conf.h"
 
+#include	"linenoise.h"
+
 struct instance
 {
 	char		*name;
@@ -418,10 +420,30 @@ int	load_labels()
 	return 0;
 }
 
-void	lui_instance(char	*name)
+void	lui_instance(char	*name, int	allow_partial)
 {
 	struct dg *d = find_instance(name);
 	if(d)
 		output_lui_dg(d, name);
-	else printf("no such\n");
+	else
+	{
+		int i;
+		start_lui_dg_list();
+		for(i=0;i<ninstances;i++)
+			if(strstr(instances[i].name, name))
+				lui_dg_list(instances[i].name, instances[i].dg);
+		if(0==stop_lui_dg_list("matching instances"))
+			printf("no such instance `%s'\n", name);
+	}
+}
+
+void	lui_instance_completions(const char	*line, linenoiseCompletions	*lc)
+{
+	int	i;
+	char	compl[10240] = ":i ";
+	for(i=0;i<ninstances;i++)if(!strncmp(line,instances[i].name,strlen(line)))
+	{
+		strcpy(compl+3, instances[i].name);
+		linenoiseAddCompletion(lc,strdup(compl));
+	}
 }

@@ -151,9 +151,21 @@ void	lui_type(char	*name)
 {
 	struct type	*t = lookup_type(name);
 
-	if(!t)
-		fprintf(stderr, "print_type: `%s' doesn't exist\n", name);
-	else output_lui_dg(t->dg, name);
+	if(t) output_lui_dg(t->dg, name);
+	else
+	{
+		int i,k=0;
+		start_lui_dg_list();
+		for(i=0;i<default_th->ntypes;i++)
+			if(strstr(default_th->types[i]->name, name))
+			{
+				if(k++<50)
+					lui_dg_list(default_th->types[i]->name, default_th->types[i]->dg);
+				else lui_dg_list_count_more();
+			}
+		if(0==stop_lui_dg_list("matching types"))
+			printf("no such type `%s'\n", name);
+	}
 }
 
 void	print_type(char	*name)

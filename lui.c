@@ -14,11 +14,14 @@
 #include	"lattice-mapping.h"
 #include	"token.h"
 #include	"hash.h"
+#include	"dag-provenance.h"
+#include	"linenoise.h"
 
 void	lui_gen_chart_level2(int	chart_id, int	nedge_ids, int	*edge_ids);
 void interactive_unify(char	*command);
 void	output_lui_dg_with_failure(struct dg	*dg, char *wtitle, struct path	relative_to);
 void	lui_text(char	*message);
+void	output_lui_dg_with_provenance(struct dg	*dg, char *wtitle, struct dg_provenance	prov);
 
 extern int preexisting_lui_fd;
 extern int input_from_lui;
@@ -114,11 +117,12 @@ void	*lui_listener(void *foo)
 				int fields = sscanf(lp, "type %s %s\n", type, command);
 				if(fields < 2) { fprintf(stderr, "LUI: bad 'type' command\n"); }
 				else if(!strcmp(command, "expansion"))
-					lui_type(type);
+					lui_type(type, 0);
 				else fprintf(stderr, "LUI: '%s' viewer for types not implemented\n", command);
 			}
 			else if(!strcmp(lp, "")) {}
 			else if(!strncmp(lp, "unify ", 6))interactive_unify(lp);
+			else if(!strncmp(lp, "daglist ", 8))lui_dg_list_respond(lp);
 			else fprintf(stderr, "LUI: unknown `%s'\n", lp);
 		}
 	}
@@ -305,10 +309,11 @@ struct lui_obj
 {
 	enum { LUI_DG, LUI_EDGE, LUI_TREE, LUI_MRS }	what;
 	void	*ptr;
+	struct dg_provenance	prov;
 };
 int	lui_id_allocator = 1;
 
-int	lui_register(int	what, void	*ptr)
+int	lui_register(int	what, void	*ptr, struct dg_provenance	*prov)
 {
 	if(!lui_dgs)lui_dgs = hash_new("lui dgs");
 	char	str[32];
@@ -317,6 +322,7 @@ int	lui_register(int	what, void	*ptr)
 	struct lui_obj	*o = calloc(sizeof(*o),1);
 	o->what = what;
 	o->ptr = ptr;
+	if(prov)o->prov = *prov;
 	hash_add(lui_dgs, strdup(str), o);
 	return id;
 }
@@ -327,7 +333,7 @@ void	*fail_to_find(int what, char	*id)
 	return NULL;
 }
 
-void *lui_find(int	what, char	*id, int	complain)
+void *lui_find(int	what, char	*id, int	complain, struct dg_provenance	*prov)
 {
 	if(!lui_dgs)
 	{
@@ -341,42 +347,51 @@ void *lui_find(int	what, char	*id, int	complain)
 		fprintf(stderr, "wrong type:\n");
 		return fail_to_find(what, id);
 	}
+	if(prov)*prov=o->prov;
 	return o->ptr;
 }
 
-int	lui_register_dg(struct dg	*dg)
+int	lui_register_dg(struct dg	*dg, struct dg_provenance	prov)
 {
-	return lui_register(LUI_DG, dg);
+	return lui_register(LUI_DG, dg, &prov);
 }
 
 int	lui_register_edge(struct edge	*e)
 {
-	return lui_register(LUI_EDGE, e);
+	return lui_register(LUI_EDGE, e, NULL);
 }
 
 int	lui_register_tree(struct hypothesis	*h)
 {
-	return lui_register(LUI_TREE, h);
+	return lui_register(LUI_TREE, h, NULL);
 }
 
 struct edge	*lui_find_edge(char	*id)
 {
-	return (struct edge*)lui_find(LUI_EDGE, id, 1);
+	return (struct edge*)lui_find(LUI_EDGE, id, 1, NULL);
 }
 
 struct hypothesis	*lui_find_tree(char	*id)
 {
-	return (struct hypothesis*)lui_find(LUI_TREE, id, 1);
+	return (struct hypothesis*)lui_find(LUI_TREE, id, 1, NULL);
 }
 
-struct dg	*lui_find_dg(char	*id)
+struct dg	*lui_find_dg(char	*id, struct dg_provenance	*prov)
 {
-	struct dg	*d = (struct dg*)lui_find(LUI_DG, id, 0);
+	struct dg	*d = (struct dg*)lui_find(LUI_DG, id, 0, prov);
 	if(d)return d;
-	struct edge	*e = (struct edge*)lui_find(LUI_EDGE, id, 0);
-	if(e)return e->dg;
+	struct edge	*e = (struct edge*)lui_find(LUI_EDGE, id, 0, NULL);
+	if(e)
+	{
+		if(prov) { prov->kind = FROM_LUI_EDGE; prov->arg0id = strdup(id); }
+		return e->dg;
+	}
 	struct hypothesis	*h = lui_find_tree(id);
-	if(h)return h->dg;
+	if(h)
+	{
+		if(prov) { prov->kind = FROM_LUI_TREE; prov->arg0id = strdup(id); }
+		return h->dg;
+	}
 	return NULL;
 }
 
@@ -396,8 +411,8 @@ void interactive_unify(char	*command)
 	*end++ = 0;
 
 	//fprintf(stderr, "should unify part of %s with part of %s\n", left_id, right_id);
-	struct dg	*left_dg = lui_find_dg(left_id);
-	struct dg	*right_dg = lui_find_dg(right_id);
+	struct dg	*left_dg = lui_find_dg(left_id, NULL);
+	struct dg	*right_dg = lui_find_dg(right_id, NULL);
 	struct dg	*original_right_dg = right_dg;
 	if(!left_dg || !right_dg)return;
 
@@ -408,6 +423,17 @@ void interactive_unify(char	*command)
 	if(!left_dg) { fprintf(stderr, "no such path in left DG\n"); return; }
 	right_dg = dg_path(right_dg, right_path);
 	if(!right_dg) { fprintf(stderr, "no such path in right DG\n"); return; }
+
+	if(!strncmp(left_path_str, right_path_str, strlen(right_path_str)) && !strcmp(left_id, right_id))
+	{
+		// special case: intentionally unifying part of an AVM into its own parent.
+		// try using this to signal a request for type provenance information.
+		struct dg_provenance	prov;
+		bzero(&prov,sizeof(prov));
+		struct dg	*left_root_dg = lui_find_dg(left_id, &prov);
+		show_provenance(left_path, &prov);
+		return;
+	}
 
 	//output_lui_dg(left_dg, "left");
 	//output_lui_dg(right_dg, "right");
@@ -424,7 +450,13 @@ void interactive_unify(char	*command)
 	}
 	else
 	{
-		output_lui_dg(result_dg, "unification result");
+		struct dg_provenance	prov;
+		prov.kind = FROM_UNIFY;
+		prov.arg0id = strdup(left_id);
+		prov.arg0path = strdup(left_path_str);
+		prov.arg1id = strdup(right_id);
+		prov.arg1path = strdup(right_path_str);
+		output_lui_dg_with_provenance(result_dg, "unification result", prov);
 	}
 }
 
@@ -484,12 +516,21 @@ void	output_lui_dg_id_with_failure(struct dg	*dg, char *wtitle, int	id, struct p
 
 void	output_lui_dg(struct dg	*dg, char *wtitle)
 {
-	output_lui_dg_id(dg, wtitle, lui_register_dg(dg));
+	struct dg_provenance	prov;
+	bzero(&prov,sizeof(prov));
+	output_lui_dg_id(dg, wtitle, lui_register_dg(dg, prov));
+}
+
+void	output_lui_dg_with_provenance(struct dg	*dg, char *wtitle, struct dg_provenance	prov)
+{
+	output_lui_dg_id(dg, wtitle, lui_register_dg(dg, prov));
 }
 
 void	output_lui_dg_with_failure(struct dg	*dg, char *wtitle, struct path	relative_to)
 {
-	output_lui_dg_id_with_failure(dg, wtitle, lui_register_dg(dg), relative_to);
+	struct dg_provenance	prov;
+	bzero(&prov,sizeof(prov));
+	output_lui_dg_id_with_failure(dg, wtitle, lui_register_dg(dg,prov), relative_to);
 }
 
 void lui_format_tree(struct hypothesis *h, char *surf)
@@ -527,7 +568,7 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 	struct mrs	*m = extract_mrs(h->dg);
 	if(!strcasecmp(type, "simple"))
 	{
-		int	id = lui_register(LUI_MRS, m);
+		int	id = lui_register(LUI_MRS, m, NULL);
 		fprintf(lui_write, "avm %d #D[mrs", id);
 		int i, j, k;
 
@@ -697,8 +738,8 @@ void	output_lui_edge_tree(struct edge	*e)
 
 void	output_lui_edge_entity(struct edge	*e)
 {
-	if(e->rule)lui_rule(e->rule->name);
-	else if(e->lex)lui_lex(e->lex->word);
+	if(e->rule)lui_rule(e->rule->name, 0);
+	else if(e->lex)lui_lex(e->lex->word, 0);
 }
 
 void	browse_lui(int eid, char *what, char	*what2)
@@ -713,8 +754,9 @@ void	browse_lui(int eid, char *what, char	*what2)
 		sprintf(eidstr, "%d", eid);
 		if(!strcmp(what, "avm"))
 		{
-			struct dg	*d = lui_find_dg(eidstr);
-			if(d)output_lui_dg(d, "edge");
+			struct dg_provenance	prov;
+			struct dg	*d = lui_find_dg(eidstr, &prov);
+			if(d)output_lui_dg_with_provenance(d, "edge", prov);
 			else printf("no such LUI dag #%s\n", eidstr);
 		}
 		else if(!strcmp(what, "mrs"))
@@ -1014,4 +1056,122 @@ extern int inhibit_pack;
 
 	fprintf(lui_write, "\n");
 	fflush(lui_write);
+}
+
+int	lui_dg_list_len = 0, lui_dg_list_nmore = 0;
+char	**lui_dg_list_names;
+struct dg	**lui_dg_list_dgs;
+int	existing_dglist_id = -1;
+
+start_lui_dg_list()
+{
+	if(existing_dglist_id >= 0)
+	{
+		fprintf(lui_write, "close %d\n", existing_dglist_id);
+		fflush(lui_write);
+	}
+	lui_dg_list_len = 0;
+	lui_dg_list_nmore = 0;
+}
+
+lui_dg_list(char	*name, struct dg	*d)
+{
+	lui_dg_list_len++;
+	lui_dg_list_names = realloc(lui_dg_list_names, sizeof(char*)*lui_dg_list_len);
+	lui_dg_list_dgs = realloc(lui_dg_list_dgs, sizeof(char*)*lui_dg_list_len);
+	lui_dg_list_names[lui_dg_list_len-1] = name;
+	lui_dg_list_dgs[lui_dg_list_len-1] = d;
+}
+
+lui_dg_list_count_more() { lui_dg_list_nmore++; }
+
+int	stop_lui_dg_list(char	*wname)
+{
+	if(lui_dg_list_len == 0)return 0;
+	if(lui_dg_list_len == 1)
+	{
+		output_lui_dg(lui_dg_list_dgs[0], lui_dg_list_names[0]);
+		return 1;
+	}
+	lui_initialize();
+	existing_dglist_id = ++xtext_id_gen;
+	fprintf(lui_write, "text %d #X[", existing_dglist_id);
+	int i;
+	for(i=0;i<lui_dg_list_len;i++)fprintf(lui_write, " %d \"%s\" newline", i+1, slab_escape(lui_dg_list_names[i]));
+	if(lui_dg_list_nmore)fprintf(lui_write, " %d \"... and %d more\" newline", i+1, lui_dg_list_nmore);
+	fprintf(lui_write, "] #M[\"Display AVM\" \"daglist %%d\"");
+	for(i=0;i<lui_dg_list_len;i++)fprintf(lui_write, " %d", i+1);
+	fprintf(lui_write, "] \"%s\"]\n", slab_escape(wname));
+	fflush(lui_write);
+	return lui_dg_list_len;
+}
+
+lui_dg_list_respond(char	*command)
+{
+	int	id;
+	assert(1==sscanf(command, "daglist %d", &id));
+	if(id<0 || id>=lui_dg_list_len)
+	{
+		fprintf(stderr, "LUI asked for out-of-range dglist ID\n");
+		return -1;
+	}
+	output_lui_dg(lui_dg_list_dgs[id], lui_dg_list_names[id]);
+}
+
+void	lui_rule_completions(const char	*line, linenoiseCompletions	*lc)
+{
+	int	i;
+	char	compl[10240] = ":r ";
+	for(i=0;i<nrules;i++)if(!strncmp(line,rules[i]->name,strlen(line)))
+	{
+		strcpy(compl+3, rules[i]->name);
+		linenoiseAddCompletion(lc,strdup(compl));
+	}
+}
+
+void	lui_type_completions(const char	*line, linenoiseCompletions	*lc)
+{
+	int	i;
+	char	compl[10240] = ":t ";
+	struct type_hierarchy	*th = default_type_hierarchy();
+	for(i=0;i<th->ntypes;i++)if(!strncmp(line,th->types[i]->name,strlen(line)))
+	{
+		strcpy(compl+3, th->types[i]->name);
+		linenoiseAddCompletion(lc,strdup(compl));
+	}
+}
+
+void	lui_lex_completions(const char	*line, linenoiseCompletions	*lc)
+{
+	int	i;
+	char	compl[10240] = ":l ";
+	extern struct lexeme	**lexemes;
+	for(i=0;i<nlexemes;i++)if(!strncmp(line,lexemes[i]->word,strlen(line)))
+	{
+		strcpy(compl+3, lexemes[i]->word);
+		linenoiseAddCompletion(lc,strdup(compl));
+	}
+}
+
+void	lui_linenoise_completion(const char	*line, linenoiseCompletions	*lc)
+{
+	if(line[0] != ':')return;
+	if(!line[1])
+	{
+		linenoiseAddCompletion(lc, ":r");
+		linenoiseAddCompletion(lc, ":l");
+		linenoiseAddCompletion(lc, ":i");
+		linenoiseAddCompletion(lc, ":t");
+		linenoiseAddCompletion(lc, ":h");
+		linenoiseAddCompletion(lc, ":g");
+		linenoiseAddCompletion(lc, ":c");
+		if(g_mode == GENERATING)linenoiseAddCompletion(lc, ":trigger");
+	}
+	else if(line[1] && line[2]==' ')switch(line[1])
+	{
+		case	'r':	lui_rule_completions(line+3, lc);	break;
+		case	't':	lui_type_completions(line+3, lc);	break;
+		case	'i':	lui_instance_completions(line+3, lc);	break;
+		case	'l':	lui_lex_completions(line+3, lc);	break;
+	}
 }

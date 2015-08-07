@@ -79,7 +79,23 @@ void	lui_lex(char	*name)
 		struct dg	*d = lexical_dg(l, NULL);
 		output_lui_dg(d, name);
 	}
-	else printf("no such\n");
+	else
+	{
+		int i,k=0;
+		start_lui_dg_list();
+		for(i=0;i<nlexemes;i++)
+			if(!strncmp(lexemes[i]->word, name, strlen(name)))
+			{
+				if(k++<50)
+				{
+					struct dg	*d = lexical_dg(lexemes[i], NULL);
+					lui_dg_list(lexemes[i]->word, d);
+				}
+				else lui_dg_list_count_more();
+			}
+		if(0==stop_lui_dg_list("matching lexemes"))
+			printf("no such lexeme `%s'\n", name);
+	}
 }
 
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
