@@ -84,7 +84,8 @@ void	build_token_dag(struct token	*t)
 	char	c_from_str[16], c_to_str[16];
 	char	bigger_string[1024];
 
-	sprintf(bigger_string, "\"%s\"", t->string);
+char	*slab_escape(char*);
+	sprintf(bigger_string, "\"%s\"", slab_escape(t->string));
 	sprintf(c_from_str, "\"%d\"", t->cfrom);
 	sprintf(c_to_str, "\"%d\"", t->cto);
 	//print_dg(dg);
@@ -266,8 +267,8 @@ void	print_token_chart(struct lattice	*tc)
 	{
 		struct lattice_edge	*e = tc->edges[i];
 		struct token	*t = e->token;
-		printf("token le %p vtx [%d-%d] char [%d-%d] string '%s' dag ",
-			e, e->from->id, e->to->id, t->cfrom, t->cto, t->string);
+		printf("token #%d le %p vtx [%d-%d] char [%d-%d] string '%s' dag ",
+			t->eid, e, e->from->id, e->to->id, t->cfrom, t->cto, t->string);
 		if(enable_token_avms)
 			print_dg(t->dg);
 		printf("\n");
@@ -375,6 +376,8 @@ int	install_tokens_in_le(struct edge	*le, struct token	**tokens)
 	if(!le_toklist || !le_toklast)
 	{
 		fprintf(stderr, "ERROR: toklist or toklast missing on a token\n");
+		//fprintf(stderr, " ... for word: %s\n", le->lex->word);
+		//print_dg(le->dg);printf("\n");
 		return -1;
 	}
 	in_toklist = build_token_list(le->lex->stemlen, tokens, &in_toklast);
