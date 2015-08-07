@@ -334,6 +334,41 @@ int	process_colon_command(char	*parent, char	*cmd)
 	return 0;
 }
 
+char	*strip_docstring(char	*rhs, int	lnum, char	*path)
+{
+	// docstring can appear immediately before the first opening '[', or not at all.
+	char	*q = strchr(rhs, '"');
+	if(!q)return NULL;
+	// we're only interested if there's a & before the ".
+	char	*m = q-1;
+	while(m>rhs && *m!='&' && (*m==' ' || *m=='\t' || *m=='\n' || *m=='\r'))m--;
+	if(m<=rhs || *m!='&')return NULL;
+	char	*p = q+1;
+	while(*p && *p!='"')
+	{
+		if(*p=='\\' && p[1])p++;
+		p++;
+	}
+	if(!*p)
+	{
+		fprintf(stderr, "ERROR: quoted docstring not terminated at %s:%d\n", path, lnum);
+		exit(-1);
+	}
+	assert(*p=='"');
+	char	*s = p+1;
+	while(*s && (*s==' ' || *s=='\t' || *s=='\n' || *s=='\r') )s++;
+	if(*s != '[' && *s != '.')
+	{
+		fprintf(stderr, "ERROR: quoted docstring does not precede open '[' or '.' at %s:%d.\n", path, lnum);
+		exit(-1);
+	}
+	*p = 0;
+	// it's a docstring.
+	char	*docstring = strdup(q+1);
+	memmove(q, p+1, strlen(p+1)+1);
+	return docstring;
+}
+
 int	load_tdl(char	*path)
 {
 	if(!path)
@@ -455,6 +490,8 @@ int	load_tdl(char	*path)
 		}
 
 		//printf("tdl input: `%s'  -->  `%s'\n", lhs, rhs);
+		char	*docstring = strip_docstring(rhs, lnum, path);
+		//if(docstring)printf("HEY! I found and stripped a docstring: |%s|\n", docstring);
 		add_tdlline(lhs, operation, rhs, odef, lnum, path);
 		*buffer = 0;
 		*odef = 0;
