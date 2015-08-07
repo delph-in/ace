@@ -28,7 +28,7 @@ struct lexeme	*get_lex_by_name_hash(char	*name)
 		if(!strcmp(name, generic_les[i]->word))
 			{ hash_add(h, strdup(name), generic_les[i]); return generic_les[i]; }
 
-	if(reconstruction_noise_level)fprintf(stderr, "unknown lexeme '%s'!\n", name);
+	if(reconstruction_noise_level)fprintf(stderr, "WARNING: unknown lexeme '%s'!\n", name);
 	return NULL;
 }
 
@@ -241,7 +241,7 @@ int	parse_token_avm(struct hash	*taghash, struct dg	*d, char	**S)
 	if(**S == '"')
 	{
 		typename = read_string(S);
-		if(!typename) { fprintf(stderr, "bad string in token avm\n"); exit(-1); }
+		if(!typename) { fprintf(stderr, "ERROR: bad string in token avm\n"); exit(-1); }
 	}
 	else typename = read_symbol(S);
 	char	delim = **S;
@@ -251,7 +251,7 @@ int	parse_token_avm(struct hash	*taghash, struct dg	*d, char	**S)
 	d->type = d->xtype = lookup_type(freeze_string(typename));
 	if(!d->type)
 	{
-		fprintf(stderr, "token structure had nonexistant type '%s'\n", typename);
+		fprintf(stderr, "WARNING: token structure had nonexistant type '%s'\n", typename);
 		return -1;
 	}
 	**S = delim;
@@ -276,7 +276,7 @@ int	parse_token_avm(struct hash	*taghash, struct dg	*d, char	**S)
 		skip_space(S);
 		if(**S == ']' || **S == 0)
 		{
-			fprintf(stderr, "token structure string ended before a whole number of feature-value pairs\n");
+			fprintf(stderr, "ERROR: token structure string ended before a whole number of feature-value pairs\n");
 			exit(-1);
 		}
 		struct dg	*dest = atomic_dg(top_type);
@@ -342,7 +342,7 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 		if(!l)
 		{
 			if(reconstruction_noise_level)
-				fprintf(stderr, "unable to find lexeme '%s'\n", uln);
+				fprintf(stderr, "WARNING: unable to find lexeme '%s'\n", uln);
 			if(error)
 			{
 				bzero(error,sizeof(*error));
@@ -364,7 +364,7 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 			if(!(l->stemlen == t->daughters[0]->ntokens))
 			{
 				if(reconstruction_noise_level)
-					fprintf(stderr, "lexeme '%s' stem has %d tokens; tree has %d\n", l->word, l->stemlen, t->daughters[0]->ntokens);
+					fprintf(stderr, "WARNING: lexeme '%s' stem has %d tokens; tree has %d\n", l->word, l->stemlen, t->daughters[0]->ntokens);
 				if(error)
 				{
 					bzero(error,sizeof(*error));
@@ -406,7 +406,7 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 			{
 				if(reconstruction_noise_level)
 				{
-					fprintf(stderr, "failed to install tokens in lexeme '%s'\n", l->word);
+					fprintf(stderr, "WARNING: failed to install tokens in lexeme '%s'\n", l->word);
 					unify_backtrace();
 				}
 				if(error)
@@ -440,7 +440,7 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 			{
 				if(reconstruction_noise_level)
 				{
-					fprintf(stderr, "failed to install tokens in lexeme '%s'\n", l->word);
+					fprintf(stderr, "WARNING: failed to install tokens in lexeme '%s'\n", l->word);
 					unify_backtrace();
 				}
 				if(error)
@@ -464,7 +464,7 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 		if(!r)
 		{
 			if(reconstruction_noise_level)
-				fprintf(stderr, "unable to find rule '%s'\n", t->label);
+				fprintf(stderr, "WARNING: unable to find rule '%s'\n", t->label);
 			if(error)
 			{
 				bzero(error,sizeof(*error));
@@ -476,7 +476,7 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 		if(t->ndaughters != r->ndaughters)
 		{
 			if(reconstruction_noise_level)
-				fprintf(stderr, "rule %s has %d daughters but tree node has %d\n", r->name, r->ndaughters, t->ndaughters);
+				fprintf(stderr, "WARNING: rule %s has %d daughters but tree node has %d\n", r->name, r->ndaughters, t->ndaughters);
 			if(error)
 			{
 				bzero(error,sizeof(*error));
@@ -503,7 +503,7 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 				forget_tmp();
 				if(reconstruction_noise_level)
 				{
-					fprintf(stderr, "reconstruction: unification failed for rule '%s'\n", t->label);
+					fprintf(stderr, "WARNING: reconstruction: unification failed for rule '%s'\n", t->label);
 					unify_backtrace();
 					if(reconstruction_noise_level > 1)print_tree(t,0);
 				}
@@ -530,7 +530,7 @@ struct dg	*reconstruct_tree_or_error(struct tree	*t, void	(*callback)(struct tre
 		{
 			if(reconstruction_noise_level)
 			{
-				fprintf(stderr, "reconstruction: cycle check failed for rule '%s'\n", t->label);
+				fprintf(stderr, "WARNING: reconstruction: cycle check failed for rule '%s'\n", t->label);
 				if(reconstruction_noise_level > 1)print_tree(t, 0);
 			}
 			if(error)
