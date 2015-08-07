@@ -7,6 +7,7 @@
 #include	"chart.h"
 #include	"dag.h"
 #include	"freeze.h"
+#include	"conf.h"
 
 static void flat_print_dg(struct dg	*d);
 
@@ -17,6 +18,7 @@ void enable_trim(int trim);
 extern int	g_loaded;
 
 int	in_slash, slash_fname, xarg_fname, sind_fname, mod_fname;
+extern int	glb_always_succeeds;
 
 static inline int slash_restricted(int l)
 {
@@ -967,6 +969,57 @@ struct dg	*get_extra_type_dg(struct type	*t)
 	return extra;
 }
 
+int	unify_always_succeeds = 0;
+void	enable_robust_unification()
+{ unify_always_succeeds = 1; } 
+void	disable_robust_unification()
+{ unify_always_succeeds = 0; }
+
+is_null(struct type	*t)
+{
+	static struct type	*null = NULL;
+	if(!null)null = lookup_type(g_null_type);
+	if(descendent_of(t->tnum, null))return 1;
+	return 0;
+}
+
+is_cons(struct type	*t)
+{
+	static struct type	*cons = NULL;
+	if(!cons)cons = lookup_type(g_cons_type);
+	if(descendent_of(t->tnum, cons))return 1;
+	return 0;
+}
+
+void check_robust_list_unification(struct dg	*nulldg, struct dg	*consdg)
+{
+	while(1)
+	{
+		consdg = dg_hop(consdg, lookup_fname("REST"));
+		if(!consdg)return;
+		consdg = dereference_dg(consdg);
+		struct type	*rt = (consdg->gen==generation)?consdg->type:consdg->xtype;
+		if(!is_cons(rt))
+		{
+			struct type	*nrt = glb(rt, lookup_type(g_null_type));
+			if(nrt)
+			{
+				if(consdg->gen != generation)
+				{
+					consdg->gen = generation;
+					consdg->forwarded = 0;
+					consdg->ncarcs = 0;
+					consdg->carcs = NULL;
+					consdg->copy = NULL;
+				}
+				fprintf(stderr, "NOTE: updating REST of a hallucinated list from %s to %s\n", rt->name, nrt->name);
+				consdg->type = nrt;
+			}
+			break;
+		}
+	}
+}
+
 int	allow_unify_swapping = 1;
 
 int	unify1(struct dg	*dg1, struct dg	*dg2)
@@ -997,11 +1050,22 @@ int	unify1(struct dg	*dg1, struct dg	*dg2)
 		if(!t)
 		{
 			//printf("no glb for %s and %s\n", t1->name, t2->name);
+			if(unify_always_succeeds)
+			{
+				if(is_null(t1) && is_cons(t2))
+					check_robust_list_unification(dg1, dg2);
+				else if(is_null(t2) && is_cons(t1))
+					check_robust_list_unification(dg2, dg1);
+				t = t2;
+			}
+			else
+			{
 #ifdef	UNIFY_PATHS
-			ut1 = t1;
-			ut2 = t2;
+				ut1 = t1;
+				ut2 = t2;
 #endif
-			return -1;
+				return -1;
+			}
 		}
 	}
 

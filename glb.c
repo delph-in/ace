@@ -106,15 +106,15 @@ static struct type	*calc_glb(struct type	*a, struct type	*b)
 				return a;
 			// otherwise, they have to be identical pointers to be equivalent,
 			// and that case has already been tested beefore calc_glb() is called.
-			return 0;
+			return NULL;
 		}
 		else if(th->strtype && descendent_of(th->strtype->tnum, b))return a;
-		else return 0;
+		else return NULL;
 	}
 	if(b->name[0]=='"')
 	{
 		if(th->strtype && descendent_of(th->strtype->tnum, a))return b;
-		else return 0;
+		else return NULL;
 	}
 
 	//fprintf(stderr, "glb %s, %s?\n", a->name, b->name);
@@ -130,7 +130,7 @@ static struct type	*calc_glb(struct type	*a, struct type	*b)
 		else ib++;
 	}
 	//fprintf(stderr, "no glb for %s, %s\n", a->name, b->name);
-	return 0;
+	return NULL;
 }
 
 void	print_glb_stats()
