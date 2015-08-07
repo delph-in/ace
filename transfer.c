@@ -37,6 +37,7 @@ int	transfer_enable_qeq_bridge = 1;
 
 int	cancel_transfer;
 char	*transfer_config_path = NULL;
+struct profiler	*transfer_packing_profiler;
 
 void	alarm_handler2(int	sig)
 {
@@ -202,7 +203,10 @@ int	thaw_transfer_rule_part(struct mrs_desc	*desc, struct transfer_rule	*tr)
 {
 	int i;
 	for(i=0;i<desc->neps;i++)
+	{
+		desc->eps[i].pred_re = NULL;
 		check_pred_re(&desc->eps[i], 1);
+	}
 	return 0;
 }
 
@@ -1337,6 +1341,7 @@ int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	// make a copy of 'mout', so we don't have to worry about structure sharing in subsumption tests
 	// the problem with structure sharing is each side has its own ->vnum's
 	mout = slab_copy_mrs(mout, 1);
+	start_and_alloc_profiler(&transfer_packing_profiler, "packing", transfer_profiler, NULL);
 	if(!mrs_is_on_list(mout, ts->n - pack_start, ts->mrs + pack_start))
 	{
 		// new result.
@@ -1344,6 +1349,7 @@ int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		ts->mrs[ts->n++] = mout;
 		setup_tmp();	// prevent subsequent forget_tmp()'s from destroying this
 	}
+	stop_profiler(transfer_packing_profiler, 1);
 
 	//printf("rule fired: %s\n", tr->name);
 	//print_mrs(mout);printf("\n");
@@ -1386,7 +1392,7 @@ int	tr_quickcheck(struct transfer_rule	*tr, struct mrs	*min)
 
 int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int first_route_only)
 {
-	//printf("rule %s -- optional %d\n", tr->name, tr->optional);
+	//DEBUG("rule %s -- optional %d\n", tr->name, tr->optional);
 	int	i, nresult = 0, nfires = 0;
 	struct mrs	**result = NULL;
 	int	pack_start = ts->n;
@@ -1399,8 +1405,7 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 	}
 	for(i=0;i<ts->n && !cancel_transfer;i++)
 	{
-		extern int noldslabs;
-		if(noldslabs >= MAX_TRANSFER_CHUNKS)
+		if((slab_usage() / (1024*1024)) >= MAX_TRANSFER_CHUNKS)
 		{
 			fprintf(stderr, "NOTE: hit RAM limit while transfering\n");
 			itsdb_error("ran out of RAM while transfering");
