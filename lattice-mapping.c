@@ -558,21 +558,22 @@ void	replace_backrefs(struct dg	*d, struct dg	*rd, struct lattice_rule	*r, struc
 					if(do_lowercase)
 					{
 						*wp = towlower(*wp);
-						if(iswupper(*wp))
+						/*if(iswupper(*wp))
 						{
+							// this triggered on 42630 L'Ꚇ' -- so I turned it off. (sweaglesw July 30 2015)
 							fprintf(stderr, "yikes! '%C' is uppercase and lowercase\n", *wp);
 							exit(-1);
-						}
+						}*/
 						wp++;
 					}
 					else if(do_uppercase)
 					{
 						*wp = towupper(*wp);
-						if(iswlower(*wp))
+						/*if(iswlower(*wp))
 						{
 							fprintf(stderr, "yikes! '%C' is uppercase and lowercase\n", *wp);
 							exit(-1);
-						}
+						}*/
 						wp++;
 					}
 				}
@@ -768,7 +769,6 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 	}
 
 	// third step: remove input edge structures
-	// first reduce all the possible-maps (while input_ids[] is stable)
 	for(i=0;i<r->ninput;i++)
 	{
 		for(j=0;j<r->noutput;j++)
@@ -776,9 +776,14 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 				break;
 		if(j<r->noutput)continue;
 		update_possible_map_remove(lat, input_ids[i], r);
+		remove_lattice_edge(lat, inputs[i]);
+		did_remove++;
+		// adjust remaining input_ids so as to reduce possible_map correctly
+		for(j=i+1;j<r->ninput;j++)
+			if(input_ids[j] > input_ids[i])
+				input_ids[j]--;
 	}
-	// next actually remove the edges from the lattice (which can change input_ids[])
-	for(i=0;i<r->ninput;i++)
+	/*for(i=0;i<r->ninput;i++)
 	{
 		for(j=0;j<r->noutput;j++)
 			if(save_le[j] == inputs[i])
@@ -786,7 +791,7 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 		if(j<r->noutput)continue;
 		remove_lattice_edge(lat, inputs[i]);
 		did_remove++;
-	}
+	}*/
 	if(mapping_tokens)nmappingtokens += did_add;
 	return did_add + did_remove;
 }
@@ -950,7 +955,12 @@ int	lattice_rule_matches(struct lattice	*lat, struct lattice_rule	*r, struct lat
 				char	*str = str_dg->xtype->name;
 				int	l = strlen(str);
 				char	copy[256];
-				sprintf(copy, "%.*s", l-2, str+1);
+				int	l2 = snprintf(copy, 255, "%.*s", l-2, str+1);
+				if(l2 >= 254)
+				{
+					DEBUG_VERBOSE(" ... trying to match too long a string; failing.\n");
+					return 0;
+				}
 				wchar_t	*wcopy = towide(copy);
 				regex_t	re = rec->re[j];
 				DEBUG_VERBOSE("... comparing string '%S' against regex '%S'\n", wcopy, rec->regexs[j]);
