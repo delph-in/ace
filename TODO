@@ -153,6 +153,11 @@ ideas:
 - now that post-model-path config option exists, Dan could include the model in the ERG distribution instead of in the ACE distribution, perhaps.  copyright issues?
 
 DONE:
+0.9.22
+	- new LUI mode features: commandline editing and history; see list of rules/lexemes/types/instances matching a substring
+	- constraint provenance computation (first pass)
+	- mega_slab's
+	- experimental "dublin" mode (incorporate PCFG edges)
 0.9.21
 	- add ubertagging
 	- make file references from config files relative to config subfiles (e.g. if :include'd from a different directory)
