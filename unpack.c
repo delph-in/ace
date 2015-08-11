@@ -1229,27 +1229,36 @@ void	install_orth(struct dg	*dg, int	nforms, char	**forms)
 	stem_list->xtype = lookup_type(g_null_type);
 }
 
-int	gen_extract_lexemes(struct hypothesis	*h, int	k, struct edge	**L)
+int	gen_extract_lexemes(struct dg	*topdown, struct hypothesis	*h, int	k, struct edge	**L)
 {
 	int	i;
 	if(h->edge->lex)
 	{
 		// we need to build the orthographies of each token for MWEs;
 		// starting with the base forms in the lexicon,
-		int	n = h->edge->lex->stemlen;
+		struct lexeme	*lex = get_leaf_lex(h);
+		int	n = lex->stemlen;
 		char	*forms[n];
-		for(i=0;i<n;i++)forms[i] = type_to_string(h->edge->lex->stem[i]);
+		for(i=0;i<n;i++)forms[i] = type_to_string(lex->stem[i]);
 		// apply all the inflections in the lexical rule chain,
 		// applying suffix rules to the right-hand edge of the MWE
 		// and prefix rules to the left-hand-edge.
 		inflect_mwe_chain(n, forms, h);
-		L[k] = h->edge;
-		h->edge->dg = h->dg;
-		install_orth(h->dg, n, forms);
+		struct edge	*e = slab_alloc(sizeof(*e));
+		*e = *h->edge;
+		e->dg = topdown;
+		install_orth(e->dg, n, forms);
+		L[k] = e;
 		return k+1;
 	}
+	// get full FS for h
+	assert(0 == unify_dg_tmp(h->edge->rule->dg, topdown, -1));
+	for(i=0;i<h->arity;i++)assert(0 == unify_dg_tmp(h->rhslist[i]->dg, topdown, i));
+	// copy out topdown info for each daughter
+	topdown = finalize_tmp(topdown, 0);
+	assert(topdown != NULL);
 	for(i=0;i<h->arity;i++)
-		k = gen_extract_lexemes(h->rhslist[i], k, L);
+		k = gen_extract_lexemes(daughter_position(topdown, i), h->rhslist[i], k, L);
 	return k;
 }
 
@@ -1302,7 +1311,7 @@ void	fixup_generator_string(struct hypothesis	*h)
 	if(enable_post_generation_mapping)
 	{
 		struct edge	**lexeme_list = slab_alloc(sizeof(struct edge*) * h->toklen);
-		int n = gen_extract_lexemes(h, 0, lexeme_list);
+		int n = gen_extract_lexemes(h->dg, h, 0, lexeme_list);
 		int k;
 		for(k=0;k<n;k++)
 		{

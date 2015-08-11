@@ -361,7 +361,7 @@ void	process_lattice_rule_set_flow_control(struct lattice_rule_set	*rs)
 struct lattice_rule_set	*load_lattice_rules(char	*tdl_status)
 {
 	struct lattice_rule_set	*rs = calloc(sizeof(*rs),1);
-	int	callback(char	*name, struct dg	*dg)
+	int	callback(char	*name, struct dg	*dg, struct tdl_line	*tdl)
 	{
 		assert( (dg = wellform_dg(dg)) != NULL );
 		struct lattice_rule	*r = study_lattice_rule(name, dg);

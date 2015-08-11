@@ -63,11 +63,15 @@ void	parse_from_lui(char	*input)
 
 void	*lui_listener(void *foo)
 {
+	int	first = 1;
 	while(!ferror(lui_read) && !feof(lui_read))
 	{
 		char	line[1024], *lp;
+		if(!first)linenoiseEnableRaw();
+		first=0;
 		if(fgets(line, 1023, lui_read))
 		{
+			linenoiseDisableRaw();
 			int	len;
 			lp = line; while(*lp==' ' || *lp=='\n' || *lp=='\r' || *lp=='' || *lp=='\t')lp++;
 			len = strlen(lp);
@@ -741,7 +745,7 @@ void	output_lui_edge_tree(struct edge	*e)
 void	output_lui_edge_entity(struct edge	*e)
 {
 	if(e->rule)lui_rule(e->rule->name, 0);
-	else if(e->lex)lui_lex(e->lex->word, 0);
+	else if(e->lex)lui_lex(e->lex->word);
 }
 
 void	browse_lui(int eid, char *what, char	*what2)
@@ -1063,6 +1067,7 @@ extern int inhibit_pack;
 int	lui_dg_list_len = 0, lui_dg_list_nmore = 0;
 char	**lui_dg_list_names;
 struct dg	**lui_dg_list_dgs;
+struct dg_provenance	*lui_dg_list_provs;
 int	existing_dglist_id = -1;
 
 start_lui_dg_list()
@@ -1076,13 +1081,15 @@ start_lui_dg_list()
 	lui_dg_list_nmore = 0;
 }
 
-lui_dg_list(char	*name, struct dg	*d)
+lui_dg_list(char	*name, struct dg	*d, struct dg_provenance	prov)
 {
 	lui_dg_list_len++;
 	lui_dg_list_names = realloc(lui_dg_list_names, sizeof(char*)*lui_dg_list_len);
 	lui_dg_list_dgs = realloc(lui_dg_list_dgs, sizeof(char*)*lui_dg_list_len);
+	lui_dg_list_provs = realloc(lui_dg_list_provs, sizeof(struct dg_provenance)*lui_dg_list_len);
 	lui_dg_list_names[lui_dg_list_len-1] = name;
 	lui_dg_list_dgs[lui_dg_list_len-1] = d;
+	lui_dg_list_provs[lui_dg_list_len-1] = prov;
 }
 
 lui_dg_list_count_more() { lui_dg_list_nmore++; }
@@ -1099,10 +1106,10 @@ int	stop_lui_dg_list(char	*wname)
 	existing_dglist_id = ++xtext_id_gen;
 	fprintf(lui_write, "text %d #X[", existing_dglist_id);
 	int i;
-	for(i=0;i<lui_dg_list_len;i++)fprintf(lui_write, " %d \"%s\" newline", i+1, slab_escape(lui_dg_list_names[i]));
-	if(lui_dg_list_nmore)fprintf(lui_write, " %d \"... and %d more\" newline", i+1, lui_dg_list_nmore);
+	for(i=0;i<lui_dg_list_len;i++)fprintf(lui_write, " %d \"%s\" newline", i, slab_escape(lui_dg_list_names[i]));
+	if(lui_dg_list_nmore)fprintf(lui_write, " %d \"... and %d more\" newline", i, lui_dg_list_nmore);
 	fprintf(lui_write, "] #M[\"Display AVM\" \"daglist %%d\"");
-	for(i=0;i<lui_dg_list_len;i++)fprintf(lui_write, " %d", i+1);
+	for(i=0;i<lui_dg_list_len;i++)fprintf(lui_write, " %d", i);
 	fprintf(lui_write, "] \"%s\"]\n", slab_escape(wname));
 	fflush(lui_write);
 	return lui_dg_list_len;
@@ -1117,5 +1124,104 @@ lui_dg_list_respond(char	*command)
 		fprintf(stderr, "LUI asked for out-of-range dglist ID\n");
 		return -1;
 	}
-	output_lui_dg(lui_dg_list_dgs[id], lui_dg_list_names[id]);
+	output_lui_dg_with_provenance(lui_dg_list_dgs[id], lui_dg_list_names[id], lui_dg_list_provs[id]);
+}
+
+struct dg_provenance	make_provenance(int	kind, void	*ptr)
+{
+	struct dg_provenance	p;
+	p.kind = kind;
+	p.arg0ptr = ptr;
+	return p;
+}
+
+lui_lex(char	*name)
+{
+	struct lexeme *l = get_lex_by_name(name);
+	if(l)
+	{
+		struct dg	*d = lexical_dg(l, NULL);
+		output_lui_dg_with_provenance(d, name, make_provenance(FROM_LEX, l));
+	}
+	else
+	{
+		int i,k=0;
+		start_lui_dg_list();
+		for(i=0;i<nlexemes;i++)
+			if(!strncmp(lexemes[i]->word, name, strlen(name)))
+			{
+				if(k++<50)
+				{
+					struct dg	*d = lexical_dg(lexemes[i], NULL);
+					lui_dg_list(lexemes[i]->word, d, make_provenance(FROM_LEX, lexemes[i]));
+				}
+				else lui_dg_list_count_more();
+			}
+		if(0==stop_lui_dg_list("matching lexemes"))
+			printf("no such lexeme `%s'\n", name);
+	}
+}
+
+lui_instance(char	*name, int	allow_partial)
+{
+	struct dg *d = find_instance(name);
+	if(d)
+		output_lui_dg_with_provenance(d, name, make_provenance(FROM_VACUUM, NULL));
+	else
+	{
+		int i;
+		start_lui_dg_list();
+		for(i=0;i<ninstances;i++)
+			if(strstr(instances[i].name, name))
+				lui_dg_list(instances[i].name, instances[i].dg, make_provenance(FROM_VACUUM, NULL));
+		if(0==stop_lui_dg_list("matching instances"))
+			printf("no such instance `%s'\n", name);
+	}
+}
+
+lui_type(char	*name)
+{
+	struct type	*t = lookup_type(name);
+
+	if(t)
+	{
+		output_lui_dg_with_provenance(t->dg, name, make_provenance(FROM_TYPE, t));
+		if(t->tdl)
+			printf("%s -- defined at %s:%d\n%s\n", t->name, t->tdl->filename, t->tdl->lnum, t->tdl->rhs);
+	}
+	else
+	{
+		int i,k=0;
+		start_lui_dg_list();
+		struct type_hierarchy	*th = default_type_hierarchy();
+		for(i=0;i<th->ntypes;i++)
+			if(strstr(th->types[i]->name, name))
+			{
+				if(k++<50)
+					lui_dg_list(th->types[i]->name, th->types[i]->dg, make_provenance(FROM_TYPE, th->types[i]));
+				else lui_dg_list_count_more();
+			}
+		if(0==stop_lui_dg_list("matching types"))
+			printf("no such type `%s'\n", name);
+	}
+}
+
+lui_rule(char	*name)
+{
+	struct rule	*r = get_rule_by_name(name);
+	if(r)
+	{
+		output_lui_dg_with_provenance(r->dg, name, make_provenance(FROM_RULE, r));
+		printf("%s -- defined at %s:%d\n%s\n", name, r->tdl->filename, r->tdl->lnum, r->tdl->rhs);
+	}
+	else
+	{
+		int i;
+		start_lui_dg_list();
+		for(i=0;i<nrules;i++)
+			if(strstr(rules[i]->name, name))
+				lui_dg_list(rules[i]->name, rules[i]->dg, make_provenance(FROM_RULE, rules[i]));
+		if(0==stop_lui_dg_list("matching rules"))
+			printf("no such rule `%s'\n", name);
+	}
 }

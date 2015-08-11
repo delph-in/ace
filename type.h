@@ -2,6 +2,7 @@
 #define	_TYPE_H
 
 #include	<stdlib.h>
+#include	"dag-provenance.h"
 
 struct type_hierarchy
 {
@@ -22,7 +23,6 @@ struct type
 {
 	char		*name;
 	struct dg	*dg;	// indefeasible constraints
-	//struct type	*par, *parb;	// multiple inheritance, binary only
 	int		ndescendents;	// this could get long-ish! :-P
 	unsigned short	*descendents;	// we should probably do a bit vector
 
@@ -31,6 +31,8 @@ struct type
 	// immediate parents and daughters
 	int			nparents, ndaughters;
 	struct type	**parents, **daughters;
+
+	struct tdl_line	*tdl;
 };
 
 struct type	*get_top();
@@ -43,6 +45,7 @@ void	setup_glb_lut();
 int	add_type_only(char	*name, int	npar, struct type	**par);
 void	number_strings();
 int		load_types();
+int	constrain_type(char	*name, struct dg	*dg, struct tdl_line	*tdl);
 int	wellform(struct dg	*d, char	*typename);
 void	print_glb_stats();
 struct type	*temporary_string_type(char *string);

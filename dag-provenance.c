@@ -22,9 +22,11 @@ print_prov(struct dg_provenance	*p)
 		case	FROM_TREE:	printf("tree %p / #%d", p->arg0ptr, ((struct hypothesis*)p->arg0ptr)->edge->id);	break;
 		case	FROM_EDGE:	printf("edge #%d", ((struct edge*)p->arg0ptr)->id);	break;
 		case	FROM_TYPE:	printf("type %s", ((struct type*)p->arg0ptr)->name);	break;
+		case	FROM_TYPE_LOCAL:	printf("type %s local constraints", ((struct type*)p->arg0ptr)->name);	break;
 		case	FROM_LEX:	printf("lexeme %s", ((struct lexeme*)p->arg0ptr)->word);	break;
 		case	FROM_LEX_LOCAL:	printf("lexeme %s local constraints", ((struct lexeme*)p->arg0ptr)->word);	break;
 		case	FROM_RULE:	printf("rule %s", ((struct rule*)p->arg0ptr)->name);	break;
+		case	FROM_RULE_LOCAL:	printf("rule %s local constraints", ((struct rule*)p->arg0ptr)->name);	break;
 		case	FROM_UNIFY:	printf("interactive unification");	break;
 	}
 }
@@ -94,21 +96,7 @@ show_provenance(struct path	path, struct dg_provenance	*p)
 			}
 			else
 			{
-				printf(" = lex %s\n", e->lex->word);
-				printf("which is the unification of lextype %s with its lexent constraints\n", e->lex->lextype->name);
-				struct dg_provenance	ltp, localp;
-				bzero(&ltp,sizeof(ltp));
-				bzero(&localp,sizeof(localp));
-				ltp.kind = FROM_TYPE;
-				ltp.arg0ptr = e->lex->lextype;
-				localp.kind = FROM_LEX_LOCAL;
-				localp.arg0ptr = e->lex;
-				struct dg	*local = e->lex->dg;
-				extern int enable_simple_form_lexicon;
-				if(enable_simple_form_lexicon)local = expand_lexeme(e->lex);
-				int	arg = -1;
-				struct dg_provenance	*provlist = &localp;
-				show_provenance_from_unification(path, e->lex->lextype->dg, &ltp, 1, &local, &provlist, &arg);
+				show_provenance_from_lexeme(path, e->lex);
 			}
 			break;
 		case	FROM_LEX_LOCAL:;
@@ -118,10 +106,24 @@ show_provenance(struct path	path, struct dg_provenance	*p)
 		case	FROM_TYPE:;
 			struct type	*type = p->arg0ptr;
 			printf("that comes from constraints on type %s\n", type->name);
+			show_provenance_in_type(path, type);
+			break;
+		case	FROM_TYPE_LOCAL:;
+			type = p->arg0ptr;
+			printf("that comes from the immediate constraints on type %s\n", type->name);
 			break;
 		case	FROM_RULE:;
 			struct rule	*r = p->arg0ptr;
 			printf("that comes from constraints on rule %s\n", r->name);
+			break;
+		case	FROM_RULE_LOCAL:;
+			r = p->arg0ptr;
+			printf("that comes from the immediate constraints on rule %s\n", r->name);
+			break;
+		case	FROM_LEX:;
+			struct lexeme	*l = p->arg0ptr;
+			printf("that comes from constraints on lexeme %s\n", l->word);
+			show_provenance_from_lexeme(path, l);
 			break;
 		default:
 			printf("that comes from provenance type %d\n", p->kind);
@@ -319,4 +321,72 @@ show_provenance_from_unification(struct path	path, struct dg	*left, struct dg_pr
 		}
 	}
 	if(upaths)free(upaths);
+}
+
+show_provenance_in_type(struct path	p, struct type	*t)
+{
+	assert(t->tdl);
+	struct dg	*node = dg_path(t->dg, p);
+	struct type	*value = node->xtype;
+	char	*tdl = t->tdl->rhs;
+	char	*bracket = strchr(tdl, '[');
+	struct dg_provenance	local_prov;
+	struct dg		*local;
+	local_prov.kind = FROM_TYPE_LOCAL;
+	local_prov.arg0ptr = t;
+	if(!bracket)
+		local = copy_dg(get_top()->dg);
+	else
+	{
+		printf("reconstructing dg for local constraints: %s\n", bracket);
+		struct dg	*localraw = dagify(strdup(bracket), NULL);
+		struct dg	*rnode = dg_path(localraw, p);
+		if(rnode && rnode->xtype==value)
+		{
+			printf("that value (%s) is present on the expanded local constraints for %s\n", value->name, t->name);
+			return 0;
+		}
+		local = copy_dg(localraw);
+		wellform(local, "provenance calculation");
+		struct dg	*wnode = dg_path(local, p);
+		if(wnode && wnode->xtype==value)
+		{
+			printf("that value (%s) is present on the expanded local constraints for %s, but only after wellformedness has applied\n", value->name, t->name);
+			return 0;
+		}
+	}
+	printf("that constraint is at least partially inherited\n");
+	struct dg		*super[t->nparents];
+	struct dg_provenance	superprov[t->nparents];
+	struct dg_provenance	*superprovp[t->nparents];
+	int			superarg[t->nparents];
+	int i;
+	for(i=0;i<t->nparents;i++)
+	{
+		super[i] = t->parents[i]->dg;
+		superprovp[i] = &superprov[i];
+		superarg[i] = -1;
+		superprov[i].kind = FROM_TYPE;
+		superprov[i].arg0ptr = t->parents[i];
+	}
+	show_provenance_from_unification(p, local, &local_prov, t->nparents, super, superprovp, superarg);
+}
+
+show_provenance_from_lexeme(struct path	p, struct lexeme	*lex)
+{
+	printf(" = lex %s\n", lex->word);
+	printf("which is the unification of lextype %s with its lexent constraints\n", lex->lextype->name);
+	struct dg_provenance	ltp, localp;
+	bzero(&ltp,sizeof(ltp));
+	bzero(&localp,sizeof(localp));
+	ltp.kind = FROM_TYPE;
+	ltp.arg0ptr = lex->lextype;
+	localp.kind = FROM_LEX_LOCAL;
+	localp.arg0ptr = lex;
+	struct dg	*local = lex->dg;
+	extern int enable_simple_form_lexicon;
+	if(enable_simple_form_lexicon)local = expand_lexeme(lex);
+	int	arg = -1;
+	struct dg_provenance	*provlist = &localp;
+	show_provenance_from_unification(p, lex->lextype->dg, &ltp, 1, &local, &provlist, &arg);
 }

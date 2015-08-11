@@ -1,9 +1,11 @@
 #ifndef	DAG_PROVENANCE_H
 #define	DAG_PROVENANCE_H
 
+#include	"conf.h"
+
 struct dg_provenance
 {
-	enum { FROM_VACUUM, FROM_LUI_EDGE, FROM_LUI_TREE, FROM_TREE, FROM_EDGE, FROM_TYPE, FROM_LEX, FROM_LEX_LOCAL, FROM_RULE, FROM_UNIFY }	kind;
+	enum { FROM_VACUUM, FROM_LUI_EDGE, FROM_LUI_TREE, FROM_TREE, FROM_EDGE, FROM_TYPE, FROM_TYPE_LOCAL, FROM_LEX, FROM_LEX_LOCAL, FROM_RULE, FROM_RULE_LOCAL, FROM_UNIFY }	kind;
 	char	*arg0id, *arg1id;
 	void	*arg0ptr, *arg1ptr;
 	char	*arg0path, *arg1path;

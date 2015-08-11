@@ -147,27 +147,6 @@ struct type	*lookup_type(char	*name)
 	return th_look(name);
 }
 
-void	lui_type(char	*name)
-{
-	struct type	*t = lookup_type(name);
-
-	if(t) output_lui_dg(t->dg, name);
-	else
-	{
-		int i,k=0;
-		start_lui_dg_list();
-		for(i=0;i<default_th->ntypes;i++)
-			if(strstr(default_th->types[i]->name, name))
-			{
-				if(k++<50)
-					lui_dg_list(default_th->types[i]->name, default_th->types[i]->dg);
-				else lui_dg_list_count_more();
-			}
-		if(0==stop_lui_dg_list("matching types"))
-			printf("no such type `%s'\n", name);
-	}
-}
-
 void	print_type(char	*name)
 {
 	struct type	*t = lookup_type(name);
@@ -381,7 +360,7 @@ setup_type_lineage(struct type	*t, int	npar, struct type	**par)
 
 extern int		g_loaded;
 
-int	constrain_type(char	*name, struct dg	*dg)
+int	constrain_type(char	*name, struct dg	*dg, struct tdl_line	*tdl)
 {
 	struct type	*type = lookup_type(name);
 
@@ -391,20 +370,17 @@ int	constrain_type(char	*name, struct dg	*dg)
 		fprintf(stderr, "type: tried to constrain type `%s' which doesn't exist yet\n", name);
 		return -1;
 	}
-	if(!dg)type->dg = atomic_dg(name);
-	else
+	type->dg = copy_dg(dg);
+	if(!type->dg)
 	{
-		type->dg = copy_dg(dg);
-		if(!type->dg)
-		{
-			fprintf(stderr, "type: cyclic dag specified for type `%s'\n", name);
-			return -1;
-		}
+		fprintf(stderr, "type: cyclic dag specified for type `%s'\n", name);
+		return -1;
 	}
 
 	type->dg->type = type->dg->xtype = type;
+	type->tdl = tdl;
 
-	//printf("\ntype: %s	definition: ", type->name);
+	//printf("type: %s	definition: %s\n", tdl->lhs, tdl->rhs);
 	//print_dg(type->dg); printf("\n");
 	return 0;
 }
@@ -581,7 +557,7 @@ struct type_hierarchy	*main_th;
 int	load_types()
 {
 extern int enable_out_of_order;
-int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
+int	typify_tdl_line(struct tdl_line	*line, void	*ref);
 
 	main_th = new_type_hierarchy("main", top_type);
 	if(!main_th)return -1;

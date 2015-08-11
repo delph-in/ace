@@ -99,7 +99,6 @@ struct dg	*wellform_dg(struct dg	*dg);
 struct dg	*walk_dg(struct dg	*dg, int *save, ...);
 void		output_lui_dg(struct dg	*dg, char *wtitle);
 
-void	unfill1(struct dg	*d);
 struct dg	*generalize(struct dg	*a, struct dg	*b);
 
 // internal operations
@@ -107,6 +106,7 @@ int			unify1(struct dg	*dg1, struct dg	*dg2);
 struct dg	*copy_dg_with_comp_arcs(struct dg	*dg);
 
 // for hyperactive parsing
+struct dg	*daughter_position(struct dg	*mother, int	arg);
 int		unify_dg_tmp(struct dg	*dg1, struct dg	*dg2, int	arg);
 int		unify_dg_defaults(struct dg	*indef, struct dg	*def);
 struct dg	*finalize_tmp(struct dg	*d, int trim);

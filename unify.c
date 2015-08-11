@@ -1275,6 +1275,29 @@ void	setup_tmp()
 	get_slabstate(&tmpstate);
 }
 
+struct dg	*daughter_position(struct dg	*mother, int	arg)
+{
+	struct dg	*to;
+	if(arg>=0)
+	{
+		int i =0 ;
+		to = dg_hop(mother, 0);	// 0 is guaranteed to be ARGS
+		while(to && i<arg)
+		{
+			to = dg_hop(to, 2);	// REST
+			i++;
+		}
+		if(to)to = dg_hop(to, 1);	// FIRST
+		if(!to)
+		{
+			fprintf(stderr, "unify_dg: couldn't get arg %d position in %s\n", arg, mother->xtype->name);
+			exit(-1);
+		}
+	}
+	else to = mother;
+	return to;
+}
+
 #ifdef	TIM_IN
 long long base_unify_dg_tmp_succ_count, base_unify_dg_tmp_fail_count, base_finalize_tmp_count;
 double	base_unify_dg_tmp_succ_time, base_unify_dg_tmp_fail_time, base_finalize_tmp_time;

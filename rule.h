@@ -1,6 +1,9 @@
 #ifndef	_RULE_H
 #define	_RULE_H
 
+#include	"dag-provenance.h"
+#include	"tdl.h"
+
 struct rule
 {
 	char		*name;
@@ -13,6 +16,8 @@ struct rule
 	int				lexical:4;
 	int				rtl:3, hyper:1;
 	int				gen_ignore:1, span_only:1, frag_only:1, pad:1;
+
+	struct tdl_line	*tdl;
 };
 
 struct instance

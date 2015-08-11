@@ -281,7 +281,7 @@ void	agenda_rules(int	count)
 	}
 }*/
 
-void	add_rule(char	*name, struct dg	*dg, int	num)
+void	add_rule(char	*name, struct dg	*dg, int	num, struct tdl_line	*tdl)
 {
 	struct rule	*r = calloc(sizeof(struct rule), 1);
 	int			i;
@@ -301,6 +301,7 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 	r->lexical = 0;
 	r->rnum = nrules-1;
 	r->rtl = rule_is_rtl_key(r);
+	r->tdl = tdl;
 
 	configure_rule(r);
 
@@ -309,7 +310,7 @@ void	add_rule(char	*name, struct dg	*dg, int	num)
 	//printf("\n");
 }
 
-int	study_rule(char	*name, struct dg	*dg)
+int	study_rule(char	*name, struct dg	*dg, struct tdl_line	*tdl)
 {
 	int	num = 0;
 	struct dg	*p;
@@ -323,7 +324,7 @@ int	study_rule(char	*name, struct dg	*dg)
 		if(dg_hop(p, 1))num++;
 		p = dg_hop(p, 2);	// REST
 	}
-	add_rule(name, dg, num);
+	add_rule(name, dg, num, tdl);
 	rules[nrules-1]->lexical = 0;
 	return 0;
 }
@@ -337,22 +338,6 @@ struct rule	*get_rule_by_name(char	*name)
 	else return rules[i];
 }
 
-void	lui_rule(char	*name)
-{
-	struct rule	*r = get_rule_by_name(name);
-	if(r)output_lui_dg(r->dg, name);
-	else
-	{
-		int i;
-		start_lui_dg_list();
-		for(i=0;i<nrules;i++)
-			if(strstr(rules[i]->name, name))
-				lui_dg_list(rules[i]->name, rules[i]->dg);
-		if(0==stop_lui_dg_list("matching rules"))
-			printf("no such rule `%s'\n", name);
-	}
-}
-
 void	print_rule(char	*name)
 {
 	struct rule	*r = get_rule_by_name(name);
@@ -361,11 +346,10 @@ void	print_rule(char	*name)
 	print_dg(r->dg);printf("\n");
 }
 
-int	study_lrule(char	*name, struct dg	*dg)
+int	study_lrule(char	*name, struct dg	*dg, struct tdl_line	*tdl)
 {
 	int	num = 0;
 	struct dg	*p;
-	extern char	*g_orth_def;
 
 	int wellform_result = wellform(dg, name);
 	assert(wellform_result == 0);
@@ -376,10 +360,10 @@ int	study_lrule(char	*name, struct dg	*dg)
 		if(dg_hop(p, 1))num++;
 		p = dg_hop(p, 2);	// REST
 	}
-	add_rule(name, dg, num);
+	add_rule(name, dg, num, tdl);
 	rules[nrules-1]->lexical = 1;
 
-	if(g_orth_def)add_orule(rules[nrules-1], g_orth_def);
+	if(tdl->odef)add_orule(rules[nrules-1], tdl->odef);
 	return 0;
 }
 

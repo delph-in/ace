@@ -71,33 +71,6 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 	return dg;
 }
 
-void	lui_lex(char	*name)
-{
-	struct lexeme *l = get_lex_by_name(name);
-	if(l)
-	{
-		struct dg	*d = lexical_dg(l, NULL);
-		output_lui_dg(d, name);
-	}
-	else
-	{
-		int i,k=0;
-		start_lui_dg_list();
-		for(i=0;i<nlexemes;i++)
-			if(!strncmp(lexemes[i]->word, name, strlen(name)))
-			{
-				if(k++<50)
-				{
-					struct dg	*d = lexical_dg(lexemes[i], NULL);
-					lui_dg_list(lexemes[i]->word, d);
-				}
-				else lui_dg_list_count_more();
-			}
-		if(0==stop_lui_dg_list("matching lexemes"))
-			printf("no such lexeme `%s'\n", name);
-	}
-}
-
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels)
 {
 	struct edge	*edge = slab_alloc(sizeof(struct edge));
@@ -543,7 +516,7 @@ int	study_lexeme(char	*name, struct dg	*dg, struct type	*t)
 	return 0;
 }
 
-int	study_generic_le(char	*name, struct dg	*dg)
+int	study_generic_le(char	*name, struct dg	*dg, struct tdl_line	*tdl)
 {
 	int wellform_result = wellform(dg, name);
 	assert(wellform_result == 0);
@@ -576,7 +549,7 @@ int	lexcomp(const void	*a, const void	*b)
 
 int	load_lexicon()
 {
-	extern int	lexify_tdl_line(char	*lhs, char	*rhs, void	*ref);
+	extern int	lexify_tdl_line(struct tdl_line	*line, void	*ref);
 	struct timeval tv1, tv2;
 
 	int load_lexicon()

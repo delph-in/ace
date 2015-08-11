@@ -255,6 +255,9 @@ static void disableRawMode(int fd) {
         rawmode = 0;
 }
 
+void linenoiseEnableRaw() { enableRawMode(STDIN_FILENO); }
+void linenoiseDisableRaw() { disableRawMode(STDIN_FILENO); }
+
 /* Use the ESC [6n escape sequence to query the horizontal cursor position
  * and return it. On error -1 is returned, on success the position of the
  * cursor. */
@@ -491,7 +494,10 @@ static void refreshSingleLine(struct linenoiseState *l) {
     snprintf(seq,64,"\x1b[0K");
     abAppend(&ab,seq,strlen(seq));
     /* Move cursor to original position. */
-    snprintf(seq,64,"\r\x1b[%dC", (int)(pos+plen));
+    // sweaglesw hack: skip the ESC [ 0 C if we want far-left positioning
+    if(pos+plen > 0)
+    	snprintf(seq,64,"\r\x1b[%dC", (int)(pos+plen));
+    else snprintf(seq,64,"\r");
     abAppend(&ab,seq,strlen(seq));
     if (write(fd,ab.b,ab.len) == -1) {} /* Can't recover from write error. */
     abFree(&ab);

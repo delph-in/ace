@@ -22,8 +22,8 @@
 #include	"version.h"
 #include	"ubertag.h"
 
-int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref);
-int	typify_tdl_line(char	*lhs, char	*rhs, void	*ref);
+int	dagify_tdl_line(struct tdl_line	*line, void	*ref);
+int	typify_tdl_line(struct tdl_line	*line, void	*ref);
 int	load_tdl(char	*path);
 
 char	*grammar_version = 0;
@@ -47,19 +47,8 @@ char	*trim_string(char	*str)
 	return str;
 }
 
-struct tdl_line
-{
-	int	processed;
-	char	*lhs, *rhs;
-	char	*odef;
-	char	*status, *filename;
-	int		lnum;
-
-	char	operation;
-};
-
 long			ntdllines;
-struct tdl_line	*tdllines;
+struct tdl_line		**tdllines;
 char			*tdlstatus = "grammar";
 
 struct hash	*tdl_hash;
@@ -68,19 +57,13 @@ int	loud_noises = 0;
 
 struct type	*_current_building_type = NULL;
 
-struct dg	*dagify(char	*str, struct type	*building_type);
-int	constrain_type(char	*name, struct dg	*dg);
-
 int	enable_out_of_order = 0;
 
 struct tdl_line	*get_conf_line(char	*lhs)
 {
 	char	key[256];
 	sprintf(key, "%s %s", "config", lhs);
-	long	had = (long)hash_find(tdl_hash, key);
-
-	if(had != 0)return &tdllines[had-1];
-	else return NULL;
+	return hash_find(tdl_hash, key);
 }
 
 char	*get_conf(char	*lhs)
@@ -156,13 +139,10 @@ char	*key_for_status_and_lhs(char	*status, char	*lhs)
 void	add_tdlline(char	*lhs, char	operation, char	*rhs, char	*odef, int	lnum, char	*path)
 {
 	char	*mbskey = key_for_status_and_lhs(tdlstatus?:"instance", lhs);
-	long	had = (long)hash_find(tdl_hash, mbskey);
-	struct tdl_line	*tdl;
+	struct tdl_line	*tdl = hash_find(tdl_hash, mbskey);;
 
-
-	if(had != 0)
+	if(tdl)
 	{
-		tdl = tdllines + had-1;
 		if(operation == '+')
 		{
 			augment_definition(tdl, rhs, lnum, path);
@@ -181,10 +161,10 @@ void	add_tdlline(char	*lhs, char	operation, char	*rhs, char	*odef, int	lnum, cha
 			exit(-1);
 		}
 		ntdllines++;
-		tdllines = realloc(tdllines, sizeof(struct tdl_line)*ntdllines);
-		tdl = tdllines + ntdllines-1;
+		tdllines = realloc(tdllines, sizeof(struct tdl_line*)*ntdllines);
+		tdl = tdllines[ntdllines-1] = malloc(sizeof(struct tdl_line));
 		tdl->lhs = strdup(lhs);
-		hash_add(tdl_hash, mbskey, (void*)ntdllines);
+		hash_add(tdl_hash, mbskey, tdl);
 	}
 	tdl->processed = 0;
 	tdl->rhs = strdup(rhs);
@@ -194,8 +174,6 @@ void	add_tdlline(char	*lhs, char	operation, char	*rhs, char	*odef, int	lnum, cha
 	tdl->lnum = lnum;
 	tdl->operation = operation;
 }
-
-char	*g_orth_def;
 
 int	process_comments(char	*line, int	in_comment)
 {
@@ -320,9 +298,7 @@ int	process_colon_command(char	*parent, char	*cmd)
 		{
 			what++;
 			what[strlen(what)-1] = 0;
-			char	*iname = path_for_include(parent, what, suffix);
-			load_tdl(iname);
-			free(iname);
+			load_tdl(path_for_include(parent, what, suffix));
 		}
 		else
 		{
@@ -405,9 +381,6 @@ int	load_tdl(char	*path)
 
 	sprintf(doing, "reading %s", tdlstatuses); show_task_name(doing);
 	printf("from `%s'\n", path);
-
-	//tdllines = 0;
-	//ntdllines = 0;
 
 	path = strdup(path);	// make our own copy so we can put it in tdlline records without duplicating further
 	*odef = 0;
@@ -508,31 +481,31 @@ void	free_tdl()
 
 	for(i=0;i<ntdllines;i++)
 	{
-		free(tdllines[i].lhs);
-		free(tdllines[i].rhs);
-		if(tdllines[i].odef)
-			free(tdllines[i].odef);
+		free(tdllines[i]->lhs);
+		free(tdllines[i]->rhs);
+		if(tdllines[i]->odef)
+			free(tdllines[i]->odef);
+		free(tdllines[i]);
 	}
 	ntdllines = 0;
 	if(tdllines)free(tdllines);
-	tdllines = 0;
+	tdllines = NULL;
 }
 
-int	process_tdl_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	*ref), void	*ref)
+int	process_tdl_status(char	*status, int	(*callback)(struct tdl_line	*line, void	*ref), void	*ref)
 {
 	int	i;
 
 	for(i=0;i<ntdllines;i++)
-		tdllines[i].processed = 0;
+		tdllines[i]->processed = 0;
 	for(i=0;i<ntdllines;i++)
 	{
-		if(strcmp(status, tdllines[i].status))continue;
-		if(tdllines[i].processed)continue;
-		tdllines[i].processed = 1;
-		g_orth_def = tdllines[i].odef;
-		if(callback(tdllines[i].lhs, tdllines[i].rhs, ref))
+		if(strcmp(status, tdllines[i]->status))continue;
+		if(tdllines[i]->processed)continue;
+		tdllines[i]->processed = 1;
+		if(callback(tdllines[i], ref))
 		{
-			fprintf(stderr, "tdl: top-level error occured near %s:%d\n", tdllines[i].filename, tdllines[i].lnum);
+			fprintf(stderr, "tdl: top-level error occured near %s:%d\n", tdllines[i]->filename, tdllines[i]->lnum);
 			exit(-1);
 			return -1;
 		}
@@ -540,7 +513,7 @@ int	process_tdl_status(char	*status, int	(*callback)(char	*lhs, char	*rhs, void	
 	return 0;
 }
 
-int	process_tdl_dgs_status(char	*status, int	(*callback)(char	*lhs, struct dg	*dg))
+int	process_tdl_dgs_status(char	*status, int	(*callback)(char	*lhs, struct dg	*dg, struct tdl_line	*line))
 {
 	return process_tdl_status(status, dagify_tdl_line, callback);
 }
@@ -561,12 +534,8 @@ struct type	*find_type(char	*name, int	constrain)
 			goto notype;
 		}
 		char	*key = key_for_status_and_lhs("type", name);
-		long	had = (long)hash_find(tdl_hash, key);
-		struct tdl_line	*tdl = NULL;
-		if(had != 0)tdl = tdllines + had-1;
+		struct tdl_line	*tdl = hash_find(tdl_hash, key);
 		
-		//for(i=0;i<ntdllines;i++)
-		//	if(!strcmp("type", tdllines[i].status) && !strcmp(name, tdllines[i].lhs))break;
 		if(tdl)
 		{
 			if(tdl->processed)
@@ -583,14 +552,14 @@ struct type	*find_type(char	*name, int	constrain)
 					if(constrain)
 					{
 						struct type	*tmp = _current_building_type;
-						if(dagify_tdl_line(tdl->lhs, tdl->rhs, constrain_type))
+						if(dagify_tdl_line(tdl, constrain_type))
 						{
 							fprintf(stderr, "tdl: error constraining occured near line %d\n", tdl->lnum);
 							return 0;
 						}
 						_current_building_type = tmp;
 					}
-					else if(typify_tdl_line(tdl->lhs, tdl->rhs, 0))
+					else if(typify_tdl_line(tdl, 0))
 					{
 						fprintf(stderr, "tdl: error typing occured near line %d\n", tdl->lnum);
 						return 0;
@@ -1226,8 +1195,9 @@ struct dg	*dagify(char	*str, struct type	*building_type)
 	return dg;
 }
 
-int	lexify_tdl_line(char	*lhs, char	*rhs, void	*ref)
+int	lexify_tdl_line(struct tdl_line	*line, void	*ref)
 {
+	char	*lhs = line->lhs, *rhs = line->rhs;
 	struct dg	*dg;
 	char	*type, *amp, *dag;
 	struct type	*ty;
@@ -1255,11 +1225,12 @@ int	lexify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 	return study_lexeme(lhs, dg, ty);
 }
 
-int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref)
+int	dagify_tdl_line(struct tdl_line	*line, void	*ref)
 {
+	char	*lhs = line->lhs, *rhs = strdup(line->rhs);
 	struct dg	*dg;
 	struct type	*bt = 0;
-	int		(*callback)(char	*name, struct dg	*dg) = ref;
+	int		(*callback)(char	*name, struct dg	*dg, struct tdl_line	*line) = ref;
 
 	if(enable_out_of_order)
 	{
@@ -1296,11 +1267,12 @@ int	dagify_tdl_line(char	*lhs, char	*rhs, void	*ref)
 		printf("\n");
 	}*/
 
-	return callback(lhs, dg);
+	return callback(lhs, dg, line);
 }
 
-int	typify_tdl_line(char	*lhs, char	*rhs_save, void	*ref)
+int	typify_tdl_line(struct tdl_line	*line, void	*ref)
 {
+	char	*lhs = line->lhs, *rhs_save = line->rhs;
 	struct type	**parents = 0;
 	int		nparents = 0, done = 0;
 	int		depth = 0, quote = 0;
@@ -1439,8 +1411,9 @@ void	recursive_bleach(struct dg	*dg, struct type	*top)
 		recursive_bleach(arcs[i], top);
 }
 
-int	mtrify_tdl_line(char	*lhs, char	*rhs, void	*ref)
+int	mtrify_tdl_line(struct tdl_line	*line, void	*ref)
 {
+	char	*lhs = line->lhs, *rhs = line->rhs;
 	int	(*process_mtr)(char	*lhs, struct dg	*main_dg, struct dg	*output_override) = ref;
 
 	// first, split off the rule type
@@ -1893,7 +1866,7 @@ int load_grammar(char	*path)
 		run_task("loading übertagger", load_ubertagging);
 
 	// make sure none of the grammar is auto-freed when the first parse is over
-	free_tdl();
+	//free_tdl();	 // actually, don't free the TDL; want to be able to freeze some of it into the .dat file.
 	commit_slab();
 
 	// make sure all string types have numbers

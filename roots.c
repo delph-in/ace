@@ -203,7 +203,7 @@ int	qc_is_root(struct qc	*q)
 	return 0;
 }
 
-int	study_instance(char	*lhs, struct dg	*dg)
+int	study_instance(char	*lhs, struct dg	*dg, struct tdl_line	*tdl)
 {
 	ninstances++;
 	instances = realloc(instances, sizeof(struct instance) * ninstances);
@@ -369,7 +369,7 @@ char	*label_dag(struct dg	*dg, char *fallback)
 	return fallback;
 }
 
-int	study_label(char	*lhs, struct dg	*dg)
+int	study_label(char	*lhs, struct dg	*dg, struct tdl_line	*tdl)
 {
 	int	is_meta = 0;
 	char	*name;
@@ -411,21 +411,4 @@ int	load_labels()
 		exit(-1);
 	}
 	return 0;
-}
-
-void	lui_instance(char	*name, int	allow_partial)
-{
-	struct dg *d = find_instance(name);
-	if(d)
-		output_lui_dg(d, name);
-	else
-	{
-		int i;
-		start_lui_dg_list();
-		for(i=0;i<ninstances;i++)
-			if(strstr(instances[i].name, name))
-				lui_dg_list(instances[i].name, instances[i].dg);
-		if(0==stop_lui_dg_list("matching instances"))
-			printf("no such instance `%s'\n", name);
-	}
 }

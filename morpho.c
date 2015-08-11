@@ -1102,7 +1102,7 @@ int	load_lrules()
 {
 	char		fname[256];
 	extern char	*grammar_dir;
-	extern int	study_lrule(char	*name, struct dg	*dg);
+	extern int	study_lrule(char	*name, struct dg	*dg, struct tdl_line	*tdl);
 
 	if(process_tdl_dgs_status("lex-rule", study_lrule))
 	{

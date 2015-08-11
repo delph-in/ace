@@ -106,6 +106,18 @@ char	*freeze_string(char	*str)
 	return strcpy(copy, str);
 }
 
+struct tdl_line	*freeze_tdl_line(struct tdl_line	*lin)
+{
+	struct tdl_line	*lout = slab_alloc(sizeof(struct tdl_line));
+	*lout=*lin;
+	lout->lhs = freeze_string(lin->lhs);
+	lout->rhs = freeze_string(lin->rhs);
+	if(lin->odef)lout->odef = freeze_string(lin->odef);
+	lout->status = freeze_string(lin->status);
+	lout->filename = freeze_string(lin->filename);
+	return lout;
+}
+
 struct rule	*freeze_rule(struct rule	*rin)
 {
 	struct rule	*rout = slab_alloc(sizeof(struct rule));
@@ -116,6 +128,7 @@ struct rule	*freeze_rule(struct rule	*rin)
 	rout->gpackdg = copy_dg(rin->gpackdg);
 	rout->name = freeze_string(rin->name);
 	strcpy(rout->name, rin->name);
+	if(rout->tdl)rout->tdl = freeze_tdl_line(rin->tdl);
 
 	// make sure the semantic index pointers can find the frozen rules
 	rin->dg = (struct dg*)rout;
@@ -203,6 +216,8 @@ struct type	*freeze_type(struct type	*tin)
 	tout->descendents = freeze_block(tin->descendents, tin->ndescendents * sizeof(short));
 	tout->parents = freeze_block(tin->parents, sizeof(struct type*)*tout->nparents);
 	tout->daughters = freeze_block(tin->daughters, sizeof(struct type*)*tout->ndaughters);
+
+	if(tout->tdl)tout->tdl = freeze_tdl_line(tin->tdl);
 
 	return tout;
 }
