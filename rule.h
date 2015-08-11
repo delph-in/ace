@@ -15,6 +15,15 @@ struct rule
 	int				gen_ignore:1, span_only:1, frag_only:1, pad:1;
 };
 
+struct instance
+{
+	char		*name;
+	int			root_flag;
+	struct dg	*dg;
+};
+extern struct instance	*instances;
+extern int	ninstances;
+
 #include	"dag.h"
 #include	"chart.h"
 

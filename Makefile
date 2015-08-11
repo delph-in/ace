@@ -35,7 +35,7 @@ OBJ=lexicon.o chart.o dag.o type.o tdl.o rule.o morpho.o roots.o freeze.o unify.
 
 PICOBJS=$(patsubst %,pic/%,${OBJ} libace.o)
 HIDDENPICOBJS=pic/timer.o
-APPOBJ=${OBJ} main.o post/post.o timer.o linenoise.o
+APPOBJ=${OBJ} main.o post/post.o timer.o linenoise.o lui-cli.o
 
 all: ace libace.so libace.a
 
