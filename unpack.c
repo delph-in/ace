@@ -19,6 +19,7 @@
 #include	"unicode.h"
 #include	"freeze.h"
 #include	"conf.h"
+#include	"dag-provenance.h"
 
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
@@ -1249,6 +1250,7 @@ int	gen_extract_lexemes(struct dg	*topdown, struct hypothesis	*h, int	k, struct 
 		e->dg = topdown;
 		install_orth(e->dg, n, forms);
 		L[k] = e;
+		//lui_dg_list(lex->word, e->dg, make_provenance(FROM_TREE,h));
 		return k+1;
 	}
 	// get full FS for h
@@ -1311,7 +1313,9 @@ void	fixup_generator_string(struct hypothesis	*h)
 	if(enable_post_generation_mapping)
 	{
 		struct edge	**lexeme_list = slab_alloc(sizeof(struct edge*) * h->toklen);
+		//start_lui_dg_list();
 		int n = gen_extract_lexemes(h->dg, h, 0, lexeme_list);
+		//stop_lui_dg_list("generator lexical output");
 		int k;
 		for(k=0;k<n;k++)
 		{

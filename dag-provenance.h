@@ -17,4 +17,6 @@ int	show_provenance_from_unification(struct path	path, struct dg	*left, struct d
 struct hypothesis	*lui_find_tree(char	*id);
 struct edge	*lui_find_edge(char	*id);
 
+struct dg_provenance	make_provenance(int	kind, void	*ptr);
+
 #endif
