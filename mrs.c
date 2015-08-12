@@ -742,7 +742,36 @@ int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 	DEBUG("mrs subsumption passed index checks\n");
 	if(in->xarg && out->xarg && !var_subsume(in->xarg, out->xarg, vmap, in->vlist.nvars))return 0;
 	DEBUG("mrs subsumption passed xarg checks\n");
-	return mrs_subsumes0(in, out, 0, vmap, used);
+	// establish a quasi-intelligent order in which to align input EPs
+	int	order[in->nrels], vmap2[in->vlist.nvars];
+	memcpy(vmap2,vmap,sizeof(vmap));
+	char	used2[in->nrels];
+	bzero(used2,sizeof(used2));
+	int	j,k;
+	for(i=0;i<in->nrels;i++)
+	{
+		int	max=-1, maxj;
+		for(j=0;j<in->nrels;j++)
+		{
+			struct mrs_ep	*e = in->rels+j;
+			int	hits = 0;
+			if(used2[j])continue;
+			if(e->lbl && vmap2[e->lbl->vnum]!=-1)hits++;
+			for(k=0;k<e->nargs;k++)
+				if(vmap2[e->args[k].value->vnum]!=-1)hits++;
+			if(hits>max) { max = hits; maxj = j; }
+		}
+		assert(max>=0);
+		// take most connected EP as next to align
+		order[i] = maxj;
+		used2[maxj] = 1;
+		// mark all vars reachable from that EP as aligned
+		struct mrs_ep	*e = in->rels+maxj;
+		if(e->lbl)vmap2[e->lbl->vnum] = 1;
+		for(k=0;k<e->nargs;k++)
+			vmap2[e->args[k].value->vnum] = 1;
+	}
+	return mrs_subsumes0(in, out, 0, vmap, used, order);
 }
 
 int pred_subsumes(char *in, char *out)
@@ -882,13 +911,8 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 	return 1;
 }
 
-int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *used)
+int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *used, int	*order)
 {
-	// try to match epi of in with some ep in out, and recurse
-	struct mrs_ep	*ep = in->rels+epi, *op;
-	int				vm[in->vlist.nvars];
-	int				i, j, k;
-
 	if(epi == in->nrels)
 	{
 		char	hused[out->nhcons];
@@ -898,7 +922,13 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 		return mrs_subsumes1(in, out, 0, vmap, hused);
 	}
 
-	//printf("checking input pred '%s' subsumption\n", ep->pred);
+	// try to match order[epi] of in with some ep in out, and recurse
+	assert(order[epi]>=0 && order[epi]<in->nrels);
+	struct mrs_ep	*ep = in->rels+order[epi], *op;
+	int				vm[in->vlist.nvars];
+	int				i, j, k;
+
+	DEBUG("checking input pred '%s' subsumption\n", ep->pred);
 	for(i=0;i<out->nrels;i++) if(!used[i])
 	{
 		op = out->rels+i;
@@ -929,11 +959,11 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 		if(j<ep->nargs)continue;
 		if(g_mrs_test_demand_equality && ep->nargs != op->nargs)continue;
 
-		DEBUG("mrs subsumption: in %d <=> out %d\n", epi, i);
+		DEBUG("mrs subsumption: in %d <=> out %d\n", order[epi], i);
 
 		// we found an alignment for epi; recurse.
 		used[i] = 1;
-		if(mrs_subsumes0(in, out, epi+1, vm, used))
+		if(mrs_subsumes0(in, out, epi+1, vm, used, order))
 		{
 			used[i] = 0;
 			return 1;

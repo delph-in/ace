@@ -1301,6 +1301,11 @@ check_all_mrs_vars_are_on_vlist(struct mrs	*m)
 	}
 }
 
+int	strptrcmp(char	**x, char	**y)
+{
+	return strcmp(*x,*y);
+}
+
 int	equiv_mrs(struct mrs	*x, struct mrs	*y)
 {
 	/*printf("is %p eq %p?\n", x, y);
@@ -1308,6 +1313,15 @@ int	equiv_mrs(struct mrs	*x, struct mrs	*y)
 	printf(" vs \n");
 	print_mrs(y);
 	printf("???\n");*/
+	// quick first step: see if PRED lists are identical
+	if(x->nrels != y->nrels)return 0;
+	char	*xpreds[x->nrels], *ypreds[y->nrels];
+	int i;
+	for(i=0;i<x->nrels;i++)xpreds[i]=x->rels[i].pred;
+	for(i=0;i<y->nrels;i++)ypreds[i]=y->rels[i].pred;
+	qsort(xpreds, x->nrels, sizeof(char*), (int(*)(const void*,const void*))strptrcmp);
+	qsort(ypreds, y->nrels, sizeof(char*), (int(*)(const void*,const void*))strptrcmp);
+	for(i=0;i<x->nrels;i++)if(strcmp(xpreds[i], ypreds[i]))return 0;
 	extern int g_mrs_test_demand_equality;
 	g_mrs_test_demand_equality = 1;
 	int result = mrs_subsumes(x,y);
@@ -1508,7 +1522,9 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 				transfer_rule_profilers = calloc(sizeof(struct profiler*), nrules);
 			start_and_alloc_profiler(transfer_rule_profilers+i, rules[i]->name, transfer_profiler, NULL);
 		}
-		int nfires = transfer_mrs1(rules[i], &ts, first_route_only);
+		int	fro = first_route_only?1:0;
+		if(rules[i]->optional && first_route_only==2)fro=0;	// 2 means FRO for obligatory rules but not for optionals
+		int nfires = transfer_mrs1(rules[i], &ts, fro);
 		if(nfires == -1)
 		{
 			if(g_profiling)
@@ -1675,7 +1691,7 @@ int	transfer(struct mrs	*m)
 		alarm(timeout_seconds);
 
 	struct mrs	**results = NULL;
-	int	n = transfer_mrs(ntransfer_rules, transfer_rules, m, &results, 0);
+	int	n = transfer_mrs(ntransfer_rules, transfer_rules, m, &results, 1);
 	int i;
 	for(i=0;i<n;i++)
 	{
