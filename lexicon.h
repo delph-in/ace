@@ -30,6 +30,7 @@ struct dg	*expand_lexeme(struct lexeme	*l);
 struct edge	*lexical_edge(struct lexeme	*lex, int	i, int	len, struct dg	*rels);
 struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels);
 struct lexeme	*get_lex_by_name(char *name);
+struct lexeme	*get_lex_by_name_hash(char	*name);
 
 extern int nlexemes;
 extern struct lexeme	**lexemes;

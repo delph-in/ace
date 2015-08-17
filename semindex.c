@@ -631,31 +631,35 @@ int evacuate(int ntriggers, char **triggers, struct dg	**trigcons)
 			add_agenda(epsilon_edge(e->rule, 0, e->rule->rtl, 0));
 			count++;
 		}
-		if(e->what == LEXEME)
-		{
-			int j;
-			for(j=0;j<ntriggers;j++)
-				if(!strcmp(triggers[j], e->lex->word))
-				{
-					// we may have to instantiate this vacuous lexeme several times, with different constraints.
-					//printf("trying to add vacuous lexeme '%s'\n", e->lex->word);
-					struct edge	*edge = lexical_edge(e->lex, 0, 0, 0);
-					if(trigcons[j])
-					{
-						//printf("applying trigger constraint to %s\n", e->lex->word);
-						//print_dg(trigcons[j]);printf("\n");
-						if(0 != unify_dg_infrom(edge->dg, trigcons[j]))
-						{
-							fprintf(stderr, "TRIGGER CONSTRAINT on '%s' failed\n", triggers[j]);
-							unify_backtrace();
-							continue;
-						}
-					}
-					add_agenda(edge);
-					count++;
-				}
-		}
 	}
+	int j;
+	// triggers[] is guaranteed unique already (unless there are multiple trigcons per lexeme)
+	for(j=0;j<ntriggers;j++)
+	{
+		struct lexeme	*lex = get_lex_by_name_hash(triggers[j]);
+		if(!lex)
+		{
+			fprintf(stderr, "ERROR: trigger rules call for non-existant lexeme `%s'\n", triggers[j]);
+			continue;
+		}
+		// we may have to instantiate this vacuous lexeme several times, with different constraints.
+		printf("trigger rules adding lexeme '%s'\n", lex->word);
+		struct edge	*edge = lexical_edge(lex, 0, 0, 0);
+		if(trigcons[j])
+		{
+			//printf("applying trigger constraint to %s\n", lex->word);
+			//print_dg(trigcons[j]);printf("\n");
+			if(0 != unify_dg_infrom(edge->dg, trigcons[j]))
+			{
+				fprintf(stderr, "TRIGGER CONSTRAINT on '%s' failed\n", triggers[j]);
+				unify_backtrace();
+				continue;
+			}
+		}
+		add_agenda(edge);
+		count++;
+	}
+
 	return count;
 }
 

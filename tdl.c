@@ -298,6 +298,7 @@ int	process_colon_command(char	*parent, char	*cmd)
 		{
 			what++;
 			what[strlen(what)-1] = 0;
+			if(strstr(what, ".mtr"))suffix=NULL;
 			load_tdl(path_for_include(parent, what, suffix));
 		}
 		else
