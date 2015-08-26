@@ -63,77 +63,81 @@ void	parse_from_lui(char	*input)
 
 void	*lui_listener(void *foo)
 {
-	int	first = 1;
 	while(!ferror(lui_read) && !feof(lui_read))
 	{
-		char	line[1024], *lp;
-		if(!first)linenoiseEnableRaw();
-		first=0;
+		char	line[1024];
 		if(fgets(line, 1023, lui_read))
 		{
-			linenoiseDisableRaw();
-			int	len;
-			lp = line; while(*lp==' ' || *lp=='\n' || *lp=='\r' || *lp=='' || *lp=='\t')lp++;
-			len = strlen(lp);
-			while(len && lp[len-1]=='\n' || lp[len-1]=='' || lp[len-1]==' ')len--;
-			lp[len] = 0;
-			if(!strncmp(lp, "browse ", 7))
-			{
-				int cid, eid;
-				char what[256], what2[256] = "";
-				int fields = sscanf(lp, "browse %d %d %s %s\n", &cid, &eid, what, what2);
-				if(fields < 3)
-					fprintf(stderr, "LUI: bad 'browse' command\n");
-				else if(cid != chart_id)
-					fprintf(stderr, "LUI: out-of-date chart %d requested [%d is current]\n", cid, chart_id);
-				else browse_lui(eid, what, what2);
-			}
-			else if(!strncmp(lp, "version ", 8)) {}
-			else if(strstr(lp, " forget"))lui_forget(lp);
-			else if(!strncmp(lp, "parse ", 6))parse_from_lui(lp+6);
-			else if(!strncmp(lp, "genchart ", 9))
-			{
-				int cid, neid=0, *eid=NULL;
-				int	offset = 0;
-				char	*p;
-				sscanf(lp, "genchart %d explore [%n", &cid, &offset);
-				p = lp + offset;
-				assert(p>lp);
-				assert(p[-1]=='[');
-				for(p=strtok(p," ");p;p=strtok(NULL," "))
-				{
-					if(*p==']')break;
-					neid++;
-					eid = realloc(eid,sizeof(int)*neid);
-					eid[neid-1] = atoi(p);
-				}
-				if(cid != chart_id)
-				{
-					fprintf(stderr, "LUI: out-of-date chart %d requested [%d is current]\n", cid, chart_id);
-					continue;
-				}
-				fprintf(stderr, "NOTE: replying to LUI request to browse genchart level 2 on %d EIDs\n", neid);
-				lui_gen_chart_level2(cid, neid, eid);
-			}
-			else if(!strncmp(lp, "type ", 5))
-			{
-				char type[256], command[256] = "";
-				int fields = sscanf(lp, "type %s %s\n", type, command);
-				if(fields < 2) { fprintf(stderr, "LUI: bad 'type' command\n"); }
-				else if(!strcmp(command, "expansion"))
-					lui_type(type, 0);
-				else fprintf(stderr, "LUI: '%s' viewer for types not implemented\n", command);
-			}
-			else if(!strcmp(lp, "")) {}
-			else if(!strncmp(lp, "unify ", 6))interactive_unify(lp);
-			else if(!strncmp(lp, "daglist ", 8))lui_dg_list_respond(lp);
-			else fprintf(stderr, "LUI: unknown `%s'\n", lp);
+			//if(!input_from_lui)linenoiseDisableRaw();
+			lui_process_request(line);
+			//if(!input_from_lui)linenoiseEnableRaw();
 		}
 	}
 	if(!waiting_for_lui)
 		fprintf(stderr, "LUI: exited\n");
 	lui_rfd = -1;
 	return 0;
+}
+
+lui_process_request(char	*line)
+{
+	char	*lp;
+	int	len;
+	lp = line; while(*lp==' ' || *lp=='\n' || *lp=='\r' || *lp=='' || *lp=='\t')lp++;
+	len = strlen(lp);
+	while(len && lp[len-1]=='\n' || lp[len-1]=='' || lp[len-1]==' ')len--;
+	lp[len] = 0;
+	if(!strncmp(lp, "browse ", 7))
+	{
+		int cid, eid;
+		char what[256], what2[256] = "";
+		int fields = sscanf(lp, "browse %d %d %s %s\n", &cid, &eid, what, what2);
+		if(fields < 3)
+			fprintf(stderr, "LUI: bad 'browse' command\n");
+		else if(cid != chart_id)
+			fprintf(stderr, "LUI: out-of-date chart %d requested [%d is current]\n", cid, chart_id);
+		else browse_lui(eid, what, what2);
+	}
+	else if(!strncmp(lp, "version ", 8)) {}
+	else if(strstr(lp, " forget"))lui_forget(lp);
+	else if(!strncmp(lp, "parse ", 6))parse_from_lui(lp+6);
+	else if(!strncmp(lp, "genchart ", 9))
+	{
+		int cid, neid=0, *eid=NULL;
+		int	offset = 0;
+		char	*p;
+		sscanf(lp, "genchart %d explore [%n", &cid, &offset);
+		p = lp + offset;
+		assert(p>lp);
+		assert(p[-1]=='[');
+		for(p=strtok(p," ");p;p=strtok(NULL," "))
+		{
+			if(*p==']')break;
+			neid++;
+			eid = realloc(eid,sizeof(int)*neid);
+			eid[neid-1] = atoi(p);
+		}
+		if(cid != chart_id)
+		{
+			fprintf(stderr, "LUI: out-of-date chart %d requested [%d is current]\n", cid, chart_id);
+			return -1;
+		}
+		fprintf(stderr, "NOTE: replying to LUI request to browse genchart level 2 on %d EIDs\n", neid);
+		lui_gen_chart_level2(cid, neid, eid);
+	}
+	else if(!strncmp(lp, "type ", 5))
+	{
+		char type[256], command[256] = "";
+		int fields = sscanf(lp, "type %s %s\n", type, command);
+		if(fields < 2) { fprintf(stderr, "LUI: bad 'type' command\n"); }
+		else if(!strcmp(command, "expansion"))
+			lui_type(type, 0);
+		else fprintf(stderr, "LUI: '%s' viewer for types not implemented\n", command);
+	}
+	else if(!strcmp(lp, "")) {}
+	else if(!strncmp(lp, "unify ", 6))interactive_unify(lp);
+	else if(!strncmp(lp, "daglist ", 8))lui_dg_list_respond(lp);
+	else fprintf(stderr, "LUI: unknown `%s'\n", lp);
 }
 
 lui_forget(char	*command) { }
