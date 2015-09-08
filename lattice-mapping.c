@@ -583,7 +583,7 @@ void	replace_backrefs(struct dg	*d, struct dg	*rd, struct lattice_rule	*r, struc
 			}
 		}
 		DEBUG_VERBOSE("built string: `%S'\n", build);
-		d->xtype = d->type = temporary_string_type(freeze_tombs(build));
+		d->xtype = d->type = lookup_type(freeze_tombs(build));
 		DEBUG_VERBOSE("... resulting in type '%s'\n", d->xtype->name);
 	}
 	else
