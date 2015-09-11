@@ -402,7 +402,7 @@ void	build_hypothesis_surface(struct hypothesis	*h)
 		{
 			// lexical rule
 			assert(h->arity==1);	// lexical rules are unary
-			if(h->edge->rule->orth)
+			if(h->edge->rule->orth && g_mode == GENERATING)
 			{
 				h->string = inflect(h->edge->rule->orth, h->rhslist[0]->string);
 				if(!h->string)h->string = "(failed to inflect)";	// packing might make us try something silly here
