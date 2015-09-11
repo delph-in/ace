@@ -1269,14 +1269,14 @@ int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct
 			par->forwarded = 0;
 			par->type = par->xtype;
 		}
-		struct type	*pt = par->type;
-		if(!glb(pt, lookup_type(g_cons_type)))
-			return -1;
+		struct type	*pt = glb(par->type, lookup_type(g_cons_type));
+		if(!pt)return -1;
+		par->type = pt;
 		struct dg	*f = dg_hop(par, 1);
 		if(!f)
 		{
 			f = slab_alloc(sizeof(struct dg));
-			bzero(f,sizeof(f));
+			bzero(f,sizeof(*f));
 			f->xtype = forms[i];
 			add_carc(par, 1, f);
 		}
@@ -1296,7 +1296,7 @@ int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct
 		if(!r)
 		{
 			r = slab_alloc(sizeof(struct dg));
-			bzero(r,sizeof(r));
+			bzero(r,sizeof(*r));
 			r->xtype = lookup_type((i+1==sl)?g_null_type:g_cons_type);
 			add_carc(par, 2, r);
 		}
@@ -1304,6 +1304,7 @@ int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct
 		{
 			struct type	*rt = (r->gen==generation)?r->type:r->xtype;
 			t = glb(rt, lookup_type(g_null_type));
+			if(!t)return -1;
 			if(rt!=t)
 			{
 				if(r->gen!=generation)
