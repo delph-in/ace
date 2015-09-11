@@ -1260,7 +1260,16 @@ int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct
 	// write to parent's orthography
 	for(i=0;i<sl;i++)
 	{
-		struct type	*pt = (par->gen==generation)?par->type:par->xtype;
+		if(par->gen!=generation)
+		{
+			par->gen = generation;
+			par->ncarcs = 0;
+			par->carcs = NULL;
+			par->copy = NULL;
+			par->forwarded = 0;
+			par->type = par->xtype;
+		}
+		struct type	*pt = par->type;
 		if(!glb(pt, lookup_type(g_cons_type)))
 			return -1;
 		struct dg	*f = dg_hop(par, 1);
@@ -1276,6 +1285,7 @@ int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct
 			f->gen = generation;
 			f->ncarcs = 0;
 			f->carcs = NULL;
+			f->copy = NULL;
 			f->forwarded = 0;
 			f->type = f->xtype;
 		}
