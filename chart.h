@@ -4,6 +4,7 @@
 #include	"dag.h"
 #include	"morpho.h"
 #include	"bitvec.h"
+#include	"lattice-mapping.h"
 
 //#define	RULE_STATS
 #define	ENABLE_HYPERACTIVE	1

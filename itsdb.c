@@ -59,6 +59,7 @@ questions:
 #include	"unpack.h"
 #include	"lattice-mapping.h"
 #include	"token.h"
+#include	"unicode.h"
 
 //#define	capi_printf(fmt...)	fprintf(stderr, fmt)
 

@@ -16,6 +16,7 @@
 #include	"hash.h"
 #include	"dag-provenance.h"
 #include	"linenoise.h"
+#include	"unicode.h"
 
 void	lui_gen_chart_level2(int	chart_id, int	nedge_ids, int	*edge_ids);
 void interactive_unify(char	*command);
