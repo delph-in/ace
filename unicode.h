@@ -12,5 +12,7 @@ int	wstrcmp(const wchar_t	*a, const wchar_t	*b);
 wchar_t	*wide_unescape(wchar_t	*str);
 
 char	*freeze_tombs(wchar_t	*w);
+char	*slab_escape(char	*str);
+char	*slab_unescape(char	*str);
 
 #endif

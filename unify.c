@@ -166,6 +166,112 @@ static struct dg	*copy_dg_no_comp_arcs(struct dg	*dg)
 	return newcopy;
 }
 
+// robust unification needs to be robust to loops in addition to type clashes
+struct dg	*copy_dg_with_comp_arcs_loopy(struct dg	*dg)
+{
+	struct dg	*newcopy;
+	unsigned short	*alptr, *olptr;
+	struct dg	**aptr, **optr;
+	int		i, j;
+
+	dg = dereference_dg(dg);
+	if(!dg)return 0;
+
+#ifdef	HAVE_CHECK_CYCLES
+	// ignore mark left by check_cycles()
+	if((unsigned long)dg->copy<=2)dg->copy = 0;
+#endif
+
+	if(dg->gen != generation)
+	{
+		dg->copy = 0;
+		dg->forwarded = 0;
+		dg->ncarcs = 0;
+		dg->carcs = 0;
+		dg->type = dg->xtype;
+		dg->gen = generation;
+	}
+	else if(dg->copy)
+	{
+		/*if((unsigned long long)dg->copy == 3)
+		{
+			// cycle detected!
+			//fprintf(stderr, "NOTE: cycle\n");
+			return NULL;
+		}*/
+		if(dg->copy->gen == generation)
+			return dg->copy;
+		assert(!"not reached -- why would copy be set and not be up-to-generation?");
+	}
+
+	int	na = dg->narcs + dg->ncarcs;
+	for(i=0;i<dg->narcs;i++)
+		if(SHOULD_TRIM(dg->label[i]))na--;
+	for(i=0;i<dg->ncarcs;i++)
+		if(SHOULD_TRIM(dg->carcs[i].label))na--;
+
+	//int	ab = (na-2 + 3)/4 * 4;
+	int		ab = DAG_EXTRA_LABELS_SIZE_FOR_COUNT(na);
+	newcopy = slab_alloc(sizeof(struct dg) + ab + sizeof(struct dg*)*na);
+	*newcopy = *dg;
+	newcopy->xtype = newcopy->type = (dg->gen==generation)?dg->type:dg->xtype;
+	newcopy->gen = generation;
+	newcopy->copy = NULL;
+	newcopy->ncarcs = 0;
+	newcopy->carcs = NULL;
+	newcopy->narcs = na;
+	newcopy->forwarded = 0;
+	alptr = newcopy->label;
+	aptr = DARCS(newcopy);
+	olptr = dg->label;
+	optr = DARCS(dg);
+
+	// set ->copy now, so cycles can be copied
+	dg->copy = newcopy;
+
+	for(j=0,i=0;i<dg->narcs || j<dg->ncarcs;) // mergesort
+	{
+		struct dg		*copyme;
+		int				copylabel;
+		if(j<dg->ncarcs && i<dg->narcs)
+		{
+			if(olptr[(int)i] < dg->carcs[(int)j].label)
+			{
+				copylabel = olptr[(int)i];
+				copyme = optr[(int)i++];
+			}
+			else
+			{
+				copylabel = dg->carcs[(int)j].label;
+				copyme = dg->carcs[(int)j++].dest;
+			}
+		}
+		else if(i<dg->narcs)
+		{
+			copylabel = olptr[(int)i];
+			copyme = optr[(int)i++];
+		}
+		else
+		{
+			copylabel = dg->carcs[(int)j].label;
+			copyme = dg->carcs[(int)j++].dest;
+		}
+		if(SHOULD_TRIM(copylabel))
+			continue;
+		//fprintf(stderr, "copying primary `%s' arc from %s to %p\n",
+		//		fnames[aptr->label], newcopy->xtype->name, xarc.dest);
+
+		*alptr = copylabel;
+		*aptr = copy_dg_with_comp_arcs_loopy(copyme);
+
+		if(!*aptr)return NULL;
+		aptr++; alptr++;
+	}
+
+	dg->copy = newcopy;
+	return newcopy;
+}
+
 static int darc_cmp(const void	*a, const void	*b)
 {
 	return ((const struct darc*)a)->label - ((const struct darc*)b)->label;
@@ -993,9 +1099,17 @@ is_cons(struct type	*t)
 
 void check_robust_list_unification(struct dg	*nulldg, struct dg	*consdg)
 {
+	struct	dg	*doublehop = consdg;
 	while(1)
 	{
 		consdg = dg_hop(consdg, lookup_fname("REST"));
+		if(doublehop)doublehop = dg_hop(doublehop, lookup_fname("REST"));
+		if(doublehop)doublehop = dg_hop(doublehop, lookup_fname("REST"));
+		if(doublehop == consdg)
+		{
+			fprintf(stderr, "NOTE: avoided falling into a circular list...\n");
+			return;
+		}
 		if(!consdg)return;
 		consdg = dereference_dg(consdg);
 		struct type	*rt = (consdg->gen==generation)?consdg->type:consdg->xtype;
@@ -1012,7 +1126,7 @@ void check_robust_list_unification(struct dg	*nulldg, struct dg	*consdg)
 					consdg->carcs = NULL;
 					consdg->copy = NULL;
 				}
-				fprintf(stderr, "NOTE: updating REST of a hallucinated list from %s to %s\n", rt->name, nrt->name);
+				//fprintf(stderr, "NOTE: updating REST of a hallucinated list from %s to %s\n", rt->name, nrt->name);
 				consdg->type = nrt;
 			}
 			break;
@@ -1402,9 +1516,14 @@ gettimeofday(&tv1, NULL);
 	/*if(trim && trimmed_portion_is_cyclic(d))
 		res = NULL;
 	else res = copy_dg_with_comp_arcs_ss(d, &ch);*/
-	res = copy_dg_with_comp_arcs_ss(d, &ch);
-	if(res && trim && trimmed_portion_is_cyclic(d))
-		res = NULL;
+	if(unify_always_succeeds)
+		res = copy_dg_with_comp_arcs_loopy(d);
+	else
+	{
+		res = copy_dg_with_comp_arcs_ss(d, &ch);
+		if(res && trim && trimmed_portion_is_cyclic(d))
+			res = NULL;
+	}
 
 	if(!res)set_slabstate(&tmpstate);
 	bump_generation();

@@ -595,3 +595,24 @@ struct type	*lub(struct type	*a, struct type	*b)
 	fprintf(stderr, "no upper bound for '%s' and '%s'\n", a->name, b->name);
 	assert(!"no upper bound found");
 }
+
+char	*type_to_string(struct type	*ty)
+{
+	assert(ty->name[0]=='"');
+	int	i, slen = strlen(ty->name)-2, alen = slen + 1;
+	assert(slen >= 0 && ty->name[slen+1]=='"');
+	if(alen%4)alen = (alen&~3)+4;
+	char	*s = slab_alloc(alen);
+	sprintf(s, "%.*s", slen, slab_unescape(ty->name+1));
+	return s;
+}
+
+struct type	*string_to_type(char	*str)
+{
+	str = slab_escape(str);
+	int	i, slen = strlen(str), alen = slen + 3;
+	if(alen%4)alen = (alen&~3)+4;
+	char	*s = slab_alloc(alen);
+	sprintf(s, "\"%.*s\"", slen, str);
+	struct type	*t = lookup_type(s);
+}

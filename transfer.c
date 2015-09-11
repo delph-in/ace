@@ -1347,7 +1347,53 @@ struct transfer_mrs_set
 	struct mrs	**mrs;
 };
 
-int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, int	*hcalignment, struct mrs	*min, struct transfer_mrs_set	*ts, int	pack_start)
+transfer_add_preds(struct hash	*seen, struct mrs	*m)
+{
+	int	i, j;
+	static int	predf = -1;
+	struct type_hierarchy	*th = default_type_hierarchy();
+	if(predf==-1)predf=lookup_fname("PRED");
+	for(i=0;i<m->nrels;i++)
+	{
+		struct mrs_ep	*e = m->rels+i;
+		struct dg	*pr = dg_hop(e->dg, predf);
+		assert(pr!=NULL);
+		struct type	*prt = pr->xtype;
+		if(!hash_find(seen, prt->name))
+			hash_add(seen, prt->name, (void*)0x1);
+		for(j=0;j<prt->ndescendents;j++)
+			if(prt->descendents[j]!=prt->tnum && !hash_find(seen, th->types[prt->descendents[j]]->name))
+				hash_add(seen, th->types[prt->descendents[j]]->name, (void*)0x1);
+	}
+}
+
+transfer_rule_has_seen_all_preds(struct hash	*seen, struct transfer_rule	*tr)
+{
+	int i;
+	static int	predf = -1;
+	if(predf==-1)predf=lookup_fname("PRED");
+	for(i=0;i<tr->context.neps+tr->input.neps;i++)
+	{
+		struct mrs_ep_desc	epd = place_in_transfer_rule(tr, i);
+		if(epd.pred_re)continue;
+		struct dg	*pd = dg_hop(epd.dg, predf);
+		if(!pd)continue;
+		struct type	*pt = pd->xtype;
+		if(pt->ndescendents > 1)
+		{
+			//printf("rule pred type %s has %d descendents\n", pt->name, pt->ndescendents);
+			continue;	// not a string type or leaf type
+		}
+		if(!hash_find(seen, pt->name))
+		{
+			//printf("can totally skip %s because %s not found\n", tr->name, pt->name);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, int	*hcalignment, struct mrs	*min, struct transfer_mrs_set	*ts, int	pack_start, struct hash	*preds_seen)
 {
 	struct mrs	*mout = transfer_mrs_result(tr, alignment, hcalignment, min);
 	if(!mout)return -1;	// latent cycle check failed
@@ -1362,6 +1408,7 @@ int	process_one_transfer_result(struct transfer_rule	*tr, int	*alignment, int	*h
 		ts->mrs = slab_realloc(ts->mrs, sizeof(struct mrs*)*ts->n, sizeof(struct mrs*)*(ts->n+1));
 		ts->mrs[ts->n++] = mout;
 		setup_tmp();	// prevent subsequent forget_tmp()'s from destroying this
+		transfer_add_preds(preds_seen, mout);
 	}
 	stop_profiler(transfer_packing_profiler, 1);
 
@@ -1404,7 +1451,7 @@ int	tr_quickcheck(struct transfer_rule	*tr, struct mrs	*min)
 	return 1;
 }
 
-int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int first_route_only)
+int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int first_route_only, struct hash	*preds_seen)
 {
 	//DEBUG("rule %s -- optional %d\n", tr->name, tr->optional);
 	int	i, nresult = 0, nfires = 0;
@@ -1439,7 +1486,7 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 		int	nalignments = 0;
 		int	found_alignment(int	*alignment, int *hcalignment)
 		{
-			if(0 != process_one_transfer_result(tr, alignment, hcalignment, min, ts, pack_start))
+			if(0 != process_one_transfer_result(tr, alignment, hcalignment, min, ts, pack_start, preds_seen))
 				return 0;
 
 			nalignments++;
@@ -1508,6 +1555,9 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 
 	//skolemize_for_transfer(m);
 
+	struct hash	*preds_seen = hash_new("transfer preds seen");
+	transfer_add_preds(preds_seen, m);
+
 	struct transfer_mrs_set	ts;
 	ts.n = 1;
 	ts.mrs = slab_alloc(sizeof(*m));
@@ -1516,6 +1566,7 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 	for(i=0;i<nrules && !cancel_transfer;i++)
 	{
 		if(rules[i]->disabled)continue;
+		if(!transfer_rule_has_seen_all_preds(preds_seen, rules[i]))continue;
 		if(g_profiling)
 		{
 			if(!transfer_rule_profilers)
@@ -1524,7 +1575,7 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 		}
 		int	fro = first_route_only?1:0;
 		if(rules[i]->optional && first_route_only==2)fro=0;	// 2 means FRO for obligatory rules but not for optionals
-		int nfires = transfer_mrs1(rules[i], &ts, fro);
+		int nfires = transfer_mrs1(rules[i], &ts, fro, preds_seen);
 		if(nfires == -1)
 		{
 			if(g_profiling)
@@ -1537,6 +1588,7 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 		if(g_profiling)
 			stop_profiler(transfer_rule_profilers[i], nfires);
 	}
+	hash_free_nokeys(preds_seen);
 
 	unskolemize_for_transfer(m);
 
@@ -1691,7 +1743,7 @@ int	transfer(struct mrs	*m)
 		alarm(timeout_seconds);
 
 	struct mrs	**results = NULL;
-	int	n = transfer_mrs(ntransfer_rules, transfer_rules, m, &results, 1);
+	int	n = transfer_mrs(ntransfer_rules, transfer_rules, m, &results, 2);
 	int i;
 	for(i=0;i<n;i++)
 	{

@@ -12,6 +12,7 @@
 #include	"rule.h"
 #include	"lexicon.h"
 #include	"freeze.h"
+#include	"morpho.h"
 
 #include	"timer.h"
 
@@ -913,17 +914,21 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 	if(!res && a->rule->orth)
 	{
 		// check whether orthographemic component accepts
-		// XXX this is sooo slow.
-		char *sub = show_orth_leaves(b), *foo;
-		if(trace > 1)printf(" .. yield of b is `%s'\n", sub);
-		foo = inflect(a->rule->orth, sub);
-		if(trace > 1)printf(" .. would inflect to `%s'\n", foo);
-		free(sub);
-		if(!foo)
+		if(unify_orthography(a->dg, b->dg, b->lex, a->rule))
 		{
 			res = -1;
 			unify_attempts_bad_orth++;
 		}
+		/*// XXX this is sooo slow.
+		char *sub = show_orth_leaves(b), *foo;
+		if(trace > 1)printf(" .. yield of b is `%s'\n", sub);
+		foo = inflect(a->rule->orth, sub);
+		if(trace > 1)printf(" .. would inflect to `%s'\n", foo);
+		if(!foo)
+		{
+			res = -1;
+			unify_attempts_bad_orth++;
+		}*/
 	}
 
 	if(!res)
@@ -993,7 +998,8 @@ char	*show_orth_leaves(struct edge	*e)
 		if(e->lex)
 		{
 			int len = 0, i;
-			for(i=0;i<e->lex->stemlen;i++)len += strlen(e->lex->stem[i]->name) + 1 - 2;
+			for(i=0;i<e->lex->stemlen;i++)
+				len += strlen(e->lex->stem[i]->name) + 1 - 2;
 			ret = malloc(len+4); *ret = 0;
 			for(i=0;i<e->lex->stemlen;i++)
 			{

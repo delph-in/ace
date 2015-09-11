@@ -291,6 +291,7 @@ void	lisp_print_s_exp(struct s_exp	*s)
 void	load_lisp(char	*path)
 {
 	FILE	*f = fopen(path, "r");
+	if(!f) { perror(path); exit(-1); }
 	fseek(f, 0, SEEK_END);
 	long	len = ftell(f);
 	rewind(f);

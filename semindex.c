@@ -643,7 +643,6 @@ int evacuate(int ntriggers, char **triggers, struct dg	**trigcons)
 			continue;
 		}
 		// we may have to instantiate this vacuous lexeme several times, with different constraints.
-		printf("trigger rules adding lexeme '%s'\n", lex->word);
 		struct edge	*edge = lexical_edge(lex, 0, 0, 0);
 		if(trigcons[j])
 		{

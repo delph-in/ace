@@ -2,6 +2,8 @@
 #define	_MORPHO_H
 
 #include	<wchar.h>
+#include	"lexicon.h"
+#include	"rule.h"
 
 struct orule
 {
@@ -53,5 +55,7 @@ void	add_orule(struct rule	*rule, char	*def);
 
 struct orule	*freeze_orule(struct orule	*orin);
 struct morpho_globals	*freeze_morpho_globals();
+
+int	unify_orthography(struct dg	*d, struct dg	*dtr, struct lexeme	*lex, struct rule	*r);
 
 #endif

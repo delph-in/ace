@@ -63,5 +63,7 @@ struct type	*glb(struct type	*a, struct type	*b);
 struct type	*lub(struct type	*a, struct type	*b);
 
 struct dg	*find_instance(char	*name);
+char	*type_to_string(struct type	*ty);
+struct type	*string_to_type(char	*str);
 
 #endif

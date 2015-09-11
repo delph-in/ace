@@ -2,8 +2,6 @@
 #define	_LEXICON_H
 
 #include	"dag.h"
-#include	"rule.h"
-#include	"morpho.h"
 
 struct lexeme
 {
@@ -16,6 +14,9 @@ struct lexeme
 
 	struct type	*pred;		// this lexeme provides relation 'pred'
 };
+
+#include	"rule.h"
+#include	"morpho.h"
 
 struct generic_le_info
 {

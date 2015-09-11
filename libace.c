@@ -59,3 +59,6 @@ struct mrs	*ace_surface_to_mrs(char	*line)
 	parse_callback = NULL;
 	return first_mrs;
 }
+
+void	linenoiseEnableRaw() {}
+void	linenoiseDisableRaw() {}

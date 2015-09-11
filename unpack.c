@@ -20,6 +20,7 @@
 #include	"freeze.h"
 #include	"conf.h"
 #include	"dag-provenance.h"
+#include	"morpho.h"
 
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
@@ -358,17 +359,6 @@ void	add_hypothesis_to_agenda(struct hypagenda_item	**agenda, struct hypothesis	
 	add_uagenda(agenda, ha);
 }
 
-char	*type_to_string(struct type	*ty)
-{
-	assert(ty->name[0]=='"');
-	int	i, slen = strlen(ty->name)-2, alen = slen + 1;
-	assert(slen >= 0 && ty->name[slen+1]=='"');
-	if(alen%4)alen = (alen&~3)+4;
-	char	*s = slab_alloc(alen);
-	sprintf(s, "%.*s", slen, ty->name+1);
-	return s;
-}
-
 void	build_hypothesis_surface(struct hypothesis	*h)
 {
 	if(h->edge->lex)
@@ -378,16 +368,34 @@ void	build_hypothesis_surface(struct hypothesis	*h)
 			// lexeme
 			struct edge	*e = h->edge;
 			int	i, slen = 0;
-			for(i=0;i<e->lex->stemlen;i++)slen += strlen(e->lex->stem[i]->name) + 3;//1 - 2;
-			if(slen%4)slen = (slen&~3)+4;
-			h->string = slab_alloc(slen); h->string[0]=0;
-			for(i=0;i<e->lex->stemlen;i++)
+			if(g_mode == GENERATING)
 			{
-				char	single[256];
-				if(i)strcat(h->string, " ");
-				strcpy(single, e->lex->stem[i]->name+1);
-				if(*single)single[strlen(single)-1] = 0;
-				strcat(h->string, single);
+				// when generating, tokens are not available, so we have to use stem[]
+				for(i=0;i<e->lex->stemlen;i++)slen += strlen(e->lex->stem[i]->name) + 3;//1 - 2;
+				if(slen%4)slen = (slen&~3)+4;
+				h->string = slab_alloc(slen); h->string[0]=0;
+				for(i=0;i<e->lex->stemlen;i++)
+				{
+					char	single[256];
+					if(i)strcat(h->string, " ");
+					strcpy(single, e->lex->stem[i]->name+1);
+					if(*single)single[strlen(single)-1] = 0;
+					strcat(h->string, single);
+				}
+			}
+			else
+			{
+				// when parsing, tokens tell us the surface form
+				struct token	**toks = (struct token**)e->daughters;
+				for(i=0;i<e->lex->stemlen;i++)
+					slen += strlen(toks[i]->string) + 3;//1 - 2;
+				if(slen%4)slen = (slen&~3)+4;
+				h->string = slab_alloc(slen); h->string[0]=0;
+				for(i=0;i<e->lex->stemlen;i++)
+				{
+					if(i)strcat(h->string, " ");
+					strcat(h->string, toks[i]->string);
+				}
 			}
 		}
 		else
@@ -906,8 +914,19 @@ int instantiate_hypothesis(struct hypothesis *h)
 					}*/
 					break;
 				}
-			if(g_mode == PARSING && h->edge->neps==-1)disable_robust_unification();
-			if(i<arity)return -1;
+			if(i<arity)
+			{
+				if(g_mode == PARSING && h->edge->neps==-1)disable_robust_unification();
+				return -1;
+			}
+			if(h->edge->rule->orth)
+				if(unify_orthography(rdg, h->rhslist[0]->dg, h->rhslist[0]->edge->lex, h->edge->rule))
+				{
+					if(g_mode == PARSING && h->edge->neps==-1)disable_robust_unification();
+					forget_tmp();
+					h->dg = (void*)1;
+					return -1;
+				}
 			if(g_mode == GENERATING)
 			{
 				int cant_share = 0;
@@ -919,6 +938,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 				else h->dg = finalize_tmp(rdg, 1);
 			}
 			else h->dg = finalize_tmp(rdg, 1);
+			if(g_mode == PARSING && h->edge->neps==-1)disable_robust_unification();
 			if(!h->dg)	// cycle failure can occur
 			{
 				h->dg = (void*)1;
@@ -934,21 +954,6 @@ int instantiate_hypothesis(struct hypothesis *h)
 	}
 
 	return 0;
-}
-
-char	*slab_escape(char	*str)
-{
-	int	len = strlen(str) * 2 + 1;
-	len -= len%4; len += 4;
-	char	*esc = slab_alloc(len), *ep = esc;
-	while(*str)
-	{
-		if(*str=='\\' || *str=='"')
-			*ep++ = '\\';
-		*ep++ = *str++;
-	}
-	*ep = 0;
-	return esc;
 }
 
 struct dstr_cache
@@ -1210,7 +1215,7 @@ char	*hypothesis_to_labelled_tree_string(struct hypothesis	*h)
 	return lt;
 }
 
-void	install_orth(struct dg	*dg, int	nforms, char	**forms)
+/*void	install_orth(struct dg	*dg, int	nforms, char	**forms)
 {
 	struct dg	*stem_list = dg_path(dg, lex_stem_path);
 	int	k = 0;
@@ -1228,27 +1233,31 @@ void	install_orth(struct dg	*dg, int	nforms, char	**forms)
 	}
 	assert(stem_list);
 	stem_list->xtype = lookup_type(g_null_type);
-}
+}*/
 
 int	gen_extract_lexemes(struct dg	*topdown, struct hypothesis	*h, int	k, struct edge	**L)
 {
 	int	i;
 	if(h->edge->lex)
 	{
-		// we need to build the orthographies of each token for MWEs;
-		// starting with the base forms in the lexicon,
-		struct lexeme	*lex = get_leaf_lex(h);
-		int	n = lex->stemlen;
-		char	*forms[n];
-		for(i=0;i<n;i++)forms[i] = type_to_string(lex->stem[i]);
-		// apply all the inflections in the lexical rule chain,
-		// applying suffix rules to the right-hand edge of the MWE
-		// and prefix rules to the left-hand-edge.
-		inflect_mwe_chain(n, forms, h);
+		// new edge structure because topdown info isn't applicable to other users
 		struct edge	*e = slab_alloc(sizeof(*e));
 		*e = *h->edge;
 		e->dg = topdown;
-		install_orth(e->dg, n, forms);
+		// no longer need to do the orthography stuff below (I think),
+		// since we now put orthography info in with unify_orthography().
+		// old:
+			// we need to build the orthographies of each token for MWEs;
+			// starting with the base forms in the lexicon,
+			/*struct lexeme	*lex = get_leaf_lex(h);
+			int	n = lex->stemlen;
+			char	*forms[n];
+			for(i=0;i<n;i++)forms[i] = type_to_string(lex->stem[i]);
+			// apply all the inflections in the lexical rule chain,
+			// applying suffix rules to the right-hand edge of the MWE
+			// and prefix rules to the left-hand-edge.
+			inflect_mwe_chain(n, forms, h);
+			install_orth(e->dg, n, forms);*/
 		L[k] = e;
 		//lui_dg_list(lex->word, e->dg, make_provenance(FROM_TREE,h));
 		return k+1;
@@ -1257,6 +1266,7 @@ int	gen_extract_lexemes(struct dg	*topdown, struct hypothesis	*h, int	k, struct 
 	assert(0 == unify_dg_tmp(h->edge->rule->dg, topdown, -1));
 	for(i=0;i<h->arity;i++)assert(0 == unify_dg_tmp(h->rhslist[i]->dg, topdown, i));
 	// copy out topdown info for each daughter
+	if(h->edge->rule->orth)assert(0 == unify_orthography(topdown, h->rhslist[0]->dg, h->rhslist[0]->edge->lex, h->edge->rule));
 	topdown = finalize_tmp(topdown, 0);
 	assert(topdown != NULL);
 	for(i=0;i<h->arity;i++)
@@ -1635,4 +1645,45 @@ report_unpacking()
 	if(!debug_level)return;
 	fprintf(stderr, "%d total hypotheses generated\n", total_hyps);
 	fprintf(stderr, "%lld total nodes reconstructed\n", total_reconstructed_nodes);
+}
+
+char	*slab_escape(char	*str)
+{
+	int	len = strlen(str) * 2 + 1;
+	len -= len%4; len += 4;
+	char	*esc = slab_alloc(len), *ep = esc;
+	while(*str)
+	{
+		if(*str=='\\' || *str=='"')
+			*ep++ = '\\';
+		*ep++ = *str++;
+	}
+	*ep = 0;
+	return esc;
+}
+
+char	*slab_unescape(char	*str)
+{
+	char	*out = freeze_string(str), *p = out, *q = str;
+
+	while(*q)
+	{
+		if(*q=='\\' && q[1])
+		{
+			q+=2;
+			switch(q[-1])
+			{
+				case	'\'':	*p++ = '\'';	break;
+				case	'\"':	*p++ = '\"';	break;
+				default:
+					// preserve escapes we don't understand
+					*p++ = '\\';
+					*p++ = q[-1];
+					break;
+			}
+		}
+		else *p++ = *q++;
+	}
+	*p = 0;
+	return out;
 }

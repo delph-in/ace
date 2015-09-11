@@ -315,6 +315,7 @@ struct dg	*expand_lexeme(struct lexeme	*l)
 	f = atomic_dg(top_type);
 	f->xtype = f->type = l->stem[0];
 	st = add_dg_hop(atomic_dg(top_type), ffeat, f);
+	st = add_dg_hop(st, rfeat, atomic_dg(g_null_type));
 	dg = atomic_dg(top_type);
 	dg = add_dg_hop(dg, orthfeat, st);
 	dg = add_dg_hop(dg, synsemfeat, ss);

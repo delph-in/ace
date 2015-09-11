@@ -1162,3 +1162,135 @@ struct orule	*freeze_orule(struct orule	*orin)
 
 	return orout;
 }
+
+char	*quote_on_slab(char	*str)
+{
+	str = slab_escape(str);
+	int	len = strlen(str)+3;
+	if(len%4)len += 4 - len%4;
+	char	*p = slab_alloc(len);
+	sprintf(p, "\"%s\"", str);
+	return p;
+}
+
+/*int	install_substitute_orthography(struct edge	*e, struct edge	*dtr, char	*fullstr)
+{
+	//printf("should install `%s' in #%d\n", orth, e->id);
+	struct dg	*orth = dg_path(e->dg, lex_stem_path);
+	if(!orth)
+	{
+		fprintf(stderr, "WARNING: ought to install new orthography `%s' on #%d, but no orthography path present\n", fullstr, e->id);
+		return 0;
+	}
+	assert(dtr->lex);
+
+	int	i;
+	char	*ptr=NULL;
+	for(i=0;i<dtr->lex->stemlen;i++)
+	{
+		char	*str = strtok_r(i?NULL:fullstr, " ", &ptr);
+		char	*qstr = quote_on_slab(str);
+		//printf("installing `%s' as #%d's %d'th ORTH value\n", qstr, e->id, i);
+		struct dg	*f = dg_hop(orth, 1);	// FIRST
+		struct dg	*r = dg_hop(orth, 2);	// REST
+		if(!f)
+		{
+			//fprintf(stderr, "WARNING: had to add a FIRST for #%d's %d'th ORTH value\n", e->id, i);
+			f = atomic_dg(qstr);
+			orth = add_dg_hop(orth, 1, f);
+		}
+		else f->xtype = lookup_type(qstr);
+		if(!r)
+		{
+			//fprintf(stderr, "WARNING: had to add a REST for #%d's %d'th ORTH value\n", e->id, i);
+			r = atomic_dg((i+1 == dtr->lex->stemlen)?g_null_type:g_cons_type);
+			orth = add_dg_hop(orth, 2, r);
+		}
+		orth = r;
+	}
+	return 0;
+}*/
+
+void	add_carc(struct dg	*d, int	fnum, struct dg	*to)
+{
+	d->ncarcs++;
+	d->carcs = slab_realloc(d->carcs, sizeof(struct darc)*(d->ncarcs-1), sizeof(struct darc)*d->ncarcs);
+	d->carcs[d->ncarcs-1].label = fnum;
+	d->carcs[d->ncarcs-1].dest = to;
+}
+
+int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct rule	*r)
+{
+	extern unsigned int	generation;
+	assert(r->orth);
+	int	i, sl = lex->stemlen;
+	struct type	*forms[sl];
+	// read off daughter's orthography
+	dtr = dg_path(dtr, lex_stem_path);
+	if(!dtr)
+	{
+		// daughter is underspecified; nothing to do
+		// this can happen when ORTH is on the packing restrictor, for example
+		return 0;
+	}
+	par = dg_path(par, lex_stem_path);
+	if(!par)
+	{
+		// parent has no value for this path; likely, ORTH is on the packing restrictor.
+		return 0;
+	}
+	for(i=0;i<sl;i++)
+	{
+		struct dg	*val = dg_hop(dtr, 1);
+		assert(val);
+		forms[i] = (val->gen==generation)?val->type:val->xtype;
+		dtr = dg_hop(dtr, 2);	// REST
+		assert(dtr != NULL);
+	}
+	// compute changes
+	struct orule	*o = r->orth;
+	int	k = 0;
+	if(o->type == or_suffix)
+		k = sl-1;
+	char	*str = type_to_string(forms[k]);
+	char	*newstr = inflect(o, str);
+	if(!newstr)return -1;
+	//printf("inflected %s to %s\n", str, newstr);
+	forms[k] = string_to_type(newstr);
+	// write to parent's orthography
+	for(i=0;i<sl;i++)
+	{
+		struct type	*pt = (par->gen==generation)?par->type:par->xtype;
+		if(!glb(pt, lookup_type(g_cons_type)))
+			return -1;
+		struct dg	*f = dg_hop(par, 1);
+		if(!f)
+		{
+			f = slab_alloc(sizeof(struct dg));
+			bzero(f,sizeof(f));
+			f->xtype = forms[i];
+			add_carc(par, 1, f);
+		}
+		if(f->gen!=generation)
+		{
+			f->gen = generation;
+			f->ncarcs = 0;
+			f->carcs = NULL;
+			f->forwarded = 0;
+			f->type = f->xtype;
+		}
+		struct type	*t = glb(f->type, forms[i]);
+		if(!t)return -1;
+		f->type = t;
+		struct dg	*r = dg_hop(par, 2);
+		if(!r)
+		{
+			r = slab_alloc(sizeof(struct dg));
+			bzero(r,sizeof(r));
+			r->xtype = lookup_type((i+1==sl)?g_null_type:g_cons_type);
+			add_carc(par, 2, r);
+		}
+		par = r;
+	}
+	return 0;
+}
