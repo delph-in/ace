@@ -1300,6 +1300,24 @@ int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct
 			r->xtype = lookup_type((i+1==sl)?g_null_type:g_cons_type);
 			add_carc(par, 2, r);
 		}
+		else if(i+1==sl)
+		{
+			struct type	*rt = (r->gen==generation)?r->type:r->xtype;
+			t = glb(rt, lookup_type(g_null_type));
+			if(rt!=t)
+			{
+				if(r->gen!=generation)
+				{
+					r->gen = generation;
+					r->ncarcs = 0;
+					r->carcs = NULL;
+					r->copy = NULL;
+					r->forwarded = 0;
+					r->type = r->xtype;
+				}
+				r->type = t;
+			}
+		}
 		par = r;
 	}
 	return 0;
