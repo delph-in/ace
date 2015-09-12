@@ -217,7 +217,8 @@ int	equiv_quickcheck(struct qc	*a, struct qc	*b, int *Fw, int *Bk, int	*Gz)
 		ta = a->entries[i];
 		tb = b->entries[i];
 
-		if(ta && tb && (ta!=tb))
+		int	eqtypes = (ta==tb) || (ta && tb && ta->tnum==-1 && tb->tnum==-1 && !strcmp(ta->name, tb->name));
+		if(ta && tb && !eqtypes)
 		{
 			g = glb(ta, tb);
 			if(g!=tb)fw = 0;
