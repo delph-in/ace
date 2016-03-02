@@ -139,6 +139,8 @@ lui_process_request(char	*line)
 			lui_type(type, 0);
 		else if(!strcmp(command, "hierarchy"))
 			lui_hierarchy(type);
+		else if(!strcmp(command, "source"))
+			lui_source(type);
 		else fprintf(stderr, "LUI: '%s' viewer for types not implemented\n", command);
 	}
 	else if(!strcmp(lp, "")) {}
@@ -1188,6 +1190,23 @@ lui_instance(char	*name, int	allow_partial)
 		if(0==stop_lui_dg_list("matching instances"))
 			printf("no such instance `%s'\n", name);
 	}
+}
+
+lui_source(char	*name)
+{
+	struct type	*t = lookup_type(name);
+	if(!t) { fprintf(stderr, "ERROR: LUI asked for type `%s' but can't find it\n", name); return -1; }
+	if(!t->tdl) { fprintf(stderr, "ERROR: no TDL information available for type `%s'\n", name); return -1; }
+	char	*editor = getenv("EDITOR");
+	char	command[10240];
+	printf("LUI: attempting to open %s:%d\n", t->tdl->filename, t->tdl->lnum);
+	if(strstr(editor, "vi"))
+		sprintf(command, "gvim --remote-silent +%d %s &", t->tdl->lnum, t->tdl->filename);
+	else if(strstr(editor, "emacs"))
+		sprintf(command, "emacsclient -c -a \"\" +%d %s &", t->tdl->lnum, t->tdl->filename);
+	else { fprintf(stderr, "ERROR: don't know how to perform a remote invocation of your $EDITOR.\n"); return -1; }
+	printf("LUI: invoking: %s\n", command);
+	int	result = system(command);
 }
 
 lui_type(char	*name)
