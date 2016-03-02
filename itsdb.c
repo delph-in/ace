@@ -144,6 +144,15 @@ void itsdb_error(char	*error)
 	else the_itsdb_error = strdup(error);
 }
 
+static char	*the_itsdb_comment;
+
+void itsdb_comment(char	*comment)
+{
+	extern int do_itsdb, tsdb_notes;
+	if(!do_itsdb && !tsdb_notes)return;
+	the_itsdb_comment = strdup(comment);
+}
+
 static struct timeval	pnstart;
 static int cpustart;
 tsdb_parse_note_start()
@@ -172,6 +181,12 @@ create_tsdb_parse_note(char	*str)
 		free(the_itsdb_error);
 		the_itsdb_error = NULL;
 	}
+	if(the_itsdb_comment)
+	{
+		str += sprintf(str, " (:comment . \"%s\")", the_itsdb_comment);
+		free(the_itsdb_comment);
+		the_itsdb_comment = NULL;
+	}
 }
 
 tsdb_parse_note_end()
@@ -189,6 +204,7 @@ static int process_item(int i_id, const char *i_input, int parse_id,
 	int readings;
 
 	the_itsdb_error = NULL;
+	the_itsdb_comment = NULL;
 	//fprintf(stderr, "process_item asked for: %d = nanalyses, %d = nderivations\n", nanalyses, nderivations);
 	tsdb_maxanalyses = nanalyses;
 	tsdb_maxderivations = nderivations;
