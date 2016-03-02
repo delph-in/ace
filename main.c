@@ -251,7 +251,7 @@ struct job_stats
 	float		time;
 };
 
-show_heirarchy(char	*type)
+show_hierarchy(char	*type)
 {
 	struct type	*t = lookup_type(type);
 	if(!t) { printf("no such type '%s'\n", type); return -1; }
@@ -354,7 +354,9 @@ handle_lui_colon_command(char	*line)
 	if(line[1]=='t' && line[2]==' ')
 		lui_type(line+3, 1);
 	if(line[1]=='h' && line[2]==' ')
-		show_heirarchy(line+3);
+		show_hierarchy(line+3);
+	if(line[1]=='H' && line[2]==' ')
+		lui_hierarchy(line+3);
 	if(line[1]=='g' && line[2]==' ')
 		show_glb(line+3);
 	if(line[1]=='c')

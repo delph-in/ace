@@ -271,7 +271,7 @@ int make_glbs()
 			}
 		}
 	}
-	rebuild_heirarchy();// to make sure daughters[] and parents[] lists are OK
+	rebuild_hierarchy();// to make sure daughters[] and parents[] lists are OK
 	//printf("%d cst hash collisions / %d R  ", ncsthash_collisions, ncsthash_requests);
 	return 0;
 }
@@ -330,7 +330,7 @@ int	nparts;
 int	npartitions = 0;
 int	biggest_partition = 0;
 
-print_subheirarchy(struct type_hierarchy	*th, struct partition	*part)
+print_subhierarchy(struct type_hierarchy	*th, struct partition	*part)
 {
 	int	i, j, k;
 	for(i=0;i<part->psize;i++)
@@ -350,7 +350,7 @@ print_subheirarchy(struct type_hierarchy	*th, struct partition	*part)
 }
 
 // partition algorithm from the LKB [AAC-1998 apparently]
-// we're trying to split the type heirarchy up into as many little chunks as possible
+// we're trying to split the type hierarchy up into as many little chunks as possible
 void	compute_partitions(struct type_hierarchy	*th, struct type	*top, char	*visitmap, char	*collectmap)
 {
 	// first see if we can split off some partitions among this node's daughters
@@ -444,7 +444,7 @@ int	make_glbs()
 	free(parts);
 
 	start_and_alloc_profiler(&rebuild_profiler, "rebuilding the hierarchy", NULL, NULL);
-	rebuild_heirarchy(0, th);
+	rebuild_hierarchy(0, th);
 	stop_profiler(rebuild_profiler, 1);
 
 	/*report_profiler(partition_profiler);
@@ -764,7 +764,7 @@ int make_glbs_part(struct type_hierarchy	*th, struct partition	*part)
 	nglbtypes = 0;
 	glbtypes = NULL;
 
-	//print_subheirarchy(th, part);
+	//print_subhierarchy(th, part);
 
 	for(i=0;i<part->psize;i++)
 	{
@@ -803,8 +803,8 @@ int make_glbs_part(struct partition	*part)//int	part_ntypes, struct type	**part_
 	int	i, j;
 	int	do_printing = (part->psize==1196)?1:0;
 	again:
-	printf("looking for glbs in heirarchy of %d types\n", part->psize);
-	//if(do_printing)print_subheirarchy(part);
+	printf("looking for glbs in hierarchy of %d types\n", part->psize);
+	//if(do_printing)print_subhierarchy(part);
 	for(i=1;i<part->psize;i++)
 	{
 		struct type	*a = part->part[i];
@@ -896,7 +896,7 @@ int make_glbs_part(struct partition	*part)//int	part_ntypes, struct type	**part_
 	if(nglbs_to_add)
 	{
 		// now we need to recompute everybody's descendents list and tnum
-		printf("rebuilding type heirarchy\n");
+		printf("rebuilding type hierarchy\n");
 		recompute_tnums();
 		nglbs_to_add = 0;
 		goto again;

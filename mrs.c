@@ -802,7 +802,7 @@ int pred_subsumes(char *in, char *out)
 	if(!tin)
 	{
 		// XXX ignoring this is wrong; find out where these types are coming from.
-		// the VPM can introduce some types that aren't in the heirarchy;
+		// the VPM can introduce some types that aren't in the hierarchy;
 		// apparently the correct behavior is to treat them as having no inheritance
 		//fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", in, in, out);
 		return 0;
@@ -829,7 +829,7 @@ int pred_compatible(char *in, char *out)
 	if(!tin)
 	{
 		// XXX ignoring this is wrong; find out where these types are coming from.
-		// the VPM can introduce some types that aren't in the heirarchy;
+		// the VPM can introduce some types that aren't in the hierarchy;
 		// apparently the correct behavior is to treat them as having no inheritance
 		//fprintf(stderr, "MRS: no such predicate type `%s' (when subsume(%s,%s) called)\n", in, in, out);
 		return 0;

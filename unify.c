@@ -1751,7 +1751,8 @@ static int	snrprint_dg(char	*str, int	maxlen, struct dg	*d)
 
 	if(!d->narcs)
 	{
-		tmp = snprintf(str, maxlen, "%s%s%s", tname_prefix, tname, tname_suffix);
+		if(dag_print_style==0) tmp = snprintf(str, maxlen, "#D[%s%s%s]", tname_prefix, tname, tname_suffix);
+		else tmp = snprintf(str, maxlen, "%s%s%s", tname_prefix, tname, tname_suffix);
 		if(str)str += tmp; maxlen -= tmp; len += tmp;
 		if(maxlen<0)maxlen=0;
 	}

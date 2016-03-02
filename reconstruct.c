@@ -47,7 +47,7 @@ struct type	*tokstr_type_of_string(char	*kp)
 		{
 			char	s = p[1];
 			p[1] = 0;
-			struct type	*t = temporary_string_type(strdup(kp));
+			struct type	*t = lookup_type(strdup(kp));
 			p[1] = s;
 			return t;
 		}

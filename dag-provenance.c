@@ -360,16 +360,20 @@ show_provenance_in_type(struct path	p, struct type	*t)
 	struct dg_provenance	superprov[t->nparents];
 	struct dg_provenance	*superprovp[t->nparents];
 	int			superarg[t->nparents];
-	int i;
+	int i, nsuper = 0;
 	for(i=0;i<t->nparents;i++)
 	{
-		super[i] = t->parents[i]->dg;
-		superprovp[i] = &superprov[i];
-		superarg[i] = -1;
-		superprov[i].kind = FROM_TYPE;
-		superprov[i].arg0ptr = t->parents[i];
+		// can safely skip constraints on parents that are GLB types, I think.
+		// those will just be unification of the GLB type's parents, which in turn (ultimately) will be the authored parents. no new info, and it makes tracing to TDL harder.
+		if(!strncmp(t->parents[i]->name, "g(", 2))continue;
+		super[nsuper] = t->parents[i]->dg;
+		superprovp[nsuper] = &superprov[nsuper];
+		superarg[nsuper] = -1;
+		superprov[nsuper].kind = FROM_TYPE;
+		superprov[nsuper].arg0ptr = t->parents[i];
+		nsuper++;
 	}
-	show_provenance_from_unification(p, local, &local_prov, t->nparents, super, superprovp, superarg);
+	show_provenance_from_unification(p, local, &local_prov, nsuper, super, superprovp, superarg);
 }
 
 show_provenance_from_lexeme(struct path	p, struct lexeme	*lex)

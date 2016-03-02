@@ -87,7 +87,7 @@ void	recompute_tnums(struct type_hierarchy	*th)
 	old_type_array = malloc(sizeof(struct type*) * th->ntypes);
 	memcpy(old_type_array, th->types, sizeof(struct type*)*th->ntypes);
 
-	// perform a topological sort of the type heirarchy,
+	// perform a topological sort of the type hierarchy,
 	// storing the result in the types[] array, back to front.
 	char	*have = calloc(1, th->ntypes);
 	int idx = th->ntypes-1;
@@ -132,12 +132,12 @@ void	recompute_tnums(struct type_hierarchy	*th)
 //  -> the GLB type doesn't see any daughters
 //  -> the GLB type doesn't see any descendents
 // NOTE: this proved to be the case, for the old code.
-//   i.e. after fixing that, a rebuild_heirarchy() after computing GLBs causes no noticeable damage.
+//   i.e. after fixing that, a rebuild_hierarchy() after computing GLBs causes no noticeable damage.
 
 // on input, the ->parents[] links must be correct.
 // on output, the ->daughters[] links and ->descendents[] links have been recomputed,
 // and the types[] array is reordered according to a topological sort.
-rebuild_heirarchy(int	report_changes, struct type_hierarchy	*th)
+rebuild_hierarchy(int	report_changes, struct type_hierarchy	*th)
 {
 	unsigned short	**old_d;
 	int	i, *old_dn;

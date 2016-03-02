@@ -176,7 +176,10 @@ char	*is_root(struct dg	*dg)
 		res = unify_dg_tmp(dg, instances[i].dg, -1);
 		forget_tmp();
 		if(!res)
+		{
+			if(trace>2)printf("it was root! %s\n", instances[i].name);
 			return instances[i].name;
+		}
 #ifdef UNIFY_PATHS
 		else if(trace>2)
 		{

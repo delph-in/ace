@@ -16,6 +16,7 @@
 #include	"hash.h"
 #include	"dag-provenance.h"
 #include	"linenoise.h"
+#include	"tdl.h"
 #include	"unicode.h"
 
 void	lui_gen_chart_level2(int	chart_id, int	nedge_ids, int	*edge_ids);
@@ -31,6 +32,7 @@ static int lui_rfd = -1, lui_wfd;
 FILE		*lui_write, *lui_read;
 static int chart_id = 0;
 int	xtext_id_gen = 1;
+int	hier_id_gen = 1;
 
 void	browse_lui(int eid, char *what, char	*what2);
 
@@ -131,8 +133,12 @@ lui_process_request(char	*line)
 		char type[256], command[256] = "";
 		int fields = sscanf(lp, "type %s %s\n", type, command);
 		if(fields < 2) { fprintf(stderr, "LUI: bad 'type' command\n"); }
+		else if(!strcmp(command, "skeleton"))
+			lui_type_skeleton(type);
 		else if(!strcmp(command, "expansion"))
 			lui_type(type, 0);
+		else if(!strcmp(command, "hierarchy"))
+			lui_hierarchy(type);
 		else fprintf(stderr, "LUI: '%s' viewer for types not implemented\n", command);
 	}
 	else if(!strcmp(lp, "")) {}
@@ -1229,4 +1235,82 @@ lui_rule(char	*name)
 		if(0==stop_lui_dg_list("matching rules"))
 			printf("no such rule `%s'\n", name);
 	}
+}
+
+void mark_parents(struct type	*t, int	*status)
+{
+	int i;
+	//if(status[t->tnum])return;
+	status[t->tnum] = 1;
+	for(i=0;i<t->nparents;i++)mark_parents(t->parents[i], status);
+}
+
+lui_hierarchy(char	*namelist)
+{
+	struct type_hierarchy	*th = default_type_hierarchy();
+	int	status[th->ntypes];
+	bzero(status,sizeof(status));
+	char	*name;
+	int	i, j, count = 0;
+	char	*listcp=strdup(namelist);
+	for(name = strtok(listcp," ");name;name=strtok(NULL," "))
+	{
+		struct type	*t = lookup_type(name);
+		if(!t)
+		{
+			fprintf(stderr, "ERROR: no such type `%s'\n", name);
+			return -1;
+		}
+		// output every type descended from t and every type t inherits from
+		// find out what part of the hierarchy is active
+		mark_parents(t, status);
+		for(i=0;i<t->ndescendents;i++)status[t->descendents[i]] = 1;
+		status[t->tnum] = 1;
+	}
+	// unmark GLBs
+	for(i=0;i<th->ntypes;i++)
+		if(status[i] && !strncmp(th->types[i]->name, "g(", 2))status[i] = 0;
+	// assign consecutive IDs
+	for(i=0;i<th->ntypes;i++)
+		if(status[i])status[i] = ++count;
+	// output the graph
+	lui_initialize();
+	fprintf(lui_write, "hierarchy %d \"%s\" [\n", hier_id_gen++, slab_escape(namelist));
+	for(i=0;i<th->ntypes;i++)
+	{
+		if(!status[i])continue;
+		struct type	*x = th->types[i];
+		fprintf(lui_write, "#H[\"%s\" [", slab_escape(x->name));
+		for(j=0;j<x->nparents;j++)
+			if(status[x->parents[j]->tnum])
+				fprintf(lui_write, " %d", status[x->parents[j]->tnum]-1);
+		fprintf(lui_write, "] [");
+		for(j=0;j<x->ndaughters;j++)
+			if(status[x->daughters[j]->tnum])
+				fprintf(lui_write, " %d", status[x->daughters[j]->tnum]-1);
+		fprintf(lui_write, "] ]\n");
+	}
+	fprintf(lui_write, "]");
+	fflush(lui_write);
+}
+
+lui_type_skeleton(char	*name)
+{
+	struct type	*t = lookup_type(name);
+	if(!t)
+	{
+		fprintf(stderr, "ERROR: no such type `%s'\n", name);
+		return -1;
+	}
+	if(!t->tdl)return -1;
+	char	*definition = strdup(t->tdl->rhs);
+	char	*bracket = strchr(definition, '[');
+	char	*superlist = strdup(t->tdl->rhs);
+	if(bracket) superlist[bracket-definition]=0;
+	char	*tempname = malloc(100+strlen(superlist));
+	sprintf(tempname, "\"supertypes: %s\"", slab_escape(superlist));
+	struct type	*temptype = temporary_string_type(tempname);
+	struct dg	*dg = bracket?dagify(bracket,NULL):atomic_top();
+	dg->xtype = temptype;
+	output_lui_dg_with_provenance(dg, name, make_provenance(FROM_TYPE_LOCAL, t));
 }

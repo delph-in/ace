@@ -50,6 +50,7 @@ int	wellform(struct dg	*d, char	*typename);
 void	print_glb_stats();
 struct type	*temporary_string_type(char *string);
 struct dg	*type_dg(char		*name);
+struct dg	*atomic_top();
 
 struct type	*most_general_type_for_feat(struct type_hierarchy	*th, int	feat);
 struct type	*most_general_type_for_dg(struct dg	*d);

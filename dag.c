@@ -719,7 +719,7 @@ struct type	*most_general_type_for_dg(struct dg	*d)
 		if(k==-1)
 		{
 			fprintf(stderr, "ERROR: tried to wellform a dag containing feature `%s', "
-					"which was never introduced in the type heirarchy\n", fnames[d->label[i]]);
+					"which was never introduced in the type hierarchy\n", fnames[d->label[i]]);
 			return NULL;
 		}
 		ty = th->types[k];

@@ -73,6 +73,7 @@ void	lui_linenoise_completion(const char	*line, linenoiseCompletions	*lc)
 		linenoiseAddCompletion(lc, ":i");
 		linenoiseAddCompletion(lc, ":t");
 		linenoiseAddCompletion(lc, ":h");
+		linenoiseAddCompletion(lc, ":H");
 		linenoiseAddCompletion(lc, ":g");
 		linenoiseAddCompletion(lc, ":c");
 		if(g_mode == GENERATING)linenoiseAddCompletion(lc, ":trigger");
@@ -81,6 +82,8 @@ void	lui_linenoise_completion(const char	*line, linenoiseCompletions	*lc)
 	{
 		case	'r':	lui_rule_completions(line+3, lc);	break;
 		case	't':	lui_type_completions(line+3, lc);	break;
+		case	'h':	lui_type_completions(line+3, lc);	break;
+		case	'H':	lui_type_completions(line+3, lc);	break;
 		case	'i':	lui_instance_completions(line+3, lc);	break;
 		case	'l':	lui_lex_completions(line+3, lc);	break;
 	}

@@ -32,7 +32,7 @@ struct semindex_pred_node
 		struct ep_list	*next;
 	}	*activation;
 
-	// complete list of semindex_pred_node's which are heirarchically related to this one,
+	// complete list of semindex_pred_node's which are hierarchically related to this one,
 	//   i.e. should be activated when this one is
 	// sweaglesw 2010-08-29: actually, we should activate supertypes, and enumerate subtypes
 	int							nrelatives;
@@ -108,7 +108,7 @@ struct semindex_pred_node	*lookup_semindex(char *predn, int alloc)
 		if(predn[0]=='"')
 		{
 			int i;
-			// string predication; add it to the relation heirarchy
+			// string predication; add it to the relation hierarchy
 			for(i=0;i<nstrpars;i++)
 				add_relative_to_spn(node, strpars[i]);
 		}

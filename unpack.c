@@ -1552,10 +1552,12 @@ extern int do_itsdb;
 						fprintf(stderr, "NOTE: generated unidiomatic output; is the generator input idiomatic?\n");
 					}
 				}
+				extern int trace;
+				if(trace>2)printf("UNIDIOMATIC\n");
 				if(idiomatic || (g_mode == GENERATING))
 				{
 					//printf("hyp = %p\n", hyp);
-					//printf("\n"); print_hypothesis(h, printf, 0); printf("\n");
+					//printf("\n"); print_hypothesis(hyp, printf, 0); printf("\n");
 					if(g_mode == GENERATING)
 						fixup_generator_string(hyp);
 					double	probability = exp((double)hyp->score) / Z;
