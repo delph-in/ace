@@ -438,7 +438,7 @@ void	maybe_dead_lattice_vertex(struct lattice	*lat, struct lattice_vertex	*v)
 		if(lat->vertices[i]==v)break;
 	if(i==lat->nvertices)
 	{
-		fprintf(stderr, "tried to remove dead vertex from lattice, but it wasn't in\n", v);
+		fprintf(stderr, "tried to remove dead vertex from lattice, but it wasn't in\n");
 		exit(-1);
 	}
 	lat->nvertices--;

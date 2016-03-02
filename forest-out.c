@@ -62,7 +62,7 @@ set_path_number(struct token	*T, struct path	path, int	n)
 	T->dg = dg_path_add(T->dg, path, new_dag_for_unfrozen_string(str));
 }
 
-update_cfrom(struct token	*T, int	new_cfrom)
+void	update_cfrom(struct token	*T, int	new_cfrom)
 {
 	if(T->cfrom == new_cfrom)return;
 	T->cfrom = new_cfrom;
@@ -70,7 +70,7 @@ update_cfrom(struct token	*T, int	new_cfrom)
 	set_path_number(T, token_from_path, new_cfrom);
 }
 
-update_cto(struct token	*T, int	new_cto)
+void	update_cto(struct token	*T, int	new_cto)
 {
 	if(T->cto == new_cto)return;
 	T->cto = new_cto;
