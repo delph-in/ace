@@ -52,6 +52,7 @@ struct ubertagger
 	struct ut_emission	*emission_tagscores;
 	struct hash	*ltmap;
 	struct ut_transition_set	*trans;
+	struct hash	*whitelist;
 };
 
 struct ubertagger	*load_ubertagger(char	*expath, char	*txpath, char	*genmappath);

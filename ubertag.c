@@ -425,6 +425,19 @@ struct ubertagger	*load_ubertagger(char	*expath, char	*txpath, char	*genmappath)
 	return ut;
 }
 
+void load_hashlist(struct hash	*h, char	*path)
+{
+	FILE	*f = fopen(path, "r");
+	if(!f){perror(path);exit(-1);}
+	char	line[102400];
+	while(fgets(line,102399,f))
+	{
+		char	*p = trim_string(line);
+		hash_add(h, strdup(p), (void*)1L);
+	}
+	fclose(f);
+}
+
 struct ubertagger	*the_ubertagger;
 
 int	load_ubertagging()
@@ -432,12 +445,15 @@ int	load_ubertagging()
 	char	*expath = get_conf_file_path("übertag-emission-path")?:get_conf_file_path("ubertag-emission-path");
 	char	*txpath = get_conf_file_path("übertag-transition-path")?:get_conf_file_path("ubertag-transition-path");
 	char	*gmpath = get_conf_file_path("übertag-generic-map-path")?:get_conf_file_path("ubertag-generic-map-path");
+	char	*wlpath = get_conf_file_path("übertag-whitelist-path")?:get_conf_file_path("ubertag-whitelist-path");
 
 	if(!expath || !txpath || !gmpath)return -1;
 	
 	//the_ubertagger = load_ubertagger("/home/sweaglesw/cdev/erg-1214/ut/nanc_wsj_redwoods_noaffix.ex.gz","/home/sweaglesw/cdev/erg-1214/ut/nanc_wsj_redwoods_noaffix.tx.gz", "/home/sweaglesw/cdev/erg-1214/ut/generics.cfg");
 	the_ubertagger = load_ubertagger(expath,txpath,gmpath);
 	if(!the_ubertagger)return -1;
+	the_ubertagger->whitelist = hash_new("ut-whitelist");
+	if(wlpath)load_hashlist(the_ubertagger->whitelist, wlpath);
 	return 0;
 }
 
@@ -485,6 +501,8 @@ void	*freeze_ubertagger()
 		t->trans3 = freeze_block(t->trans3, sizeof(struct ut_transition)*t->ntrans3);
 		t->trans2 = freeze_block(t->trans2, sizeof(struct ut_transition)*t->ntrans2);
 	}
+	u->whitelist = freeze_hash(the_ubertagger->whitelist);
+	printf("UT whitelist to freeze flk = %d\n", u->whitelist->has_flk);
 	the_ubertagger = u;
 	return u;
 }
@@ -520,6 +538,31 @@ char	*ut_get_lextag(struct ubertagger	*ut, struct edge	*e, int	len)
 		strcpy(s, ltname);
 		return s;
 	}
+}
+
+int	ubertag_whitelist_check(struct edge	*e)
+{
+	//printf("how about %s?\n", e->lex->word);
+	while(1)
+	{
+		if(e->rule)
+		{
+			if(hash_find(the_ubertagger->whitelist, e->rule->name))
+			{
+				//printf("whitelist saved rule %s\n", e->rule->name);
+				return 1;
+			}
+		}
+		else if(hash_find(the_ubertagger->whitelist, e->lex->word))
+		{
+			//printf("whitelist saved %s\n", e->lex->word);
+			return 1;
+		}
+		//else printf("whitelist didn't save %s\n", e->lex->word);
+		if(!e->have)break;
+		e = e->daughters[0];
+	}
+	return 0;
 }
 
 // lexical chart has an edge for each possible tag of each possible token
@@ -778,12 +821,17 @@ void	ubertag_lattice(struct ubertagger	*ut, struct lattice	*ll, double	thresh)
 			e_total = logsumexp(e_total, p_x_y);
 		}
 		DEBUG("%s	%s	=>	%f	=>	%f\n", ll->edges[i_true]->edge->lex->word, ut->tags[tags[i]], e_total, exp(e_total));
-		if(e_total >= thresh)
+		if(e_total >= thresh || ubertag_whitelist_check(ll->edges[i_true]->edge))
 		{
+			//printf("keeping %s / %s\n", tagnames[i_true], ll->edges[i_true]->edge->lex->word);
 			DEBUG("	KEEP\n");
 			ll->edges[new_nedges++] = ll->edges[i_true];
 		}
-		else DEBUG("	DISCARD\n");
+		else
+		{
+			//printf("discard %s / %s\n", tagnames[i_true], ll->edges[i_true]->edge->lex->word);
+			DEBUG("	DISCARD\n");
+		}
 	}
 
 	for(i=0;i<ll->nedges;i++)
