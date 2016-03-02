@@ -28,10 +28,11 @@ void	lui_rule_completions(const char	*line, linenoiseCompletions	*lc)
 	}
 }
 
-void	lui_type_completions(const char	*line, linenoiseCompletions	*lc)
+void	lui_type_completions(const char	*line, char	*command, linenoiseCompletions	*lc)
 {
 	int	i;
-	char	compl[10240] = ":t ";
+	char	compl[10240];
+	sprintf(compl, ":%s ", command);
 	struct type_hierarchy	*th = default_type_hierarchy();
 	for(i=0;i<th->ntypes;i++)if(!strncmp(line,th->types[i]->name,strlen(line)))
 	{
@@ -81,9 +82,9 @@ void	lui_linenoise_completion(const char	*line, linenoiseCompletions	*lc)
 	else if(line[1] && line[2]==' ')switch(line[1])
 	{
 		case	'r':	lui_rule_completions(line+3, lc);	break;
-		case	't':	lui_type_completions(line+3, lc);	break;
-		case	'h':	lui_type_completions(line+3, lc);	break;
-		case	'H':	lui_type_completions(line+3, lc);	break;
+		case	't':	lui_type_completions(line+3, "t", lc);	break;
+		case	'h':	lui_type_completions(line+3, "h", lc);	break;
+		case	'H':	lui_type_completions(line+3, "H", lc);	break;
 		case	'i':	lui_instance_completions(line+3, lc);	break;
 		case	'l':	lui_lex_completions(line+3, lc);	break;
 	}
