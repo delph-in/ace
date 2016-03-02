@@ -321,7 +321,7 @@ char	*strip_docstring(char	*rhs, int	lnum, char	*path)
 	while(m>rhs && *m!='&' && (*m==' ' || *m=='\t' || *m=='\n' || *m=='\r'))m--;
 	if(m<=rhs || *m!='&')return NULL;	// preceded by something other than '&'
 	while(m>=rhs && *m!='[')m--;
-	if(m>=rhs)return;	// found a '[' before the '"'; it's not a docstring
+	if(m>=rhs)return NULL;	// found a '[' before the '"'; it's not a docstring
 	char	*p = q+1;
 	while(*p && *p!='"')
 	{

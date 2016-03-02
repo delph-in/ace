@@ -415,7 +415,7 @@ int	parsing_oracle(int	step, char	**reduce, char	**shift)
 	return 0;
 }
 
-treebank_control()
+void	treebank_control()
 {
 	struct tree	**trees = NULL;
 	int			ntrees = 0;

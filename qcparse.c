@@ -278,7 +278,7 @@ struct pq	*pq_pop(struct pq	**Q)
 	return q;
 }
 
-print_pq(struct pq	*q, int	t)
+void	print_pq(struct pq	*q, int	t)
 {
 	if(!q)return;
 	printf("%*d\n", t, q->prio);
