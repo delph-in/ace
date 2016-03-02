@@ -280,6 +280,7 @@ int	subsume_forward, subsume_backward;
 
 int	gsubsume_forward, gsubsume_backward;
 
+//#define	GEN_SUBSUMPTION_QC
 #ifndef	GEN_SUBSUMPTION_QC
 #define	ss_backtrace(a,b,k)  do {} while(0)
 #else
@@ -349,6 +350,29 @@ int	subsume_same_dg(struct dg	*a)
 }
 
 int	uindifflist = 0;
+
+static inline int	is_difflist(struct type	*t)
+{
+	static struct type	*difflist = NULL;
+	static struct type_hierarchy	*th;
+	static char	*type_difflist_cache = NULL;
+	static int	type_difflist_cache_size;
+	if(!difflist)
+	{
+		th = default_type_hierarchy();
+		difflist = lookup_type(g_diff_list_type);
+		type_difflist_cache_size = th->ntypes;
+		type_difflist_cache = calloc(1,type_difflist_cache_size);
+	}
+	if(t->name[0]=='"')return 0;
+	assert(t->tnum>=0 && t->tnum < th->ntypes);
+	assert(th->ntypes == type_difflist_cache_size);
+	if(!type_difflist_cache[t->tnum])
+		type_difflist_cache[t->tnum] = descendent_of(t->tnum, difflist)?2:1;
+	int	answer = type_difflist_cache[t->tnum] - 1;
+	//assert(answer == (descendent_of(t->tnum, difflist)?1:0));
+	return answer;
+}
 
 // on input, assume a and b both have noncurrent generation
 // on output, 'copy' pointers are used, so don't try to copy them until next generation
@@ -425,7 +449,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		int	old_subsume_forward = subsume_forward;
 		int	old_subsume_backward = subsume_backward;
 		int	local_ss = 0;
-		if(b->xtype->name[0]=='"')
+		/*if(b->xtype->name[0]=='"')
 		{
 			if(!descendent_of(th->strtype->tnum, a->xtype))subsume_forward = 0;
 			else local_ss = 1;
@@ -444,7 +468,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		{
 			if(!descendent_of(a->xtype->tnum, b->xtype))subsume_backward = 0;
 			else local_ss = 1;
-		}
+		}*/
+		if(b->xtype == lower)local_ss = 1;
+		else subsume_forward = 0;
+		if(a->xtype == lower)local_ss = 1;
+		else subsume_backward = 0;
 		if(dont_generalize_at_all)
 		{
 			if(b->xtype == lower)gsubsume_backward = 0;
@@ -552,10 +580,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	//printf("maybe %p [%s] <=> %p [%s]\n", a, a->xtype->name, b, b->xtype->name);
 
 	int	local_indifflist = 0;
-	static struct type	*difflist = NULL;
-	if(!difflist)difflist = lookup_type(g_diff_list_type);
-	if(a->xtype->name[0]!='"' && descendent_of(a->xtype->tnum, difflist))local_indifflist = 1;
-	if(b->xtype->name[0]!='"' && descendent_of(b->xtype->tnum, difflist))local_indifflist = 1;
+	if(is_difflist(a->xtype) || is_difflist(b->xtype))local_indifflist = 1;
 	if(local_indifflist)uindifflist++;
 
 	// there are certain cases where we don't want to apply generalization packing with different arc sets, even if we could.
