@@ -1039,19 +1039,16 @@ struct orule	*make_identity_orule_for_rule(struct rule	*r)
 int	load_irregulars(char	*path)
 {
 	FILE	*f = fopen(path, "r");
-	char	line[1024], copy[1024];
+	char	line_full[1024], copy[1024];
 	char	*form = NULL, *rule = NULL, *stem = NULL;
 	struct orule	*or;
 
 	char	*rule_suffix = get_conf("irregular-form-rule-suffix");
 
 	if(!f) { perror(path); return 0; }
-	while(fgets(line, 1024, f))
+	while(fgets(line_full, 1024, f))
 	{
-		if(!*line)break;
-		if(*line=='\n')continue;
-		line[strlen(line)-1] = 0;
-
+		char	*line = trim_string(line_full);
 		if(!*line)continue;
 		if(*line=='"')continue;	// silly ERG .tab files have "'s at the beginning and ends
 		if(*line==';')continue;	// full-line comment
