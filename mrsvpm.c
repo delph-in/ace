@@ -108,7 +108,7 @@ struct vpm	*load_vpm(char	*path)
 		nargs = 0; args[0] = 0;
 		while(*p)
 		{
-			if(*p==';' || *p=='\n'){*p=0; break;}
+			if(*p==';' || *p=='\n' || *p=='\r'){*p=0; break;}
 			if(*p==' ' || *p=='\t'){*p=0; if(args[nargs])args[++nargs]=0; }
 			else if(!args[nargs])args[nargs] = p;
 			p++;
