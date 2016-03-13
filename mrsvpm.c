@@ -69,14 +69,14 @@ struct vpm	*invert_vpm(struct vpm	*v)
 	return vpm;
 }
 
-char	*type_for_empty_if_rule(char	*token)
+/*char	*type_for_empty_if_rule(char	*token)
 {
 	int	sl=strlen(token);
 	if(! (token[0]=='[' && token[sl-1]==']'))return NULL;
 	token = freeze_string(token+1);
 	token[sl-2] = 0;
 	return token;
-}
+}*/
 
 struct vpm	*load_vpm(char	*path)
 {
@@ -344,10 +344,16 @@ int vpm_test(char	*vartype, char *value, char *rule, int require_equality)
 	}
 	if(rule[0]=='[')
 	{
+		/* PRIOR TO March 12 2016, ACE thought:
 		// semantics of "[x" rule:
 		// matches iff value is missing and var is of type x
 		if(value)return -1;
 		else if(prop_subsumes(rule+1, vartype))return 0;
+		else return -1;*/
+		/* BUT NOW... */
+		// semantics of "[x" rule:
+		// matches if var is of type x
+		if(prop_subsumes(rule+1, vartype))return 0;
 		else return -1;
 	}
 	if(!value)return -1;
