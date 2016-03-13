@@ -24,8 +24,11 @@
 
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
+#define	DEBUG2(fmt, ...)	do {} while(0)
 
 extern int enable_token_avms;
+
+int derivations_include_roots = 0;
 
 extern int max_unpack_megabytes;
 //#define	MAX_UNPACK_CHUNKS	70000
@@ -47,7 +50,7 @@ struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry
 struct scoring_ancestry	compute_sub_ancestry(struct scoring_ancestry	panc, struct edge	*edge);
 struct hypothesis	*get_cui_hypothesis(struct context_unpack_info	*cui, int	rank);
 void	set_cui_hypothesis(struct context_unpack_info	*cui, int	rank, struct hypothesis	*h);
-int	cui_has_hypothesis(struct context_unpack_info	*cui, struct hypothesis	*hyp);
+//int	cui_has_hypothesis(struct context_unpack_info	*cui, struct hypothesis	*hyp);
 
 static inline char* edge_sign(struct edge *e)
 {
@@ -431,6 +434,7 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypagenda_it
 	int					i;
 
 	DEBUG("hypothesize %p at dec %p [%d ...] for edge #%d\n", h, dec, indexlist[0], dec->edge->id);
+	DEBUG2("current memory usage = %.1fmb\n", (double)slab_usage() / (1024*1024));
 //	DEBUG(" ... ancestry: ");
 //	for(i=0;i<ancestry.nparent_types;i++){ DEBUG(" %s", ancestry.parent_types[i]); }
 //	DEBUG("\n");
@@ -457,6 +461,7 @@ struct hypothesis *new_hypothesis(struct decomposition	*dec, struct hypagenda_it
 
 	add_hypothesis_to_agenda(agenda, h);
 	total_hyps++;
+	DEBUG2("(returning) current memory usage = %.1fmb\n", (double)slab_usage() / (1024*1024));
 	return h;
 }
 
@@ -559,6 +564,7 @@ void	put_more_on_agenda(struct hypagenda_item	**A, struct decomposition	*dec, in
 			// try to add a new agenda hypothesis for {dec,idx}
 			for(j=1;j<indent;j++)DEBUG("  ");
 			DEBUG("trying further hypothesize [%d %d] on dec %p of #%d\n", idx[0], idx[1], dec, dec->edge->id);
+			DEBUG2("current memory usage = %.1fmb\n", (double)slab_usage() / (1024*1024));
 
 			int	status = 0;
 			for(j=0;j<arity;j++)
@@ -597,6 +603,8 @@ void	put_more_on_agenda(struct hypagenda_item	**A, struct decomposition	*dec, in
 	}
 }
 
+extern int cancel_parse, did_timeout;
+
 struct hypothesis *process_hypagenda(struct hypagenda_item **A)
 {
 	struct hypothesis	*hyp;
@@ -605,6 +613,8 @@ struct hypothesis *process_hypagenda(struct hypagenda_item **A)
 
 	if((slab_usage() / (1024*1024)) >= max_unpack_megabytes && !arbiter_request_memory())
 		longjmp(out_of_memory_jump, 2);
+	if(cancel_parse)
+		longjmp(out_of_memory_jump, 10);
 
 	//printf("agenda:\n");
 	//print_heap(*A, 1);
@@ -643,20 +653,27 @@ again:
 	else *W = r;
 
 	// do the expansion around the popped hyp
+	DEBUG2("before put_more_on_agenda(): current memory usage = %.1fmb\n", (double)slab_usage() / (1024*1024));
 	put_more_on_agenda(A, hyp->dec, hyp->indexlist, hyp->ancestry);
+	DEBUG2("after put_more_on_agenda(): current memory usage = %.1fmb\n", (double)slab_usage() / (1024*1024));
 
 	checkup(hyp);
 	if(hyp->dg == (void*)1)
 	{
-		//printf("checkup failed for edge #%d hypothesis: ", hyp->eid);
+		DEBUG("checkup failed for edge #%d hypothesis: ", hyp->eid);
 		//print_hypothesis(hyp, printf, 0); printf("\n");
 		goto again;
 	}
 
 	// 'hyp' is the next ranking item in the relevant edge's cache for this ancestry; record it.
 	struct context_unpack_info	*cui = get_edge_cui(hyp->edge, hyp->ancestry);
-	if(!cui_has_hypothesis(cui, hyp))
-		set_cui_hypothesis(cui, cui->nhypotheses, hyp);
+	//if(!cui_has_hypothesis(cui, hyp))
+	set_cui_hypothesis(cui, cui->nhypotheses, hyp);
+	//else assert(!"wow... that hypothesis was already on the cui! how?");
+	// ^^ I've never seen that assertion go off in my life.
+	// the cui_has_hypothesis() call takes up a lot of time when there are long lists
+
+	DEBUG2("returning from process_hypagenda(): current memory usage = %.1fmb\n", (double)slab_usage() / (1024*1024));
 
 	return hyp;
 }
@@ -693,11 +710,27 @@ void	set_cui_hypothesis(struct context_unpack_info	*cui, int	rank, struct hypoth
 	if(cui->nhypotheses <= rank)
 	{
 		assert(cui->nhypotheses == rank);
-		int	oah = cui->ahypotheses;
 		cui->nhypotheses = rank+1;
-		cui->ahypotheses = 2*(rank+1) - 1;
-		//cui->nhb = cui->ahypotheses / HYPS_PER_BLOCK;
-		cui->hypotheses = slab_realloc(cui->hypotheses, sizeof(struct hypothesis*)*(oah), sizeof(struct hypothesis*)*cui->ahypotheses);
+		if(cui->nhypotheses > cui->ahypotheses)
+		{
+			int	oah = cui->ahypotheses;
+			cui->ahypotheses = 2*(rank+1) - 1;
+			//cui->nhb = cui->ahypotheses / HYPS_PER_BLOCK;
+			int	newlen = sizeof(struct hypothesis*)*cui->ahypotheses;
+			extern int currslabsize;
+			if(newlen >= currslabsize)
+			{
+				struct hypothesis	**newlist = mega_slab(newlen, max_unpack_megabytes);
+				if(!newlist)
+				{
+					fprintf(stderr, "NOTE: couldn't allocate %d hypothesis pointers, giving up\n", cui->ahypotheses);
+					longjmp(out_of_memory_jump, 3);
+				}
+				memcpy(newlist, cui->hypotheses, sizeof(struct hypothesis*)*(oah));
+				cui->hypotheses = newlist;
+			}
+			else cui->hypotheses = slab_realloc(cui->hypotheses, sizeof(struct hypothesis*)*(oah), newlen);
+		}
 	}
 	cui->hypotheses[rank] = h;
 }
@@ -708,13 +741,13 @@ struct hypothesis	*get_cui_hypothesis(struct context_unpack_info	*cui, int	rank)
 	return cui->hypotheses[rank];
 }
 
-int	cui_has_hypothesis(struct context_unpack_info	*cui, struct hypothesis	*hyp)
+/*int	cui_has_hypothesis(struct context_unpack_info	*cui, struct hypothesis	*hyp)
 {
 	int i;
 	for(i=0;i<cui->nhypotheses;i++)
 		if(hyp == cui->hypotheses[i])return 1;
 	return 0;
-}
+}*/
 
 struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_ancestry	ancestry, struct hypagenda_item	**customAgenda)
 {
@@ -833,6 +866,14 @@ struct hypothesis	*cheap_hypothesis(struct edge	*e, int	with_dg)
 
 unsigned long long total_reconstructed_nodes;
 
+struct lexeme	*get_hypothesis_lexeme(struct hypothesis	*h)
+{
+	// have to walk down to the bottom because packing can cause the ->edge->lex on an upper node to be different from on a lower node
+	while(h->edge->rule)h = h->rhslist[0];
+	assert(h->edge->lex);
+	return h->edge->lex;
+}
+
 int instantiate_hypothesis(struct hypothesis *h)
 {
 	int arity = h->arity, i;
@@ -920,7 +961,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 				return -1;
 			}
 			if(h->edge->rule->orth)
-				if(unify_orthography(rdg, h->rhslist[0]->dg, h->rhslist[0]->edge->lex, h->edge->rule))
+				if(unify_orthography(rdg, h->rhslist[0]->dg, get_hypothesis_lexeme(h), h->edge->rule))
 				{
 					if(g_mode == PARSING && h->edge->neps==-1)disable_robust_unification();
 					forget_tmp();
@@ -1146,7 +1187,15 @@ void print_hypothesis_from(struct hypothesis *hyp, int (*print)(const char *fmt,
 	//struct slab_state	st;
 	//get_slabstate(&st);	// the slab_escape() nonsense for escaping token structures shouldn't stay with us forever!
 	// actually, it should since we're caching them now
+	if(derivations_include_roots)
+	{
+		assert(hyp->dg != NULL);
+		char	*root = is_root(hyp->dg);
+		assert(root != NULL);
+		print(" (%s", root);
+	}
 	print_tree0(hyp, _from, NULL);
+	if(derivations_include_roots)print(")");
 	//set_slabstate(&st);
 	stop_timer(timer, 1);
 }
@@ -1266,7 +1315,7 @@ int	gen_extract_lexemes(struct dg	*topdown, struct hypothesis	*h, int	k, struct 
 	assert(0 == unify_dg_tmp(h->edge->rule->dg, topdown, -1));
 	for(i=0;i<h->arity;i++)assert(0 == unify_dg_tmp(h->rhslist[i]->dg, topdown, i));
 	// copy out topdown info for each daughter
-	if(h->edge->rule->orth)assert(0 == unify_orthography(topdown, h->rhslist[0]->dg, h->rhslist[0]->edge->lex, h->edge->rule));
+	if(h->edge->rule->orth)assert(0 == unify_orthography(topdown, h->rhslist[0]->dg, get_hypothesis_lexeme(h), h->edge->rule));
 	topdown = finalize_tmp(topdown, 0);
 	assert(topdown != NULL);
 	for(i=0;i<h->arity;i++)
@@ -1433,8 +1482,19 @@ extern int do_itsdb;
 
 	if(setjmp(out_of_memory_jump) != 0)
 	{
-		fprintf(stderr, "NOTE: hit RAM limit while unpacking\n");
-		itsdb_error("ran out of RAM while unpacking");
+		if(cancel_parse && did_timeout)
+		{
+			// NOTE and itsdb_error already have been called
+			fprintf(stderr, "NOTE: out of time while unpacking\n");
+			itsdb_error("ran out of time while unpacking");
+		}
+		else
+		{
+			// cancel_parse can be set when arbiter sends a cancellation request
+			// we might also get here when we decide on our own that we're out of memory
+			fprintf(stderr, "NOTE: hit RAM limit while unpacking\n");
+			itsdb_error("ran out of RAM while unpacking");
+		}
 		goto resume_after_oom;
 	}
 
@@ -1473,6 +1533,7 @@ extern int do_itsdb;
 	// and scored every local context by now
 	// ... go get the normalization factor
 	double	Z = 0;
+	//double	Z_robust = 0;
 	for(i=0;i<cell->p_nedges;i++)
 	{
 		edge = cell->p_edges[i];
@@ -1485,7 +1546,8 @@ extern int do_itsdb;
 				struct edge *e = (j==-1)?edge:edge->pack[j];
 				if(e->frozen && !e->frosted)continue;
 				if(!e->daughters)continue;	// generalization edge
-				if(!is_root(e->dg))continue;
+				char	*root = is_root(e->dg);
+				if(!root)continue;
 				struct context_unpack_info	*cui = get_edge_cui(e, root_ancestry);
 				int k;
 				for(k=0;k<cui->ndecs;k++)
@@ -1498,11 +1560,16 @@ extern int do_itsdb;
 					Z += cui->decs[k].all_unpackings_z;
 					//fprintf(stderr, "root edge #%d dec %p %d / %d score %f\n",
 					//	e->id, cui->decs+k, k+1, cui->ndecs, cui->decs[k].all_unpackings_z);
+					//if(strstr(root, "robust"))Z_robust += cui->decs[k].all_unpackings_z;
 				}
 			}
 		}
 	}
 	//fprintf(stderr, "MaxEnt normalization factor = %f\n", Z);
+	//char	comment[128];
+	//sprintf(comment, "%f", Z_robust / Z);
+	//itsdb_comment(comment);
+	//fprintf(stderr, "memory usage = %.1fmb\n", (double)slab_usage()/(1024*1024));
 
 	if(hyp_timer==-1)hyp_timer = new_timer("hypothesize");
 	if(inst_timer==-1)inst_timer = new_timer("instantiate");
@@ -1642,7 +1709,7 @@ resume_after_oom:;
 	return count;
 }
 
-report_unpacking()
+void report_unpacking()
 {
 	if(!debug_level)return;
 	fprintf(stderr, "%d total hypotheses generated\n", total_hyps);
