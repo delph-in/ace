@@ -18,6 +18,7 @@
 #include	"profiler.h"
 
 double	ubertagging_threshold = 0.0001;
+int		give_up_threshold = 70;
 
 void	itsdb_dump_tokens(char	*name, char	*countname, struct lattice	*tokens);
 int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, int	status, int	tforest);
@@ -268,13 +269,14 @@ qsort(list, nlist, sizeof(void*), cmp);
 	return 0;
 }
 
-int	cancel_parse;
+int	cancel_parse, did_timeout;
 
 void	alarm_handler(int	sig)
 {
 	fprintf(stderr, "NOTE: cancelling parse, taking too long\n");
 	itsdb_error("timeout");
 	cancel_parse = 1;
+	did_timeout = 1;
 }
 
 int	fits(struct rule	*r, int	d, struct edge	*e)
@@ -460,10 +462,10 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	apply_token_mapping(token_chart);
 	sort_lattice(token_chart);
 
-	if(token_chart->nvertices>70)
+	if(token_chart->nvertices>give_up_threshold)
 	{
-		fprintf(stderr, "NOTE: giving up, too many words (70+)\n");
-		itsdb_error("too many words (70+)");
+		fprintf(stderr, "NOTE: giving up, too many words (%d+)\n", give_up_threshold);
+		itsdb_error("too many words");
 		if(do_itsdb)itsdb_report_parse(token_chart, NULL, -2, 0);
 		stop_timer(chart_setup_timer, 1);
 		return -2;
@@ -563,6 +565,7 @@ extern int	enable_ubertagging;
 	predict_rule_uses(nwords, lexical_chart);
 
 	cancel_parse = 0;
+	did_timeout = 0;
 	signal(SIGALRM, alarm_handler);
 
 	if(timeout_seconds > 0)
@@ -600,8 +603,6 @@ extern int	enable_ubertagging;
 	t_forest = t_half + timer();
 	cforest = clock() - start;
 
-	alarm(0);
-
 	if(do_forest)
 	{
 		char	*sentence = current_sentence;
@@ -637,6 +638,7 @@ extern int	enable_ubertagging;
 		if(!num_parses){}//output_lui_chart(words);
 		last_token_chart = token_chart;
 	}
+	alarm(0);
 
 //	extern int	output_edge_vectors;
 //	if(output_edge_vectors)
