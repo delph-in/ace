@@ -29,6 +29,7 @@ int	debug_level = 0, export_parts = 0, do_itsdb = 0;
 extern int itsdb_dump_chart;
 extern int	show_probability;
 extern int	enable_dublin;
+extern int	derivations_include_roots;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
@@ -63,6 +64,7 @@ extern char			*use_roots, *disable_signs;
 extern int do_forest;
 extern int g_profiling;
 extern int use_packed_edge_ids;
+extern int give_up_threshold;
 float	stdin_time = 0;
 
 int	form_to_relation = 0;
@@ -143,6 +145,7 @@ void	parse_args(int	argc, char	*argv[])
 		{"show-gen-chart", 0, &show_gen_chart, 1},
 		{"yy-rules", 0, &yy_rule_mode, 1},
 		{"tsdb-notes", 0, &tsdb_notes, 1},
+		{"rooted-derivations", 0, &derivations_include_roots, 1},
 #define	MAX_UNPACK_MEGABYTES_OPTION	1000
 		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},
 #define	MAX_CHART_MEGABYTES_OPTION	1001
@@ -169,6 +172,8 @@ void	parse_args(int	argc, char	*argv[])
 		{"maxent", 2, NULL, MAXENT_OPTION},
 #define	LICENSE_INFO_OPTION		1011
 		{"license-info", 0, NULL, LICENSE_INFO_OPTION},
+#define GIVE_UP_THRESHOLD_OPTION	1012
+		{"max-words", 1, NULL, GIVE_UP_THRESHOLD_OPTION},
 		{NULL,0,NULL,0}
 		};
 
@@ -217,6 +222,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	MAX_CHART_MEGABYTES_OPTION:		max_chart_megabytes = atoi(optarg);		REQUIRE_POSITIVE("--max-chart-megabytes"); break;
 		case	GENERATION_SERVER_OPTION:	generation_server_lang = optarg;	break;
 		case	LUI_FD_OPTION:	preexisting_lui_fd = atoi(optarg);	REQUIRE_POSITIVE("--lui-fd"); break;
+		case	GIVE_UP_THRESHOLD_OPTION:	give_up_threshold = atoi(optarg)+1; REQUIRE_POSITIVE("--max-words"); break;
 		case	TNT_MODEL_OPTION:	enable_tnt = 1; tnt_model_path = optarg; break;
 		case	TNT_MAX_TAGS_OPTION: tnt_max_tags = atoi(optarg); REQUIRE_POSITIVE("--tnt-max-tags"); break;
 		case	TIMEOUT_OPTION: timeout_seconds = atoi(optarg); REQUIRE_POSITIVE("--timeout"); break;
@@ -363,6 +369,8 @@ handle_lui_colon_command(char	*line)
 		show_last_parse_chart();
 	if(!strncmp(line, ":trigger", 8))
 		debug_trigger_rules(line+8);
+	if(!strncmp(line, ":break", 6))
+		debug_lattice_mapping(line+6);
 }
 
 struct job_stats	main_input_loop(FILE	*fin)
@@ -603,7 +611,7 @@ int	main(int	argc, char	*argv[])
 		if(input_from_lui)
 		{
 			input_from_lui_mode();
-			return;
+			return 0;
 		}
 	}
 

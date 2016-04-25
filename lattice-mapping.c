@@ -32,15 +32,16 @@ void	update_possible_map_add(struct lattice	*lat, int	id, struct lattice_edge	*e
 void	update_possible_map_remove(struct lattice	*lat, int	id, struct lattice_rule	*r);
 int	initialize_possible_map(struct lattice	*lat, struct lattice_rule	*r);
 
-int			ntmrules = 0;
-struct lattice_rule	**tmrules = NULL;
-
 struct lattice_rule_set	*token_mapping_rules = NULL;
 struct lattice_rule_set	*lexical_filtering_rules = NULL;
 struct lattice_rule_set	*post_generation_mapping_rules = NULL;
 
 int	mapping_tokens = 0;
 int	noriginaltokens, nmappingtokens;
+
+char	*lm_breakpoint = NULL;
+int		lm_break_before = 0, lm_break_after = 0, lm_just_list = 0;
+int		lm_break_after_finish = 0, lm_break_before_start = 0;
 
 struct edge	*new_edge(struct dg	*d)
 {
@@ -1019,6 +1020,8 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 	{
 		// apply the rule as matched
 		DEBUG("found an alignment of rule '%s'\n", r->name);
+		if(lm_just_list || lm_break_before || lm_break_after)
+			printf("LATTICE-MAPPING: applying %s\n", r->name);
 		if(inputs[0]->token)
 		{
 			for(i=0;i<r->ninput;i++)DEBUG("I%d = '%s' = %p\n", i+1, inputs[i]->token->string, inputs[i]);
@@ -1186,24 +1189,71 @@ struct profiler	*start_lmr_profiler(struct lattice_rule_set	*rs, int	ri)
 	return (*lmr_profilers)[ri];
 }
 
+lm_break(struct lattice	*lat, struct lattice_rule	*r)
+{
+	char	name[1024];
+	if(lm_just_list)printf("LATTICE-MAPPING: %s\n", r?r->name:"ENDPOINT");
+	sprintf(name, "%s lattice mapping rule %s", lm_break_before?"before":"after", r?r->name:"ENDPOINT");
+	if(r)output_lui_dg(r->dg, r->name);
+	int	id = lui_show_tokens(lat, name);
+	lui_await_amnesia(id);
+}
+
+debug_lattice_mapping(char	*args)
+{
+	if(*args==' ')args++;
+	lm_breakpoint = NULL;
+	lm_break_before = lm_break_after = 0;
+	lm_just_list = 0;
+	lm_break_after_finish = 0;
+	lm_break_before_start = 0;
+	int	all = 0;
+	char	*tok;
+	for(tok=strtok(args," ,");tok;tok=strtok(NULL," ,"))
+	{
+		if(!strcmp(tok, "all"))all = 1;
+		else if(!strcmp(tok, "before"))lm_break_before = 1;
+		else if(!strcmp(tok, "after"))lm_break_after = 1;
+		else if(!strcmp(tok, "list"))lm_just_list = 1;
+		else if(!strcmp(tok, "clear")) {}
+		else lm_breakpoint = strdup(tok);
+	}
+	if(lm_break_after && !all && !lm_breakpoint)
+		lm_break_after_finish = 1;
+	if(lm_break_before && !all && !lm_breakpoint)
+		lm_break_before_start = 1;
+	if(lm_just_list && !lm_breakpoint)all = 1;
+	if(all)lm_breakpoint = NULL;
+	if((all || lm_breakpoint) && !lm_break_before && !lm_break_after)
+		lm_break_after = 1;
+	if(lm_break_after && lm_break_before)lm_break_before = 0;
+}
+
 void	apply_lattice_mapping(struct lattice	*lat, struct lattice_rule_set	*rs)
 {
 	int	pc = 0;
 	int possible = 1;
 
+	if(rs == token_mapping_rules && lm_break_before_start)
+		lm_break(lat, NULL);
 	while(pc < rs->nrules)
 	{
 		clear_failed();
 		struct profiler	*prof = NULL;
 		if(g_profiling)prof = start_lmr_profiler(rs, pc);
-		if(!possible_map)possible = initialize_possible_map(lat, rs->rules[pc]);
-		int result = possible?apply_lattice_rule(lat, rs->rules[pc]):0;
+		struct lattice_rule	*r = rs->rules[pc];
+		if(!lm_break_before_start && !lm_break_after_finish && !lm_just_list && lm_break_before && (lm_breakpoint && !strcasecmp(r->name, lm_breakpoint)))
+			lm_break(lat, r);
+		if(!possible_map)possible = initialize_possible_map(lat, r);
+		int result = possible?apply_lattice_rule(lat, r):0;
+		if(!lm_break_before_start && !lm_break_after_finish && !lm_just_list && (lm_breakpoint || result) && lm_break_after && (!lm_breakpoint || !strcasecmp(r->name, lm_breakpoint)))
+			lm_break(lat, r);
 		if(result != 0)
 		{
 			// found and applied a match.
-			if(pc != rs->rules[pc]->jump_on_match)
+			if(pc != r->jump_on_match)
 			{
-				pc = rs->rules[pc]->jump_on_match;
+				pc = r->jump_on_match;
 				if(possible_map)free(possible_map);
 				possible_map = NULL;
 			}
@@ -1217,6 +1267,8 @@ void	apply_lattice_mapping(struct lattice	*lat, struct lattice_rule_set	*rs)
 		}
 		if(prof)stop_profiler(prof, 1);
 	}
+	if(rs == token_mapping_rules && lm_break_after_finish)
+		lm_break(lat, NULL);
 }
 
 int	load_token_mapping_rules()

@@ -149,7 +149,17 @@ lui_process_request(char	*line)
 	else fprintf(stderr, "LUI: unknown `%s'\n", lp);
 }
 
-lui_forget(char	*command) { }
+int	awaiting_chart_id = 0;
+
+lui_forget(char	*command)
+{
+	//printf("LUI: forget `%s'\n", command);
+	int	id;
+	if(1 == sscanf(command, "chart %d forget", &id))
+	{
+		if(id == awaiting_chart_id)awaiting_chart_id = 0;
+	}
+}
 
 void quit_lui()
 {
@@ -1332,4 +1342,49 @@ lui_type_skeleton(char	*name)
 	struct dg	*dg = bracket?dagify(bracket,NULL):atomic_top();
 	dg->xtype = temptype;
 	output_lui_dg_with_provenance(dg, name, make_provenance(FROM_TYPE_LOCAL, t));
+}
+
+int	lui_show_tokens(struct lattice	*lat, char	*wname)
+{
+	//printf("LUI: should show `%s'\n", wname);
+	lui_initialize();
+
+	sort_lattice(lat);
+	int	chart_size = lat->lattice_vertex_id_gen - 1 + 1;
+	fprintf(lui_write, "chart %d %d \"%s\"", ++chart_id, chart_size-1, slab_escape(wname));
+	//int	leid = -1;
+	int i, j;
+	for(j=0;j<chart_size;j++)
+	{
+		for(i=0;i<lat->nedges;i++)
+		{
+			struct lattice_edge	*e = lat->edges[i];
+			if(e->from->id != j)continue;
+			if(!e->token)continue;
+			fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -(i+1), -(i+1), e->from->id, e->to->id, slab_escape(e->token->string));
+			break;
+		}
+	}
+	for(j=0;j<chart_size;j++)
+	{
+		for(i=0;i<lat->nedges;i++)
+		{
+			struct lattice_edge	*e = lat->edges[i];
+			if(e->from->id != j)continue;
+			if(!e->token)continue;
+			fprintf(lui_write, " #E[%d %d %d %d \"%s\" \"%s\" [ ] -1000 ]", lui_register_dg(e->token->dg, make_provenance(FROM_VACUUM, NULL)), e->token->eid, e->from->id, e->to->id, slab_escape(e->token->string), slab_escape(e->token->string));
+			//leid--;
+			//break;
+		}
+	}
+	fprintf(lui_write, "\n");
+	fflush(lui_write);
+	return chart_id;
+}
+
+lui_await_amnesia(int	id)
+{
+	//printf("should wait for chart %d to be forgotten\n", id);
+	awaiting_chart_id = id;
+	while(awaiting_chart_id == id)usleep(100000);
 }

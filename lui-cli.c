@@ -64,6 +64,42 @@ void	lui_instance_completions(const char	*line, linenoiseCompletions	*lc)
 	}
 }
 
+extern struct lattice_rule_set	*token_mapping_rules;
+extern struct lattice_rule_set	*lexical_filtering_rules;
+extern struct lattice_rule_set	*post_generation_mapping_rules;
+
+void	lui_break_completions1(char	*compl, char	*idea, char	*tok, linenoiseCompletions	*lc, struct lattice_rule_set	*rs)
+{
+	int	i;
+	for(i=0;i<rs->nrules;i++)if(!strncmp(tok,rs->rules[i]->name,strlen(tok)))
+	{
+		strcpy(idea, rs->rules[i]->name);
+		linenoiseAddCompletion(lc,strdup(compl));
+	}
+}
+
+void	lui_break_completions(const char	*line, linenoiseCompletions	*lc)
+{
+	if(!strchr(line, ' '))
+	{
+		linenoiseAddCompletion(lc, strdup(":break "));
+		return;
+	}
+	char	*tok = strrchr(line, ' ');
+	if(!tok)return;
+	tok++;
+	char	compl[10240];
+	memcpy(compl, line, tok-line);
+	char	*idea = compl + (tok-line);
+	lui_break_completions1(compl, idea, tok, lc, token_mapping_rules);
+	lui_break_completions1(compl, idea, tok, lc, lexical_filtering_rules);
+	lui_break_completions1(compl, idea, tok, lc, post_generation_mapping_rules);
+	if(!strncmp(tok, "before", strlen(tok))){ sprintf(idea, "before"); linenoiseAddCompletion(lc, strdup(compl)); }
+	if(!strncmp(tok, "after", strlen(tok))){ sprintf(idea, "after"); linenoiseAddCompletion(lc, strdup(compl)); }
+	if(!strncmp(tok, "clear", strlen(tok))){ sprintf(idea, "clear"); linenoiseAddCompletion(lc, strdup(compl)); }
+	if(!strncmp(tok, "all", strlen(tok))){ sprintf(idea, "all"); linenoiseAddCompletion(lc, strdup(compl)); }
+}
+
 void	lui_linenoise_completion(const char	*line, linenoiseCompletions	*lc)
 {
 	if(line[0] != ':')return;
@@ -77,9 +113,10 @@ void	lui_linenoise_completion(const char	*line, linenoiseCompletions	*lc)
 		linenoiseAddCompletion(lc, ":H");
 		linenoiseAddCompletion(lc, ":g");
 		linenoiseAddCompletion(lc, ":c");
+		linenoiseAddCompletion(lc, ":break");
 		if(g_mode == GENERATING)linenoiseAddCompletion(lc, ":trigger");
 	}
-	else if(line[1] && line[2]==' ')switch(line[1])
+	else if(line[1])switch(line[1])
 	{
 		case	'r':	lui_rule_completions(line+3, lc);	break;
 		case	't':	lui_type_completions(line+3, "t", lc);	break;
@@ -87,5 +124,6 @@ void	lui_linenoise_completion(const char	*line, linenoiseCompletions	*lc)
 		case	'H':	lui_type_completions(line+3, "H", lc);	break;
 		case	'i':	lui_instance_completions(line+3, lc);	break;
 		case	'l':	lui_lex_completions(line+3, lc);	break;
+		case	'b':	lui_break_completions(line, lc);	break;
 	}
 }
