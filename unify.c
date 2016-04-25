@@ -41,8 +41,11 @@ unsigned int	generation = 10;
 void	null_generation() { generation = 10; }
 struct darc	*realloc_carcs(struct darc	*ptr, int	old, int	new);
 
+#define	MAX_COPY_PATH	1024
+int	copypath[MAX_COPY_PATH + 10], copypathp;
+
 #ifdef	UNIFY_PATHS
-extern int	upath[1024];
+extern int	upath[MAX_COPY_PATH + 10];
 extern int	upathl, upathgl;
 extern struct type *uglb;
 extern struct type	*ut1, *ut2;
@@ -276,9 +279,6 @@ static int darc_cmp(const void	*a, const void	*b)
 {
 	return ((const struct darc*)a)->label - ((const struct darc*)b)->label;
 }
-
-#define	MAX_COPY_PATH	1024
-int	copypath[MAX_COPY_PATH], copypathp;
 
 static void print_copy_path(char	*name)
 {
