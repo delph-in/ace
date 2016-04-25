@@ -18,6 +18,8 @@
 
 #define	VACUOUS	"vacuous"
 
+char	*normalize_predicate(char	*p, char	*q);
+
 struct semindex_pred_node
 {
 	// structure to keep track of all the info about a particular pred name
@@ -98,13 +100,16 @@ void init_index()
 	}
 }
 
-struct semindex_pred_node	*lookup_semindex(char *predn, int alloc)
+struct semindex_pred_node	*lookup_semindex(char *predn_orig, int alloc)
 {
+	char	temp[1024];
+	char	*predn = normalize_predicate(predn_orig, temp);
+	//printf("lookup_semindex: normalized %s to %s\n", predn_orig, predn);
 	struct semindex_pred_node	*node = hash_find(sindex, predn);
 	if(!node && alloc)
 	{
 		node = calloc(sizeof(struct semindex_pred_node), 1);
-		node->pred = predn;
+		node->pred = freeze_string(predn);
 		if(predn[0]=='"')
 		{
 			int i;
@@ -112,7 +117,7 @@ struct semindex_pred_node	*lookup_semindex(char *predn, int alloc)
 			for(i=0;i<nstrpars;i++)
 				add_relative_to_spn(node, strpars[i]);
 		}
-		hash_add(sindex, predn, node);
+		hash_add(sindex, node->pred, node);
 	}
 	return node;
 }
@@ -440,6 +445,7 @@ int	instantiate_alignment(struct ep_alignment	*a)
 		// the edge has not been restricted yet...
 		extern int	dont_unspecialize, inhibit_pack;
 		if(edge && !dont_unspecialize && !inhibit_pack)edge->dg = restrict_copy_dg(edge->dg, 1);
+		//if(!edge)printf("failed lexical_edge\n");
 		//cont = walk_dg(edge->dg, savef, "SYNSEM", "LOCAL", "CONT", NULL);
 	}
 	if(e->what == RULE)
@@ -485,7 +491,7 @@ struct ep_alignment	*record_alignment(struct grammar_entity	*e, struct mrs_ep	*a
 	int	mark = (e->what == LEXEME)?1:2;
 	for(i=0;i<=e->nextra_preds;i++)
 		ep_hit_map[align[i]->epnum] |= mark;
-	/*printf(" ... accepting new alignment: ");
+	/*printf(" ... accepting new alignment of %s: ", (e->what==LEXEME)?e->lex->word:e->rule->name);
 	for(i=0;i<=e->nextra_preds;i++)
 		printf(" %s/%p", align[i]->pred, align[i]);
 	printf("\n");*/

@@ -477,7 +477,11 @@ int	generate(struct mrs	*mrs)
 		//if(!mrs_subsumes(mrs, mrs_res))
 		//if(!mrs_subsumes(hax_ref, hax_res))
 #ifdef	SEMI_SIDE_SUBSUMPTION_TEST
-		if((disable_subsumption_test==0) && !mrs_subsumes(current_input_mrs, mrs_res))	// totally SEMI-side comparison
+		extern struct type_hierarchy	*main_th, *semi_th;
+		set_default_type_hierarchy(semi_th);
+		int	sst_result = (disable_subsumption_test==0) && !mrs_subsumes(current_input_mrs, mrs_res);
+		set_default_type_hierarchy(main_th);
+		if(sst_result)	// totally SEMI-side comparison
 #else
 		struct mrs	*hax_res = external_to_internal_mrs(mrs_res);
 		if((disable_subsumption_test==0) && !mrs_subsumes(current_internal_input_mrs, hax_res))	// grammar-side comparison

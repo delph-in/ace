@@ -774,6 +774,20 @@ int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 	return mrs_subsumes0(in, out, 0, vmap, used, order);
 }
 
+char	*normalize_predicate(char	*p, char	*storage)
+{
+	if(strlen(p) > 1000)return p;
+	char	*q = storage;
+	if(*p=='"')p++;
+	while(*p)
+	{
+		if(!strcmp(p,"_rel") || !strcmp(p,"_rel\""))break;
+		*q++ = *p++;
+	}
+	*q = 0;
+	return storage;
+}
+
 int pred_subsumes(char *in, char *out)
 {
 	// XXX when SEM-I import works, this is where we make our move...
@@ -796,6 +810,16 @@ int pred_subsumes(char *in, char *out)
 	{
 		if(in[0]=='"' && out[0]!='"' && !strncasecmp(in+1, out, strlen(out)) && strlen(in) == strlen(out)+2)return 1;
 		if(out[0]=='"' && in[0]!='"' && !strncasecmp(out+1, in, strlen(in)) && strlen(out) == strlen(in)+2)return 1;
+	}
+	extern struct type_hierarchy	*semi_th;
+	char	normal_in[1024], normal_out[1024];
+	if(th == semi_th)
+	{
+		// when comparing predicates in the new regime, quotes and _rel are discarded
+		in = normalize_predicate(in, normal_in);
+		out = normalize_predicate(out, normal_out);
+		//printf("%s >? %s\n", in, out);
+		if(!strcasecmp(in,out))return 1;
 	}
 	if(g_mrs_test_demand_equality)return 0;
 	if(in[0]=='"')return 0;	// strings don't subsume anything but themself

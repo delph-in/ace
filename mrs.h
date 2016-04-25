@@ -103,6 +103,8 @@ char		*external_to_internal_var_type(char	*in);
 struct mrs	*apply_transfer_input_vpm(struct mrs	*min);
 struct mrs	*apply_transfer_output_vpm(struct mrs	*min);
 
+char	*normalize_predicate(char	*p, char	*storage);
+
 struct mrs_var	*dg_to_mrs_var(struct dg	*dg, struct mrs_vlist *vlist);
 void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep);
 

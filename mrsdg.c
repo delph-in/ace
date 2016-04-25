@@ -239,7 +239,11 @@ void	dg_to_mrs_ep(struct dg *dg, struct mrs_vlist *vlist, struct mrs_ep	*ep)
 		//fprintf(stderr, "EP dag had no PRED\n");
 		//exit(-1);
 	}
-	else ep->pred = strdup(pred->xtype->name);
+	else
+	{
+		char	norm[1024];
+		ep->pred = strdup(normalize_predicate(pred->xtype->name, norm));
+	}
 	ep->dg = dg;
 	ep->lbl = dg_to_mrs_var(dg_hop(dg, lblf), vlist);
 	if(!ep->lbl)
@@ -605,11 +609,15 @@ int dagify_mrs_ep(struct mrs_ep *ep)
 	struct dg	*dg = atomic_dg("relation");	// XXX should this be configurable?
 	int			i;
 
-	struct type	*predtype = lookup_type(ep->pred);
+	// try to find an unquoted predicate in the grammar
+	char	normalized[1024], *pred = normalize_predicate(ep->pred, normalized);
+	char	*strpred = slab_alloc_unaligned(strlen(pred)+7);
+	sprintf(strpred, "%s_rel", pred);
+	struct type	*predtype = lookup_type(strpred);
 	if(!predtype)
 	{
-		char	*strpred = slab_alloc_unaligned(strlen(ep->pred)+3);
-		sprintf(strpred, "\"%s\"", ep->pred);
+		// find it as a quoted string
+		sprintf(strpred, "\"%s_rel\"", pred);
 		predtype = lookup_type(strpred);
 		assert(predtype != NULL);	// temporary string types are auto-added; should never fail.
 	}
