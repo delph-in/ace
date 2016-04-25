@@ -21,7 +21,8 @@ void	print_current_sentence(int	sig)
 
 	int	r;
 	
-	r = write(saved_termerr, "ERROR: DEADLY SIGNAL! sent = `", strlen("DEADLY SIGNAL! sent = `"));
+	char	*message = "ERROR: DEADLY SIGNAL! sent = `";
+	r = write(saved_termerr, message, strlen(message));
 	r = write(saved_termerr, current_sentence, strlen(current_sentence));
 	r = write(saved_termerr, "'\n", 2);
 	shutdown_net();
