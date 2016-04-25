@@ -348,6 +348,15 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 
 	if(!cont)return mrs;
 
+//	static int other_timer = -1;
+//	if(other_timer==-1)other_timer = new_timer("reset CONT");
+//	start_timer(other_timer);
+	extern int unify_always_succeeds;
+	if(unify_always_succeeds)
+		if(check_cycles(cont))return mrs;
+	dgreset_r(cont);
+//	stop_timer(other_timer, 1);
+
 	// allocate temporary space for lots and lots of mrs_var*'s
 	static struct mrs_var	**tmp_vlist = NULL;
 	if(!tmp_vlist)tmp_vlist = malloc(sizeof(struct mrs_var*) * 10240);
@@ -368,12 +377,6 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	}
 	//printf("extract from cont: "); print_dg(cont); printf("\n");
 
-//	static int other_timer = -1;
-//	if(other_timer==-1)other_timer = new_timer("reset CONT");
-//	start_timer(other_timer);
-	dgreset_r(cont);
-//	stop_timer(other_timer, 1);
-
 	nvars_extracted = 0;
 
 	load_ep_drop();
@@ -390,7 +393,9 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 			// msg-less grammars tend to want their LTOP to be disconnected from the top constructed label.  we used to just add a new hole for LTOP -- now we add a qeq to go with it.
 			// originally a hack -- see chat w/ oe 2010-08-30
 			// grew into something more tenable.
-			mrs->ltop = invent_mrs_var(handle_type, &mrs->vlist);
+			char	*lbltype = handle_type;
+			if(inhibit_vpm)lbltype = external_to_internal_var_type(lbltype);
+			mrs->ltop = invent_mrs_var(lbltype, &mrs->vlist);
 			if(top_hcons_type && strcasecmp(top_hcons_type, "") && strcasecmp(top_hcons_type, "none"))
 				grammar_ltop = dg_to_mrs_var(dg_hop(hook, ltopf), &mrs->vlist);
 		}

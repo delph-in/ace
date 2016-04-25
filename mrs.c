@@ -783,6 +783,7 @@ int pred_subsumes(char *in, char *out)
 	//   3. vpm (via prop_subsumes)
 	// (1) can be in either type hierarchy.
 	// (2) will only be in the internal hierarchy.
+	//		-- jan 2016 -- what we want is to activate all GE's whose internal pred maps to something that is compatible with the input pred under SEM-I
 	// (3) can be in either type hierarchy.
 	// *so*, we need a way to specify which hierarchy we want to use!
 	// answer: default_type_hierarchy()
@@ -936,7 +937,7 @@ int mrs_subsumes0(struct mrs *in, struct mrs *out, int epi, int *vmap, char *use
 		DEBUG(" ... might match output pred '%s'\n", op->pred);
 		memcpy(vm, vmap, sizeof(int)*in->vlist.nvars);
 		if(ep->lbl && !var_subsume(ep->lbl, op->lbl, vm, in->vlist.nvars))continue;
-		//printf(" ... label ok\n");
+		DEBUG(" ... label ok\n");
 		for(j=0;j<ep->nargs;j++)
 		{
 			for(k=0;k<op->nargs;k++)
