@@ -36,6 +36,8 @@ char	*get_conf_parent_dir(char	*lhs);
 char	*get_lisp_parameter(char	*name);
 void	load_lisp(char	*path);
 
+char	*path_for_include(char	*parent, char	*what, char	*suffix);
+
 struct dg	*dagify(char	*str, struct type	*building_type);
 
 #endif

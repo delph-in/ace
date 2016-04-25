@@ -27,7 +27,6 @@ int	typify_tdl_line(struct tdl_line	*line, void	*ref);
 int	load_tdl(char	*path);
 
 char	*grammar_version = 0;
-int	loading_semi = 0;
 
 void show_task_name(char *task)
 {
@@ -398,7 +397,7 @@ int	load_tdl(char	*path)
 
 		if(*lp == 0)continue;
 
-		if(loading_semi)
+		/*if(loading_semi)
 		{
 			if(strchr(lp, ':') && (!strchr(lp, ' ') || strchr(lp, ':')<strchr(lp, ' ')))
 			{
@@ -410,7 +409,7 @@ int	load_tdl(char	*path)
 				if(process_semi_line(path, lnum, lp))return -1;
 				continue;
 			}
-		}
+		}*/
 
 		if(lp[0] == '%')
 		{
@@ -1599,144 +1598,6 @@ int	load_grammar_top(char *toptdl)
 	return 0;
 }
 
-enum
-{
-	semi_signature = 1,
-	semi_properties = 2,
-	semi_roles = 3,
-	semi_predicates = 4
-};
-
-int	semi_mode = 0;
-
-int	process_semi_command(char	*parent, int	lnum, char	*cmd)
-{
-	if(0) {}
-	else if(!strcasecmp(cmd, "signature:")) semi_mode = semi_signature;
-	else if(!strcasecmp(cmd, "properties:")) semi_mode = semi_properties;
-	else if(!strcasecmp(cmd, "roles:")) semi_mode = semi_roles;
-	else if(!strcasecmp(cmd, "predicates:")) semi_mode = semi_predicates;
-	else if(!strncasecmp(cmd, "include:", 8))
-	{
-		char	*file = trim_string(cmd + 8);
-		char	*iname = path_for_include(parent, file, NULL);
-		//fprintf(stderr, "SEMI INCLUDE %s\n", iname);
-		load_tdl(iname);
-		free(iname);
-	}
-	else
-	{
-		fprintf(stderr, "%s:%d:  unknown SEMI command: %s\n", parent, lnum, cmd);
-		return -1;
-	}
-	return 0;
-}
-
-int	process_semi_signature_line(char	*file, int	lnum, char	*line)
-{
-	int	l = strlen(line);
-	if(l && line[l-1]=='.')line[l-1]=0;
-
-	char	*delim = strstr(line, ":=");
-	if(!delim)
-	{
-		fprintf(stderr, "%s:%d: SEMI signature line with no := operator.\n", file, lnum);
-		return -1;
-	}
-
-	*delim = 0;
-	char	*lhs = trim_string(line);
-	char	*rhs = trim_string(delim + 2);
-
-	if(!*lhs || !*rhs)
-	{
-		fprintf(stderr, "%s:%d: missing operand\n", file, lnum);
-		return -1;
-	}
-
-	//fprintf(stderr, "SEMI signature line: %s   ||    %s\n", lhs, rhs);
-	tdlstatus = "semi-signature";
-	add_tdlline(lhs, '=', rhs, NULL, lnum, file);
-	return 0;
-}
-
-int	process_semi_properties_line(char	*file, int	lnum, char	*line)
-{
-	int	l = strlen(line);
-	if(l && line[l-1]=='.')line[l-1]=0;
-
-	char	*delim = strstr(line, ":");
-	if(!delim)
-	{
-		fprintf(stderr, "%s:%d: SEMI properties line with no : operator.\n", file, lnum);
-		return -1;
-	}
-
-	*delim = 0;
-	char	*lhs = trim_string(line);
-	char	*rhs = trim_string(delim + 2);
-
-	if(!*lhs || !*rhs)
-	{
-		fprintf(stderr, "%s:%d: missing operand\n", file, lnum);
-		return -1;
-	}
-
-	char	*vtype = strchr(lhs, '[');
-	if(!vtype || strlen(vtype) < 3 || !strchr(vtype+1, ']'))
-	{
-		fprintf(stderr, "%s:%d: missing variable type\n", file, lnum);
-		return -1;
-	}
-	*vtype = 0;
-	vtype++;
-	*strchr(vtype, ']') = 0;
-	vtype = trim_string(vtype);
-	lhs = trim_string(lhs);
-
-	//fprintf(stderr, "SEMI properties line: property '%s' on var type '%s' with data type '%s'\n", lhs, vtype, rhs);
-	lookup_fname(lhs);
-	return 0;
-}
-
-int	process_semi_line(char	*parent, int	lnum, char	*line)
-{
-	switch(semi_mode)
-	{
-		case	semi_signature:
-			return process_semi_signature_line(parent, lnum, line);
-		case	semi_properties:
-			return process_semi_properties_line(parent, lnum, line);
-		case	semi_roles:
-			//fprintf(stderr, "SEMI roles line: %s\n", line);
-			return 0;
-		case	semi_predicates:
-			//fprintf(stderr, "SEMI predicates line: %s\n", line);
-			return 0;
-		default:
-			fprintf(stderr, "SEMI line outside of any section: '%s'\n", line);
-			return -1;
-	}
-}
-
-struct type_hierarchy	*semi_th;
-
-int	load_semi(char	*path)
-{
-	tdl_push_status("semi");
-	loading_semi = 1;
-	semi_th = new_type_hierarchy("semi-signature", semi_top_type);
-	struct type_hierarchy	*main_th = default_type_hierarchy();
-	set_default_type_hierarchy(semi_th);
-	load_tdl(path);
-	// the following calls "add_type_only()" on each definition
-	process_tdl_status("semi-signature", typify_tdl_line, NULL);
-	make_glbs();
-	set_default_type_hierarchy(main_th);
-	loading_semi = 0;
-	tdl_pop_status();
-}
-
 int	load_quickcheck()
 {
 	char	*qccode_path = get_conf_file_path("quickcheck-code");
@@ -1818,7 +1679,7 @@ int load_grammar(char	*path)
 		int do_load_mem() { load_mem(get_conf_file_path("maxent-model")); return 0; }
 		run_task("loading maxent model", do_load_mem);
 
-		char	*semi_path = get_conf_file_path("semantic-interface");
+		char	*semi_path = get_conf_file_path("semantic-interface-2016");
 		if(semi_path)load_semi(semi_path);
 
 		// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...
