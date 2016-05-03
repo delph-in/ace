@@ -95,8 +95,8 @@ void dublin_robustness(struct lattice	*lexical_chart, char	*sentence)
 		dublin_tree = NULL;
 		return;
 	}
-	printf("DUBLIN tree:\n");
-	print_tree(t,0);
+	//printf("DUBLIN tree:\n");
+	//print_tree(t,0);
 	void got_edge(struct tree	*tx, struct dg	*d)
 	{
 		int i;

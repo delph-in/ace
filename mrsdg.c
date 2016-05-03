@@ -609,20 +609,26 @@ int dagify_mrs_ep(struct mrs_ep *ep)
 	struct dg	*dg = atomic_dg("relation");	// XXX should this be configurable?
 	int			i;
 
-	// try to find an unquoted predicate in the grammar
-	/*char	normalized[1024], *pred = normalize_predicate(ep->pred, normalized);
-	char	*strpred = slab_alloc_unaligned(strlen(pred)+7);
-	sprintf(strpred, "%s_rel", pred);
-	struct type	*predtype = lookup_type(strpred);
-	if(!predtype)
-	{
-		// find it as a quoted string
-		sprintf(strpred, "\"%s_rel\"", pred);
-		predtype = lookup_type(strpred);
-		assert(predtype != NULL);	// temporary string types are auto-added; should never fail.
-	}*/
 	struct dg	*preddg = atomic_dg(top_type);
-	//preddg->type = preddg->xtype = predtype;
+	// in the SEM-I aware bright new world, PRED values are in the SEM-I hierarchy and not 1-1-mapable into the grammar hierarchy.
+	// this means dagifying an EP including PRED is impossible without knowing what GE it will be unified into.
+	extern int g_normalize_predicates;
+	if(!g_normalize_predicates)
+	{
+		// try to find an unquoted predicate in the grammar
+		char	*pred = ep->pred;
+		char	*strpred = slab_alloc_unaligned(strlen(pred)+7);
+		sprintf(strpred, "%s", pred);
+		struct type	*predtype = lookup_type(strpred);
+		if(!predtype)
+		{
+			// find it as a quoted string
+			sprintf(strpred, "\"%s\"", pred);
+			predtype = lookup_type(strpred);
+			assert(predtype != NULL);	// temporary string types are auto-added; should never fail.
+		}
+		preddg->type = preddg->xtype = predtype;
+	}
 	dg = add_dg_feature(dg, "PRED", preddg);
 	dg = add_dg_feature(dg, "LBL", ep->lbl->dg);
 	for(i=0;i<ep->nargs;i++)

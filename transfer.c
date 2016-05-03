@@ -1379,13 +1379,17 @@ transfer_add_preds(struct hash	*seen, struct mrs	*m)
 	static int	predf = -1;
 	struct type_hierarchy	*th = default_type_hierarchy();
 	if(predf==-1)predf=lookup_fname("PRED");
+	extern int g_normalize_predicates;
+	extern struct type_hierarchy	*semi_th, *main_th;
+	if(g_normalize_predicates)th = semi_th;
+	else th = main_th;
 	for(i=0;i<m->nrels;i++)
 	{
 		struct mrs_ep	*e = m->rels+i;
 		//struct dg	*pr = dg_hop(e->dg, predf);
 		//assert(pr!=NULL);
 		//struct type	*prt = pr->xtype;
-		struct type	*prt = semi_find_type(e->pred);
+		struct type	*prt = th_lookup_type(th, e->pred);//semi_find_type(e->pred);
 		if(!prt)continue;
 		if(!hash_find(seen, prt->name))
 			hash_add(seen, prt->name, (void*)0x1);
@@ -1479,7 +1483,15 @@ int	tr_quickcheck(struct transfer_rule	*tr, struct mrs	*min)
 		struct mrs_ep_desc	epd = place_in_transfer_rule(tr, i);
 		struct dg	*de_p = dg_hop(epd.dg, pred_fnum);
 		char	*pred = pred_for_place_in_transfer_rule(tr, i);
-		if(de_p && !pred_present(min, semi_find_type(pred)))return 0;
+		extern int g_normalize_predicates;
+		if(g_normalize_predicates)
+		{
+			if(de_p && !pred_present(min, semi_find_type(pred)))return 0;
+		}
+		else
+		{
+			if(de_p && !pred_present(min, lookup_type(pred)))return 0;
+		}
 		// don't bother with regex's; they're typically quite general and will match most MRSes somewhere. the question is whether they match in the right variable pattern, which we won't discover here anyway.
 		// they're also relatively rare (hypothesis).
 	}
@@ -1496,7 +1508,7 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 		if(tr_quickcheck(tr, ts->mrs[i]))break;
 	if(i==ts->n)
 	{
-		//printf("quickly rejected: %s\n", tr->name);
+		//DEBUG("quickly rejected: %s\n", tr->name);
 		return 0;
 	}
 	for(i=0;i<ts->n && !cancel_transfer;i++)

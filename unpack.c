@@ -1620,7 +1620,11 @@ extern int do_itsdb;
 					}
 				}
 				extern int trace;
-				if(trace>2)printf("UNIDIOMATIC\n");
+				if(trace>2)
+				{
+					printf("UNIDIOMATIC:\n");
+					print_mrs(m);printf("\n");
+				}
 				if(idiomatic || (g_mode == GENERATING))
 				{
 					//printf("hyp = %p\n", hyp);

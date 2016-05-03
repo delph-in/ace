@@ -90,6 +90,7 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 	if(res == 0)goto idiomatic;	// no further checking necessary.
 
 	if(!m)m = extract_mrs(dg);
+	//printf("ready to transfer for idiom check\n");
 
 	struct mrs	**results;
 	extern struct profiler	**transfer_rule_profilers, **idiom_profilers;
@@ -99,7 +100,7 @@ int	check_idioms(struct dg	*dg, struct mrs	*m)
 	mc = reformat_mrs_for_transfer(mc);	// this essentially re-extracts 'mc' from its ->dg pointers, with no VPM
 	int	n = transfer_mrs(nidiom_rules, idiom_rules, mc, &results, 0);
 	idiom_profilers = transfer_rule_profilers;
-	//printf("%d idiom rule transfer result[s]\n", n);
+	//printf("%d idiom rule transfer result[s] from %d idiom rules\n", n, nidiom_rules);
 
 	// at this point, 'mc' and 'm' share ->dg pointers, but the MRS extraction machinery
 	// is set up to associate those dgs with the 'mc' no-vpm 'struct mrs_var's.
