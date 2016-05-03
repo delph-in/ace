@@ -167,7 +167,7 @@ void	parse_args(int	argc, char	*argv[])
 		{"uebertagging", 2,NULL, UBERTAG_OPTION},
 		{"übertagging", 2,NULL, UBERTAG_OPTION},
 #define	DUBLIN_OPTION	1009
-		{"dublin", 2, NULL, DUBLIN_OPTION},
+		{"pcfg", 2, NULL, DUBLIN_OPTION},
 #define	MAXENT_OPTION	1010
 		{"maxent", 2, NULL, MAXENT_OPTION},
 #define	LICENSE_INFO_OPTION		1011

@@ -138,7 +138,7 @@ struct tree	*csaw_parse(char	*sentence)
 	if(res <= 0) { perror("write to CSAW"); exit(-1); }
 	assert(res == 1);
 
-	// recieve the parses
+	// receive the parses
 	char	*line = NULL;
 	int	ready = 0;
 	while(1)

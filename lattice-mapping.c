@@ -1337,3 +1337,88 @@ struct lattice	*edge_list_to_lattice(int	n, void	**list)
 	}
 	return l;
 }
+
+struct edge	*duplicate_lexical_edge(struct edge	*e)
+{
+	if(e->unpack)return (struct edge*)e->unpack;
+	struct edge	*e2 = slab_alloc(sizeof(struct edge));
+	*e2 = *e;
+	e->unpack = (struct unpack_info*)e2;
+	if(e->have)
+	{
+		int i;
+		e2->daughters = slab_alloc(sizeof(struct edge*) * e->have);
+		for(i=0;i<e->have;i++)e2->daughters[i] = duplicate_lexical_edge(e->daughters[i]);
+	}
+	return e2;
+}
+
+struct lattice_edge	*duplicate_lexical_lattice_edge(struct lattice_edge	*le)
+{
+	struct lattice_edge	*e2 = slab_alloc(sizeof(*e2));
+	e2->edge = duplicate_lexical_edge(le->edge);
+	e2->token = NULL;
+	e2->from = le->from;
+	e2->to = le->to;
+	return e2;
+}
+
+struct lattice_vertex	*duplicate_lattice_vertex(struct lattice_vertex	*v)
+{
+	struct lattice_vertex	*v2 = slab_alloc(sizeof(*v2));
+	*v2 = *v;
+	v2->followers = slab_alloc(sizeof(struct lattice_edge*)*v2->nfollowers);
+	return v2;
+}
+
+struct lattice_vertex	*patch_vertex(struct lattice_vertex	*vold, struct lattice	*oldl, struct lattice	*newl)
+{
+	int i;
+	assert(oldl->nvertices == newl->nvertices);
+	for(i=0;i<oldl->nvertices;i++)
+		if(oldl->vertices[i] == vold)return newl->vertices[i];
+	assert(!"not reached");
+}
+
+patch_lattice_edge_vertices(struct lattice_edge	*e, struct lattice	*oldl, struct lattice	*newl)
+{
+	e->from = patch_vertex(e->from, oldl, newl);
+	e->to = patch_vertex(e->to, oldl, newl);
+}
+
+patch_lattice_vertex_followers(struct lattice_vertex	*v, struct lattice	*newl)
+{
+	int i, afol = v->nfollowers;
+	v->nfollowers = 0;
+	for(i=0;i<newl->nedges;i++)
+		if(newl->edges[i]->from == v)
+		{
+			assert(v->nfollowers < afol);
+			v->followers[v->nfollowers++] = newl->edges[i];
+		}
+}
+
+void	clear_unpack_slot(struct edge	*e)
+{
+	int i;
+	e->unpack = NULL;
+	for(i=0;i<e->have;i++)clear_unpack_slot(e->daughters[i]);
+}
+
+struct lattice	*duplicate_lexical_lattice(struct lattice	*lat)
+{
+	struct lattice	*l = slab_alloc(sizeof(*l));
+	int i;
+	*l = *lat;
+	for(i=0;i<l->nedges;i++)clear_unpack_slot(lat->edges[i]->edge);
+	l->edges = slab_alloc(sizeof(struct lattice_edge*)*l->nedges);
+	for(i=0;i<l->nedges;i++)l->edges[i] = duplicate_lexical_lattice_edge(lat->edges[i]);
+	l->vertices = slab_alloc(sizeof(struct lattice_vertx*)*l->nvertices);
+	for(i=0;i<l->nvertices;i++)l->vertices[i] = duplicate_lattice_vertex(lat->vertices[i]);
+	for(i=0;i<l->nedges;i++)patch_lattice_edge_vertices(l->edges[i], lat, l);
+	for(i=0;i<l->nvertices;i++)patch_lattice_vertex_followers(l->vertices[i], l);
+	l->start = patch_vertex(lat->start, lat, l);
+	l->end = patch_vertex(lat->start, lat, l);
+	for(i=0;i<l->nedges;i++)clear_unpack_slot(lat->edges[i]->edge);
+	return l;
+}

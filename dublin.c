@@ -7,6 +7,7 @@
 #include	"token.h"
 #include	"tree.h"
 #include	"reconstruct.h"
+#include	"csaw/csaw.h"
 
 // approximation of the Dublin pub idea (conversation between sweaglesw and oe at SemEval 2014)
 // take a robust parse as input (e.g. from csaw).  using robust unification, construct edges corresponding to all the nodes in that tree, and add them to the agenda for a full TFS parse.
@@ -86,16 +87,16 @@ void dublin_robustness(struct lattice	*lexical_chart, char	*sentence)
 	assert(l>=0);
 	deriv[l] = 0;
 	struct tree	*t = string_to_tree(deriv);*/
-	struct tree	*t = csaw_parse(sentence);
+	struct tree	*t = csaw_parse_lattice(lexical_chart);
 	if(!t)
 	{
-		fprintf(stderr, "NOTE: dublin got no csaw help\n");
+		fprintf(stderr, "NOTE: no PCFG helper tree\n");
 		dublin_root = NULL;
 		dublin_tree = NULL;
 		return;
 	}
-	//printf("DUBLIN tree:\n");
-	//print_tree(t,0);
+	printf("DUBLIN tree:\n");
+	print_tree(t,0);
 	void got_edge(struct tree	*tx, struct dg	*d)
 	{
 		int i;

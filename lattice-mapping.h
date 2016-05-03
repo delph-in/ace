@@ -74,5 +74,6 @@ struct lattice_rule_set	*freeze_lattice_rule_set(struct lattice_rule_set	*rs);
 void	compile_lattice_rule_set(struct lattice_rule_set	*rs);
 void	apply_post_generation_mapping_rules(struct lattice	*lat);
 struct lattice	*edge_list_to_lattice(int	n, void	**list);
+struct lattice	*duplicate_lexical_lattice(struct lattice	*lat);
 
 #endif
