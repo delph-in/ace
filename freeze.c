@@ -58,7 +58,7 @@ struct grammar
 	int		nlexemes, nrules, norules, nfnames, ngeneric_les;
 
 	struct type_hierarchy	*main_th;
-	struct type_hierarchy	*semi_th;
+	struct type_hierarchy	*semi_th, *semi_p_th;
 
 	struct rule	**rules;
 	struct lexeme	**lexemes, **generic_les;
@@ -317,16 +317,24 @@ int	freeze_grammar()
 
 	//null_generation();	// why? seems dangerous...
 
-extern struct type_hierarchy	*main_th, *semi_th;
+extern struct type_hierarchy	*main_th, *semi_th, *semi_p_th;
 	G->main_th = freeze_type_hierarchy(main_th);
-	main_th = G->main_th;
-	set_default_type_hierarchy(main_th);
-	G->semi_th = freeze_type_hierarchy(semi_th);
-	semi_th = G->semi_th;
-	ft_th = G->semi_th;
-	patch_type_hierarchy(G->semi_th);
+	if(semi_th==main_th)G->semi_th = G->semi_p_th = G->main_th;
+	else
+	{
+		G->semi_th = freeze_type_hierarchy(semi_th);
+		ft_th = G->semi_th;
+		patch_type_hierarchy(G->semi_th);
+		G->semi_p_th = freeze_type_hierarchy(semi_p_th);
+		ft_th = G->semi_p_th;
+		patch_type_hierarchy(G->semi_p_th);
+	}
 	ft_th = G->main_th;
 	patch_type_hierarchy(G->main_th);
+	semi_th = G->semi_th;
+	semi_p_th = G->semi_p_th;
+	main_th = G->main_th;
+	set_default_type_hierarchy(main_th);
 	freezer_note("types");
 	reset_memorized_types = 1;
 
@@ -498,9 +506,10 @@ static int	load_freeze()
 		if(debug_level > 0)fprintf(stderr, "NOTE: loading frozen grammar %s\n", grammar_version);
 	}
 
-extern struct type_hierarchy	*main_th, *semi_th;
+extern struct type_hierarchy	*main_th, *semi_th, *semi_p_th;
 	main_th = G->main_th;
 	semi_th = G->semi_th;
+	semi_p_th = G->semi_p_th;
 	set_default_type_hierarchy(main_th);
 
 	nlexemes = G->nlexemes;

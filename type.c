@@ -13,6 +13,8 @@
 
 static struct type_hierarchy	*default_th;
 
+struct type_hierarchy	*main_th;
+
 struct type_hierarchy	*default_type_hierarchy() { return default_th; }
 void	set_default_type_hierarchy(struct type_hierarchy	*th) { default_th = th; }
 
@@ -92,26 +94,30 @@ void	th_add(struct type	*t)
 	hash_add(default_th->thash, t->name, t);
 }
 
-struct type	*th_look(char	*name)
+struct type	*th_look(struct type_hierarchy	*th, char	*name)
 {
 	char	*p;
 	for(p=name;*p;p++)
 		if(isalpha(*p) && isupper(*p))
 			*p = tolower(*p);
-	return hash_find(default_th->thash, name);
+	return hash_find(th->thash, name);
 }
 
 struct type	*lookup_type(char	*name)
 {
-	int	i;
-
 	if(!default_th)
 	{
 		fprintf(stderr, "lookup_type(%s) called with no default type hierarchy active\n", name);
 		exit(-1);
 	}
+	return th_lookup_type(default_th, name);
+}
 
-	if(name[0]=='"' || name[0]=='\'' || name[0]=='^')
+struct type	*th_lookup_type(struct type_hierarchy	*th, char	*name)
+{
+	int	i;
+
+	if(th==main_th && (name[0]=='"' || name[0]=='\'' || name[0]=='^'))
 	{
 		if(!strcmp(name, "\"\\\"\""))strcpy(name, "\"\"\"");
 
@@ -141,10 +147,14 @@ struct type	*lookup_type(char	*name)
 			name[0]='"';
 		}
 		// auto-add strings. this does a lookup too.
-		return add_string(name);
+		struct type_hierarchy	*tmp = default_th;
+		default_th = th;
+		struct type	*t = add_string(name);
+		default_th = tmp;
+		return t;
 	}
 
-	return th_look(name);
+	return th_look(th, name);
 }
 
 void	print_type(char	*name)
@@ -299,7 +309,7 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 		}
 	}
 
-	if(th_look(name))
+	if(th_look(default_th, name))
 	{
 		fprintf(stderr, "type: `%s' already declared, go away!\n", name);
 		return -1;
@@ -552,16 +562,17 @@ int	constrain_glbs_and_wellformedness()
 	return 0;
 }
 
-struct type_hierarchy	*main_th;
+void	init_type_hierarchy()
+{
+	main_th = new_type_hierarchy("main", top_type);
+	if(!main_th)exit(-1);
+	set_default_type_hierarchy(main_th);
+}
 
 int	load_types()
 {
 extern int enable_out_of_order;
 int	typify_tdl_line(struct tdl_line	*line, void	*ref);
-
-	main_th = new_type_hierarchy("main", top_type);
-	if(!main_th)return -1;
-	set_default_type_hierarchy(main_th);
 
 	enable_out_of_order = 1;
 	process_tdl_status("type", typify_tdl_line, 0);
@@ -615,4 +626,5 @@ struct type	*string_to_type(char	*str)
 	char	*s = slab_alloc(alen);
 	sprintf(s, "\"%.*s\"", slen, str);
 	struct type	*t = lookup_type(s);
+	return t;
 }

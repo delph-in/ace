@@ -383,6 +383,7 @@ void	compute_partitions(struct type_hierarchy	*th, struct type	*top, char	*visit
 		{
 			// this node has a parent that is not a descendent of our local top.
 			// that means we can't have a partition dominated by this top.
+			//printf("%s can't dominate a partition because %s has an outside parent\n", top->name, d->name);
 			return;
 		}
 	}
@@ -396,6 +397,7 @@ void	compute_partitions(struct type_hierarchy	*th, struct type	*top, char	*visit
 	{
 		struct type	*d = th->types[top->descendents[i]];
 		if(collectmap[d->tnum])continue;
+		if(d->nparents==1 && d->ndaughters==0)continue;	// skip single-parent leaves, as they cannot give rise to GLBs
 		part[psize++] = d;
 		collectmap[d->tnum] = 1;
 	}
@@ -406,6 +408,7 @@ void	compute_partitions(struct type_hierarchy	*th, struct type	*top, char	*visit
 	parts = realloc(parts, sizeof(struct partition) * nparts);
 	parts[nparts-1].psize = psize;
 	parts[nparts-1].part = part;
+	//printf("%s dominates a partition of %d\n", top->name, psize);
 }
 
 void	count_nonleaf_nodes(struct type_hierarchy	*th)

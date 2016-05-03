@@ -39,7 +39,14 @@ struct dg	*lexical_dg(struct lexeme *lex, struct dg	*rels)
 		ldg = expand_lexeme(lex);
 	else ldg = lex->dg;
 
-	if(rels)ldg = constrain_lex_rels(lex->dg?copy_dg(ldg):ldg, rels);
+	if(rels)
+	{
+		//printf("constraining lexical dag for %s.\n", lex->word);
+		//printf("base:\n"); print_dg(lex->dg?copy_dg(ldg):ldg); printf("\n");
+		//printf("rels:\n"); print_dg(rels); printf("\n");
+		ldg = constrain_lex_rels(lex->dg?copy_dg(ldg):ldg, rels);
+		//printf("result:\n"); print_dg(ldg); printf("\n");
+	}
 
 	struct dg	*lt = lex->lextype->dg;//restrict_copy_dg(lex->lextype->dg, (g_mode == GENERATING)?1:0);
 	dg = unify_dg(ldg, lt, -1);

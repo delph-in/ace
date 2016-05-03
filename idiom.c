@@ -33,8 +33,14 @@ int	study_idiom_rule(char	*name, struct dg	*dg, struct dg	*output_override)
 
 int	is_idiom_ep(char	*ep)
 {
+	// normalized predicates: idioms end with _i and -i
+	if(strlen(ep) < 2)return 0;
+	char	*tail = ep + strlen(ep) - 2;
+	if(!strcmp(tail, "_i"))return 1;
+	if(!strcmp(tail, "-i"))return 1;
+	// unnormalized predicates: idioms end with _i_rel and -i_rel
 	if(strlen(ep) < 6)return 0;
-	char	*tail = ep + strlen(ep) - 6;
+	tail = ep + strlen(ep) - 6;
 	if(!strcmp(tail, "_i_rel"))return 1;
 	if(!strcmp(tail, "-i_rel"))return 1;
 	if(tail>ep && !strcmp(tail-1, "_i_rel\""))return 1;

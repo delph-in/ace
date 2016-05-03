@@ -47,6 +47,7 @@ char		*token_type;
 int			ortho_max_rules = 7;
 int			ortho_warn_max_rules = 1;
 extern int invent_ltop;
+extern int g_normalize_predicates;
 char		*top_hcons_type = NULL;
 
 // options configured but not saved in the freezer:
@@ -217,6 +218,8 @@ struct conf
 
 	char	*transfer_input_relation_prefix;
 	int		transfer_enable_qeq_bridge;
+
+	int	normalize_predicates;
 };
 
 struct path	freeze_path(struct path	p)
@@ -258,6 +261,7 @@ void	*freeze_conf()
 	c->restrictor_size = restrictor_size;
 	c->ep_drop = freeze_block(ep_drop, restrictor_size);
 	c->transfer_enable_qeq_bridge = transfer_enable_qeq_bridge;
+	c->normalize_predicates = g_normalize_predicates;
 
 	if(!g_transfer)
 	{
@@ -345,6 +349,7 @@ void	recover_conf(void	*vc)
 	ep_drop = c->ep_drop;
 	reload_restrictors = (restrictor_size != nfnames);
 	transfer_enable_qeq_bridge = c->transfer_enable_qeq_bridge;
+	g_normalize_predicates = c->normalize_predicates;
 
 	if(!g_transfer)
 	{

@@ -1019,6 +1019,7 @@ char	*show_orth_leaves(struct edge	*e)
 		{
 			//printf("applying orth rule `%s' to `%s'\n", e->rule->name, sub);
 			ret = inflect(e->rule->orth, sub);
+			if(!ret)ret = strdup("*INFL-FAIL*");
 			free(sub);
 			return strdup(ret);	// higher-up show_orth_leaves() might want to free what we return... blah.
 		}

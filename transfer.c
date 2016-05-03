@@ -563,6 +563,18 @@ struct mrs_ep_desc	place_in_transfer_rule(struct transfer_rule	*tr, int	pl)
 	pl -= tr->context.neps;
 	if(pl < tr->filter.neps)return tr->filter.eps[pl];
 	fprintf(stderr, "asked for nonexistant place in transfer rule '%s'\n", tr->name);
+	exit(-1);
+}
+
+char	*pred_for_place_in_transfer_rule(struct transfer_rule	*tr, int	pl)
+{
+	if(pl < tr->input.neps)return tr->input.mrs->rels[pl].pred;
+	pl -= tr->input.neps;
+	if(pl < tr->context.neps)return tr->context.mrs->rels[pl].pred;
+	pl -= tr->context.neps;
+	if(pl < tr->filter.neps)return tr->filter.mrs->rels[pl].pred;
+	fprintf(stderr, "asked for nonexistant predplace in transfer rule '%s'\n", tr->name);
+	exit(-1);
 }
 
 int	is_semarg_type(struct type	*x)
@@ -751,9 +763,11 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 		if(pred_fnum == -1)pred_fnum = lookup_fname("PRED");
 		if(arg0_fnum == -1)arg0_fnum = lookup_fname("ARG0");
 		struct mrs_ep	*ep = &mrs->rels[align[i]];
+		char	*ep_raw_pred = ep->pred;
 		struct dg	*ep_p = dg_hop(ep->dg, pred_fnum);
 		struct dg	*ep_a0 = dg_hop(ep->dg, arg0_fnum);
 		struct mrs_ep_desc	de = place_in_transfer_rule(tr, i);
+		char	*de_raw_pred = pred_for_place_in_transfer_rule(tr, i);
 		struct dg	*de_p = dg_hop(de.dg, pred_fnum);
 		struct dg	*de_a0 = dg_hop(de.dg, arg0_fnum);
 		if(de_p && ep_p)
@@ -766,9 +780,21 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 				// most common failure path
 				return -1;
 			}
+			extern struct type_hierarchy	*semi_th;
+			struct type	*semi_de_pred = th_lookup_type(semi_th, de_raw_pred);
+			struct type	*semi_ep_pred = th_lookup_type(semi_th, ep_raw_pred);
+			if(!de.pred_re || !semi_ep_pred)
+			{
+				if(!semi_de_pred || !semi_ep_pred || !glb(semi_de_pred, semi_ep_pred))
+				{
+					DEBUG("wrong pred (sem-i): %s [%p] vs %s [%p]\n", de_raw_pred, semi_de_pred, ep_raw_pred, semi_ep_pred);
+					return -1;
+				}
+			}
 			if(de.pred_re)
 			{
-				wchar_t	*wide = towide(ep_pred->name);
+				//wchar_t	*wide = towide(ep_pred->name);
+				wchar_t	*wide = towide(ep_raw_pred);
 				DEBUG("need to see if '%S' and '%S' are RE-compatible\n", wide, de.pred_re);
 				regmatch_t	mat;
 				int	res = regexec(&de.re, wide, 1, &mat, 0);
@@ -1356,9 +1382,11 @@ transfer_add_preds(struct hash	*seen, struct mrs	*m)
 	for(i=0;i<m->nrels;i++)
 	{
 		struct mrs_ep	*e = m->rels+i;
-		struct dg	*pr = dg_hop(e->dg, predf);
-		assert(pr!=NULL);
-		struct type	*prt = pr->xtype;
+		//struct dg	*pr = dg_hop(e->dg, predf);
+		//assert(pr!=NULL);
+		//struct type	*prt = pr->xtype;
+		struct type	*prt = semi_find_type(e->pred);
+		if(!prt)continue;
 		if(!hash_find(seen, prt->name))
 			hash_add(seen, prt->name, (void*)0x1);
 		for(j=0;j<prt->ndescendents;j++)
@@ -1378,17 +1406,18 @@ transfer_rule_has_seen_all_preds(struct hash	*seen, struct transfer_rule	*tr)
 		if(epd.pred_re)continue;
 		struct dg	*pd = dg_hop(epd.dg, predf);
 		if(!pd)continue;
-		struct type	*pt = pd->xtype;
-		if(pt->ndescendents > 1)
+		extern struct type_hierarchy	*semi_th;
+		char	*pred = pred_for_place_in_transfer_rule(tr, i);
+		struct type	*pt = pd->xtype, *pts = th_lookup_type(semi_th, pred);
+		if(pt->ndescendents > 1 || (pts && pts->ndescendents>1))
 		{
 			//printf("rule pred type %s has %d descendents\n", pt->name, pt->ndescendents);
 			continue;	// not a string type or leaf type
 		}
-		if(!hash_find(seen, pt->name))
-		{
-			//printf("can totally skip %s because %s not found\n", tr->name, pt->name);
-			return 0;
-		}
+		if(hash_find(seen, pred))continue;
+		if(hash_find(seen, pt->name))continue;
+		//printf("can totally skip %s because %s not found\n", tr->name, pt->name);
+		return 0;
 	}
 	return 1;
 }
@@ -1422,13 +1451,18 @@ int	pred_present(struct mrs	*m, struct type	*pred)
 {
 	int	i;
 	static int	pred_fnum = -1;
+	if(!pred)return 0;
 	if(pred_fnum == -1)pred_fnum = lookup_fname("PRED");
 	for(i=0;i<m->nrels;i++)
 	{
 		struct mrs_ep	*ep = &m->rels[i];
-		struct dg	*ep_p = dg_hop(ep->dg, pred_fnum);
-		assert(ep_p);
-		if(glb(ep_p->xtype, pred))return 1;
+		//struct dg	*ep_p = dg_hop(ep->dg, pred_fnum);
+		//assert(ep_p);
+		//if(glb(ep_p->xtype, pred))return 1;
+		extern struct type_hierarchy	*semi_th;
+		assert(semi_th != NULL);
+		struct type	*ep_pt = th_lookup_type(semi_th, ep->pred);
+		if(ep_pt && glb(ep_pt, pred))return 1;
 	}
 	return 0;
 }
@@ -1444,7 +1478,8 @@ int	tr_quickcheck(struct transfer_rule	*tr, struct mrs	*min)
 	{
 		struct mrs_ep_desc	epd = place_in_transfer_rule(tr, i);
 		struct dg	*de_p = dg_hop(epd.dg, pred_fnum);
-		if(de_p && !pred_present(min, de_p->xtype))return 0;
+		char	*pred = pred_for_place_in_transfer_rule(tr, i);
+		if(de_p && !pred_present(min, semi_find_type(pred)))return 0;
 		// don't bother with regex's; they're typically quite general and will match most MRSes somewhere. the question is whether they match in the right variable pattern, which we won't discover here anyway.
 		// they're also relatively rare (hypothesis).
 	}
@@ -1644,7 +1679,10 @@ struct mrs	*reformat_mrs_for_transfer(struct mrs	*m)
 	m->xarg = m->xarg?dg_to_mrs_var(m->xarg->dg, &new_vlist):NULL;
 	for(i=0;i<m->nrels;i++)
 	{
+		// keep the predicate, because the AVM representation does NOT include it
+		char	*pred = m->rels[i].pred;
 		dg_to_mrs_ep(m->rels[i].dg, &new_vlist, m->rels+i);
+		m->rels[i].pred = pred;
 		m->rels[i].epnum = i;
 	}
 	for(i=0;i<m->nhcons;i++)

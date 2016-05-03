@@ -1665,6 +1665,10 @@ int load_grammar(char	*path)
 		load_expedients(get_conf_file_path("generation-ignore-rules"));
 	}
 
+	init_type_hierarchy();
+	// want the SEM-I loaded before the grammar so that semantic indexing can take place during lexicon loading
+	if(!g_transfer)load_semi(get_conf_file_path("semantic-interface-2016"));
+
 	load_grammar_top(get_conf_file_path("grammar-top"));
 
 	if(!g_transfer)
@@ -1678,9 +1682,6 @@ int load_grammar(char	*path)
 
 		int do_load_mem() { load_mem(get_conf_file_path("maxent-model")); return 0; }
 		run_task("loading maxent model", do_load_mem);
-
-		char	*semi_path = get_conf_file_path("semantic-interface-2016");
-		if(semi_path)load_semi(semi_path);
 
 		// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...
 		tdl_push_status("tree-node-label");

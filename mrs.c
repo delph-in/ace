@@ -24,6 +24,8 @@ int mrs_enable_icons = 0;
 #define	slab_free(ptr)
 #endif
 
+int	g_normalize_predicates = 0;
+
 // mrs IO
 
 make_reliable_vnums(struct mrs	*m)
@@ -339,6 +341,7 @@ char	*preddup(char	*pred)
 	char	*d = malloc(b-pred+1);
 	memcpy(d, pred, b-pred);
 	d[b-pred]=0;
+	normalize_predicate(d, d);
 	return d;
 }
 
@@ -438,6 +441,8 @@ struct mrs	*parse_mrs(char	*buffer)
 		fname = parse_word(&p, 1);
 		if(!fname)break;
 		if(!strcasecmp(fname, "LTOP:"))
+			mrs.ltop = parse_mrs_var(&vlist, &p);
+		if(!strcasecmp(fname, "TOP:"))
 			mrs.ltop = parse_mrs_var(&vlist, &p);
 		if(!strcasecmp(fname, "INDEX:"))
 			mrs.index = parse_mrs_var(&vlist, &p);
@@ -776,7 +781,13 @@ int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 
 char	*normalize_predicate(char	*p, char	*storage)
 {
+	if(!g_normalize_predicates)return p;
 	if(strlen(p) > 1000)return p;
+	if(!strcmp(p, "predsort"))
+	{
+		strcpy(storage, "semi-predicate");
+		return storage;
+	}
 	char	*q = storage;
 	if(*p=='"')p++;
 	while(*p)
@@ -875,7 +886,17 @@ int pred_compatible(char *in, char *out)
 int prop_subsumes(char *in, char *out)
 {
 	if(!strcasecmp(in, out))return 1;
-	return pred_subsumes(in, out);
+	extern struct type_hierarchy	*semi_th, *semi_p_th;
+	int	semi = 0;
+	if(default_type_hierarchy() == semi_th)
+	{
+		// properties are actually in the semi_p_th, not the semi_th; only predicates live there.
+		semi = 1;
+		set_default_type_hierarchy(semi_p_th);
+	}
+	int	res = pred_subsumes(in, out);
+	if(semi)set_default_type_hierarchy(semi_th);
+	return res;
 }
 
 int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
@@ -901,7 +922,7 @@ int var_subsume(struct mrs_var *in, struct mrs_var *out, int *vmap, int nv)
 	DEBUG("passed pre-hierarchical var subsume test [ '%s' vs '%s' ]\n", in->type, out->type);
 
 	// make sure variable type is subsumed
-	if(!pred_subsumes(in->type, out->type))return 0;
+	if(!prop_subsumes(in->type, out->type))return 0;
 	/*switch(in->type[0])
 	{
 		case	'u':	break;

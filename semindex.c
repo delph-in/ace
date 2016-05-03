@@ -73,7 +73,6 @@ static int predfnum, cargfnum;
 
 void init_index()
 {
-	struct type	*predsort = lookup_type("predsort");
 	int			i, j;
 
 #define	GLB_TYPE(t)	(t->name[0]=='g' && t->name[1]=='(')	/* XXX crude hack to detect GLB types */
@@ -81,23 +80,33 @@ void init_index()
 	predfnum = lookup_fname("PRED");
 	cargfnum = lookup_fname("CARG");
 	sindex = hash_new("semantic index");
-	struct type_hierarchy	*th = default_type_hierarchy();
+	struct type_hierarchy	*odth = default_type_hierarchy();
+	extern struct type_hierarchy	*semi_th;
+	set_default_type_hierarchy(semi_th);
+	struct type	*predsort = lookup_type("semi-predicate");
+	if(!predsort)predsort = lookup_type("predsort");
+	if(!predsort)
+	{
+		fprintf(stderr, "WARNING: unable to find semi-predicate or predsort; not performing semantic indexing.\n");
+		return;
+	}
 	for(i=0;i<predsort->ndescendents;i++)
 	{
-		struct type	*t = th->types[predsort->descendents[i]];
+		struct type	*t = semi_th->types[predsort->descendents[i]];
 		if(GLB_TYPE(t))continue;
 		struct semindex_pred_node *node = lookup_semindex(t->name, 1);
 
-		for(j=1;j<t->ndescendents;j++) if(!GLB_TYPE(th->types[t->descendents[j]]))
-			add_relative_to_spn(node, lookup_semindex(th->types[t->descendents[j]]->name, 1));
+		for(j=1;j<t->ndescendents;j++) if(!GLB_TYPE(semi_th->types[t->descendents[j]]))
+			add_relative_to_spn(node, lookup_semindex(semi_th->types[t->descendents[j]]->name, 1));
 
-		if(descendent_of(th->strtype->tnum, t))
+		if(descendent_of(semi_th->strtype->tnum, t))
 		{
 			nstrpars++;
 			strpars = realloc(strpars, sizeof(struct type*) * nstrpars);
 			strpars[nstrpars-1] = lookup_semindex(t->name, 1);
 		}
 	}
+	set_default_type_hierarchy(odth);
 }
 
 struct semindex_pred_node	*lookup_semindex(char *predn_orig, int alloc)
@@ -166,6 +175,11 @@ void	entity_add_semantic_index(short what, struct dg *indpred, char *indkey, voi
 //static int	savef[10] = {-1,-1,-1,-1,-1,-1,-1,-1};
 //static int	rsavef[10] = {-1,-1,-1,-1,-1,-1,-1,-1};
 
+key_for_carg(char	*carg, char	*store)
+{
+	snprintf(store, 1000, "CARG=%s\n", carg);
+}
+
 void	add_semantic_index(struct lexeme *l, struct dg *full, int which)
 {
 	// walk through the lexeme's full dag's MRS, hash-add this lexeme for each relation name mentioned
@@ -201,7 +215,14 @@ void	add_semantic_index(struct lexeme *l, struct dg *full, int which)
 			if(!pred)continue;
 			predn = pred->xtype->name;
 
-			entity_add_semantic_index(which?RULE:LEXEME, pred, cargn?cargn:pred->xtype->name, l, Rels, pidx++);
+			char	*key, ckstore[1024];
+			if(cargn)
+			{
+				key_for_carg(cargn, ckstore);
+				key = ckstore;
+			}
+			else key = pred->xtype->name;
+			entity_add_semantic_index(which?RULE:LEXEME, pred, key, l, Rels, pidx++);
 			break;
 		}
 	}
@@ -406,7 +427,9 @@ int	activate_semindex(struct mrs_ep *ep, struct spn_list	**Rest)
 	{
 		// grammar entities with CARG's aren't put into their pred's index slot, but into the carg's index slot.
 		// go looking for those.
-		cnode = lookup_semindex(carg, 0);
+		char	key[1024];
+		key_for_carg(carg, key);
+		cnode = lookup_semindex(key, 0);
 		if(cnode) count += activate_semindex_node(cnode, ep, Rest);
 	}
 
@@ -601,7 +624,9 @@ int	semindex_try_generics(struct mrs_ep	*ep, struct ep_alignment	**Rest, char	*e
 		{
 			if(!generic_le_infos[i].for_generation)continue;
 			struct type	*p = generic_les[i]->pred;
-			if(!strcmp(p->name, ep->pred))
+			char	normal[1024];
+			char	*gle_pred = normalize_predicate(p->name, normal);
+			if(!strcmp(gle_pred, ep->pred))
 			{
 				// bingo.
 				//printf("NOTE: generic '%s' fires for unknown input EP '%s'\n", generic_les[i]->word, ep->pred);

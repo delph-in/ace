@@ -610,7 +610,7 @@ int dagify_mrs_ep(struct mrs_ep *ep)
 	int			i;
 
 	// try to find an unquoted predicate in the grammar
-	char	normalized[1024], *pred = normalize_predicate(ep->pred, normalized);
+	/*char	normalized[1024], *pred = normalize_predicate(ep->pred, normalized);
 	char	*strpred = slab_alloc_unaligned(strlen(pred)+7);
 	sprintf(strpred, "%s_rel", pred);
 	struct type	*predtype = lookup_type(strpred);
@@ -620,9 +620,9 @@ int dagify_mrs_ep(struct mrs_ep *ep)
 		sprintf(strpred, "\"%s_rel\"", pred);
 		predtype = lookup_type(strpred);
 		assert(predtype != NULL);	// temporary string types are auto-added; should never fail.
-	}
+	}*/
 	struct dg	*preddg = atomic_dg(top_type);
-	preddg->type = preddg->xtype = predtype;
+	//preddg->type = preddg->xtype = predtype;
 	dg = add_dg_feature(dg, "PRED", preddg);
 	dg = add_dg_feature(dg, "LBL", ep->lbl->dg);
 	for(i=0;i<ep->nargs;i++)

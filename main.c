@@ -190,7 +190,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	'V':	printf("ACE version %s\n", ACE_VERSION);
 						printf("compiled at " __TIME__ " on "  __DATE__ "\n");
 						exit(0);
-		case	'h':	usage: printf("usage: %s [-l | -n COUNT] [-R] [-f] [-e] [-g grammar-to-load] [-G grammar-to-save] [sentences-file] [--license-info] \n", prog); exit(0);
+		case	'h':	usage: printf("usage: %s [-1 | -n COUNT] [-R] [-f] [-e] [-g grammar-to-load] [-G grammar-to-save] [sentences-file] [--license-info] \n", prog); exit(0);
 		case	'v':	if(debug_level)trace++; debug_level++;	break;
 		case	'y':	yy_mode = 1; break;
 		case	'g':	load_grammar_path = optarg;	break;

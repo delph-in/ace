@@ -502,7 +502,7 @@ void	*freeze_ubertagger()
 		t->trans2 = freeze_block(t->trans2, sizeof(struct ut_transition)*t->ntrans2);
 	}
 	u->whitelist = freeze_hash(the_ubertagger->whitelist);
-	printf("UT whitelist to freeze flk = %d\n", u->whitelist->has_flk);
+	//printf("UT whitelist to freeze flk = %d\n", u->whitelist->has_flk);
 	the_ubertagger = u;
 	return u;
 }

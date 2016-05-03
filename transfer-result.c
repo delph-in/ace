@@ -133,6 +133,7 @@ void	transfer_result_dg_to_mrs(struct transfer_rule	*tr, struct mrs_vlist	*new_v
 	}*/
 	for(i=0;i<tr->output.neps;i++)
 	{
+		assert(!"not reached; code to extract new PRED value for EPs created in transfer is not yet written for SEM-I-enabled ACE");
 		dg_to_mrs_ep(copy_ep_out_dgs[i], new_vars, &new_eps[i]);
 		/*printf("new EP %d:    ", i);
 		printf("[ %s LBL: ", new_eps[i].pred);

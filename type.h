@@ -18,6 +18,7 @@ struct type_hierarchy
 struct type_hierarchy	*new_type_hierarchy(char	*id, char	*topname);
 struct type_hierarchy	*default_type_hierarchy();
 void					set_default_type_hierarchy(struct type_hierarchy	*th);
+struct type	*th_lookup_type(struct type_hierarchy	*th, char	*name);
 
 struct type
 {
