@@ -1668,6 +1668,7 @@ int load_grammar(char	*path)
 	init_type_hierarchy();
 	// want the SEM-I loaded before the grammar so that semantic indexing can take place during lexicon loading
 	if(!g_transfer)load_semi(get_conf_file_path("semantic-interface-2016"));
+	else load_semi(NULL);
 
 	load_grammar_top(get_conf_file_path("grammar-top"));
 

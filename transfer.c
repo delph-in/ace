@@ -1482,15 +1482,20 @@ int	tr_quickcheck(struct transfer_rule	*tr, struct mrs	*min)
 	{
 		struct mrs_ep_desc	epd = place_in_transfer_rule(tr, i);
 		struct dg	*de_p = dg_hop(epd.dg, pred_fnum);
+		if(!de_p || de_p->xtype==get_top())continue;	// no PRED info to match (or regex)
 		char	*pred = pred_for_place_in_transfer_rule(tr, i);
 		extern int g_normalize_predicates;
 		if(g_normalize_predicates)
 		{
-			if(de_p && !pred_present(min, semi_find_type(pred)))return 0;
+			if(!pred_present(min, semi_find_type(pred)))return 0;
 		}
 		else
 		{
-			if(de_p && !pred_present(min, lookup_type(pred)))return 0;
+			if(!pred_present(min, lookup_type(pred)))
+			{
+				//printf("not present: %s / %s\n", de_p->xtype->name, pred);
+				return 0;
+			}
 		}
 		// don't bother with regex's; they're typically quite general and will match most MRSes somewhere. the question is whether they match in the right variable pattern, which we won't discover here anyway.
 		// they're also relatively rare (hypothesis).
@@ -1500,7 +1505,7 @@ int	tr_quickcheck(struct transfer_rule	*tr, struct mrs	*min)
 
 int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int first_route_only, struct hash	*preds_seen)
 {
-	//DEBUG("rule %s -- optional %d\n", tr->name, tr->optional);
+	DEBUG("rule %s -- optional %d\n", tr->name, tr->optional);
 	int	i, nresult = 0, nfires = 0;
 	struct mrs	**result = NULL;
 	int	pack_start = ts->n;
@@ -1508,7 +1513,7 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 		if(tr_quickcheck(tr, ts->mrs[i]))break;
 	if(i==ts->n)
 	{
-		//DEBUG("quickly rejected: %s\n", tr->name);
+		DEBUG("quickly rejected: %s\n", tr->name);
 		return 0;
 	}
 	for(i=0;i<ts->n && !cancel_transfer;i++)
@@ -1614,6 +1619,7 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 	{
 		if(rules[i]->disabled)continue;
 		if(!transfer_rule_has_seen_all_preds(preds_seen, rules[i]))continue;
+		//printf("trying %s\n", rules[i]->name);
 		if(g_profiling)
 		{
 			if(!transfer_rule_profilers)
