@@ -6,7 +6,6 @@
 #include	<stdarg.h>
 
 #include	"../hash.h"
-#include	<liba.h>
 #include	"csaw.h"
 #include	"../tree.h"
 #include	"../dag.h"
