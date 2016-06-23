@@ -26,7 +26,7 @@ int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, in
 struct lattice	*last_token_chart;
 
 extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trace, used_total, pused_total;
-extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only, timeout_seconds;
+extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, do_itsdb_stdout, best_only, timeout_seconds;
 extern float timer();
 
 #ifdef	LEVEL_TIMER
@@ -700,7 +700,8 @@ int	parse_line1(char	*line)
 int	check_mbs(char	*mbs);
 	if(!*line || check_mbs(line)==-1)
 	{
-		if(!inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
+		if(!inhibit_results && !do_itsdb_stdout){printf("SKIP: %s\n", line);fflush(stdout);}
+		if(do_itsdb) itsdb_report_parse(NULL, NULL, -1, 0);
 		return -1;
 	}
 	if(!strncmp(line, "<DOC", 4))
@@ -732,7 +733,7 @@ int	check_mbs(char	*mbs);
 	{
 		fprintf(stderr, "NOTE: 0 readings, too many words (200+)\n");
 		itsdb_error("too many words (200+ before token mapping)");
-		if(!inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
+		if(!inhibit_results && !do_itsdb_stdout){printf("SKIP: %s\n", line);fflush(stdout);}
 		goto finished;
 	}
 
@@ -740,7 +741,7 @@ int	check_mbs(char	*mbs);
 	level = 0;
 	timer();
 	nparse = parse(nwords, words, cfrom, cto, current_sentence);
-	if(nparse<=0 && !inhibit_results){printf("SKIP: %s\n", line);fflush(stdout);}
+	if(nparse<=0 && !inhibit_results && !do_itsdb_stdout){printf("SKIP: %s\n", line);fflush(stdout);}
 
 #ifdef	LEVEL_TIMER
 	level_times[nwords] = timer();

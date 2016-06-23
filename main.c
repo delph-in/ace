@@ -25,7 +25,7 @@
 
 #include	"linenoise.h"
 
-int	debug_level = 0, export_parts = 0, do_itsdb = 0;
+int	debug_level = 0, export_parts = 0, do_itsdb = 0, do_itsdb_stdout = 0;
 extern int itsdb_dump_chart;
 extern int	show_probability;
 extern int	enable_dublin;
@@ -174,6 +174,8 @@ void	parse_args(int	argc, char	*argv[])
 		{"license-info", 0, NULL, LICENSE_INFO_OPTION},
 #define GIVE_UP_THRESHOLD_OPTION	1012
 		{"max-words", 1, NULL, GIVE_UP_THRESHOLD_OPTION},
+#define	TSDB_STDOUT_OPTION	1013
+		{"tsdb-stdout", 0, NULL, TSDB_STDOUT_OPTION},
 		{NULL,0,NULL,0}
 		};
 
@@ -227,6 +229,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	TNT_MAX_TAGS_OPTION: tnt_max_tags = atoi(optarg); REQUIRE_POSITIVE("--tnt-max-tags"); break;
 		case	TIMEOUT_OPTION: timeout_seconds = atoi(optarg); REQUIRE_POSITIVE("--timeout"); break;
 		case	TRANSFER_CONFIG_OPTION: transfer_config_path = optarg; break;
+		case	TSDB_STDOUT_OPTION: do_itsdb = do_itsdb_stdout = 1; { extern char* mrs_end; mrs_end = ""; } break;
 		case	UBERTAG_OPTION:
 			if(optarg)ubertagging_threshold = atof(optarg);
 			if(ubertagging_threshold<=0 || ubertagging_threshold >1)
@@ -248,6 +251,12 @@ void	parse_args(int	argc, char	*argv[])
 	if(generation_server_lang)
 		g_mode = GENERATING;
 	if(enable_tnt)assert(0 == tnt_init(tnt_model_path, tnt_max_tags));
+
+	if(do_itsdb_stdout)
+	{
+		extern int tsdb_maxderivations, tsdb_maxanalyses;
+		tsdb_maxderivations = tsdb_maxanalyses = best_only;
+	}
 }
 
 struct job_stats
@@ -458,7 +467,7 @@ struct job_stats	main_input_loop(FILE	*fin)
 			}
 		}
 		if(num_results==-1 || num_results==-2)
-			{ if(num_results==-1)fprintf(stderr, "NOTE: ignore\n"); }
+			{ if(num_results==-1 && !do_itsdb_stdout)fprintf(stderr, "NOTE: ignore\n"); }
 		else if(num_results>0)st.success++;
 		else if(num_results==0)st.fail++;
 		fflush(stderr);
@@ -603,7 +612,7 @@ int	main(int	argc, char	*argv[])
 	parse_args(argc, argv);
 	initialize_engine();
 
-	if(do_itsdb) itsdb_mode();
+	if(do_itsdb && !do_itsdb_stdout) itsdb_mode();
 	setup_signal_handlers();
 	if(preexisting_lui_fd != -1)
 	{

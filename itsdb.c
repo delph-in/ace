@@ -6,6 +6,27 @@
 #include	<sys/time.h>
 #include	<stdarg.h>
 
+extern int do_itsdb_stdout;
+
+int captured_capi_printf(const char	*format, ...)
+{
+	va_list	v, v2;
+	va_start(v, format);
+	va_copy(v2, v);
+	int q = vsnprintf(NULL, 0, format, v);
+	char	*buffer = malloc(q+2);
+	vsnprintf(buffer, q+1, format, v2);
+	if(!do_itsdb_stdout)
+		capi_printf("%s", buffer);
+	else printf("%s", buffer);
+	free(buffer);
+	va_end(v);
+	va_end(v2);
+	return q;
+}
+
+#define	capi_printf	captured_capi_printf
+
 /* notes:
 
 There are 4 top-level entry points where the ITSDB communication loop calls back to ACE:
@@ -352,7 +373,7 @@ void	itsdb_report_genresult(struct hypothesis *hyp, struct mrs *mrs, int id)
 
 	tsdb_nanalyses++;
 
-	if(tsdb_nderivations >= tsdb_maxderivations)return;
+	if(tsdb_nderivations >= tsdb_maxderivations && !(do_itsdb_stdout && tsdb_maxderivations==0))return;
 	tsdb_nderivations++;
 
 	capi_printf("((:result-id . %d)", id++);
@@ -642,7 +663,7 @@ int	capi_print_derivations()
 	int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
 	{
 		tsdb_nanalyses++;
-		if(tsdb_nderivations >= tsdb_maxderivations)return 1;
+		if(tsdb_nderivations >= tsdb_maxderivations && !(do_itsdb_stdout && tsdb_maxderivations==0))return 1;
 		tsdb_nderivations++;
 
 		capi_printf("((:result-id . %d)", id++);
