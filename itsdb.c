@@ -214,7 +214,8 @@ tsdb_parse_note_end()
 {
 	char	buffer[10240];
 	create_tsdb_parse_note(buffer);
-	printf("NOTE: tsdb parse: %s\n", buffer);
+	if(do_itsdb_stdout)printf(" %s\n", buffer);
+	else printf("NOTE: tsdb parse: %s\n", buffer);
 	fflush(stdout);
 }
 

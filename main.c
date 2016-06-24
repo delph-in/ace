@@ -229,7 +229,7 @@ void	parse_args(int	argc, char	*argv[])
 		case	TNT_MAX_TAGS_OPTION: tnt_max_tags = atoi(optarg); REQUIRE_POSITIVE("--tnt-max-tags"); break;
 		case	TIMEOUT_OPTION: timeout_seconds = atoi(optarg); REQUIRE_POSITIVE("--timeout"); break;
 		case	TRANSFER_CONFIG_OPTION: transfer_config_path = optarg; break;
-		case	TSDB_STDOUT_OPTION: do_itsdb = do_itsdb_stdout = 1; { extern char* mrs_end; mrs_end = ""; } break;
+		case	TSDB_STDOUT_OPTION: do_itsdb = do_itsdb_stdout = tsdb_notes = 1; { extern char* mrs_end; mrs_end = ""; } break;
 		case	UBERTAG_OPTION:
 			if(optarg)ubertagging_threshold = atof(optarg);
 			if(ubertagging_threshold<=0 || ubertagging_threshold >1)

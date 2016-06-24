@@ -513,7 +513,7 @@ int	generate(struct mrs	*mrs)
 		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->edge->id);
 		if(trace>1){print_dg(hyp->dg); printf("\n");}
 		if(master_addr)printf("SURFACE = %s\n", hyp->string);
-		else if(!inhibit_results)printf("%s\n", hyp->string);
+		else if(!inhibit_results && !do_itsdb)printf("%s\n", hyp->string);
 		if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, count);
 		count++;
 		//if(trace>0){ print_mrs(mrs_res); printf("\n"); }
