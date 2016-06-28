@@ -639,7 +639,7 @@ static int csaw_reconstruct(int	from, int	to, int	lhs, int (*dprintf)(const char
 		struct rule	*r = &rules[i];
 		int	left[r->arity];
 		if(r->lhs != lhs)continue;
-		if(reconstruct_one(from, to, r, 0, left, p, r->p, dprintf))break;
+		if(csaw_reconstruct_one(from, to, r, 0, left, p, r->p, dprintf))break;
 	}
 	if(i==nrules)
 	{
