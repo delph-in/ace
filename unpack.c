@@ -29,6 +29,7 @@
 extern int enable_token_avms;
 
 int derivations_include_roots = 0;
+int format_udx = 0;
 
 extern int max_unpack_megabytes;
 //#define	MAX_UNPACK_CHUNKS	70000
@@ -1116,14 +1117,28 @@ void print_hypothesis_from(struct hypothesis *hyp, int (*print)(const char *fmt,
 
 		// print out the edge, with span information
 		char	*sign = "no-sign";
-		if(e->rule)sign = e->rule->name;
+		char	*udx_type = "", *udx_at = "";
+		if(e->rule)
+		{
+			sign = e->rule->name;
+			if(format_udx>1)
+			{
+				udx_at = "@";
+				udx_type = e->rule->dg->xtype->name;
+			}
+		}
 		else if(e->lex)
 		{
 			sign = e->lex->word;
-			//sign = e->dg->xtype->name;
+			if(format_udx>0)
+			{
+				udx_at = "@";
+				udx_type = e->lex->lextype->name;
+			}
 		}
 		if(!labelled)
-			print(" (%d %s %f %d %d", hyp->eid, sign, hyp->score, from, from+hyp->toklen);
+			print(" (%d %s%s%s %f %d %d", hyp->eid, sign, udx_at, udx_type,
+							hyp->score, from, from+hyp->toklen);
 		else print(" (\"%s\"", label_dag(hyp->dg, "?"));
 		if(e->have)
 		{

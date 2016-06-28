@@ -30,6 +30,7 @@ extern int itsdb_dump_chart;
 extern int	show_probability;
 extern int	enable_dublin;
 extern int	derivations_include_roots;
+extern int	format_udx;
 char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
@@ -176,6 +177,8 @@ void	parse_args(int	argc, char	*argv[])
 		{"max-words", 1, NULL, GIVE_UP_THRESHOLD_OPTION},
 #define	TSDB_STDOUT_OPTION	1013
 		{"tsdb-stdout", 0, NULL, TSDB_STDOUT_OPTION},
+#define	UDX_OPTION			1014
+		{"udx", 2,NULL, UDX_OPTION},
 		{NULL,0,NULL,0}
 		};
 
@@ -241,6 +244,10 @@ void	parse_args(int	argc, char	*argv[])
 			break;
 		case	DUBLIN_OPTION: csaw_grammar_path = optarg; enable_dublin = 1; break;
 		case	MAXENT_OPTION: override_maxent_path = optarg; break;
+		case	UDX_OPTION:
+			if(optarg && !strcasecmp(optarg, "all"))format_udx = 2;
+			else format_udx = 1;
+			break;
 		case	LICENSE_INFO_OPTION: show_long_license_info(); break;
 		case	0:	continue;	// auto-handled long option
 	} }
