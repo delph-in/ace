@@ -1255,6 +1255,7 @@ int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct
 	//printf("inflected %s to %s\n", str, newstr);
 	forms[k] = string_to_type(newstr);
 	// write to parent's orthography
+	//printf("writing type %s to STEM[%d]\n", forms[k]->name, k);
 	for(i=0;i<sl;i++)
 	{
 		if(par->gen!=generation)
@@ -1318,5 +1319,6 @@ int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct
 		}
 		par = r;
 	}
+	//printf("success\n");
 	return 0;
 }

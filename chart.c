@@ -914,6 +914,7 @@ int	unify_and_build1(struct edge	*a, struct edge	*b, struct edge	**Eout, int	for
 	if(!res && a->rule->orth)
 	{
 		// check whether orthographemic component accepts
+		//printf("invoking unify_orthography(#%d & #%d)\n", a->id, b->id);
 		if(unify_orthography(a->dg, b->dg, b->lex, a->rule))
 		{
 			res = -1;
