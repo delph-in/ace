@@ -6,6 +6,13 @@
 #include	<sys/time.h>
 #include	<stdarg.h>
 
+#ifdef	TSDB
+#include	<itsdb.h>
+#else
+#define capi_printf	printf
+//#define capi_printf(fmt,...)
+#endif
+
 extern int do_itsdb_stdout;
 
 int captured_capi_printf(const char	*format, ...)
@@ -65,13 +72,6 @@ questions:
 	- how do we send back a tree for generation?
 
 */
-
-#ifdef	TSDB
-#include	<itsdb.h>
-#else
-#define capi_printf	printf
-//#define capi_printf(fmt,...)
-#endif
 
 #include	"chart.h"
 #include	"rule.h"
