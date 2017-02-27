@@ -149,6 +149,8 @@ int	tsdb_i_id = -1;
 
 int tsdb_nanalyses, tsdb_maxanalyses, tsdb_nderivations, tsdb_maxderivations=1;
 
+#define	ERROR_BUFFER_LENGTH	1024
+static char	the_itsdb_error_buffer[ERROR_BUFFER_LENGTH];
 static char	*the_itsdb_error;
 
 void itsdb_error(char	*error)
@@ -157,12 +159,26 @@ void itsdb_error(char	*error)
 	if(!do_itsdb && !tsdb_notes)return;
 	if(the_itsdb_error)
 	{
-		char	*e2 = malloc(strlen(the_itsdb_error) + strlen(error) + 10);
-		sprintf(e2, "%s, %s", the_itsdb_error, error);
-		free(the_itsdb_error);
-		the_itsdb_error = e2;
+		int	l2 = strlen(the_itsdb_error) + strlen(error) + 10;
+		if(l2 > ERROR_BUFFER_LENGTH - 5)
+		{
+			fprintf(stderr, "ERROR: not enough room for that many itsdb errors!\n");
+			return;
+		}
+		sprintf(the_itsdb_error_buffer, "%s, %s", the_itsdb_error, error);
 	}
-	else the_itsdb_error = strdup(error);
+	else
+	{
+		int	l2 = strlen(error);
+		the_itsdb_error = the_itsdb_error_buffer;
+		if(l2 > ERROR_BUFFER_LENGTH - 5)
+		{
+			fprintf(stderr, "ERROR: not enough room for that many itsdb errors!\n");
+			strcpy(the_itsdb_error, "I have discovered a truly beautiful error, which sadly the margin is too small to contain.");
+			return;
+		}
+		strcpy(the_itsdb_error, error);
+	}
 }
 
 static char	*the_itsdb_comment;
@@ -199,7 +215,6 @@ create_tsdb_parse_note(char	*str)
 	if(the_itsdb_error)
 	{
 		str += sprintf(str, " (:error . \"%s\")", the_itsdb_error);
-		free(the_itsdb_error);
 		the_itsdb_error = NULL;
 	}
 	if(the_itsdb_comment)
