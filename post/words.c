@@ -8,6 +8,8 @@
 #include	"words.h"
 #include	"tags.h"
 
+#include	<ace/hash.h>
+
 int	post_verbose = 0;
 
 #define	WH_SIZE	65535
@@ -28,6 +30,36 @@ static inline unsigned int	hash_str(char	*str)
 		h ^= *str++;
 	}
 	return h;
+}
+
+char	*lookup_dict_pos(char	*word)
+{
+	return NULL;
+	static struct hash	*dict = NULL;
+	if(!dict)
+	{
+		dict = hash_new("pos-dictionary");
+		FILE	*f = fopen("/tmp/wordnet-dict.txt","r");
+		char	line[1024];
+		while(fgets(line, 1000, f))
+		{
+			char	word[1024], pos[100];
+			if(2==sscanf(line, "%[^\t]	%s", word, pos))
+			{
+				char	*p = word;
+				while(*p)
+				{
+					*p = tolower(*p);
+					p++;
+				}
+				hash_add(dict, strdup(word), strdup(pos));
+			}
+		}
+		fclose(f);
+	}
+	char	*res = hash_find(dict, word);
+	printf("dictionary: %s => %s\n", word, res);
+	return res;
 }
 
 double	*unknown_tprob(char	*word, int	first)
@@ -65,6 +97,14 @@ double	*unknown_tprob(char	*word, int	first)
 	if(len>3 && !strcmp(word+len-3, "ing")){SPIKE("VBG", 5);SPIKE("JJ", 2);}
 	if(len>1 && !strcmp(word+len-1, "s")){SPIKE("NNS", 4);SPIKE("VBZ", 3);}
 #endif
+
+	/*char	*dictpos = lookup_dict_pos(word);
+	if(dictpos)
+	{
+		if(!strcmp(dictpos, "NN"))SPIKE("NN", 20);
+		if(!strcmp(dictpos, "JJ"))SPIKE("JJ", 20);
+		if(!strcmp(dictpos, "VB"))SPIKE("VB", 20);
+	}*/
 
 	//printf("unknown word `%s'\n", word);
 	for(best=bi=i=0;i<ntags;i++)
