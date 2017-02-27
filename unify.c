@@ -1077,7 +1077,7 @@ struct dg	*get_extra_type_dg(struct type	*t)
 
 int	unify_always_succeeds = 0;
 void	enable_robust_unification()
-{ unify_always_succeeds = 1; } 
+{ unify_always_succeeds = 1; }
 void	disable_robust_unification()
 { unify_always_succeeds = 0; }
 
