@@ -549,6 +549,7 @@ extern int	enable_ubertagging;
 		itsdb_error("negative lexical chart length");
 		if(do_itsdb)itsdb_report_parse(token_chart, lexical_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
+		enable_packing(0);
 		return -2;
 	}
 	assert(nwords >= 0);
@@ -558,6 +559,7 @@ extern int	enable_ubertagging;
 		itsdb_error("nothing to parse");
 		if(do_itsdb)itsdb_report_parse(token_chart, lexical_chart, -2, 0);
 		stop_timer(chart_setup_timer, 1);
+		enable_packing(0);
 		return -2;
 	}
 
