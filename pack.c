@@ -526,15 +526,10 @@ int	pack_edge(struct edge	*edge)
 				int was_frozen = h->frozen;
 				// retroactive packing
 				// edge subsumes h
-				if(same_cell_daughter(h, edge))
+				if(same_cell_daughter(edge, h))
 				{
-					// edge is a descendent of h
-					// packing would cause a loop in unpacking
-					// how could this happen?
-					// to build 'h', 'edge' would already have to be in the chart... 
-					// this should never be reached.
-					assert(!"not reached");
-					//printf("blocked same-cell-daughter packing\n");
+					// h is a descendent of edge
+					PACKBUG("blocked same-cell-daughter retroactive packing\n");
 					continue;
 				}
 				if(g_mode==PARSING && h->neps==-1)
