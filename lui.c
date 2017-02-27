@@ -19,6 +19,8 @@
 #include	"tdl.h"
 #include	"unicode.h"
 
+#define	SHOW_SCORES_INSTEAD_OF_LABELS	0
+
 void	lui_gen_chart_level2(int	chart_id, int	nedge_ids, int	*edge_ids);
 void interactive_unify(char	*command);
 void	output_lui_dg_with_failure(struct dg	*dg, char *wtitle, struct path	relative_to);
@@ -576,6 +578,8 @@ void lui_format_tree(struct hypothesis *h, char *surf)
 	}
 	//char	*sign = e->rule?e->rule->name:e->lex->word;
 	char	*label = label_dag(h->dg, sign);
+	if(SHOW_SCORES_INSTEAD_OF_LABELS)
+		asprintf(&label, "%f", h->score);
 	int arity = e->have, i;
 
 	if(!surf && e->lex)surf = h->string;
