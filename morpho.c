@@ -309,6 +309,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 //#undef USE_GENERICS
 #ifdef	USE_GENERICS
 		int k;
+		//printf("TRYING GENERICS ON TOKEN:\n");print_dg(t->dg);printf("\n");
 		for(k=0;k<oc->nedges;k++)
 		{
 			struct ochart_edge	*carg_e = oc->edges[k];
@@ -352,13 +353,19 @@ int record_oroute(struct ochart_edge *e, int routelen, int *rnums)
 	int i, j;
 
 	// see if this route is already recorded on the edge
-	// XXX can this actually happen?
+	// Q: can this actually happen?
+	// A: yes, in some grammars.
+	// example: Hausa has rules where the suffix "ce" can come from
+	// either -ca or -ta under rule X, and either -ca or -ta can
+	// come from -cece under rule Y, leading to two paths through
+	// the graph of forms from -ce to -cece, but with identical
+	// sequences of rules.  Only record one of them, but don't complain.
 	for(i=0;i<e->north_routes;i++)
 	{
 		struct orth_route *r = e->orth_routes+i;
 		if(r->len == routelen && !memcmp(r->rules, rnums, sizeof(int)*routelen))
 		{
-			assert(!"duplicate oroute recorded");
+			//assert(!"duplicate oroute recorded");
 			return 0;
 		}
 	}
