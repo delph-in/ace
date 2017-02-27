@@ -693,9 +693,6 @@ int	capi_print_derivations()
 
 		//capi_printf(" (:score .%f))", hyp->score);
 		capi_printf(" (:flags ((:ascore . %f) (:probability . %f))))", hyp->score, prob);
-#ifndef TSDB
-		capi_printf("\n");
-#endif
 		return 1;
 	}
 	itsdb_start_results();
