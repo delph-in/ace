@@ -8,7 +8,7 @@
 #include	"words.h"
 #include	"tags.h"
 
-#include	<ace/hash.h>
+#include	"../hash.h"
 
 int	post_verbose = 0;
 
