@@ -681,8 +681,12 @@ int evacuate(int ntriggers, char **triggers, struct dg	**trigcons)
 			//print_dg(trigcons[j]);printf("\n");
 			if(0 != unify_dg_infrom(edge->dg, trigcons[j]))
 			{
-				fprintf(stderr, "TRIGGER CONSTRAINT on '%s' failed\n", triggers[j]);
-				unify_backtrace();
+				extern int trace;
+				if(trace)
+				{
+					fprintf(stderr, "TRIGGER CONSTRAINT on '%s' failed\n", triggers[j]);
+					unify_backtrace();
+				}
 				continue;
 			}
 		}
