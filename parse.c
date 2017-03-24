@@ -26,7 +26,7 @@ int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, in
 struct lattice	*last_token_chart;
 
 extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trace, used_total, pused_total;
-extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, do_itsdb_stdout, best_only, timeout_seconds;
+extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, do_itsdb_stdout, best_only, timeout_seconds, cancel_task, did_timeout;
 extern float timer();
 
 #ifdef	LEVEL_TIMER
@@ -269,13 +269,11 @@ qsort(list, nlist, sizeof(void*), cmp);
 	return 0;
 }
 
-int	cancel_parse, did_timeout;
-
 void	alarm_handler(int	sig)
 {
 	fprintf(stderr, "NOTE: cancelling parse, taking too long\n");
 	itsdb_error("timeout");
-	cancel_parse = 1;
+	cancel_task = 1;
 	did_timeout = 1;
 }
 
@@ -566,7 +564,7 @@ extern int	enable_ubertagging;
 	// XXX experimental chart-pruning-like idea
 	predict_rule_uses(nwords, lexical_chart);
 
-	cancel_parse = 0;
+	cancel_task = 0;
 	did_timeout = 0;
 	signal(SIGALRM, alarm_handler);
 
@@ -583,7 +581,7 @@ extern int	enable_ubertagging;
 	// do the actual parsing
 	int	half = nwords/2;
 	double t_half;
-	while( !cancel_parse && (edge = next_agenda(0)) )
+	while( !cancel_task && (edge = next_agenda(0)) )
 	{
 		if(edge->to-edge->from >= half)
 		{

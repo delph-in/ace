@@ -604,7 +604,7 @@ void	put_more_on_agenda(struct hypagenda_item	**A, struct decomposition	*dec, in
 	}
 }
 
-extern int cancel_parse, did_timeout;
+extern int cancel_task, did_timeout;
 
 struct hypothesis *process_hypagenda(struct hypagenda_item **A)
 {
@@ -614,7 +614,7 @@ struct hypothesis *process_hypagenda(struct hypagenda_item **A)
 
 	if((slab_usage() / (1024*1024)) >= max_unpack_megabytes && !arbiter_request_memory())
 		longjmp(out_of_memory_jump, 2);
-	if(cancel_parse)
+	if(cancel_task)
 		longjmp(out_of_memory_jump, 10);
 
 	//printf("agenda:\n");
@@ -1497,7 +1497,7 @@ extern int do_itsdb;
 
 	if(setjmp(out_of_memory_jump) != 0)
 	{
-		if(cancel_parse && did_timeout)
+		if(cancel_task && did_timeout)
 		{
 			// NOTE and itsdb_error already have been called
 			fprintf(stderr, "NOTE: out of time while unpacking\n");
@@ -1505,7 +1505,7 @@ extern int do_itsdb;
 		}
 		else
 		{
-			// cancel_parse can be set when arbiter sends a cancellation request
+			// cancel_task can be set when arbiter sends a cancellation request
 			// we might also get here when we decide on our own that we're out of memory
 			fprintf(stderr, "NOTE: hit RAM limit while unpacking\n");
 			itsdb_error("ran out of RAM while unpacking");

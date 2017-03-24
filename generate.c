@@ -3,6 +3,7 @@
 #include	<string.h>
 #include	<assert.h>
 #include	<sys/time.h>
+#include	<signal.h>
 
 #define	DISJUNCTIVE_GENERATION	0
 
@@ -18,7 +19,7 @@
 void	itsdb_report_gen(int readings, double	fixup_time);
 
 extern int	disable_subsumption_test;
-extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
+extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only, timeout_seconds, cancel_task, did_timeout;
 extern int show_gen_chart;
 extern char	*master_addr;
 
@@ -28,6 +29,15 @@ unsigned long long	*can_be_ccont_ep_bv;
 int			enable_index_accessibility_filtering = 0;
 extern int show_realization_trees;
 extern int show_realization_mrses;
+
+void	alarm_handler3(int	sig)
+{
+	fprintf(stderr, "NOTE: cancelling generation, taking too long\n");
+	itsdb_error("timeout");
+	cancel_task = 1;
+	did_timeout = 1;
+}
+
 
 void collect_vars(struct dg	*dg, unsigned long long	*bv)
 {
@@ -336,6 +346,13 @@ int	generate(struct mrs	*mrs)
 	reset_edges();
 	clear_chart(1);
 
+	cancel_task = 0;
+	did_timeout = 0;
+	signal(SIGALRM, alarm_handler3);
+
+	if(timeout_seconds > 0)
+		alarm(timeout_seconds);
+
 	struct mrs	*external_mrs = mrs;
 	mrs = external_to_internal_mrs(mrs);
 
@@ -428,7 +445,7 @@ int	generate(struct mrs	*mrs)
 
 	int	npassive_edges = 0;
 	sentential = 0;
-	while( (edge = next_agenda(0)) )
+	while( !cancel_task && (edge = next_agenda(0)) )
 	{
 		if(edge->have == edge->need)npassive_edges++;
 		//printf("... process %p = #%d  ; %d EPs\n", edge, edge->id, edge->neps);

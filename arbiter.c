@@ -17,7 +17,7 @@ char	*arbiter_partial_line;
 int		arbiter_partial_line_length, arbiter_partial_line_length_a = 0;
 int		arbiter_fd = 0;
 
-extern int cancel_parse, die, timeout_seconds, best_only;
+extern int cancel_task, die, timeout_seconds, best_only;
 extern int	max_chart_megabytes, max_unpack_megabytes;
 
 int	arbiter_version = 0;
@@ -38,18 +38,18 @@ int	arbiter_request_memory()//char	*purpose)
 	arbiter_granted_more_memory = 0;
 	read_from_arbiter();
 	if(arbiter_granted_more_memory)return 1;
-	if(cancel_parse)return 0;
+	if(cancel_task)return 0;
 
 	printf(":m chartlimit=%d unpackinglimit=%d %s\n", max_chart_megabytes, max_unpack_megabytes, purpose);
 	fflush(stdout);
 
-	while(!cancel_parse && !arbiter_granted_more_memory)
+	while(!cancel_task && !arbiter_granted_more_memory)
 	{
 		usleep(100000);
 		read_from_arbiter();
 	}
 	if(arbiter_granted_more_memory)return 1; // arbiter allocated us more RAM. how nice. :-)
-	if(cancel_parse)return 0;
+	if(cancel_task)return 0;
 }
 
 void	arbiter_status(char	*format, ...)
@@ -108,8 +108,8 @@ void	arbiter_cancel(char	*res)
 {
 	if(current_arbiter_job_id)
 	{
-		extern int cancel_parse;
-		cancel_parse = 1;
+		extern int cancel_task;
+		cancel_task = 1;
 		arbiter_status("cancelling %s", current_arbiter_job_id);
 	}
 	else arbiter_status("no job to cancel");
@@ -153,13 +153,13 @@ read_from_arbiter()
 		if(!narbiterinputs && !arbiter_processing)make_blocking(arbiter_fd);
 		else make_nonblocking(arbiter_fd);
 		int		r = read(arbiter_fd, buffer, 1023);
-		if(r == 0) { cancel_parse = die = 1; break; }
+		if(r == 0) { cancel_task = die = 1; break; }
 		if(r < 0)
 		{
 			if(errno == EAGAIN)break;	// would have blocked
 			restore_stderr();
 			perror("read");
-			cancel_parse = die = 1;
+			cancel_task = die = 1;
 			break;
 		}
 		make_blocking(arbiter_fd);	// be sure to leave the socket in blocking mode, so that printf()'s etc don't have partial sends

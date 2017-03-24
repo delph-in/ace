@@ -52,7 +52,8 @@ extern char mrs_line_breaks;
 
 int g_mode = PARSING, print_trees = 1;
 int	die = 0;
-extern int cancel_parse;
+int cancel_task;
+int did_timeout;
 
 extern int enable_tnt;
 char	*tnt_model_path = NULL;
@@ -110,7 +111,7 @@ FILE	*open_sentence_source()
 	return fin;
 }
 
-void broken_pipe_handler(int sig) { cancel_parse = die = 1; }
+void broken_pipe_handler(int sig) { cancel_task = die = 1; }
 
 void	setup_signal_handlers()
 {
