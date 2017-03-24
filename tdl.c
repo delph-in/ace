@@ -1324,7 +1324,7 @@ int	typify_tdl_line(struct tdl_line	*line, void	*ref)
 		else if(*p == '"')quote = !quote;
 		else if(*p == '\\' && p[1])p++;
 	}
-	res = add_type_only(lhs, nparents, parents);
+	res = add_type_only(lhs, nparents, parents, 0);
 	if(parents)free(parents);
 	free(rhs);
 

@@ -21,7 +21,7 @@ void	set_default_type_hierarchy(struct type_hierarchy	*th) { default_th = th; }
 static int	init_top_type(char	*top_type)
 {
 	default_th->types = calloc(sizeof(struct type*), 1);
-	if(add_type_only(top_type, 0, 0)) return -1;
+	if(add_type_only(top_type, 0, 0, 0)) return -1;
 	default_th->types[0]->dg = atomic_dg(top_type);
 	return 0;
 }
@@ -289,7 +289,7 @@ void	number_strings()
 	for(i=0;i<default_th->nstrings;i++)default_th->strings[i]->tnum = i;
 }
 
-int	add_type_only(char	*name, int	npar, struct type	**par)
+int	add_type_only(char	*name, int	npar, struct type	**par, int	overwrite)
 {
 	struct type	*t;
 	int		i, pari, lexical = 0;
@@ -309,12 +309,6 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 		}
 	}
 
-	if(th_look(default_th, name))
-	{
-		fprintf(stderr, "type: `%s' already declared, go away!\n", name);
-		return -1;
-	}
-
 	/*fprintf(stderr, "new type `%s' inherits from:", name);
 	for(i=0;i<npar;i++)
 	{
@@ -322,17 +316,36 @@ int	add_type_only(char	*name, int	npar, struct type	**par)
 	}
 	fprintf(stderr, "\n");*/
 
-	t = calloc(sizeof(struct type), 1);
-	default_th->ntypes++;
-	default_th->types = realloc(default_th->types, sizeof(struct type*) * default_th->ntypes);
-	default_th->types[default_th->ntypes-1] = t;
-	t->name = strdup(name);
-	t->ndescendents = 0;
-	t->descendents = 0;
-	t->dg = 0;
-	if(!strcasecmp(name, "string"))default_th->strtype = t;	// XXX hardcoded type name
-	t->tnum = default_th->ntypes-1;
-	th_add(t);
+	t = th_look(default_th, name);
+	if(t)
+	{
+		if(!overwrite)
+		{
+			fprintf(stderr, "type: `%s' already declared, go away!\n", name);
+			return -1;
+		}
+		else
+		{
+			// SEM-I type definition is supposed to be revokable...
+			// i.e. we can come in later and say "actually, this type is NOT a parent of that type."
+			// the call to setup_type_lineage() below will overwrite parent info.
+			// SEM-I construction calls rebuild_th() after completion, to get descendent and daughter links right.
+		}
+	}
+	else
+	{
+		t = calloc(sizeof(struct type), 1);
+		default_th->ntypes++;
+		default_th->types = realloc(default_th->types, sizeof(struct type*) * default_th->ntypes);
+		default_th->types[default_th->ntypes-1] = t;
+		t->name = strdup(name);
+		t->ndescendents = 0;
+		t->descendents = 0;
+		t->dg = NULL;
+		if(!strcasecmp(name, "string"))default_th->strtype = t;	// XXX hardcoded type name
+		t->tnum = default_th->ntypes-1;
+		th_add(t);
+	}
 
 	if(npar>=0)setup_type_lineage(t, npar, par);
 	return 0;

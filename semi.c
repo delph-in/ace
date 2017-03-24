@@ -49,7 +49,7 @@ void	semi_set_super(char	*what)
 	{
 		//printf("adding %s as a subtype of %p\n", what, semi_top);
 		struct type	*semi_top = lookup_type(semi_top_type);
-		add_type_only(what, 1, &semi_top);
+		add_type_only(what, 1, &semi_top, 0);
 	}
 	semi_super = lookup_type(what);
 	//semi_super = semi_top;
@@ -149,7 +149,7 @@ struct semi_def
 void semi_define_immediately(char	*name)
 {
 	if(lookup_type(name))return;
-	add_type_only(name, 1, &semi_super);
+	add_type_only(name, 1, &semi_super, 0);
 }
 
 semi_define(char	*name, int	npar, char	**par)
@@ -192,14 +192,14 @@ struct type	*semi_process_1_def(struct semi_def	*d)
 				//fprintf(stderr, "ERROR: SEM-I: %s (parent of %s) undefined\n", d->par[j], d->name);
 				//exit(-1);
 				//printf("SEM-I: %s (parent of %s) undefined, adding implicitly at top of predicate hierarchy\n", d->par[j], d->name);
-				add_type_only(d->par[j], 1, &semi_super);
+				add_type_only(d->par[j], 1, &semi_super, 0);
 				par[j] = lookup_type(d->par[j]);
 			}
 			else par[j] = semi_process_1_def(&defs[k]);
 		}
 		assert(par[j] != NULL);
 	}
-	add_type_only(d->name, d->npar, par);
+	add_type_only(d->name, d->npar, par, 1);
 	d->active = 2;
 	return lookup_type(d->name);
 }
@@ -371,8 +371,10 @@ int	load_semi(char	*path)
 	set_default_type_hierarchy(semi_th);
 	load_semi_path(path);
 	semi_process_definitions();
+	rebuild_hierarchy(0, semi_th);	// BECAUSE we allow overwriting parent lists (see email from oe Mar-15-2017)
 	make_glbs();
 	set_default_type_hierarchy(semi_p_th);
+	rebuild_hierarchy(0, semi_p_th);	// BECAUSE we allow overwriting parent lists (see email from oe Mar-15-2017)
 	make_glbs();
 	set_default_type_hierarchy(main_th);
 }

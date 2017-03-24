@@ -43,7 +43,7 @@ char	*trim_string(char	*str);
 int	descendent_of(int	dec, struct type	*of);
 void	inval_thash();
 void	setup_glb_lut();
-int	add_type_only(char	*name, int	npar, struct type	**par);
+int	add_type_only(char	*name, int	npar, struct type	**par, int	overwrite);
 void	number_strings();
 int		load_types();
 int	constrain_type(char	*name, struct dg	*dg, struct tdl_line	*tdl);
