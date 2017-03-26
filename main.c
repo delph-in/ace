@@ -22,6 +22,7 @@
 
 #include	"timer.h"
 #include	"profiler.h"
+#include	"timeout.h"
 
 #include	"linenoise.h"
 
@@ -608,6 +609,16 @@ void	logon_generation_server(char	*langcode)
 		unlink(path);
 	}
 	exit(0);
+}
+
+void    alarm_handler(int   sig)
+{
+    fprintf(stderr, "NOTE: cancelling %s, taking too long\n",
+        g_mode==PARSING?"parsing":(g_mode==TRANSFER?"transfer":"generation")
+    );
+    itsdb_error("timeout");
+    cancel_task = 1;
+    did_timeout = 1;
 }
 
 int	main(int	argc, char	*argv[])

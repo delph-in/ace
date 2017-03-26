@@ -15,11 +15,12 @@
 #include	"conf.h"
 #include	"transfer.h"
 #include	"profiler.h"
+#include	"timeout.h"
 
 void	itsdb_report_gen(int readings, double	fixup_time);
 
 extern int	disable_subsumption_test;
-extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only, timeout_seconds, cancel_task, did_timeout;
+extern int	question, exhaustive, lui_mode, inhibit_pack, trace, debug_level, inhibit_results, do_itsdb, best_only;
 extern int show_gen_chart;
 extern char	*master_addr;
 
@@ -29,15 +30,6 @@ unsigned long long	*can_be_ccont_ep_bv;
 int			enable_index_accessibility_filtering = 0;
 extern int show_realization_trees;
 extern int show_realization_mrses;
-
-void	alarm_handler3(int	sig)
-{
-	fprintf(stderr, "NOTE: cancelling generation, taking too long\n");
-	itsdb_error("timeout");
-	cancel_task = 1;
-	did_timeout = 1;
-}
-
 
 void collect_vars(struct dg	*dg, unsigned long long	*bv)
 {
@@ -348,7 +340,7 @@ int	generate(struct mrs	*mrs)
 
 	cancel_task = 0;
 	did_timeout = 0;
-	signal(SIGALRM, alarm_handler3);
+	signal(SIGALRM, alarm_handler);
 
 	if(timeout_seconds > 0)
 		alarm(timeout_seconds);

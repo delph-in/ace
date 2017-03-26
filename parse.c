@@ -16,6 +16,7 @@
 #include	"lexical-parse.h"
 #include	"timer.h"
 #include	"profiler.h"
+#include	"timeout.h"
 
 double	ubertagging_threshold = 0.0001;
 int		give_up_threshold = 70;
@@ -26,7 +27,7 @@ int itsdb_report_parse(struct lattice	*tokens, struct lattice	*lexical_chart, in
 struct lattice	*last_token_chart;
 
 extern int	total_edges, real_edges, passive_edges, used_edges, pused_edges, trace, used_total, pused_total;
-extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, do_itsdb_stdout, best_only, timeout_seconds, cancel_task, did_timeout;
+extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, do_itsdb_stdout, best_only;
 extern float timer();
 
 #ifdef	LEVEL_TIMER
@@ -267,14 +268,6 @@ qsort(list, nlist, sizeof(void*), cmp);
 	}
 	if(prof)stop_profiler(prof, 1);
 	return 0;
-}
-
-void	alarm_handler(int	sig)
-{
-	fprintf(stderr, "NOTE: cancelling parse, taking too long\n");
-	itsdb_error("timeout");
-	cancel_task = 1;
-	did_timeout = 1;
 }
 
 int	fits(struct rule	*r, int	d, struct edge	*e)

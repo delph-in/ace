@@ -143,7 +143,7 @@ int	check_for_glb(struct type	*a, struct type	*b)
 
 	// no glb existed; make one!
 	sprintf(name, "g(%s,%s)", a->name, b->name);
-	add_type_only(name, 2, ar);
+	add_type_only(name, 2, ar, 0);
 	//printf("add `%s'\n", name);
 
 	_glb_common[_glb_ncommon++] = ntypes-1;	// a,b have a new common descendent
@@ -500,7 +500,7 @@ struct type	*new_glb_type()
 	char	name[1024];
 	static int glbtypecounter;
 	sprintf(name, "g(%d)", glbtypecounter++);
-	add_type_only(name, -1, NULL);
+	add_type_only(name, -1, NULL, 0);
 	glb_type_count++;
 	struct type_hierarchy	*th = default_type_hierarchy();
 	return th->types[th->ntypes-1];

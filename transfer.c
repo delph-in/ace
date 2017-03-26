@@ -24,6 +24,7 @@ extern int max_unpack_megabytes;
 #include	"conf.h"
 #include	"mrs.h"
 #include	"profiler.h"
+#include	"timeout.h"
 
 extern struct type_hierarchy	*semi_th, *main_th;
 extern int inhibit_vpm;
@@ -35,16 +36,8 @@ int	debug_transfer = 0;
 
 int	transfer_enable_qeq_bridge = 1;
 
-int	cancel_transfer;
 char	*transfer_config_path = NULL;
 struct profiler	*transfer_packing_profiler;
-
-void	alarm_handler2(int	sig)
-{
-	fprintf(stderr, "NOTE: cancelling transfer, taking too long\n");
-	itsdb_error("timeout");
-	cancel_transfer = 1;
-}
 
 //int	saved_ntcopies = 0;
 //struct tcopy	*saved_tcopies = NULL;
@@ -1516,7 +1509,7 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 		DEBUG("quickly rejected: %s\n", tr->name);
 		return 0;
 	}
-	for(i=0;i<ts->n && !cancel_transfer;i++)
+	for(i=0;i<ts->n && !cancel_task;i++)
 	{
 		if((slab_usage() / (1024*1024)) >= MAX_TRANSFER_CHUNKS)
 		{
@@ -1615,7 +1608,7 @@ int	transfer_mrs(int	nrules, struct transfer_rule	**rules, struct mrs	*m, struct
 	ts.mrs = slab_alloc(sizeof(*m));
 	ts.mrs[0] = m;
 
-	for(i=0;i<nrules && !cancel_transfer;i++)
+	for(i=0;i<nrules && !cancel_task;i++)
 	{
 		if(rules[i]->disabled)continue;
 		if(!transfer_rule_has_seen_all_preds(preds_seen, rules[i]))continue;
@@ -1791,10 +1784,10 @@ int	transfer(struct mrs	*m)
 	//printf("reformatted mrs:\n");
 	//print_mrs(m);
 
-	cancel_transfer = 0;
-	signal(SIGALRM, alarm_handler2);
+	cancel_task = 0;
+	did_timeout = 0;
+	signal(SIGALRM, alarm_handler);
 
-	extern int timeout_seconds;
 	if(timeout_seconds > 0)
 		alarm(timeout_seconds);
 
