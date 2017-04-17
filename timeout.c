@@ -1,7 +1,6 @@
 #include	<stdio.h>
 
 #include	"chart.h"
-#include	"itsdb.h"
 #include	"timeout.h"
 
 int cancel_task;
