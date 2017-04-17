@@ -589,6 +589,40 @@ int	load_lexicon()
 	return 0;
 }
 
+int	install_substitute_orthography(struct lexeme	*lex, char	*str)
+{
+	//printf("should install `%s' in L_%s\n", orth, lex->word);
+	struct dg	*orth = dg_path(lex->dg, lex_stem_path);
+	if(!orth)
+	{
+		fprintf(stderr, "WARNING: ought to install new orthography `%s' on L_%s, but no orthography path present\n", str, lex->word);
+		return 0;
+	}
+
+	int	i;
+	char	*ptr=NULL;
+	assert(lex->stemlen==1);
+	//printf("installing `%s' as L_%s's %d'th ORTH value\n", qstr, lex->word, i);
+	struct dg	*f = dg_hop(orth, 1);	// FIRST
+	struct dg	*r = dg_hop(orth, 2);	// REST
+	if(!f)
+	{
+		//fprintf(stderr, "WARNING: had to add a FIRST for L_%s's %d'th ORTH value\n", lex->word, i);
+		f = atomic_dg(str);
+		orth = add_dg_hop(orth, 1, f);
+	}
+	else f->xtype = lookup_type(str);
+	if(!r)
+	{
+		//fprintf(stderr, "WARNING: had to add a REST for L_%s's %d'th ORTH value\n", lex->word, i);
+		r = atomic_dg(g_null_type);
+		orth = add_dg_hop(orth, 2, r);
+	}
+	else r->xtype = lookup_type(g_null_type);
+	orth = r;
+	return 0;
+}
+
 struct lexeme	*instantiate_gle(struct lexeme	*gle, char	*surface, char	*carg)
 {
 	// create a temporary copy of 'gle'
@@ -611,6 +645,7 @@ struct lexeme	*instantiate_gle(struct lexeme	*gle, char	*surface, char	*carg)
 
 	// set the orthography value
 	l->stem[0] = add_string(surface);
+	install_substitute_orthography(l, surface);
 	// set the CARG value
 	
 	struct dg	*carg_dg;

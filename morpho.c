@@ -1177,44 +1177,6 @@ char	*quote_on_slab(char	*str)
 	return p;
 }
 
-/*int	install_substitute_orthography(struct edge	*e, struct edge	*dtr, char	*fullstr)
-{
-	//printf("should install `%s' in #%d\n", orth, e->id);
-	struct dg	*orth = dg_path(e->dg, lex_stem_path);
-	if(!orth)
-	{
-		fprintf(stderr, "WARNING: ought to install new orthography `%s' on #%d, but no orthography path present\n", fullstr, e->id);
-		return 0;
-	}
-	assert(dtr->lex);
-
-	int	i;
-	char	*ptr=NULL;
-	for(i=0;i<dtr->lex->stemlen;i++)
-	{
-		char	*str = strtok_r(i?NULL:fullstr, " ", &ptr);
-		char	*qstr = quote_on_slab(str);
-		//printf("installing `%s' as #%d's %d'th ORTH value\n", qstr, e->id, i);
-		struct dg	*f = dg_hop(orth, 1);	// FIRST
-		struct dg	*r = dg_hop(orth, 2);	// REST
-		if(!f)
-		{
-			//fprintf(stderr, "WARNING: had to add a FIRST for #%d's %d'th ORTH value\n", e->id, i);
-			f = atomic_dg(qstr);
-			orth = add_dg_hop(orth, 1, f);
-		}
-		else f->xtype = lookup_type(qstr);
-		if(!r)
-		{
-			//fprintf(stderr, "WARNING: had to add a REST for #%d's %d'th ORTH value\n", e->id, i);
-			r = atomic_dg((i+1 == dtr->lex->stemlen)?g_null_type:g_cons_type);
-			orth = add_dg_hop(orth, 2, r);
-		}
-		orth = r;
-	}
-	return 0;
-}*/
-
 void	add_carc(struct dg	*d, int	fnum, struct dg	*to)
 {
 	d->ncarcs++;
