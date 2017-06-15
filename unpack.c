@@ -694,11 +694,12 @@ struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry
 
 	e->unpack->cuis = slab_realloc(e->unpack->cuis, sizeof(struct context_unpack_info*)*e->unpack->ncuis, sizeof(struct context_unpack_info*)*(e->unpack->ncuis+1));
 	struct context_unpack_info	*cui = slab_alloc(sizeof(*cui));
-	cui->agenda = NULL;
+	bzero(cui, sizeof(*cui));
+	/*cui->agenda = NULL;
 	cui->nhypotheses = 0;
 	cui->ahypotheses = 0;
 	cui->nhb = 0;
-	cui->hypotheses = NULL;
+	cui->hypotheses = NULL;*/
 	cui->ancestry = ancestry;
 	e->unpack->cuis[e->unpack->ncuis++] = cui;
 	return cui;
