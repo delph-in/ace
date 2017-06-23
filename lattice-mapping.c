@@ -185,7 +185,7 @@ void	extract_regex_constraints(struct dg	*d, struct lattice_regex_constraints	*r
 			// d->xtype->name looks like: "myregex$
 			char	*re = malloc(l + 7);
 			sprintf(re, "^(?:%.*s)$", l-2, d->xtype->name+1);
-			//printf("extracted RE: %s\n", re);
+			//printf("extracted RE: %s\nat path: ", re); print_path(path);printf("\n");
 			rec->count++;
 			rec->paths = realloc(rec->paths, sizeof(struct path)*rec->count);
 			rec->regexs = realloc(rec->regexs, sizeof(wchar_t*)*rec->count);
@@ -193,8 +193,6 @@ void	extract_regex_constraints(struct dg	*d, struct lattice_regex_constraints	*r
 			rec->paths[rec->count-1].fnums = malloc(sizeof(int)*path.count);
 			memcpy(rec->paths[rec->count-1].fnums, path.fnums, sizeof(int)*path.count);
 			rec->regexs[rec->count-1] = towide(re);
-			d->xtype = d->type = default_type_hierarchy()->strtype;
-			return;
 		}
 	}
 
@@ -206,6 +204,22 @@ void	extract_regex_constraints(struct dg	*d, struct lattice_regex_constraints	*r
 		extract_regex_constraints(da[i], rec, path);
 		path.count--;
 	}
+}
+
+void	remove_regex_constraints(struct dg	*d)
+{
+	d = dereference_dg(d);
+	if(d->xtype->name[0]=='"')
+	{
+		int	l = strlen(d->xtype->name);
+		if(d->xtype->name[l-1]=='$')
+			d->xtype = d->type = default_type_hierarchy()->strtype;
+	}
+
+	int	i;
+	struct dg	**da = DARCS(d);
+	for(i=0;i<d->narcs;i++)
+		remove_regex_constraints(da[i]);
 }
 
 struct lattice_rule	*study_lattice_rule(char	*name, struct dg	*dg)
@@ -231,6 +245,7 @@ struct lattice_rule	*study_lattice_rule(char	*name, struct dg	*dg)
 		struct path	path = {0,fnum_buffer};
 		bzero(rec, sizeof(*rec));
 		extract_regex_constraints(d, rec, path);
+		remove_regex_constraints(d);
 	}
 
 	DEBUG_VERBOSE("lattice rule '%s': ", r->name);
