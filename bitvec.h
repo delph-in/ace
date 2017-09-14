@@ -26,7 +26,7 @@ static inline void bitvec_clear_all(unsigned long long	*r, int	n)
 static inline int	bitvec_and(unsigned long long	*a, unsigned long long	*b, unsigned long long	*r, int	n)
 {
 	int	i, nz=0;
-	for(i=0;i<BV_SUMMARY_WORDS;i++)r[i] = 0;
+	if(r)for(i=0;i<BV_SUMMARY_WORDS;i++)r[i] = 0;
 	for(i=BV_SUMMARY_WORDS;i<n;i++)
 	{
 		unsigned long long	R = a[i] & b[i];
