@@ -11,6 +11,8 @@
 
 int		glb_type_count;
 
+int	glb_noisy = 0;
+
 int	shortcomp(const void	*a, const void	*b) { return *(unsigned short*)a - *(unsigned short*)b; }
 
 #define	BITVEC_GLB		1
@@ -450,10 +452,13 @@ int	make_glbs()
 	rebuild_hierarchy(0, th);
 	stop_profiler(rebuild_profiler, 1);
 
-	/*report_profiler(partition_profiler);
-	report_profiler(code_profiler);
-	report_profiler(insert_profiler);
-	report_profiler(rebuild_profiler);*/
+	if(glb_noisy)
+	{
+		report_profiler(partition_profiler);
+		report_profiler(code_profiler);
+		report_profiler(insert_profiler);
+		report_profiler(rebuild_profiler);
+	}
 
 	return 0;
 }
@@ -468,10 +473,17 @@ struct hash	*bchash;
 int	nglbtypes;
 struct code_record	**glbtypes;
 
+long long cp_zeros = 0, cp_nonzeros = 0;
+
 void	check_pair(unsigned long long	*x, unsigned long long	*y, unsigned long long	*result, int	bcsize)
 {
-	int	nonzero = bitvec_and(x, y, result, bcsize);
-	if(!nonzero)return;
+	int	nonzero = bitvec_and_ss(x, y, result, bcsize);
+	if(!nonzero)
+	{
+		cp_zeros++;
+		return;
+	}
+	cp_nonzeros++;
 	// glb(a,b) = result
 	// see if we can find it.
 	if(!memcmp(x, result, bcsize*sizeof(unsigned long long)))return;
@@ -505,6 +517,8 @@ struct type	*new_glb_type()
 	struct type_hierarchy	*th = default_type_hierarchy();
 	return th->types[th->ntypes-1];
 }
+
+static struct profiler	*ancestor_profiler, *decendant_profiler, *lineage_profiler;
 
 // same algorithm as LKB function of similar name
 insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct code_record	*cr, int	bcsize)
@@ -562,6 +576,7 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 		}
 	}
 
+	start_and_alloc_profiler(&ancestor_profiler, "GLB ancestors", insert_profiler, NULL);
 	// see what authored types subsume 'cr'
 	for(i=0;i<part->psize;i++)
 	{
@@ -581,20 +596,25 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 	for(i=j=0;i<nanc;i++)
 		if(anc[i].t)anc[j++] = anc[i];
 	nanc = j;
+	stop_profiler(ancestor_profiler, nanc);
 
 	// we now have a set of immediate parent types for this glb type
 	//printf("%s with parents: ", cr->t->name);
 	//for(i=0;i<nanc;i++)printf(" %s", anc[i].t->name);
 	//printf("\n");
 
+	start_and_alloc_profiler(&lineage_profiler, "GLB lineage", insert_profiler, NULL);
+
 	struct type	**par = malloc(sizeof(struct type*)*nanc);
 	for(i=0;i<nanc;i++)par[i] = anc[i].t;
 	setup_type_lineage(cr->t, nanc, par);
 
+	stop_profiler(lineage_profiler, 1);
+
 
 	// next, figure out this glb type's immediate daughters so we can
 	// add it to their ->parents[] arrays
-	int	ndec = 0;
+	int	ndec = 0, adec = 0, add_dec_calls = 0;
 	struct code_record	*dec = NULL;
 
 	int do_print = 0;
@@ -608,6 +628,7 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 		int	i, is_in = 0;
 		int	di = -1;
 		if(do_print)printf("add_dec %s\n", t->name);
+		add_dec_calls++;
 		for(i=0;i<ndec;i++)
 		{
 			struct type	*dt = dec[i].t;
@@ -641,18 +662,27 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 			else
 			{
 				ndec++;
-				dec = realloc(dec, sizeof(struct code_record)*ndec);
+				if(ndec>adec)
+				{
+					adec = ndec*2;
+					dec = realloc(dec, sizeof(struct code_record)*adec);
+				}
 				dec[ndec-1].t = t;
 				dec[ndec-1].code = v;
 			}
 		}
 	}
 
+	start_and_alloc_profiler(&decendant_profiler, "GLB decendants", insert_profiler, NULL);
+
 	// see what authored types 'cr' subsumes
 	for(i=0;i<part->psize;i++)
 	{
 		unsigned long long	*v = vectors[i];
-		if(bitvec_subsume(cr->code, v, bcsize))add_dec(part->part[i], v);
+		//int	subsumed = bitvec_subsume(cr->code, v, bcsize)?1:0;
+		int	subsumed2 = bitvec_test(cr->code, i)?1:0;
+		//assert(subsumed == subsumed2);
+		if(subsumed2)add_dec(part->part[i], v);
 	}
 	// see what new glb types 'cr' subsumes
 	for(i=0;i<nglbtypes;i++)
@@ -678,6 +708,7 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 	for(i=j=0;i<ndec;i++)
 		if(dec[i].t)dec[j++] = dec[i];
 	ndec = j;
+	//printf("%16s	%d decendents (%d add_dec calls)\n", cr->t->name, ndec, add_dec_calls);
 
 	// we now have a set of immediate daughter types for this glb type
 	if(do_print)
@@ -694,6 +725,10 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 		d->parents = realloc(d->parents, sizeof(struct type*) * d->nparents);
 		d->parents[d->nparents-1] = cr->t;
 	}
+
+	free(dec);
+
+	stop_profiler(decendant_profiler, ndec);
 }
 
 sanity_check_1_bitvector(struct partition	*part, struct type	*t, unsigned long long	*vector)
@@ -720,13 +755,17 @@ sanity_check_bitvectors(struct partition	*part, unsigned long long	**vectors)
 
 int make_glbs_part(struct type_hierarchy	*th, struct partition	*part)
 {
+	//if(part->psize > 30000)part->psize = 30000;
 	start_and_alloc_profiler(&code_profiler, "bitcode creation and finding new glbs", NULL, NULL);
-	int		bcsize = (part->psize + 63) / 64;
+	int		bcsize = bitvec_n(part->psize);
 	unsigned long long	**vectors = calloc(sizeof(unsigned long long*), part->psize);
 	int		i, j, k;
+	int		nnonleaves = 0;
 	struct hash	*ptnumhash = hash_new("ptnum");
 	bchash = hash_new("bc");
 	bchash->has_flk = bcsize * sizeof(unsigned long long);
+	extern long long hash_collisions;
+	hash_collisions = 0;
 	char	key[32];
 	for(i=0;i<part->psize;i++)
 	{
@@ -741,6 +780,7 @@ int make_glbs_part(struct type_hierarchy	*th, struct partition	*part)
 	for(i=0;i<part->psize;i++)
 	{
 		struct type	*t = part->part[i];
+		if(t->ndaughters)nnonleaves++;
 		for(j=0;j<t->ndescendents;j++)
 		{
 			sprintf(key, "%d", t->descendents[j]);
@@ -762,25 +802,73 @@ int make_glbs_part(struct type_hierarchy	*th, struct partition	*part)
 	}
 
 	hash_free(ptnumhash);
+	//printf("after encoding, hash_collisions = %lld\n", hash_collisions);
+	hash_collisions = 0;
 
 	unsigned long long	*result = calloc(sizeof(unsigned long long), bcsize);
 	nglbtypes = 0;
 	glbtypes = NULL;
 
 	//print_subhierarchy(th, part);
+	if(glb_noisy && part->psize > 1000)printf("glb-ifying a partition of %d types\n", part->psize);
+
+	cp_zeros = cp_nonzeros = 0;
+
+	long long	steps = ((long long)nnonleaves) * nnonleaves / 2, step = 0;
 
 	for(i=0;i<part->psize;i++)
 	{
+		if(!part->part[i]->ndaughters)continue;
 		for(j=0;j<i;j++)
+		{
+			if(!part->part[j]->ndaughters)continue;
+			step++;
+			if(glb_noisy && part->psize > 1000 && (step%1000000)==0)
+			{
+				printf("\r[ %lld / %lld ] ...  ", step / 1000000, steps / 1000000);
+				fflush(stdout);
+			}
 			check_pair(vectors[i], vectors[j], result, bcsize);
+		}
 	}
-	for(i=0;i<nglbtypes;i++)
+	if(glb_noisy && part->psize > 1000)printf(" ... found %d new glbs, continuing (%lld zeros, %lld nonzeros)\n", nglbtypes, cp_zeros, cp_nonzeros);
+
+	cp_zeros = cp_nonzeros = 0;
+	int	firstnewglbtype = 0, lastnewglbtype = nglbtypes;
+	do
 	{
-		for(j=0;j<part->psize;j++)
-			check_pair(glbtypes[i]->code, vectors[j], result, bcsize);
-		for(j=0;j<i;j++)
-			check_pair(glbtypes[i]->code, glbtypes[j]->code, result, bcsize);
-	}
+		steps = (lastnewglbtype-firstnewglbtype) * ((lastnewglbtype-firstnewglbtype)/2/* + part->psize*/);
+		step = 0;
+		for(i=firstnewglbtype;i<lastnewglbtype;i++)
+		{
+			/*for(j=0;j<part->psize;j++)
+			{
+				check_pair(glbtypes[i]->code, vectors[j], result, bcsize);
+				step++;
+				if((step%10000)==0)
+				{
+					steps = nglbtypes * (nglbtypes/2 + part->psize);
+					printf("\r[ %lld / %lld ] ...  ", step / 10000, steps / 10000);
+					fflush(stdout);
+				}
+			}*/
+			for(j=firstnewglbtype;j<i;j++)
+			{
+				check_pair(glbtypes[i]->code, glbtypes[j]->code, result, bcsize);
+				step++;
+				if(glb_noisy && part->psize > 1000 && (step%10000)==0)
+				{
+					printf("\r[ %lld / %lld ] ...  ", step / 10000, steps / 10000);
+					fflush(stdout);
+				}
+			}
+		}
+		if(glb_noisy && part->psize > 1000)printf(" ... now %d new glb types; %d new this iteration (%lld zeros, %lld nonzeros)\n", nglbtypes, nglbtypes - lastnewglbtype, cp_zeros, cp_nonzeros);
+		firstnewglbtype = lastnewglbtype;
+		lastnewglbtype = nglbtypes;
+	} while(firstnewglbtype < lastnewglbtype);
+
+	//printf("%lld more collisions from adding glb types\n", hash_collisions);
 
 	start_and_alloc_profiler(&insert_profiler, "building the new glb types", NULL, code_profiler);
 	if(nglbtypes)
@@ -788,14 +876,25 @@ int make_glbs_part(struct type_hierarchy	*th, struct partition	*part)
 		//printf("discovered %d new GLB types that we need.\n", nglbtypes);
 		for(i=0;i<nglbtypes;i++)
 			glbtypes[i]->t = new_glb_type();
+		steps = nglbtypes;
+		step = 0;
 		for(i=0;i<nglbtypes;i++)
+		{
+			step++;
+			if(glb_noisy && part->psize > 1000 && (step%100)==0)
+			{
+				printf("\r[ %lld / %lld ] ...  ", step, steps);
+				fflush(stdout);
+			}
 			insert_glb_type(part, vectors, glbtypes[i], bcsize);
+		}
 	}
 	stop_profiler(insert_profiler, nglbtypes);
 
 	hash_free(bchash);	// also frees vectors[] contents
 	free(vectors);
 	free(glbtypes);
+	//if(part->psize >= 30000)exit(0);
 }
 #endif	// BITVEC_GLB
 

@@ -22,15 +22,28 @@ struct hash	*hash_new(char	*name)
 
 static inline unsigned hash_code(struct hash *ht, char	*key)
 {
-	unsigned code = 0, off = 0;
+	unsigned long long code = 0, off = 0;
 
 	if(ht->has_flk)
 	{
 		int	i;
 		for(i=0;i<ht->has_flk;i++)
 		{
-			int	b = (i*7)%24;
+			int	b = (i*17)%56;
+			//int	c = (i*17)%23;
+			//int	d = (i*29)%53;
 			code ^= ((unsigned)key[i])<<b;
+			//code ^= ((unsigned)key[i])<<c;
+			//code ^= ((unsigned)key[i])<<d;
+			//if(key[i]) code ^= i * 0x0001000300050007LL;
+			/*if(key[i])
+			{
+				int j;
+				unsigned k = key[i];
+				for(j=0;j<8;j++)if(k&0x80)break; else k<<=1;
+				code = 8*i + j;
+				break;
+			}*/
 		}
 	}
 	else
@@ -42,6 +55,15 @@ static inline unsigned hash_code(struct hash *ht, char	*key)
 	return code % (ht->size - 1);
 }
 
+long long hash_collisions = 0;
+
+print_flk(unsigned char	*key, int	len)
+{
+	int i;
+	for(i=0;i<len;i++)printf("%2.2X ", key[i]);
+	printf("\n");
+}
+
 static inline void		hash_add_bucket(struct hash	*ht, struct hash_bucket	*bucket)
 {
 	unsigned	hash = hash_code(ht, bucket->key);
@@ -49,6 +71,18 @@ static inline void		hash_add_bucket(struct hash	*ht, struct hash_bucket	*bucket)
 	bucket->next = ht->buckets[hash];
 	ht->buckets[hash] = bucket;
 	ht->entries++;
+	if(bucket->next)
+	{
+		/*if(ht->has_flk)
+		{
+			int	depth = 0;
+			struct hash_bucket	*b = bucket;
+			while(b){depth++;b=b->next;}
+			printf("collision at %8.8X  /// depth now %d\n", hash, depth);
+			//print_flk(bucket->key, ht->has_flk);
+		}*/
+		hash_collisions++;
+	}
 }
 
 void		grow_hash(struct hash	*ht)
@@ -56,7 +90,9 @@ void		grow_hash(struct hash	*ht)
 	int					old_size = ht->size, i;
 	struct hash_bucket	**old_buckets = ht->buckets, *walker;
 
+	hash_collisions = 0;
 	ht->size = GROW_FACTOR * ht->size;
+	//printf("growing %s to %d\n", ht->name, ht->size);
 	ht->entries = 0;
 	ht->buckets = calloc(sizeof(struct hash_bucket*), ht->size);
 	for(i=0;i<old_size;i++)
