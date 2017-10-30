@@ -196,7 +196,7 @@ int	parse_yy(char	*yy)
 	if(rv <= 0)
 	{
 		skip:;
-		printf("SKIP: (yy mode)\n");
+		if(!inhibit_results && !do_itsdb_stdout){printf("SKIP: (yy mode)\n");fflush(stdout);}
 	}
 	return rv;
 }
