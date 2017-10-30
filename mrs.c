@@ -793,6 +793,7 @@ char	*normalize_predicate(char	*p, char	*storage)
 	while(*p)
 	{
 		if(!strcmp(p,"_rel") || !strcmp(p,"_rel\""))break;
+		if(!strcmp(p,"\""))break;
 		*q++ = *p++;
 	}
 	*q = 0;
