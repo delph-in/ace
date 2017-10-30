@@ -1556,7 +1556,7 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 			}
 			else
 			{
-				assert(!"packing didn't do its job");
+				fprintf(stderr, "WARNING: duplicate MRS created during transfer\n");
 			}
 		}
 		else
