@@ -10,6 +10,8 @@
 #include	"lattice-mapping.h"
 #include	"timer.h"
 
+extern int inhibit_results, do_itsdb_stdout;
+
 int	yy_rule_mode = 0;
 
 static void	skip_whitespace(char	**P)
