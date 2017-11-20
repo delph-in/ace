@@ -41,6 +41,7 @@ struct ochart
 		int					north_routes;
 		struct orth_route	*orth_routes;
 		int					nparents;
+		int					depth;
 		struct ochart_parent
 		{
 			struct ochart_edge	*edge;
@@ -50,6 +51,7 @@ struct ochart
 };
 
 void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule, int	depth);
+void	expand_ochart_edge(struct ochart_edge	*edge, struct ochart *chart);
 void	unfold_oroutes(struct ochart_edge *target, struct ochart_edge *visit, int routelen, int *rnums);
 
 char	*freeze_tombs(wchar_t	*w)
@@ -151,6 +153,8 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 			char	*low = mbsdowncase(t->string);
 			// compute all possible stems, with dynamic programming
 			add_ochart_edge(0, t->oc, low, 0, 0);
+			for(j=0;j<t->oc->nedges;j++)
+				expand_ochart_edge(t->oc->edges[j], t->oc);
 			free(low);
 			// enumerate all possible ways of reaching each possible stem
 			for(j=0;j<t->oc->nedges;j++)
@@ -507,6 +511,14 @@ void add_oparent(struct ochart_edge *daughter, struct ochart_edge *parent, struc
  * note: we work in wchar_t's much of the time...
  * note: 'parent' and 'rule' are either both NULL or both not NULL
  */
+/* NOTE: Nov-20-2017 sweaglesw
+ *   this was implemented as a depth-first search, truncated at depth 8 by default.
+ * when a hypothesized stem X is found at depth 6, we don't look any farther than 2 from X.
+ * unfortunately, when X is found again at a shallower depth (e.g. 4), we don't have
+ * a good way of reigniting the search starting at X, to bring in things 4 from X.
+ * if we instead do a breadth-first search, this problem goes away...
+ * trying a depth-first-search now.
+ */
 void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *form, struct orule *rule, int	depth)
 {
 	int	i;
@@ -525,9 +537,6 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 			return;
 		}
 
-	wchar_t	*wform = towide(form);
-	int forml = wcslen(wform);
-
 	//printf(".. `%s' is new (arrived via %s)\n", form, rule?rule->rule->name:"START");
 	// completely new edge; add it to the chart
 	chart->nedges++;
@@ -538,9 +547,18 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 	edge->orth_routes = 0;
 	edge->nparents = 0;
 	edge->parents = 0;
+	edge->depth = depth;
 
 	add_oparent(edge, parent, rule);
+}
 
+void	expand_ochart_edge(struct ochart_edge	*edge, struct ochart *chart)
+{
+	int i, j;
+	int	depth = edge->depth;
+	char	*form = edge->form;
+	wchar_t	*wform = towide(form);
+	int forml = wcslen(wform);
 	// this edge is at least partly new; try to combine it with all the orthographemic rules
 	for(i=0;i<norules;i++)
 	{
@@ -579,8 +597,8 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 					continue;
 				}
 
-				//fprintf(stderr, "form `%S' = stem `%s' under rule `%s'[%d], i.e. `%S' replaced by `%S'\n",
-				//		wform, stem, or->rule->name, j, sub->pat, sub->rep);
+				//printf("form `%S' = stem `%s' under rule `%s'[%d], i.e. `%S' replaced by `%S' [depth %d]\n",
+						//wform, stem, or->rule->name, j, sub->pat, sub->rep, depth+1);
 				add_ochart_edge(edge, chart, stem, or, depth+1);
 			}
 		}
