@@ -560,6 +560,7 @@ void	expand_ochart_edge(struct ochart_edge	*edge, struct ochart *chart)
 	wchar_t	*wform = towide(form);
 	int forml = wcslen(wform);
 	// this edge is at least partly new; try to combine it with all the orthographemic rules
+	//printf("expanding %s\n", form);
 	for(i=0;i<norules;i++)
 	{
 		int				j, k, l, r;//, *mrules = 0;
@@ -578,7 +579,10 @@ void	expand_ochart_edge(struct ochart_edge	*edge, struct ochart *chart)
 			// continue;
 		}*/
 		void visit_irreg_stem(char	*stem)
-			{ add_ochart_edge(edge, chart, stem, or, depth+1); }
+		{
+			//printf("irregular: %s -> %s\n", form, stem);
+			add_ochart_edge(edge, chart, stem, or, depth+1);
+		}
 		hash_visit_key(or->irregs_form_to_stem, form, (void(*)(void*))visit_irreg_stem);
 
 		for(j=or->nsub-1;j>=0;j--)

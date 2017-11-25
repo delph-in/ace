@@ -128,13 +128,14 @@ struct slab_state
 {
 	int	noldslabs;
 	void	*slab, *last;
-	int	slabu;
+	long long	slabu;
 };
 
 static inline void	get_slabstate(struct slab_state	*s)
 {
 	extern void	*slab, *last;
-	extern int	slabu, noldslabs;
+	extern long long	slabu;
+	extern int	noldslabs;
 	s->noldslabs = noldslabs;
 	s->slab = slab;
 	s->last = last;
@@ -144,7 +145,8 @@ static inline void	get_slabstate(struct slab_state	*s)
 static inline void	set_slabstate(struct slab_state	*s)
 {
 	extern void	*slab, *last;
-	extern int	slabu, noldslabs;
+	extern long long	slabu;
+	extern int	noldslabs;
 	noldslabs = s->noldslabs;
 	slab = s->slab;
 	last = s->last;
@@ -158,7 +160,7 @@ void	*slab_alloc_unaligned(int	len);
 static inline void	slab_warm_cache()
 {
 	extern void	*last, *slab;
-	extern int	slabu, currslabsize;
+	extern long long	slabu, currslabsize;
 	// pull the next cacheline that will be allocated from the slab into cache,
 	// to avoid taking a cache miss when we allocate it and immediately start writing to it
 	__builtin_prefetch(slab+slabu, 1);
@@ -169,7 +171,7 @@ static inline void	slab_warm_cache()
 static inline	void	*slab_alloc(int	len)
 {
 	extern void	*last, *slab;
-	extern int	slabu, currslabsize;
+	extern long long	slabu, currslabsize;
 	extern void	next_slab();
 
 	assert(len>=0);

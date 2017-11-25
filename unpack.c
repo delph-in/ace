@@ -191,7 +191,7 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	}
 	// this has been known to exceed the slab segment size:
 	int	len = sizeof(struct decomposition) * n;
-	extern int currslabsize;
+	extern long long currslabsize;
 	if(len >= currslabsize)
 	{
 		d = dec = mega_slab(len, max_unpack_megabytes);
@@ -719,7 +719,7 @@ void	set_cui_hypothesis(struct context_unpack_info	*cui, int	rank, struct hypoth
 			cui->ahypotheses = 2*(rank+1) - 1;
 			//cui->nhb = cui->ahypotheses / HYPS_PER_BLOCK;
 			int	newlen = sizeof(struct hypothesis*)*cui->ahypotheses;
-			extern int currslabsize;
+			extern long long currslabsize;
 			if(newlen >= currslabsize)
 			{
 				struct hypothesis	**newlist = mega_slab(newlen, max_unpack_megabytes);

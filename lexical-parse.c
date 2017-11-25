@@ -118,8 +118,12 @@ int	lexical_parse(struct lattice	*lc, struct lattice_edge	*le, struct edge	**eps
 			}
 			else if(trace>1)
 			{
-				printf("rule %s failed on lexical-parsing edge #%d\n", rules[i]->name, le->edge->id);
+				printf("rule %s failed on lexical-parsing edge #%d ; res = %d\n", rules[i]->name, le->edge->id, res);
 				unify_backtrace();
+				/*printf("mother AVM:\n");
+				print_dg(epsila[i]->dg);printf("\n");
+				printf("daughter AVM:\n");
+				print_dg(le->edge->dg);printf("\n");*/
 			}
 		}
 		if(g_profiling)stop_profiler(prof, fired);

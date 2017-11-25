@@ -23,7 +23,8 @@
 #include	"ubertag.h"
 
 extern void		**oldslabs;
-extern int		noldslabs, aoldslabs, currslabsize;
+extern int		noldslabs, aoldslabs;
+extern long long		currslabsize;
 
 extern int debug_level;
 

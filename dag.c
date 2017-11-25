@@ -21,10 +21,10 @@ extern int	loud_noises;
 
 void		**oldslabs;
 int		noldslabs, aoldslabs;
-int		currslabsize;
+long long		currslabsize;
 
 void	*slab, *last;
-int	slabu;
+long long		slabu;
 
 int	nmegaslabs;
 long long	megaslab_usage;
@@ -128,7 +128,7 @@ void	next_slab()
 	if(noldslabs > aoldslabs)
 	{
 		aoldslabs++;
-		if(debug_level>1 && noldslabs>1)fprintf(stderr, "slab: moving to next slab with old at %dkbytes\n", slabu/1024);
+		if(debug_level>1 && noldslabs>1)fprintf(stderr, "slab: moving to next slab with old at %lldkbytes\n", slabu/1024);
 		oldslabs = realloc(oldslabs, sizeof(void*)*aoldslabs);
 		//oldslabs[aoldslabs-1] = malloc(SLAB_SIZE);
 		/*void	*ptr = mmap(NULL, SLAB_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_HUGETLB, -1, 0);
