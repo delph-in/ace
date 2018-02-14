@@ -56,16 +56,16 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl_unused, struct sco
 
 	int	ngp;
 	char	*hkp = hkey;
-	hkp += snprintf(hkey, 511 - (hkp-hkey), "%s:%s:%s", lhs, rhs1?:"", rhs2?:"");//key?:"");
+	hkp += safe_snprintf(hkey, 511 - (hkp-hkey), "%s:%s:%s", lhs, rhs1?:"", rhs2?:"");//key?:"");
 	for(ngp=0;ngp<=anc->nparent_types;ngp++)
 	{
-		if(ngp) hkp += snprintf(hkp, 511 - (hkp-hkey), ":%s", anc->parent_types[ngp-1]);
+		if(ngp) hkp += safe_snprintf(hkp, 511 - (hkp-hkey), ":%s", anc->parent_types[ngp-1]);
 		MAXENT_NOISE("scoring key = %s\n", hkey);
 		hash_visit_key(mem, hkey, (void(*)(void*))visitor);
 	}
 	if(anc->rooted)
 	{
-		hkp += snprintf(hkp, 511 - (hkp-hkey), ":^");
+		hkp += safe_snprintf(hkp, 511 - (hkp-hkey), ":^");
 		MAXENT_NOISE("scoring key = %s\n", hkey);
 		hash_visit_key(mem, hkey, (void(*)(void*))visitor);
 	}

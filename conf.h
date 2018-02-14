@@ -61,4 +61,6 @@ void iterate_conf_list(char	*key, int	(*callback)(char	*word));
 void	load_chart_dependencies(char	*depstring);
 struct path slab_string_to_path(char	*str);
 
+int	safe_snprintf(char	*str, int	len, char	*fmt, ...);
+
 #endif
