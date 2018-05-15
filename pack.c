@@ -582,7 +582,7 @@ int	pack_edge(struct edge	*edge)
 				h->pack = 0;
 				// frozen edges don't need to be put onto packing lists... they were there as placeholders but are irrelevant to unpacking.
 				// also, generalization edges don't need to be put onto packing lists... they are also irrelevant to unpacking.
-				if(!h->frozen && !(h->daughters==NULL && h->lex==NULL))
+				if(!(h->frozen && !h->frosted) && !(h->daughters==NULL && h->lex==NULL))
 				{
 					//printf(" ... packing it too\n");
 					//h->frosted = 1;
@@ -676,6 +676,9 @@ int	pack_edge(struct edge	*edge)
 			// NEW provision added Feb-29-2018 to address bug found when parsing:
 			// Until Version 2.1 (⌊/Peach/⌋), Fruit was an ⌊>open source>⌋ engine.
 			// it turns out we should be block()'ing the host!
+			// reason: we don't want more stuff to be built on it
+			//    before the generalized edge comes and picks it up.
+			// however, we also don't want block()'ing it to STOP the generalized edge from picking it up...
 			if(generalizable_host->built_on)
 				block(generalizable_host, 0, 0);
 			add_agenda(ge);
