@@ -50,6 +50,9 @@ extern struct path	rels_list_path, hcons_list_path, icons_list_path, hook_path;
 extern struct path	recursive_label_path_in_sign, recursive_label_path_in_label;
 extern struct path	label_path;
 
+struct path	robustness_marker_path;
+char		*robustness_marker_type;
+
 struct dg	*dg_path(struct dg	*dg, struct path	p);
 struct dg	*dg_path_add(struct dg	*dg, struct path	p, struct dg	*add);
 int			pathcmp(const struct path	*p1, const struct path	*p2);

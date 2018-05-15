@@ -876,6 +876,30 @@ struct lexeme	*get_hypothesis_lexeme(struct hypothesis	*h)
 	return h->edge->lex;
 }
 
+int unify_type_to_path(struct dg	*dg, char	*typename, struct path	path)
+{
+	struct dg	*d = dg_path(dg, path);
+	if(!d || d==dg)
+	{
+		fprintf(stderr, "ERROR: no such path\n");
+		return -1;
+	}
+	struct type	*t = lookup_type(typename);
+	if(!t)
+	{
+		fprintf(stderr, "ERROR: no such type '%s'\n", typename);
+		return -1;
+	}
+	struct type	*g = glb(d->xtype, t);
+	if(!g)
+	{
+		fprintf(stderr, "ERROR: no glb for '%s' and '%s'\n", d->xtype->name, typename);
+		return -1;
+	}
+	d->type = d->xtype = g;
+	return 0;
+}
+ 
 int instantiate_hypothesis(struct hypothesis *h)
 {
 	int arity = h->arity, i;
@@ -981,7 +1005,12 @@ int instantiate_hypothesis(struct hypothesis *h)
 				else h->dg = finalize_tmp(rdg, 1);
 			}
 			else h->dg = finalize_tmp(rdg, 1);
-			if(g_mode == PARSING && h->edge->neps==-1)disable_robust_unification();
+			if(g_mode == PARSING && h->edge->neps==-1)
+			{
+				disable_robust_unification();
+				if(robustness_marker_type)
+					unify_type_to_path(h->dg, robustness_marker_type, robustness_marker_path);
+			}
 			if(!h->dg)	// cycle failure can occur
 			{
 				h->dg = (void*)1;
@@ -1212,6 +1241,9 @@ void print_hypothesis_from(struct hypothesis *hyp, int (*print)(const char *fmt,
 	{
 		assert(hyp->dg != NULL);
 		char	*root = is_root(hyp->dg);
+		extern int enable_dublin;
+		if(enable_dublin && !root)
+			root = "CSAW_ROBUST";
 		assert(root != NULL);
 		print(" (%s", root);
 	}

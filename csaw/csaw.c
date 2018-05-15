@@ -178,6 +178,9 @@ struct tree	*csaw_parse_lattice(struct lattice	*lexical_chart)
 
 	csaw_reset_pcfg_tokens();
 	clear_dstr_cache();
+	extern int derivations_include_roots;
+	int save_derivations_include_roots = derivations_include_roots;
+	derivations_include_roots = 0;
 	for(i=0;i<lexical_chart->nedges;i++)
 	{
 		struct lattice_edge	*e = lexical_chart->edges[i];
@@ -231,6 +234,8 @@ struct tree	*csaw_parse_lattice(struct lattice	*lexical_chart)
 		//printf("term %s with surface '%s' ; chart %d - %d, orig %d - %d\n", pcfg_term, surface, t->from, t->to, vtx_id_map[t->from], vtx_id_map[t->to]);
 		free(surface);
 	}
+	clear_dstr_cache();
+	derivations_include_roots = save_derivations_include_roots;
 
 	// parse and unpack best 1 tree
 	struct tree	*found_tree = NULL;

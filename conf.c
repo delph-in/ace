@@ -42,6 +42,9 @@ struct path	lattice_mapping_input_path, lattice_mapping_output_path, lattice_map
 
 struct path	rels_list_path, hcons_list_path, icons_list_path, hook_path;
 
+struct path	robustness_marker_path;
+char		*robustness_marker_type;
+
 char		*token_type;
 
 int			ortho_max_rules = 7;
@@ -222,6 +225,9 @@ struct conf
 
 	int	normalize_predicates;
 	int	generics_overwrite_orth;
+
+	struct path	robustness_marker_path;
+	char		*robustness_marker_type;
 };
 
 struct path	freeze_path(struct path	p)
@@ -312,6 +318,8 @@ void	*freeze_conf()
 		c->ortho_warn_max_rules = ortho_warn_max_rules;
 		c->recursive_label_path_in_label = freeze_path(recursive_label_path_in_label);
 		c->recursive_label_path_in_sign = freeze_path(recursive_label_path_in_sign);
+		c->robustness_marker_path = freeze_path(robustness_marker_path);
+		c->robustness_marker_type = freeze_string(robustness_marker_type);
 	}
 	else
 	{
@@ -396,6 +404,9 @@ void	recover_conf(void	*vc)
 		ortho_warn_max_rules = c->ortho_warn_max_rules;
 		recursive_label_path_in_label = c->recursive_label_path_in_label;
 		recursive_label_path_in_sign = c->recursive_label_path_in_sign;
+
+		robustness_marker_path = c->robustness_marker_path;
+		robustness_marker_type = c->robustness_marker_type;
 	}
 	else
 	{
@@ -469,6 +480,9 @@ load_syntax_conf()
 
 	ortho_max_rules = get_conf_int("ortho-max-rules", 7);
 	ortho_warn_max_rules = get_conf_bool("ortho-warn-on-max-rules", 1);
+
+	robustness_marker_path = try_get_conf_path("robustness-marker-path", "");
+	robustness_marker_type = get_conf("robustness-marker-type");
 }
 
 int	load_conf()
