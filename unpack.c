@@ -949,11 +949,18 @@ int instantiate_hypothesis(struct hypothesis *h)
 		{
 			total_reconstructed_nodes++;
 			struct dg *rdg = h->edge->rule->dg;
-			if(g_mode == PARSING && h->edge->neps==-1)
+			int	robustness_licensed = 0, robustness_used = 0;
+			if(0)
 			{
+				try_with_robustness:
+				robustness_used = 1;
+				enable_robust_unification();
 				//printf("using robust unification to reconstruct #%d: %s\n",
 				//	h->edge->id, h->edge->rule?h->edge->rule->name:h->edge->lex->word);
-				enable_robust_unification();
+			}
+			if(g_mode == PARSING && h->edge->neps==-1)
+			{
+				robustness_licensed = 1;
 			}
 			for(i=0;i<arity;i++)
 				if(unify_dg_tmp(h->rhslist[i]->dg, rdg, i))
@@ -983,15 +990,17 @@ int instantiate_hypothesis(struct hypothesis *h)
 				}
 			if(i<arity)
 			{
-				if(g_mode == PARSING && h->edge->neps==-1)disable_robust_unification();
+				if(robustness_used)disable_robust_unification();
+				else if(robustness_licensed)goto try_with_robustness;
 				return -1;
 			}
 			if(h->edge->rule->orth)
 				if(unify_orthography(rdg, h->rhslist[0]->dg, get_hypothesis_lexeme(h), h->edge->rule))
 				{
-					if(g_mode == PARSING && h->edge->neps==-1)disable_robust_unification();
 					forget_tmp();
 					h->dg = (void*)1;
+					if(robustness_used)disable_robust_unification();
+					else if(robustness_licensed)goto try_with_robustness;
 					return -1;
 				}
 			if(g_mode == GENERATING)
@@ -1005,7 +1014,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 				else h->dg = finalize_tmp(rdg, 1);
 			}
 			else h->dg = finalize_tmp(rdg, 1);
-			if(g_mode == PARSING && h->edge->neps==-1)
+			if(robustness_used)
 			{
 				disable_robust_unification();
 				if(robustness_marker_type)
