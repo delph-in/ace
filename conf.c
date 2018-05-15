@@ -352,6 +352,7 @@ void	recover_conf(void	*vc)
 	ep_drop = c->ep_drop;
 	reload_restrictors = (restrictor_size != nfnames);
 	transfer_enable_qeq_bridge = c->transfer_enable_qeq_bridge;
+	g_normalize_predicates = c->normalize_predicates;
 	g_generics_overwrite_orth = c->generics_overwrite_orth;
 
 	if(!g_transfer)
