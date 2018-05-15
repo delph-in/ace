@@ -32,6 +32,8 @@ extern int yy_rule_mode;
 int				norules;
 struct orule	**orules;
 
+int	g_generics_overwrite_orth = 0;
+
 struct ochart
 {
 	int	nedges;
@@ -331,7 +333,8 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 				// need to make carg_e->form available to the AVM of the GLE somehow,
 				// e.g. installing it in ORTH.FIRST.
 				if(install_tokens_in_le(le, &t) != 0)continue;
-				install_orth(le->dg, carg_e->form);
+				if(g_generics_overwrite_orth)
+					install_orth(le->dg, carg_e->form);
 				//fprintf(stderr, "for token '%s', issued generic '%s'\n", t->string, le->lex->word);
 				extern int form_to_relation;
 				if(form_to_relation)
