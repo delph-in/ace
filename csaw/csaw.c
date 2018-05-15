@@ -177,6 +177,7 @@ struct tree	*csaw_parse_lattice(struct lattice	*lexical_chart)
 	}
 
 	csaw_reset_pcfg_tokens();
+	clear_dstr_cache();
 	for(i=0;i<lexical_chart->nedges;i++)
 	{
 		struct lattice_edge	*e = lexical_chart->edges[i];

@@ -1011,6 +1011,11 @@ struct dstr_cache
 static struct dstr_cache	dstr_cache[DSTR_CACHE_SIZE];
 int		dstr_cache_gen = 1;
 
+void clear_dstr_cache()
+{
+	dstr_cache_gen++;
+}
+
 #define	DSTR_HASH(h,o)	(int)((((unsigned long long)h)^o) % (DSTR_CACHE_SIZE))
 
 char	*dstr_lookup(struct hypothesis	*h, int	o)
@@ -1494,7 +1499,7 @@ extern int do_itsdb;
 
 	static struct scoring_ancestry	root_ancestry = {.nparent_types=0,.parent_types=NULL, .rooted = 1};
 
-	dstr_cache_gen++;
+	clear_dstr_cache();
 
 	if(setjmp(out_of_memory_jump) != 0)
 	{

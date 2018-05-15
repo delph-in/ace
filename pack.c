@@ -673,6 +673,11 @@ int	pack_edge(struct edge	*edge)
 			//printf("verifying that gdg subsumes #%d ->dg\n", generalizable_host->id);
 			//assert(1 == equivalent_dg(gdg, generalizable_host->dg, 1, 1, 0));
 			//fflush(stdout);
+			// NEW provision added Feb-29-2018 to address bug found when parsing:
+			// Until Version 2.1 (⌊/Peach/⌋), Fruit was an ⌊>open source>⌋ engine.
+			// it turns out we should be block()'ing the host!
+			if(generalizable_host->built_on)
+				block(generalizable_host, 0, 0);
 			add_agenda(ge);
 			return 1;	// report that 'edge' is packed.
 		}
@@ -761,8 +766,8 @@ void	compact_generalization_edges()
 				if(p->daughters == NULL && !p->lex)
 				{
 					// generalization edge
-					fprintf(stderr, "error: edge #%d packed g-edge #%d\n", e->id, p->id);
-					assert(!"found a generalization edge on a packing list... oops.");
+					fprintf(stderr, "ERROR: edge #%d packed g-edge #%d\n", e->id, p->id);
+					assert(!"ERROR: found a generalization edge on a packing list... oops.");
 				}
 			}
 		}
@@ -795,7 +800,7 @@ void	compact_generalization_edges()
 					{
 						if(d->npack == 0)
 						{
-							fprintf(stderr, "error: edge #%d had generalization daughter #%d which packs nothing\n", e->id, d->id);
+							fprintf(stderr, "ERROR: edge #%d had generalization daughter #%d which packs nothing\n", e->id, d->id);
 							exit(-1);
 						}
 						e->daughters[k] = d->pack[0];
