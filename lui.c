@@ -1214,9 +1214,9 @@ lui_source(char	*name)
 	char	*editor = getenv("EDITOR");
 	char	command[10240];
 	printf("LUI: attempting to open %s:%d\n", t->tdl->filename, t->tdl->lnum);
-	if(strstr(editor, "vi"))
+	if(editor && strstr(editor, "vi"))
 		sprintf(command, "gvim --remote-silent +%d %s &", t->tdl->lnum, t->tdl->filename);
-	else if(strstr(editor, "emacs"))
+	else if(editor && strstr(editor, "emacs"))
 		sprintf(command, "emacsclient -c -a \"\" +%d %s &", t->tdl->lnum, t->tdl->filename);
 	else { fprintf(stderr, "ERROR: don't know how to perform a remote invocation of your $EDITOR.\n"); return -1; }
 	printf("LUI: invoking: %s\n", command);

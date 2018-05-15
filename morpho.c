@@ -327,7 +327,11 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 				struct edge	*le = lexical_edge(generic_les[j], lat_e->from->id, lat_e->to->id-lat_e->from->id, 0);
 				le->north_routes = carg_e->north_routes;
 				le->orth_routes = carg_e->orth_routes;
+				// FIXME -- to make form hypothesization work for generics,
+				// need to make carg_e->form available to the AVM of the GLE somehow,
+				// e.g. installing it in ORTH.FIRST.
 				if(install_tokens_in_le(le, &t) != 0)continue;
+				install_orth(le->dg, carg_e->form);
 				//fprintf(stderr, "for token '%s', issued generic '%s'\n", t->string, le->lex->word);
 				extern int form_to_relation;
 				if(form_to_relation)
@@ -1205,6 +1209,17 @@ void	add_carc(struct dg	*d, int	fnum, struct dg	*to)
 	d->carcs = slab_realloc(d->carcs, sizeof(struct darc)*(d->ncarcs-1), sizeof(struct darc)*d->ncarcs);
 	d->carcs[d->ncarcs-1].label = fnum;
 	d->carcs[d->ncarcs-1].dest = to;
+}
+
+install_orth(struct dg	*avm, char	*neworth)
+{
+	extern unsigned int	generation;
+	struct dg	*stem = dg_path(avm, lex_stem_path);
+	assert(stem);
+	struct dg	*first = dg_hop(stem, lookup_fname("FIRST"));
+	assert(first);
+	first->type = first->xtype = string_to_type(neworth);
+	return 0;
 }
 
 int	unify_orthography(struct dg	*par, struct dg	*dtr, struct lexeme	*lex, struct rule	*r)

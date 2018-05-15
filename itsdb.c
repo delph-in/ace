@@ -32,6 +32,7 @@ int captured_capi_printf(const char	*format, ...)
 	return q;
 }
 
+#undef	capi_printf
 #define	capi_printf	captured_capi_printf
 
 /* notes:
