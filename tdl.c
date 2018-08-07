@@ -202,12 +202,20 @@ int	process_comments(char	*line, int	in_comment)
 
 int	unbalanced(char	*line)
 {
+	int	in3quote = 0;
 	int	inquote = 0, bal = 0, regex = 0;
 	int	escape = 0;
 
 	while(*line)
 	{
 		if(escape) { line++; escape = 0; }
+		else if(*line == '\\') { line++; escape = 1; }
+		else if(in3quote)
+		{
+			if(!strncmp(line,"\"\"\"",3)) { line += 3; in3quote = 0; }
+			else line += 1;
+		}
+		else if(!strncmp(line,"\"\"\"",3)) { line += 3; in3quote = 1; }
 		else if(!inquote && !regex && *line==':' && line[1]=='<')line+=2;
 		else switch(*line++)
 		{
@@ -219,7 +227,7 @@ int	unbalanced(char	*line)
 			case	'\\':	escape = 1;		break;
 		}
 	}
-	return (bal != 0 || regex != 0 || inquote);
+	return (bal != 0 || regex != 0 || inquote || in3quote);
 }
 
 char	*tdlstatus_stack[16] = {"grammar"};
@@ -310,7 +318,7 @@ int	process_colon_command(char	*parent, char	*cmd)
 	return 0;
 }
 
-char	*strip_docstring(char	*rhs, int	lnum, char	*path)
+char	*strip_docstring_v1(char	*rhs, int	lnum, char	*path)
 {
 	// docstring can appear immediately before the first opening '[', or not at all.
 	char	*q = strchr(rhs, '"');
@@ -344,6 +352,31 @@ char	*strip_docstring(char	*rhs, int	lnum, char	*path)
 	// it's a docstring.
 	char	*docstring = strdup(q+1);
 	memmove(q, p+1, strlen(p+1)+1);
+	return docstring;
+}
+
+char	*strip_docstring_v2(char	*rhs, int	lnum, char	*path)
+{
+	// docstring can appear pretty much anywhere
+	char	*q = strstr(rhs, "\"\"\"");
+	if(!q)return NULL;
+	// the """ pattern cannot legally occur outside a docstring, since it would necessarily be two adjacent strings, which is not valid TDL.
+	// find the end of the docstring.
+	char	*p = q+3;
+	while(*p && strncmp(p,"\"\"\"",3))
+	{
+		if(*p=='\\' && p[1])p++;
+		p++;
+	}
+	if(!*p)
+	{
+		fprintf(stderr, "ERROR: triple-quoted docstring not terminated at %s:%d\n", path, lnum);
+		exit(-1);
+	}
+	assert(!strncmp(p,"\"\"\"",3));
+	*p = 0;
+	char	*docstring = strdup(q+3);
+	memmove(q, p+3, strlen(p+3)+1);
 	return docstring;
 }
 
@@ -465,7 +498,13 @@ int	load_tdl(char	*path)
 		}
 
 		//printf("tdl input: `%s'  -->  `%s'\n", lhs, rhs);
-		char	*docstring = strip_docstring(rhs, lnum, path);
+		char	*next_ds;
+		do
+		{
+			next_ds = strip_docstring_v2(rhs, lnum, path);
+			if(next_ds)printf("HEY! I found and stripped a triple-quoted docstring: |%s|\n", next_ds);
+		} while(next_ds);
+		char	*docstring = strip_docstring_v1(rhs, lnum, path);
 		//if(docstring)printf("HEY! I found and stripped a docstring: |%s|\n", docstring);
 		add_tdlline(lhs, operation, rhs, odef, lnum, path);
 		*buffer = 0;
