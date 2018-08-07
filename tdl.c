@@ -502,7 +502,7 @@ int	load_tdl(char	*path)
 		do
 		{
 			next_ds = strip_docstring_v2(rhs, lnum, path);
-			if(next_ds)printf("HEY! I found and stripped a triple-quoted docstring: |%s|\n", next_ds);
+			//if(next_ds)printf("HEY! I found and stripped a triple-quoted docstring: |%s|\n", next_ds);
 		} while(next_ds);
 		char	*docstring = strip_docstring_v1(rhs, lnum, path);
 		//if(docstring)printf("HEY! I found and stripped a docstring: |%s|\n", docstring);
