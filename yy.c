@@ -93,7 +93,10 @@ struct token	yy_read_token(char	**yy, int	*vfrom, int	*vto)
 	struct token	T;
 	bzero(&T,sizeof(T));
 	expect(yy, '(');
-	read_int(yy);	// id
+	int id = read_int(yy);	// id
+	T.nids = 1;
+	T.ids = slab_alloc(sizeof(int));
+	T.ids[0] = id;
 	expect(yy, ',');
 	*vfrom = read_int(yy);
 	expect(yy, ',');

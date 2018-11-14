@@ -12,6 +12,7 @@ struct token
 		char	*tag;
 		char	*prob;
 	}	*postags;
+	int	nids, *ids;
 	int		cfrom, cto;
 	struct dg	*dg;
 

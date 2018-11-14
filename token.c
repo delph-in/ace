@@ -78,6 +78,32 @@ struct dg	*build_pos_prbs_list(int	ntags, struct postag	*tags)
 	return rest;
 }
 
+struct dg	*build_id_list(int	nids, int	*ids, struct dg	**last)
+{
+	if(nids<=0)
+	{
+		*last = type_dg(g_list_type);
+		return *last;
+	}
+	struct dg	*rest = build_id_list(nids-1, ids+1, last);
+	struct dg	*list = atomic_dg(g_cons_type);
+	char		idstr[1024];
+	sprintf(idstr, "\"%d\"", ids[0]);
+	struct dg	*iddg = new_dag_for_unfrozen_string(idstr);
+	list = add_dg_hop(list, 1, iddg);
+	list = add_dg_hop(list, 2, rest);
+	return list;
+}
+
+struct dg	*build_id_dlist(int	nids, int	*ids)
+{
+	struct dg	*dl = atomic_dg(g_diff_list_type);
+	struct dg	*last = NULL;
+	dl = add_dg_feature(dl, "LIST", build_id_list(nids, ids, &last));
+	dl = add_dg_feature(dl, "LAST", last);
+	return dl;
+}
+
 void	build_token_dag(struct token	*t)
 {
 	struct dg	*dg = type_dg(token_type);
@@ -94,6 +120,7 @@ char	*slab_escape(char*);
 	dg = dg_path_add(dg, token_to_path, new_dag_for_unfrozen_string(c_to_str));
 	dg = dg_path_add(dg, token_postags_path, build_pos_tags_list(t->npostags, t->postags));
 	dg = dg_path_add(dg, token_posprobs_path, build_pos_prbs_list(t->npostags, t->postags));
+	dg = dg_path_add(dg, token_id_path, build_id_dlist(t->nids, t->ids));
 	dg = wellform_dg(dg);
 	assert(dg != NULL);
 	t->dg = dg;
@@ -191,6 +218,9 @@ struct lattice	*build_token_chart(int	nwords, char	**words, int	*cfrom, int	*cto
 			e->token->postags[j].tag = tags[i][j];
 			e->token->postags[j].prob = probs[i][j];
 		}
+		e->token->nids = 1;
+		e->token->ids = slab_alloc(sizeof(int));
+		e->token->ids[0] = i;
 		e->token->string = freeze_string(words[i]);
 		e->token->cfrom = cfrom[i];
 		e->token->cto = cto[i];
