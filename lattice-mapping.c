@@ -1063,7 +1063,14 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 		for(i=0;i<r->noutput;i++)
 		{
 			struct dg	*o = lattice_rule_spot(r, i+r->ninput+r->ncontext);
+			// don't want the different outputs to share structure with each other; if they do and are later on recombined, spurious reentrancies will occur.
+			dagreset_c_including_carcs(o);
 			out_dg[i] = copy_dg_with_comp_arcs(o);
+			if(!out_dg[i])
+			{
+				fprintf(stderr, "ERROR: cyclic result of lattice mapping rule %s\n", r->name);
+				exit(-1);
+			}
 		}
 		bump_generation();
 

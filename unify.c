@@ -1625,6 +1625,22 @@ void dagreset_c(struct dg	*d)
 		dagreset_c(arcs[i]);
 }
 
+void dagreset_c_including_carcs(struct dg	*d)
+{
+	int	i;
+	struct dg	**arcs;
+
+	d = dereference_dg(d);
+	if(!d)return;
+
+	d->copy = 0;
+	arcs = DARCS(d);
+	for(i=0;i<d->narcs;i++)
+		dagreset_c_including_carcs(arcs[i]);
+	for(i=0;i<d->ncarcs;i++)
+		dagreset_c_including_carcs(d->carcs[i].dest);
+}
+
 void dgreset_r(struct dg	*d)
 {
 	int	i;
