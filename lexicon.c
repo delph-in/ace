@@ -11,6 +11,7 @@
 #include	"morpho.h"
 #include	"conf.h"
 #include	"freeze.h"
+#include	"unicode.h"
 
 struct lexeme	**lexemes;
 int		nlexemes;
@@ -115,7 +116,7 @@ int	lex_strcmp(char	*a, char	*b)
 	return 0;
 }
 
-int	visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex))
+int	ascii_visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex))
 {
 	int		num=0;
 	char		stemcmp[1024];
@@ -136,6 +137,40 @@ int	visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex))
 		for(i=k;i<nlexemes && !lex_strcmp(lexemes[i]->stem[0]->name, stemcmp);i++)
 			num += visitor(lexemes[i]);
 		for(i=k-1;i>=0 && !lex_strcmp(lexemes[i]->stem[0]->name, stemcmp);i--)
+			num += visitor(lexemes[i]);
+	}
+	return num;
+}
+
+int	mbswcscasecmp(char	*mbs, wchar_t	*wcs)
+{
+	wchar_t	*w = towide(mbs);
+	int	r = wcscasecmp(w, wcs);
+	free(w);
+	return r;
+}
+
+int	visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex))
+{
+	int		num=0;
+	wchar_t		stemcmp[1024];
+	int		i, j, k, r = -1;
+
+	swprintf(stemcmp, 1020, L"\"%s\"", stem);
+	for(i=0,j=nlexemes-1;i<=j;)
+	{
+		k = (i+j)/2;
+		r = mbswcscasecmp(lexemes[k]->stem[0]->name, stemcmp);
+		if(r==0)break;
+		if(r<0)i = k+1;
+		else j = k-1;
+	}
+	if(r==0)
+	{
+		i=k;
+		for(i=k;i<nlexemes && !mbswcscasecmp(lexemes[i]->stem[0]->name, stemcmp);i++)
+			num += visitor(lexemes[i]);
+		for(i=k-1;i>=0 && !mbswcscasecmp(lexemes[i]->stem[0]->name, stemcmp);i--)
 			num += visitor(lexemes[i]);
 	}
 	return num;
