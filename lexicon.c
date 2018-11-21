@@ -585,9 +585,16 @@ int	lexcomp(const void	*a, const void	*b)
 
 	if(la->stemlen==0)return -1;
 	if(lb->stemlen==0)return 1;
-	res = strcasecmp(la->stem[0]->name, lb->stem[0]->name);
+	wchar_t	*sa = towide(la->stem[0]->name);
+	wchar_t	*sb = towide(lb->stem[0]->name);
+	res = wcscasecmp(sa,sb);
+	if(!res)res = strcmp(la->word, lb->word);
+	free(sa);
+	free(sb);
+	return res;
+	/*res = strcasecmp(la->stem[0]->name, lb->stem[0]->name);
 	if(res)return res;
-	else return strcmp(la->word, lb->word);
+	else return strcmp(la->word, lb->word);*/
 }
 
 int	load_lexicon()
