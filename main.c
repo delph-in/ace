@@ -67,6 +67,7 @@ extern int do_forest;
 extern int g_profiling;
 extern int use_packed_edge_ids;
 extern int give_up_threshold;
+extern int gen_qc;
 float	stdin_time = 0;
 
 int	form_to_relation = 0;
@@ -180,6 +181,7 @@ void	parse_args(int	argc, char	*argv[])
 		{"tsdb-stdout", 0, NULL, TSDB_STDOUT_OPTION},
 #define	UDX_OPTION			1014
 		{"udx", 2,NULL, UDX_OPTION},
+		{"gen-qc", 0,&gen_qc, 1},
 		{NULL,0,NULL,0}
 		};
 
