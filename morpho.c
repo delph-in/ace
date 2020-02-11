@@ -14,6 +14,10 @@
 #define	SHOW_ORTH_ROUTE_COUNTS
 #define	SHOW_ORTH_ROUTES
 
+// replace unescaped ! in orthographemic rule patterns with a special code so escaped \! can be treated as a regular character.
+//#define	LETTERSET_BANG_SPECIAL	'!'
+#define	LETTERSET_BANG_SPECIAL	0xdeadbeef
+
 static int	invert_ipat(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*form, int forml, char	*stem, int type);
 
 //extern int	wcap[1024];
@@ -719,12 +723,13 @@ void	set_letterset(int	group, wchar_t	*letters)
 	return memcpy(w, str, (len+1)*sizeof(wchar_t));
 }*/
 
-wchar_t	*wcsdup_esc_lower(wchar_t	*str)
+wchar_t	*wcsdup_esc_lower(wchar_t	*str, int replace_bangs)
 {
 	int len = wcslen(str);
 	wchar_t	*w = malloc((len+1)*sizeof(wchar_t)), *p, *r = w;
 	for(p=str;*p;p++)
 		if(*p=='\\' && p[1])*r++ = *++p;
+		else if(*p == '!' && p[1] && replace_bangs)*r++ = LETTERSET_BANG_SPECIAL;
 		else *r++ = towlower(*p);
 	*r = 0;
 	return w;
@@ -786,7 +791,7 @@ void	setup_morpho(char	*line)
 	}
 	letter = *wide;
 	if(wide[1] != ' ' && wide[1] != '\t')goto synt;
-	set_letterset(letter, trim_wcs(wcsdup_esc_lower(wide+2)));
+	set_letterset(letter, trim_wcs(wcsdup_esc_lower(wide+2, 0)));
 }
 
 int	appropriate_letter(wchar_t	let, int	group)
@@ -855,7 +860,7 @@ int	invert_ipat_prefix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 	{
 		let = form[fi++];
 		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
-		if(ri+1<repl && rep[ri]=='!')
+		if(ri+1<repl && rep[ri]==LETTERSET_BANG_SPECIAL)
 		{
 			if(!lclear){bzero(letters, 256*sizeof(wchar_t));lclear=1;}
 			if(appropriate_letter(let, rep[++ri]))
@@ -879,7 +884,7 @@ int	invert_ipat_prefix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 		// success!
 		/*if(*pat!='*') */while(*pat)
 		{
-			if(*pat != '!')
+			if(*pat != LETTERSET_BANG_SPECIAL)
 				*stem++ = *pat++;
 			else
 			{
@@ -907,7 +912,7 @@ int	invert_ipat_suffix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 	{
 		let = form[len--];
 		//printf("now to match `%c'; [%d %d]\n", let, len, len2);
-		if(len2>0 && rep[len2-1]=='!')
+		if(len2>0 && rep[len2-1]==LETTERSET_BANG_SPECIAL)
 		{
 			if(!lclear){bzero(letters, 256*sizeof(wchar_t));lclear=1;}
 			if(appropriate_letter(let, rep[len2]))
@@ -934,7 +939,7 @@ int	invert_ipat_suffix(wchar_t	*pat, int patl, wchar_t	*rep, int repl, wchar_t	*
 		stem += len+1;
 		/*if(*pat!='*') */while(*pat)
 		{
-			if(*pat != '!' || !pat[1])
+			if(*pat != LETTERSET_BANG_SPECIAL || !pat[1])
 				*stem++ = *pat++;
 			else
 			{
@@ -1025,10 +1030,10 @@ void	setup_orule(struct orule	*or, char	*def)
 		or->sub = realloc(or->sub, sizeof(struct orule_sub)*or->nsub);
 		sub = or->sub + or->nsub-1;
 		if(wdef[0]=='*' && wdef[1]==0)sub->pat = wcsdup(L"");
-		else sub->pat = wcsdup_esc_lower(wdef);
+		else sub->pat = wcsdup_esc_lower(wdef, 1);
 		sub->patl = wcslen(sub->pat);
 		if(wsp[0]=='*' && wsp[1]==0)sub->rep = wcsdup(L"");
-		else sub->rep = wcsdup_esc_lower(wsp);
+		else sub->rep = wcsdup_esc_lower(wsp, 1);
 		sub->repl = wcslen(sub->rep);
 
 		wdef = trim_wcs(next);
