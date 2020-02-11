@@ -488,7 +488,7 @@ char	*setup_rule_filter1(int pack)
 					//unify_backtrace();
 					ssbl++;
 				}
-				forget_tmp();
+				//forget_tmp();
 			}
 			else if(i == j)res = 0;
 			else res = !rule_sfilter[j*nrules+i];

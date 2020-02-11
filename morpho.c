@@ -7,6 +7,7 @@
 #include	<ctype.h>
 #include	"unicode.h"
 #include	"profiler.h"
+#include	"mrs.h"
 
 #define	USE_GENERICS
 
@@ -114,8 +115,9 @@ show_form_to_relation(struct edge	*le, struct token	**toklist)
 	// SYNSEM LKEYS KEYREL PRED
 	static int save[100] = {-1};
 	struct dg	*preddg = walk_dg(le->dg, save, "SYNSEM", "LKEYS", "KEYREL", "PRED", NULL);
+	char	storage[1000];
 	if(!preddg) fprintf(stderr, "warning: lexeme `%s' has null pred\n", le->lex->word);
-	else printf("FORM-TO-RELATION	%s	%s\n", toklist[0]->string, preddg->xtype->name);
+	else printf("FORM-TO-RELATION	%s	%s\n", toklist[0]->string, normalize_predicate(preddg->xtype->name, storage));
 }
 
 char	*mbsdowncase(char	*mbsin)

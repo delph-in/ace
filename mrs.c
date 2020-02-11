@@ -705,6 +705,27 @@ void	print_mrs(struct mrs	*m)
 	else fwrite(buffer, l, 1, stdout);
 }
 
+char	*normalize_predicate(char	*p, char	*storage)
+{
+	if(!g_normalize_predicates)return p;
+	if(strlen(p) > 1000)return p;
+	if(!strcmp(p, "predsort"))
+	{
+		strcpy(storage, "semi-predicate");
+		return storage;
+	}
+	char	*q = storage;
+	if(*p=='"')p++;
+	while(*p)
+	{
+		if(!strcmp(p,"_rel") || !strcmp(p,"_rel\""))break;
+		if(!strcmp(p,"\""))break;
+		*q++ = *p++;
+	}
+	*q = 0;
+	return storage;
+}
+
 #ifndef	NOTESTING
 
 // mrs testing
@@ -777,27 +798,6 @@ int mrs_subsumes(struct mrs	*in, struct mrs	*out)
 			vmap2[e->args[k].value->vnum] = 1;
 	}
 	return mrs_subsumes0(in, out, 0, vmap, used, order);
-}
-
-char	*normalize_predicate(char	*p, char	*storage)
-{
-	if(!g_normalize_predicates)return p;
-	if(strlen(p) > 1000)return p;
-	if(!strcmp(p, "predsort"))
-	{
-		strcpy(storage, "semi-predicate");
-		return storage;
-	}
-	char	*q = storage;
-	if(*p=='"')p++;
-	while(*p)
-	{
-		if(!strcmp(p,"_rel") || !strcmp(p,"_rel\""))break;
-		if(!strcmp(p,"\""))break;
-		*q++ = *p++;
-	}
-	*q = 0;
-	return storage;
 }
 
 int pred_subsumes(char *in, char *out)
