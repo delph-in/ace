@@ -77,9 +77,11 @@ void score_hypothesis(struct hypothesis *h)
 		char	*rhs1_sign = (h->arity>1)?edge_sign(h->rhslist[1]->edge):NULL;
 		int		key_arg = h->edge->rule->rtl;
 
-		//start_and_alloc_profiler(&score_profiler, "score-hypothesis", unpacking_profiler, NULL);
+		//int has_lexical_dtrs = 0;
+		//for(i=0;i<h->arity;i++)if(h->rhslist[i]->arity == 0)has_lexical_dtrs = 1;
+		//if(has_lexical_dtrs)start_and_alloc_profiler(&score_profiler, "score-hypothesis", unpacking_profiler, NULL);
 		float	score = maxent_score(lhs_sign, rhs0_sign, rhs1_sign, key_arg, &h->ancestry);
-		//stop_profiler(score_profiler, 1);
+		//if(has_lexical_dtrs)stop_profiler(score_profiler, 1);
 		h->score += score;
 
 		float	lexical_daughter_scores = 0;
@@ -736,6 +738,18 @@ struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry
 	cui->ancestry = ancestry;
 	e->unpack->cuis[e->unpack->ncuis++] = cui;
 	//stop_profiler(gec_profiler, 1);
+	/*if(e->unpack->ncuis == 200)
+	{
+		printf("edge #%d %d - %d has 200+ CUIs\n", e->id, e->from, e->to);
+		for(i=0;i<e->unpack->ncuis;i++)
+		{
+			struct scoring_ancestry a = e->unpack->cuis[i]->ancestry;
+			int j;
+			if(a.rooted)printf("^ ");
+			for(j=0;j<a.nparent_types;j++)printf("%s ",a.parent_types[j]);
+			printf("\n");
+		}
+	}*/
 	return cui;
 }
 

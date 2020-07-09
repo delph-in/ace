@@ -26,12 +26,12 @@ static struct hash	*mem;
 #define MAXENT_NOISE(fmt, ...)
 //#define MAXENT_NOISE printf
 
-int	nmaxent_requests = 0, nmaxent_visits = 0;
+//int	nmaxent_requests = 0, nmaxent_lookups = 0, nmaxent_visits = 0;
 
-show_me()
+/*show_me()
 {
-	fprintf(stderr, "MAXENT: %d visits / %d requests = %.1f per\n", nmaxent_visits, nmaxent_requests, (float)nmaxent_visits / nmaxent_requests);
-}
+	fprintf(stderr, "MAXENT: %d visits / %d lookups / %d requests = %.1f per request ; %.1f%% hit rate\n", nmaxent_visits, nmaxent_lookups, nmaxent_requests, (float)nmaxent_visits / nmaxent_requests, 100*(float)nmaxent_visits / nmaxent_lookups);
+}*/
 
 // visit all maxent features containing this local subtree and compatible with the ancestry
 // add up their scores
@@ -45,11 +45,11 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl_unused, struct sco
 	void visitor(struct maxent_feature *feat)
 	{
 		int	i;
-		nmaxent_visits++;
+		//nmaxent_visits++;
 		ret += feat->score;
 	}
 
-	nmaxent_requests++;
+	//nmaxent_requests++;
 
 	//return (double)rand()/RAND_MAX - 0.5;
 	if(!mem)return 0;
@@ -61,13 +61,19 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl_unused, struct sco
 	{
 		if(ngp) hkp += safe_snprintf(hkp, 511 - (hkp-hkey), ":%s", anc->parent_types[ngp-1]);
 		MAXENT_NOISE("scoring key = %s\n", hkey);
-		hash_visit_key(mem, hkey, (void(*)(void*))visitor);
+		//hash_visit_key(mem, hkey, (void(*)(void*))visitor);
+		struct maxent_feature	*feat = hash_find(mem, hkey);
+		if(feat)ret += feat->score;
+		//nmaxent_lookups++;
 	}
 	if(anc->rooted)
 	{
 		hkp += safe_snprintf(hkp, 511 - (hkp-hkey), ":^");
 		MAXENT_NOISE("scoring key = %s\n", hkey);
-		hash_visit_key(mem, hkey, (void(*)(void*))visitor);
+		//hash_visit_key(mem, hkey, (void(*)(void*))visitor);
+		struct maxent_feature	*feat = hash_find(mem, hkey);
+		if(feat)ret += feat->score;
+		//nmaxent_lookups++;
 	}
 	MAXENT_NOISE(" ... %f\n", ret);
 	return ret;
