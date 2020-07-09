@@ -53,7 +53,7 @@ struct unpack_info	// used by hypothesize_edge() to keep track of what hypothesi
 	{
 		struct hypagenda_item *agenda;
 		struct hypothesis **hypotheses;
-		int	nhb, nhypotheses, ahypotheses;
+		int	nhypotheses, ahypotheses;
 		int	ndecs;
 		struct decomposition	*decs;
 

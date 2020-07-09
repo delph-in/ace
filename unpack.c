@@ -21,6 +21,7 @@
 #include	"conf.h"
 #include	"dag-provenance.h"
 #include	"morpho.h"
+#include	"profiler.h"
 
 //#define	DEBUG	printf
 #define	DEBUG(fmt, ...)	do {} while(0)
@@ -38,7 +39,7 @@ extern int max_unpack_megabytes;
 
 extern int debug_level, inhibit_pack;
 
-unsigned long long	ndecomposed;
+unsigned long long	ndecomposed, totaldecompositions;
 
 static jmp_buf	out_of_memory_jump;
 
@@ -46,6 +47,9 @@ int	max_grandparenting = 3;
 int use_packed_edge_ids = 0;
 
 int	total_hyps;
+
+//struct profiler	*gec_profiler;
+//struct profiler	*score_profiler;
 
 struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry	ancestry);
 struct scoring_ancestry	compute_sub_ancestry(struct scoring_ancestry	panc, struct edge	*edge);
@@ -73,7 +77,9 @@ void score_hypothesis(struct hypothesis *h)
 		char	*rhs1_sign = (h->arity>1)?edge_sign(h->rhslist[1]->edge):NULL;
 		int		key_arg = h->edge->rule->rtl;
 
+		//start_and_alloc_profiler(&score_profiler, "score-hypothesis", unpacking_profiler, NULL);
 		float	score = maxent_score(lhs_sign, rhs0_sign, rhs1_sign, key_arg, &h->ancestry);
+		//stop_profiler(score_profiler, 1);
 		h->score += score;
 
 		float	lexical_daughter_scores = 0;
@@ -117,11 +123,10 @@ void score_hypothesis(struct hypothesis *h)
 			//fprintf(stderr, "final Z for dec %p = %f\n", h->dec, h->dec->all_unpackings_z);
 		}
 	}
-	else
+	else if(g_mode != GENERATING) // FIXME: realization ranking doesn't have access to surface forms because we have no tokens...
 	{
 		// 'h' is a leaf/lexeme node
 		// construct the cannonical surface form
-		if(g_mode == GENERATING)return;	// FIXME: realization ranking doesn't have access to surface forms because we have no tokens...
 		//if(!enable_token_avms)return;
 		extern char	current_sentence[];
 		char	surface[1024], *sp = surface;
@@ -251,6 +256,7 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 	}
 
 	*Ndecompositions = n;
+	totaldecompositions += n;
 	return dec;
 }
 
@@ -498,11 +504,17 @@ static inline void checkup(struct hypothesis *h)
 	if(h->dg)return; // if we already know failure/success status, don't recurse
 	if(h->checkup>=0 && h->checkup != g_checkup)
 	{
+		if(h->dec && h->dec->failed)
+		{
+			//printf("local failure saved work\n");
+			h->dg = (void*)1;
+			return;
+		}
 		int i;
 		for(i=0;i<h->arity;i++)
 		{
 			checkup(h->rhslist[i]);
-			if(h->rhslist[i]->dg == (void*)1 || h->dec->failed)
+			if(h->rhslist[i]->dg == (void*)1)// || h->dec->failed)
 			{
 				h->dg = (void*)1;
 				return;
@@ -522,6 +534,23 @@ int	compare_ancestry(struct scoring_ancestry	a, struct scoring_ancestry	b)
 	return 0;
 }
 
+void	hash_ancestry(struct scoring_ancestry	*anc)
+{
+	int i;
+	char	*p;
+	anc->hash = 0;
+	anc->hash = anc->rooted * 7 + anc->nparent_types * 101;
+	for(i=0;i<anc->nparent_types;i++)
+	{
+		anc->hash = ((anc->hash << 5) * 13) ^ (anc->hash >> 27);
+		for(p=anc->parent_types[i];*p;p++)
+		{
+			anc->hash ^= *p;
+			anc->hash  = (anc->hash << 3) | (anc->hash >> 29);
+		}
+	}
+}
+
 struct scoring_ancestry	compute_sub_ancestry(struct scoring_ancestry	panc, struct edge	*edge)
 {
 	struct scoring_ancestry	anc;
@@ -539,6 +568,7 @@ struct scoring_ancestry	compute_sub_ancestry(struct scoring_ancestry	panc, struc
 	assert(edge->rule != NULL);
 	if(anc.nparent_types)
 		anc.parent_types[0] = edge_sign(edge);
+	hash_ancestry(&anc);
 	return anc;
 }
 
@@ -681,6 +711,7 @@ again:
 
 struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry	ancestry)
 {
+	//start_and_alloc_profiler(&gec_profiler, "get-edge-cui", unpacking_profiler, NULL);
 	if(!e->unpack)
 	{
 		e->unpack = slab_alloc(sizeof(struct unpack_info));
@@ -689,19 +720,22 @@ struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry
 
 	int i;
 	for(i=0;i<e->unpack->ncuis;i++)
-		if(!compare_ancestry(ancestry, e->unpack->cuis[i]->ancestry))
-			return e->unpack->cuis[i];
+		if(ancestry.hash == e->unpack->cuis[i]->ancestry.hash)
+		{
+			if(!compare_ancestry(ancestry, e->unpack->cuis[i]->ancestry))
+			{
+				//stop_profiler(gec_profiler, 1);
+				return e->unpack->cuis[i];
+			}
+			//else printf("HASH collision @ %8.8x\n", ancestry.hash);
+		}
 
 	e->unpack->cuis = slab_realloc(e->unpack->cuis, sizeof(struct context_unpack_info*)*e->unpack->ncuis, sizeof(struct context_unpack_info*)*(e->unpack->ncuis+1));
 	struct context_unpack_info	*cui = slab_alloc(sizeof(*cui));
 	bzero(cui, sizeof(*cui));
-	/*cui->agenda = NULL;
-	cui->nhypotheses = 0;
-	cui->ahypotheses = 0;
-	cui->nhb = 0;
-	cui->hypotheses = NULL;*/
 	cui->ancestry = ancestry;
 	e->unpack->cuis[e->unpack->ncuis++] = cui;
+	//stop_profiler(gec_profiler, 1);
 	return cui;
 }
 
@@ -717,7 +751,6 @@ void	set_cui_hypothesis(struct context_unpack_info	*cui, int	rank, struct hypoth
 		{
 			int	oah = cui->ahypotheses;
 			cui->ahypotheses = 2*(rank+1) - 1;
-			//cui->nhb = cui->ahypotheses / HYPS_PER_BLOCK;
 			int	newlen = sizeof(struct hypothesis*)*cui->ahypotheses;
 			extern long long currslabsize;
 			if(newlen >= currslabsize)
@@ -985,6 +1018,23 @@ int instantiate_hypothesis(struct hypothesis *h)
 						}
 						else h->dec->failed &= ~(1<<i);
 						h->dec->checked |= 1<<i;
+					}*/
+					/*if(!h->dec->checked)
+					{
+						// experiment to see whether the un-reconstructed edges fit...
+						//  better than previous experiment: put all daughters in, not just 1.
+						int k;
+						for(k=0;k<arity;k++)
+							if(unify_dg_tmp(h->dec->rhs[k]->dg, rdg, k))
+								break;
+						forget_tmp();
+						h->dec->checked = 1;
+						if(k<arity)
+						{
+							//printf("experiment: local failure for decomposition %p\n", h->dec);
+							h->dec->failed = 1;
+						}
+						//else printf("experiment: local success for decomposition %p\n", h->dec);
 					}*/
 					break;
 				}
@@ -1539,6 +1589,7 @@ extern int do_itsdb;
 	//if(!nbest && !do_itsdb)return exhaustive_unpack(cell, process);
 
 	static struct scoring_ancestry	root_ancestry = {.nparent_types=0,.parent_types=NULL, .rooted = 1};
+	hash_ancestry(&root_ancestry);
 
 	clear_dstr_cache();
 
@@ -1739,6 +1790,7 @@ resume_after_oom:;
 	if(debug_level)
 	{
 		printf("%d hyps / %d reconstructed / %d readings\n", nhyp, ninsthyps, count);
+		printf("%lld decompositions produced for %lld passive edges\n", totaldecompositions, ndecomposed);
 	}
 	/*for(i=0;i<chart_size;i++)
 	{

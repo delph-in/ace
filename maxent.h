@@ -6,6 +6,7 @@ struct scoring_ancestry
 	int		nparent_types;
 	int		rooted;
 	char	**parent_types;
+	unsigned int	hash;
 };
 
 int		load_mem(char *fname);
