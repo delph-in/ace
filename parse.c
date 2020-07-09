@@ -37,6 +37,7 @@ int		level = 0;
 int	do_forest = 0;
 extern int debug_level;
 int yy_mode = 0;
+int	do_improve_characterization = 0;
 
 int	g_profiling = 0;
 
@@ -452,6 +453,8 @@ int parse_with_token_chart(struct lattice	*token_chart, clock_t	start)
 	if(do_itsdb)itsdb_dump_tokens(":p-input", ":ninputs", token_chart);
 	apply_token_mapping(token_chart);
 	sort_lattice(token_chart);
+	if(!yy_mode && do_improve_characterization)
+		improve_token_lattice_characterization(token_chart);
 
 	if(token_chart->nvertices>give_up_threshold)
 	{

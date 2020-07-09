@@ -61,6 +61,7 @@ int		tnt_max_tags = 2;
 
 extern int	g_loaded, inhibit_results, trace;
 extern int yy_mode;
+extern int do_improve_characterization;
 extern long long	accum_ram_usage;
 extern char			*use_roots, *disable_signs;
 extern int do_forest;
@@ -182,6 +183,7 @@ void	parse_args(int	argc, char	*argv[])
 #define	UDX_OPTION			1014
 		{"udx", 2,NULL, UDX_OPTION},
 		{"gen-qc", 0,&gen_qc, 1},
+		{"improve-characterization", 0,&do_improve_characterization, 1},
 		{NULL,0,NULL,0}
 		};
 
