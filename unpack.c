@@ -76,12 +76,27 @@ void score_hypothesis(struct hypothesis *h)
 		char	*rhs0_sign = edge_sign(h->rhslist[0]->edge);
 		char	*rhs1_sign = (h->arity>1)?edge_sign(h->rhslist[1]->edge):NULL;
 		int		key_arg = h->edge->rule->rtl;
+		float	score;
 
-		//int has_lexical_dtrs = 0;
-		//for(i=0;i<h->arity;i++)if(h->rhslist[i]->arity == 0)has_lexical_dtrs = 1;
-		//if(has_lexical_dtrs)start_and_alloc_profiler(&score_profiler, "score-hypothesis", unpacking_profiler, NULL);
-		float	score = maxent_score(lhs_sign, rhs0_sign, rhs1_sign, key_arg, &h->ancestry);
-		//if(has_lexical_dtrs)stop_profiler(score_profiler, 1);
+		int has_lexical_dtrs = 0;
+		for(i=0;i<h->arity;i++)if(h->rhslist[i]->arity == 0)has_lexical_dtrs = 1;
+		//start_and_alloc_profiler(&score_profiler, "score-hypothesis", unpacking_profiler, NULL);
+		if(has_lexical_dtrs)
+		{
+			score = maxent_score(lhs_sign, rhs0_sign, rhs1_sign, key_arg, &h->ancestry);
+		}
+		else
+		{
+			int	lhs_rnum = h->edge->rule->rnum;
+			int	rhs0_rnum = h->rhslist[0]->edge->rule->rnum;
+			int	rhs1_rnum = (h->arity > 1)?h->rhslist[1]->edge->rule->rnum:-1;
+			//float verify = maxent_score(lhs_sign, rhs0_sign, rhs1_sign, key_arg, &h->ancestry);
+			score = maxent_score_ro(lhs_rnum, rhs0_rnum, rhs1_rnum, &h->ancestry);
+			//printf("score  = %f\n", score);
+			//printf("verify = %f\n", verify);
+			//assert(score == verify);
+		}
+		//stop_profiler(score_profiler, 1);
 		h->score += score;
 
 		float	lexical_daughter_scores = 0;
@@ -532,7 +547,8 @@ int	compare_ancestry(struct scoring_ancestry	a, struct scoring_ancestry	b)
 	if(a.rooted != b.rooted)return a.rooted - b.rooted;
 	int i, r;
 	for(i=0;i<a.nparent_types;i++)
-		if( (r=strcmp(a.parent_types[i], b.parent_types[i])) != 0)return r;
+		if(a.gprnum[i] != b.gprnum[i])return a.gprnum[i] - b.gprnum[i];
+		//if( (r=strcmp(a.parent_types[i], b.parent_types[i])) != 0)return r;
 	return 0;
 }
 
@@ -544,12 +560,13 @@ void	hash_ancestry(struct scoring_ancestry	*anc)
 	anc->hash = anc->rooted * 7 + anc->nparent_types * 101;
 	for(i=0;i<anc->nparent_types;i++)
 	{
-		anc->hash = ((anc->hash << 5) * 13) ^ (anc->hash >> 27);
-		for(p=anc->parent_types[i];*p;p++)
+		anc->hash = ((anc->hash << 9) * 13) ^ (anc->hash >> 23);
+		anc->hash ^= anc->gprnum[i];
+		/*for(p=anc->parent_types[i];*p;p++)
 		{
 			anc->hash ^= *p;
 			anc->hash  = (anc->hash << 3) | (anc->hash >> 29);
-		}
+		}*/
 	}
 }
 
@@ -563,13 +580,20 @@ struct scoring_ancestry	compute_sub_ancestry(struct scoring_ancestry	panc, struc
 		anc.nparent_types = max_grandparenting;
 		anc.rooted = 0;
 	}
-	anc.parent_types = slab_alloc(sizeof(char*) * anc.nparent_types);
+	//anc.parent_types = slab_alloc(sizeof(char*) * anc.nparent_types);
 	int i;
 	for(i=1;i<anc.nparent_types;i++)
-		anc.parent_types[i] = panc.parent_types[i-1];
+	{
+		//anc.parent_types[i] = panc.parent_types[i-1];
+		anc.gprnum[i] = panc.gprnum[i-1];
+	}
 	assert(edge->rule != NULL);
 	if(anc.nparent_types)
-		anc.parent_types[0] = edge_sign(edge);
+	{
+		//anc.parent_types[0] = edge_sign(edge);
+		assert(edge->rule);
+		anc.gprnum[0]  = edge->rule->rnum;
+	}
 	hash_ancestry(&anc);
 	return anc;
 }
@@ -807,7 +831,7 @@ struct hypothesis *hypothesize_edge(struct edge *e, int rank, struct scoring_anc
 	for(i=0;i<indent;i++)DEBUG("  ");
 	DEBUG("asked to hyp %d on edge #%d [%d-%d] (had seen %d)\n", rank, e->id, e->from, e->to, cui->nhypotheses);
 	DEBUG(" ... cui %p ancestry: ", cui);
-	for(i=0;i<ancestry.nparent_types;i++){ DEBUG(" %s", ancestry.parent_types[i]); }
+	for(i=0;i<ancestry.nparent_types;i++){ DEBUG(" %d", ancestry.gprnum[i]); }
 	DEBUG("\n");
 
 	struct hypothesis	*hyp = get_cui_hypothesis(cui, rank);
@@ -1602,7 +1626,7 @@ extern int do_itsdb;
 	// and it doesn't know how to `dont_unspecialize'...
 	//if(!nbest && !do_itsdb)return exhaustive_unpack(cell, process);
 
-	static struct scoring_ancestry	root_ancestry = {.nparent_types=0,.parent_types=NULL, .rooted = 1};
+	static struct scoring_ancestry	root_ancestry = {.nparent_types=0/*,.parent_types=NULL*/, .rooted = 1};
 	hash_ancestry(&root_ancestry);
 
 	clear_dstr_cache();

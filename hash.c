@@ -156,8 +156,6 @@ struct hash	*freeze_hash(struct hash	*ht)
 	struct hash_bucket	*buck, **Bp, *walk;
 	int				i;
 
-	assert(!ht->has_flk);
-
 	*nh = *ht;
 	nh->buckets = slab_alloc(sizeof(struct hash_bucket*) * nh->size);
 	buck = slab_alloc(sizeof(struct hash_bucket) * nh->entries);
@@ -168,7 +166,9 @@ struct hash	*freeze_hash(struct hash	*ht)
 		{
 			*Bp = buck;
 			Bp = &buck->next;
-			buck->key = freeze_string(walk->key);
+			if(!ht->has_flk)
+				buck->key = freeze_string(walk->key);
+			else buck->key = freeze_block(walk->key, ht->has_flk);
 			buck->value = walk->value;
 			buck++;
 		}
