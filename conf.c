@@ -448,7 +448,7 @@ load_syntax_conf()
 	extract_mrs_path = get_conf_path("semantics-path");
 	label_path = try_get_conf_path("label-path", "LNAME");
 	recursive_label_path_in_label = try_get_conf_path("recursive-label-path-in-label", "SYNSEM LOCAL");
-	recursive_label_path_in_sign = try_get_conf_path("recursive-label-path-in-label", "SYNSEM NONLOC SLASH LIST FIRST");
+	recursive_label_path_in_sign = try_get_conf_path("recursive-label-path-in-sign", "SYNSEM NONLOC SLASH LIST FIRST");
 
 	load_chart_dependencies(get_conf("chart-dependencies"));
 	reduce_chart_before_lexical_parsing = get_conf_bool("process-chart-dependencies-before-lexical-parsing", 0);
