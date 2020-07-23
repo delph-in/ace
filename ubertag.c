@@ -124,7 +124,11 @@ ut_load_ex(struct ubertagger	*ut, char	*expath)
 	char	*gzsuffix = strstr(expath, ".gz");
 	int	zipped = (gzsuffix && strlen(gzsuffix)==3)?1:0;
 	char	unzipper[10240];
+#ifdef __APPLE__
+	if(zipped)sprintf(unzipper, "gzcat %s", expath);
+#else
 	if(zipped)sprintf(unzipper, "zcat %s", expath);
+#endif
 	FILE	*f = zipped?popen(unzipper,"r"):fopen(expath,"r");
 	if(!f){perror(expath);exit(-1);}
 
@@ -277,7 +281,11 @@ ut_load_tx(struct ubertagger	*ut, char	*txpath)
 	char	*gzsuffix = strstr(txpath, ".gz");
 	int	zipped = (gzsuffix && strlen(gzsuffix)==3)?1:0;
 	char	unzipper[10240];
+#ifdef	__APPLE__
+	if(zipped)sprintf(unzipper, "gzcat %s", txpath);
+#else
 	if(zipped)sprintf(unzipper, "zcat %s", txpath);
+#endif
 	FILE	*f = zipped?popen(unzipper,"r"):fopen(txpath,"r");
 	if(!f){perror(txpath);exit(-1);}
 
