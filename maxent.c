@@ -147,6 +147,11 @@ void record_maxent_feature(char *lhs, char *rhs[2], float score, int	ngp, char	*
 		*v = score;
 		struct maxent_rule_key	*bkey = malloc(sizeof(*bkey));
 		struct rule	*lhsrule = lookup_rule(lhs);
+		if(!lhsrule)
+		{
+			fprintf(stderr, "WARNING: no such rule as %s in maxent model\n", lhs);
+			return;
+		}
 		assert(lhsrule != NULL);
 		bkey->lhs = lhsrule->rnum;
 		bkey->rhs1 = rhsrule[0]->rnum;
@@ -158,6 +163,11 @@ void record_maxent_feature(char *lhs, char *rhs[2], float score, int	ngp, char	*
 			else
 			{
 				struct rule	*rgp = lookup_rule(gp[i]);
+				if(!rgp)
+				{
+					fprintf(stderr, "WARNING: no such rule %s in maxent model\n", gp[i]);
+					return;
+				}
 				assert(rgp != NULL);
 				bkey->gp[i] = rgp->rnum;
 			}

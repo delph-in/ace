@@ -744,6 +744,33 @@ struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry
 		bzero(e->unpack, sizeof(struct unpack_info));
 	}
 
+	// binary search
+	int hi=e->unpack->ncuis,lo=0,mid = 0;
+	while(hi>lo)
+	{
+		mid = (hi+lo)/2;
+		unsigned int mh = e->unpack->cuis[mid]->ancestry.hash;
+		if(ancestry.hash == mh)
+			break;
+		if(ancestry.hash > mh)lo=mid+1;
+		else hi=mid;
+	}
+	if(hi>lo)
+	{
+		int i;
+		// found the right part of the list
+		for(i=mid;i<e->unpack->ncuis && ancestry.hash == e->unpack->cuis[mid]->ancestry.hash;i++)
+			if(!compare_ancestry(ancestry, e->unpack->cuis[i]->ancestry))
+				return e->unpack->cuis[i];
+		for(i=mid-1;i>=0 && ancestry.hash == e->unpack->cuis[mid]->ancestry.hash;i--)
+			if(!compare_ancestry(ancestry, e->unpack->cuis[i]->ancestry))
+				return e->unpack->cuis[i];
+	}
+	else mid = lo;
+	// no matching hash value, but 'mid' is where to insert it
+
+/*
+	// linear search
 	int i;
 	for(i=0;i<e->unpack->ncuis;i++)
 		if(ancestry.hash == e->unpack->cuis[i]->ancestry.hash)
@@ -751,16 +778,32 @@ struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry
 			if(!compare_ancestry(ancestry, e->unpack->cuis[i]->ancestry))
 			{
 				//stop_profiler(gec_profiler, 1);
+				if(i>0)
+				{
+					// hack to massage the list into a more use-frequency sorted order over time if a lot of requests are made
+					int	swap = i/2;
+					struct context_unpack_info *tmp = e->unpack->cuis[i];
+					e->unpack->cuis[i] = e->unpack->cuis[swap];
+					e->unpack->cuis[swap] = tmp;
+					return tmp;
+				}
 				return e->unpack->cuis[i];
 			}
 			//else printf("HASH collision @ %8.8x\n", ancestry.hash);
 		}
+*/
 
 	e->unpack->cuis = slab_realloc(e->unpack->cuis, sizeof(struct context_unpack_info*)*e->unpack->ncuis, sizeof(struct context_unpack_info*)*(e->unpack->ncuis+1));
 	struct context_unpack_info	*cui = slab_alloc(sizeof(*cui));
 	bzero(cui, sizeof(*cui));
 	cui->ancestry = ancestry;
-	e->unpack->cuis[e->unpack->ncuis++] = cui;
+	//e->unpack->cuis[e->unpack->ncuis++] = cui;
+
+	// insert at 'mid'
+	memmove(e->unpack->cuis+mid+1, e->unpack->cuis+mid, sizeof(struct context_unpack_info*) * (e->unpack->ncuis - mid));
+	e->unpack->cuis[mid] = cui;
+	e->unpack->ncuis++;
+
 	//stop_profiler(gec_profiler, 1);
 	/*if(e->unpack->ncuis == 200)
 	{

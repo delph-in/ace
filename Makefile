@@ -18,7 +18,8 @@ CC=gcc
 #REPP_LIBS+=-lgcov
 #CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -falign-loops=32 -funroll-loops ${CPU} -fprofile-use=./profile-data/
 
-CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -falign-loops=32 -funroll-loops ${CPU}
+#CFLAGS=-g -O6 -fomit-frame-pointer -funsigned-char -falign-loops=32 -funroll-loops ${CPU}
+CFLAGS=-g -O6 -fno-omit-frame-pointer -funsigned-char -falign-loops=32 -funroll-loops ${CPU}
 #CFLAGS=-g -O6 -funsigned-char -falign-loops=32 -funroll-loops ${CPU}  -pg
 #CFLAGS=-g -O2 -funsigned-char
 #CFLAGS=-g -O2 -pg -funsigned-char
