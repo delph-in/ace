@@ -1641,6 +1641,7 @@ void dagreset_c_including_carcs(struct dg	*d)
 		dagreset_c_including_carcs(d->carcs[i].dest);
 }
 
+// as of December 2020, the following function gets to assume the generation has been bumped immediately prior to the top-level call.
 void dgreset_r(struct dg	*d)
 {
 	int	i;
@@ -1648,6 +1649,7 @@ void dgreset_r(struct dg	*d)
 
 	d = p_dereference_dg(d);
 	if(!d)return;
+	if(d->gen == generation)return;	// because of the new precondition, up-to-date generation means this substructure is already reset.
 
 	d->ncarcs = 0;
 	d->carcs = 0;

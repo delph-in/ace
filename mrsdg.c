@@ -358,6 +358,7 @@ struct mrs	*cont_to_mrs(struct dg	*cont)
 	extern int unify_always_succeeds;
 	if(unify_always_succeeds)
 		if(check_cycles(cont))return mrs;
+	bump_generation();
 	dgreset_r(cont);
 //	stop_timer(other_timer, 1);
 
