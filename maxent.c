@@ -307,7 +307,13 @@ void	*freeze_stochastic_model()
 {
 	int	i, j;
 	struct hash_bucket *walk;
-	if(!mem)return 0;
+	if(!mem)
+	{
+		struct stochastic_model *mod = slab_alloc(sizeof(*mod));
+		mod->mem = NULL;
+		mod->mem_ro = NULL;
+		return mod;
+	}
 	for(i=0;i<mem->size;i++)
 		for(walk=mem->buckets[i];walk;walk=walk->next)
 		{
@@ -334,7 +340,11 @@ void	recover_stochastic_model(void *_frozen)
 {
 	extern int debug_level;
 	struct stochastic_model *mod = _frozen;
-	mem = mod->mem;
-	mem_ro = mod->mem_ro;
+	if(!mod) { mem = NULL; mem_ro = NULL; }
+	else
+	{
+		mem = mod->mem;
+		mem_ro = mod->mem_ro;
+	}
 	if(mem && debug_level)printf("NOTE: max-ent model hash contains %d entries in %d slots\n", mem->entries, mem->size);
 }
