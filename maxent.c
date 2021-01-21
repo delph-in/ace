@@ -49,6 +49,7 @@ float	maxent_score_ro(int lhs, int rhs1, int rhs2, struct scoring_ancestry	*anc)
 	struct maxent_rule_key key;
 	int i;
 	float	score = 0;
+	if(!mem_ro)return 0;
 	//printf("score_ro: mem_ro entries = %d\n", mem_ro->entries);
 	//printf(" lhs %d = %s, rhs1 %d = %s, rhs2 %d, anc.rooted %d, anc.nparent_types %d [%s = %d]\n",
 		//lhs, rules[lhs]->name, rhs1, rules[rhs1]->name, rhs2, anc->rooted, anc->nparent_types, anc->parent_types[0], lookup_rule(anc->parent_types[0])->rnum);
