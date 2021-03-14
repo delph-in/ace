@@ -48,7 +48,7 @@ struct type_hierarchy	*new_type_hierarchy(char	*id, char	*topname)
 
 //int		ntypes;
 //struct type	**types;
-int		glb_type_count;
+extern int		glb_type_count;
 
 //int		nstrings;
 //struct type	**strings;
