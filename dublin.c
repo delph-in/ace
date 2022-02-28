@@ -74,7 +74,62 @@ extern char	*csaw_grammar_path;
 
 static struct tree	*dublin_tree;
 static struct edge	*dublin_root;
+static struct lexical_chart *dublin_lexical_chart;
 
+static void dublin_got_edge(struct tree	*tx, struct dg	*d)
+{
+	int i;
+	struct edge	*e = NULL;
+	if(tx->ndaughters==1 && tx->daughters[0]->ndaughters==0)
+	{
+		// lexical; these should all be on the agenda already
+		e = find_lex_edge(dublin_lexical_chart, tx);
+		assert(e!=NULL);
+		//printf("found preexisting lexeme edge #%d for dublin lex %s\n", e->id, e->lex->word);
+	}
+	else
+	{
+		struct rule	*r = lookup_rule(tx->label);
+		assert(r != NULL);
+		if(r->lexical)
+		{
+			//printf("looking for preexisting %s[%d-%d]\n", r->name, tx->tfrom, tx->tto);
+			e = find_lexrule_edge(dublin_lexical_chart, tx);
+		}
+		if(!e)
+		{
+			e = slab_alloc(sizeof(*e));
+			bzero(e,sizeof(*e));
+			callable_generalize_certain_paths(d);	// bleach top-level type to 'sign' to be packable
+			e->dg = d;
+			e->from = tx->tfrom;
+			e->to = tx->tto;
+			e->id = next_eid();
+			// rule
+			e->rule = lookup_rule(tx->label);
+			e->have = e->need = tx->ndaughters;
+			e->daughters = slab_alloc(sizeof(void*)*e->have);
+			for(i=0;i<tx->ndaughters;i++)
+			{
+				e->daughters[i] = (void*)tx->daughters[i]->lexhead;
+				e->daughters[i]->built_on = 1;
+			}
+			if(e->rule->lexical)e->lex = e->daughters[0]->lex;
+			e->qc = extract_qc(d);
+			//printf("dublin rule edge #%d = %s\n", e->id, e->rule?e->rule->name:e->lex->word);
+			add_agenda(e);
+		}
+		else
+		{
+			//printf("found preexisting lexical rule edge #%d for dublin rule %s\n", e->id, r->name);
+		}
+	}
+	e->neps = -1;	// signal that this edge is part of the dublin tree.
+	tx->lexhead = (void*)e;
+}
+
+// XXX NOT reentrant since pulling out got_edge() which was an inner function;
+// now lexical_chart is stored in a global variable.
 void dublin_robustness(struct lattice	*lexical_chart, char	*sentence)
 {
 	if(!enable_dublin)return;
@@ -97,60 +152,10 @@ void dublin_robustness(struct lattice	*lexical_chart, char	*sentence)
 	}
 	//printf("DUBLIN tree:\n");
 	//print_tree(t,0);
-	void got_edge(struct tree	*tx, struct dg	*d)
-	{
-		int i;
-		struct edge	*e = NULL;
-		if(tx->ndaughters==1 && tx->daughters[0]->ndaughters==0)
-		{
-			// lexical; these should all be on the agenda already
-			e = find_lex_edge(lexical_chart, tx);
-			assert(e!=NULL);
-			//printf("found preexisting lexeme edge #%d for dublin lex %s\n", e->id, e->lex->word);
-		}
-		else
-		{
-			struct rule	*r = lookup_rule(tx->label);
-			assert(r != NULL);
-			if(r->lexical)
-			{
-				//printf("looking for preexisting %s[%d-%d]\n", r->name, tx->tfrom, tx->tto);
-				e = find_lexrule_edge(lexical_chart, tx);
-			}
-			if(!e)
-			{
-				e = slab_alloc(sizeof(*e));
-				bzero(e,sizeof(*e));
-				callable_generalize_certain_paths(d);	// bleach top-level type to 'sign' to be packable
-				e->dg = d;
-				e->from = tx->tfrom;
-				e->to = tx->tto;
-				e->id = next_eid();
-				// rule
-				e->rule = lookup_rule(tx->label);
-				e->have = e->need = tx->ndaughters;
-				e->daughters = slab_alloc(sizeof(void*)*e->have);
-				for(i=0;i<tx->ndaughters;i++)
-				{
-					e->daughters[i] = (void*)tx->daughters[i]->lexhead;
-					e->daughters[i]->built_on = 1;
-				}
-				if(e->rule->lexical)e->lex = e->daughters[0]->lex;
-				e->qc = extract_qc(d);
-				//printf("dublin rule edge #%d = %s\n", e->id, e->rule?e->rule->name:e->lex->word);
-				add_agenda(e);
-			}
-			else
-			{
-				//printf("found preexisting lexical rule edge #%d for dublin rule %s\n", e->id, r->name);
-			}
-		}
-		e->neps = -1;	// signal that this edge is part of the dublin tree.
-		tx->lexhead = (void*)e;
-	}
 	t->lexhead = NULL;
 	enable_robust_unification();
-	reconstruct_tree(t, got_edge);
+	dublin_lexical_chart = lexical_chart;
+	reconstruct_tree(t, dublin_got_edge);
 	disable_robust_unification();
 	dublin_tree = t;
 	dublin_root = (struct edge*)dublin_tree->lexhead;

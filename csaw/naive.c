@@ -706,9 +706,9 @@ static sort_splits(struct unpacker	*u)
 	qsort(u->splits, u->nsplits, sizeof(struct usplit), usplitcmp);
 }
 
-static void visit_local_reconstructions1(int	rid, struct rule	*r, int	*from, int	to, int	n, float	p, void	(*visitor)(float,int,int*))
+static void visit_local_reconstructions1(int	rid, struct rule	*r, int	*from, int	to, int	n, float	p, void	(*visitor)(struct unpacker*,float,int,int*), struct unpacker *u)
 {
-	if(n==r->arity)visitor(p, rid, from);
+	if(n==r->arity)visitor(u, p, rid, from);
 	else
 	{
 		if(from[n]>=to)return;	// no room
@@ -721,7 +721,7 @@ static void visit_local_reconstructions1(int	rid, struct rule	*r, int	*from, int
 				float	rp = READ_CHART(from[n], mid, r->rhs[n]);
 				if(rp == ZERO_PROB)continue;
 				from[n+1] = mid;
-				visit_local_reconstructions1(rid, r, from, to, n+1, COMBINE_PROB(p, rp), visitor);
+				visit_local_reconstructions1(rid, r, from, to, n+1, COMBINE_PROB(p, rp), visitor, u);
 			}
 		}
 		else
@@ -729,12 +729,12 @@ static void visit_local_reconstructions1(int	rid, struct rule	*r, int	*from, int
 			// next daughter has known width
 			float	rp = READ_CHART(from[n], to, r->rhs[n]);
 			if(rp == ZERO_PROB)return;
-			visit_local_reconstructions1(rid, r, from, to, n+1, COMBINE_PROB(p, rp), visitor);
+			visit_local_reconstructions1(rid, r, from, to, n+1, COMBINE_PROB(p, rp), visitor, u);
 		}
 	}
 }
 
-static void visit_local_reconstructions(int	from, int to, int	x, void (*visitor)(float,int,int*))
+static void visit_local_reconstructions(int	from, int to, int	x, void (*visitor)(struct unpacker*,float,int,int*), struct unpacker *u)
 {
 	int i;
 	assert(x>=0);
@@ -743,8 +743,20 @@ static void visit_local_reconstructions(int	from, int to, int	x, void (*visitor)
 		if(rules[i].lhs != x)continue;
 		int	_from[rules[i].arity+1];
 		_from[0] = from;
-		visit_local_reconstructions1(i, &rules[i], _from, to, 0, rules[i].p, visitor);
+		visit_local_reconstructions1(i, &rules[i], _from, to, 0, rules[i].p, visitor, u);
 	}
+}
+
+void vlu_visitor(struct unpacker *u, float score, int rule, int *from)
+{
+	u->nsplits++;
+	u->splits = realloc(u->splits, sizeof(struct usplit)*u->nsplits);
+	struct usplit	*s = &u->splits[u->nsplits-1];
+	s->score = score;
+	s->rule = rule;
+	s->from = malloc(sizeof(int)*rules[rule].arity);
+	memcpy(s->from, from, sizeof(int)*rules[rule].arity);
+	s->idx = calloc(sizeof(int),rules[rule].arity);
 }
 
 static struct unpacker	*get_unpacker(int	from, int	to, int	nonterminal)
@@ -761,18 +773,7 @@ static struct unpacker	*get_unpacker(int	from, int	to, int	nonterminal)
 	//float	best = READ_CHART(from, to, nonterminal);
 	if(nonterminal >= 0)
 	{
-		void visitor(float	score, int	rule, int	*from)
-		{
-			u->nsplits++;
-			u->splits = realloc(u->splits, sizeof(struct usplit)*u->nsplits);
-			struct usplit	*s = &u->splits[u->nsplits-1];
-			s->score = score;
-			s->rule = rule;
-			s->from = malloc(sizeof(int)*rules[rule].arity);
-			memcpy(s->from, from, sizeof(int)*rules[rule].arity);
-			s->idx = calloc(sizeof(int),rules[rule].arity);
-		}
-		visit_local_reconstructions(from, to, nonterminal, visitor);
+		visit_local_reconstructions(from, to, nonterminal, vlu_visitor, u);
 		sort_splits(u);
 	}
 	else
@@ -875,7 +876,7 @@ static struct tree	*unpack(struct unpacker	*u, int	n)
 
 static float	beam_width = 0;
 
-void	csaw_parse_these_tokens(int	nbest, void (*visitor)(struct tree	*t))
+void	csaw_parse_these_tokens(int	nbest, void (*visitor)(struct tree	*t, void *ctx), void *visitorctx)
 {
 	start_timer(ctimer);
 
@@ -948,7 +949,7 @@ void	csaw_parse_these_tokens(int	nbest, void (*visitor)(struct tree	*t))
 			struct tree	*t = unpack(u, k);
 			if(!t)break;
 			assert(!strcmp(t->label, "TOP"));
-			visitor(t->daughters[0]);
+			visitor(t->daughters[0], visitorctx);
 		}
 		free_unpackers();
 	}

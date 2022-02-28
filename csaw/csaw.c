@@ -147,6 +147,11 @@ struct tree	*duplicate_tree(struct tree	*t)
 }
 */
 
+void csawvisitor(struct tree	*t, struct tree **FoundTree)
+{
+	*FoundTree = t;
+}
+
 struct tree	*csaw_parse_lattice(struct lattice	*lexical_chart)
 {
 // up to here, same as normal ACE parsing; all we need(?) for rest of processing is `lexical_chart'
@@ -239,15 +244,11 @@ struct tree	*csaw_parse_lattice(struct lattice	*lexical_chart)
 
 	// parse and unpack best 1 tree
 	struct tree	*found_tree = NULL;
-	void visitor(struct tree	*t)
-	{
-		clear_mrs();
-		csaw_denormalize_tree(t);
-		csaw_repair_spans(t, lexical_chart->nvertices, vtx_id_map);
-		found_tree = t;
-	}
+	clear_mrs();
+	csaw_denormalize_tree(found_tree);
+	csaw_repair_spans(found_tree, lexical_chart->nvertices, vtx_id_map);
 
-	csaw_parse_these_tokens(1, visitor);
+	csaw_parse_these_tokens(1, (void(*)(struct tree*,void*))csawvisitor, &found_tree);
 	csaw_free_chart();
 	return found_tree;
 }
