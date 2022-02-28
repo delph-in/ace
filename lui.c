@@ -1032,6 +1032,39 @@ struct edge	*first_lexical_daughter(struct edge	*e)
 	return first_lexical_daughter(e->daughters[0]);
 }
 
+void	lui_print_chart_edge_gcl2(struct edge	*e, char	*covermap)
+{
+	if(e->unpack)return;
+	e->unpack = (void*)0x1;
+	if(!covermap[e->from])
+	{
+		struct edge	*firstlex = first_lexical_daughter(e);
+		char	*yield = slab_orth_leaves(firstlex);
+		fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -(e->from+1), -(e->from+1), e->from, e->to, slab_escape(yield));
+		covermap[e->from] = 1;
+	}
+	if(e->rule)
+	{
+		struct dg *rn = feature_exists("RNAME")?
+			dg_hop(e->rule->dg, lookup_fname("RNAME")):NULL;
+		char *symb = strdup(rn?rn->xtype->name:e->rule->name);
+		if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
+		fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, symb, e->rule->name);
+		int l;
+		for(l=0;l<e->have;l++)
+			fprintf(lui_write, " %d", e->daughters[l]->id);
+		fprintf(lui_write, "]");
+	}
+	else if(e->lex)
+	{
+		fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, e->lex->word, e->lex->word);
+		fprintf(lui_write, " %d]", -(e->from+1));
+	}
+	int i;
+	for(i=0;i<e->have;i++)
+		lui_print_chart_edge_gcl2(e->daughters[i], covermap);
+}
+
 
 /* the following is a copy of lui_show_chart() that has not been fully adapted yet.
  * I started on it, and then realized I'm not sure what constitute the vertices. */
@@ -1063,42 +1096,9 @@ extern int inhibit_pack;
 	char	covermap[canonical_count];
 	bzero(covermap, canonical_count);
 
-	void	lui_print_chart_edge(struct edge	*e)
-	{
-		if(e->unpack)return;
-		e->unpack = (void*)0x1;
-		if(!covermap[e->from])
-		{
-			struct edge	*firstlex = first_lexical_daughter(e);
-			char	*yield = slab_orth_leaves(firstlex);
-			fprintf(lui_write, " #E[%d %d %d %d \"%s\" orth [ ]]", -(e->from+1), -(e->from+1), e->from, e->to, slab_escape(yield));
-			covermap[e->from] = 1;
-		}
-		if(e->rule)
-		{
-			struct dg *rn = feature_exists("RNAME")?
-				dg_hop(e->rule->dg, lookup_fname("RNAME")):NULL;
-			char *symb = strdup(rn?rn->xtype->name:e->rule->name);
-			if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
-			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, symb, e->rule->name);
-			int l;
-			for(l=0;l<e->have;l++)
-				fprintf(lui_write, " %d", e->daughters[l]->id);
-			fprintf(lui_write, "]");
-		}
-		else if(e->lex)
-		{
-			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, e->lex->word, e->lex->word);
-			fprintf(lui_write, " %d]", -(e->from+1));
-		}
-		int i;
-		for(i=0;i<e->have;i++)
-			lui_print_chart_edge(e->daughters[i]);
-	}
-
 	reset_unpacking();
 	for(i=0;i<nedge_ids;i++)
-		lui_print_chart_edge(find_gen_edge(edge_ids[i]));
+		lui_print_chart_edge_gcl2(find_gen_edge(edge_ids[i]), covermap);
 	reset_unpacking();
 
 	fprintf(lui_write, "\n");
