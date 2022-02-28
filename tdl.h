@@ -21,6 +21,7 @@ extern char	*g_diff_list_type;
 
 char	*trim_string(char	*str);
 int	process_tdl_dgs_status(char	*status, int	(*callback)(char	*lhs, struct dg	*dg, struct tdl_line	*line));
+int	process_tdl_dgs_status_r(char	*status, int	(*callback)(char	*lhs, struct dg	*dg, struct tdl_line	*line, void *ctx), void *ctx);
 int	process_mtr_status(char	*status, int	(*process)(char	*lhs, struct dg	*main_dg, struct dg	*output_override));
 int	process_tdl_status(char	*status, int	(*callback)(struct tdl_line	*line, void	*ref), void	*ref);
 //int	iterate_tdl(char	*path, int	(*callback)(char	*lhs, char	*rhs, void	*ref), void	*ref);

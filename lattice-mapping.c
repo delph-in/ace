@@ -374,20 +374,21 @@ void	process_lattice_rule_set_flow_control(struct lattice_rule_set	*rs)
 	}
 }
 
+static int	llr_callback(char	*name, struct dg	*dg, struct tdl_line	*tdl, struct lattice_rule_set	*rs)
+{
+	assert( (dg = wellform_dg(dg)) != NULL );
+	struct lattice_rule	*r = study_lattice_rule(name, dg);
+	if(!r)return -1;
+	rs->nrules++;
+	rs->rules = realloc(rs->rules, sizeof(struct lattice_rule*)*rs->nrules);
+	rs->rules[rs->nrules-1] = r;
+	return 0;
+}
+
 struct lattice_rule_set	*load_lattice_rules(char	*tdl_status)
 {
 	struct lattice_rule_set	*rs = calloc(sizeof(*rs),1);
-	int	callback(char	*name, struct dg	*dg, struct tdl_line	*tdl)
-	{
-		assert( (dg = wellform_dg(dg)) != NULL );
-		struct lattice_rule	*r = study_lattice_rule(name, dg);
-		if(!r)return -1;
-		rs->nrules++;
-		rs->rules = realloc(rs->rules, sizeof(struct lattice_rule*)*rs->nrules);
-		rs->rules[rs->nrules-1] = r;
-		return 0;
-	}
-	if(process_tdl_dgs_status(tdl_status, callback))
+	if(process_tdl_dgs_status_r(tdl_status, (int (*)(char *, struct dg *, struct tdl_line *, void *))llr_callback, rs))
 	{
 		fprintf(stderr, "token-mapping-rules: unable to load rules, bailing out.\n");
 		exit(-1);

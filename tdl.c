@@ -22,7 +22,15 @@
 #include	"version.h"
 #include	"ubertag.h"
 
+struct dagifyrctx
+{
+	int	(*callback)(char	*lhs, struct dg	*dg, struct tdl_line	*line, void *ctx);
+	int	hasctx;
+	void	*ctx;
+};
+
 int	dagify_tdl_line(struct tdl_line	*line, void	*ref);
+int	dagify_tdl_line_r(struct tdl_line	*line, void	*ref);
 int	typify_tdl_line(struct tdl_line	*line, void	*ref);
 int	load_tdl(char	*path);
 
@@ -555,6 +563,12 @@ int	process_tdl_status(char	*status, int	(*callback)(struct tdl_line	*line, void
 int	process_tdl_dgs_status(char	*status, int	(*callback)(char	*lhs, struct dg	*dg, struct tdl_line	*line))
 {
 	return process_tdl_status(status, dagify_tdl_line, callback);
+}
+
+int	process_tdl_dgs_status_r(char	*status, int	(*callback)(char	*lhs, struct dg	*dg, struct tdl_line	*line, void *ctx), void *ctx)
+{
+	struct dagifyrctx dctx = { .callback = callback, .ctx = ctx, .hasctx = 1 };
+	return process_tdl_status(status, dagify_tdl_line_r, &dctx);
 }
 
 struct type	*find_type(char	*name, int	constrain)
@@ -1266,10 +1280,17 @@ int	lexify_tdl_line(struct tdl_line	*line, void	*ref)
 
 int	dagify_tdl_line(struct tdl_line	*line, void	*ref)
 {
+	struct dagifyrctx ctx = {.callback = ref, .hasctx = 0 };
+	return dagify_tdl_line_r(line, &ctx);
+}
+
+int	dagify_tdl_line_r(struct tdl_line	*line, void	*ref)
+{
 	char	*lhs = line->lhs, *rhs = strdup(line->rhs);
 	struct dg	*dg;
 	struct type	*bt = 0;
-	int		(*callback)(char	*name, struct dg	*dg, struct tdl_line	*line) = ref;
+	struct dagifyrctx	*ctx = ref;
+	//int		(*callback)(char	*name, struct dg	*dg, struct tdl_line	*line) = ref;
 
 	if(enable_out_of_order)
 	{
@@ -1306,7 +1327,16 @@ int	dagify_tdl_line(struct tdl_line	*line, void	*ref)
 		printf("\n");
 	}*/
 
-	return callback(lhs, dg, line);
+	if(ctx->hasctx)
+	{
+		int		(*callback)(char	*name, struct dg	*dg, struct tdl_line	*line, void *ctx) = ctx->callback;
+		return callback(lhs, dg, line, ctx->ctx);
+	}
+	else
+	{
+		int		(*callback)(char	*name, struct dg	*dg, struct tdl_line	*line) = (void*)ctx->callback;
+		return callback(lhs, dg, line);
+	}
 }
 
 int	typify_tdl_line(struct tdl_line	*line, void	*ref)
