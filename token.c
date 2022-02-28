@@ -256,6 +256,16 @@ int	lattice_vertex_follows(struct lattice	*lat, struct lattice_vertex	*a, struct
 	return a->mark;
 }
 
+static void sl_traverse(struct lattice_vertex	*v, int *Id)
+{
+	int j;
+	if(v->mark)return;	// already got an id.
+	for(j=0;j<v->nfollowers;j++)
+		sl_traverse(v->followers[j]->to, Id);
+	v->id = (*Id)--;
+	v->mark = 1;
+}
+
 void	sort_lattice(struct lattice	*tc)
 {
 	/* assign consecutive numbers to each vertex,
@@ -270,20 +280,11 @@ void	sort_lattice(struct lattice	*tc)
 	for(i=0;i<tc->nvertices;i++)
 		tc->vertices[i]->mark = 0;
 	// the idea is that once we can guarantee that everything following 'v' already has a number > 'id', it is safe to assign 'id' to 'v'.
-	void traverse(struct lattice_vertex	*v)
-	{
-		int j;
-		if(v->mark)return;	// already got an id.
-		for(j=0;j<v->nfollowers;j++)
-			traverse(v->followers[j]->to);
-		v->id = id--;
-		v->mark = 1;
-	}
-	traverse(tc->end);	// make sure tc->end gets the highest id
+	sl_traverse(tc->end, &id);	// make sure tc->end gets the highest id
 	for(i=0;i<tc->nvertices;i++)
 		if(tc->vertices[i] != tc->start)
-			traverse(tc->vertices[i]);
-	traverse(tc->start);	// make sure tc->start gets the lowest id
+			sl_traverse(tc->vertices[i], &id);
+	sl_traverse(tc->start, &id);	// make sure tc->start gets the lowest id
 	assert(id == -1);
 
 	// to determine: do we need to sort the vertex array on the new IDs?
