@@ -94,29 +94,82 @@ int	ut_lookup_classcase(struct ubertagger	*ut, char	*classcase, int	insert)
 	return *cci;
 }
 
+struct ut_score_ex_ecmp_ctx
+{
+	struct ubertagger *ut;
+	char *emission;
+};
+
+int	ut_score_ex_ecmp(struct ut_score_ex_ecmp_ctx *ctx, const struct ut_emission	*a, const struct ut_emission	*b)
+{
+	char	*sa = ctx->ut->emissions + a->offset;
+	char	*sb = ctx->ut->emissions + b->offset;
+	if(a->offset==-1)sa = ctx->emission;
+	if(b->offset==-1)sb = ctx->emission;
+	int	s = strcmp(sa, sb);
+	if(s)return s;
+	s = ((int)a->classcase) - (int)b->classcase;
+	if(s)return s;
+	s = ((int)a->tag) - (int)b->tag;
+	return s;
+}
+
+void *my_bsearch_r(const void *key, const void *base, size_t nel, size_t width, void *thunk, int (*compar) (void*,const void *, const void *))
+{
+	// could be as low as 'low', definitely not as high as 'high'
+	int low = 0, high = nel;
+	while(low < high)
+	{
+		int mid = (low+high)/2;
+		int result = compar(thunk, key, base + width*mid);
+		if(result == 0)return base + width*mid;
+		if(result < 0)
+		{
+			// key is less
+			low = mid+1;
+		}
+		else
+		{
+			// key is more
+			high = mid;
+		}
+	}
+	return NULL;
+}
+
 double	ut_score_ex(struct ubertagger	*ut, int	tag, char	*emission, int	classcase)
 {
 	//double	score = SMOOTH_EMISSION;
 	//void	visitor(struct ut_emission	*e) { if(e->tag == tag)score = e->score; }
 	//hash_visit_key(ut->emission_hash, emission, (void(*)(void*))visitor);
 	//return score;
-	int	ecmp(const struct ut_emission	*a, const struct ut_emission	*b)
-	{
-		char	*sa = ut->emissions + a->offset;
-		char	*sb = ut->emissions + b->offset;
-		if(a->offset==-1)sa = emission;
-		if(b->offset==-1)sb = emission;
-		int	s = strcmp(sa, sb);
-		if(s)return s;
-		s = ((int)a->classcase) - (int)b->classcase;
-		if(s)return s;
-		s = ((int)a->tag) - (int)b->tag;
-		return s;
-	}
+	struct ut_score_ex_ecmp_ctx ctx = {ut, emission};
 	struct ut_emission	EM = {-1,tag,classcase,0};
-	struct ut_emission	*em = bsearch(&EM, ut->emission_tagscores, ut->nemissions, sizeof(struct ut_emission), (int(*)(const void*,const void*))ecmp);
+	struct ut_emission	*em = my_bsearch_r(&EM, ut->emission_tagscores, ut->nemissions, sizeof(struct ut_emission), &ctx, (int(*)(void*,const void*,const void*))ut_score_ex_ecmp);
 	if(em)return em->score;
 	else return SMOOTH_EMISSION;
+}
+
+struct ut_visit_emission_ctx
+{
+	int	tagid;
+	int	classcase;
+	struct ut_emission **result;
+};
+
+void ut_visit_emission(struct ut_visit_emission_ctx *ctx, struct ut_emission	*e)
+{
+	if(e->tag==ctx->tagid && e->classcase == ctx->classcase)*ctx->result=e;
+}
+
+int	ut_epcmp(struct ubertagger	*ut, const struct ut_emission	**a, const struct ut_emission	**b)
+{
+	int	s = strcmp(ut->emissions + (*a)->offset, ut->emissions + (*b)->offset);
+	if(s)return s;
+	s = ((int)(*a)->classcase) - (int)(*b)->classcase;
+	if(s)return s;
+	s = ((int)(*a)->tag) - (int)(*b)->tag;
+	return s;
 }
 
 ut_load_ex(struct ubertagger	*ut, char	*expath)
@@ -163,8 +216,8 @@ ut_load_ex(struct ubertagger	*ut, char	*expath)
 		int tagid = ut_lookup_tag(ut, tag, 1);
 		// this emission may already be in our table, since we're normalizing (collapsing the space of emissions sometimes)
 		struct ut_emission	*em = NULL;
-		void visitor(struct ut_emission	*e) { if(e->tag==tagid && e->classcase == classcase)em=e; }
-		hash_visit_key(ehash, emission, (void(*)(void*))visitor);
+		struct ut_visit_emission_ctx ctx = {tagid, classcase, &em};
+		hash_visit_key_r(ehash, emission, &ctx, (void(*)(void*,void*))ut_visit_emission);
 		if(!em)
 		{
 			em = malloc(sizeof(*em));
@@ -195,16 +248,7 @@ ut_load_ex(struct ubertagger	*ut, char	*expath)
 	else fclose(f);
 	//printf("loaded %d emissions\n", ut->nemissions);
 
-	int	epcmp(const struct ut_emission	**a, const struct ut_emission	**b)
-	{
-		int	s = strcmp(ut->emissions + (*a)->offset, ut->emissions + (*b)->offset);
-		if(s)return s;
-		s = ((int)(*a)->classcase) - (int)(*b)->classcase;
-		if(s)return s;
-		s = ((int)(*a)->tag) - (int)(*b)->tag;
-		return s;
-	}
-	qsort(eptrs, ut->nemissions, sizeof(void*), (int(*)(const void*,const void*))epcmp);
+	qsort_r(eptrs, ut->nemissions, sizeof(void*), ut, (int(*)(void*,const void*,const void*))ut_epcmp);
 
 	ut->emission_tagscores = malloc(sizeof(struct ut_emission) * ut->nemissions);
 	int i;
