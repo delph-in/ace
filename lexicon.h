@@ -24,7 +24,7 @@ struct generic_le_info
 	char	part_of_speech_trigger[8];
 };
 
-int	visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex));
+int	visit_lexicon_r(char	*stem, int (*visitor)(struct lexeme *lex, void *ctx), void *ctx);
 void	dump_parts_of_speech();
 int		load_lexicon();
 struct dg	*expand_lexeme(struct lexeme	*l);

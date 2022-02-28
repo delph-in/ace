@@ -138,6 +138,107 @@ char	*mbsdowncase(char	*mbsin)
 	return mbsout;
 }
 
+struct lex_handler_ctx
+{
+	struct lattice_edge	*lat_e;
+	struct token		*t;
+	struct ochart_edge	*e;
+	struct token		*mwe_trace[10];
+	void				(*edge_handler)(struct edge	*e, struct token	**tokens, void *ctx);
+	void				*edge_handler_ctx;
+};
+
+int	mwe_lex_handler(struct lexeme	*lex, struct lattice_edge	*mwe_lat_e, int	pos, struct lex_handler_ctx	*ctx)
+{
+	struct token	*tok = mwe_lat_e->token;
+	int	nles = 0, i;
+	ctx->mwe_trace[pos] = tok;
+	if(pos < lex->stemlen-1)
+	{
+		// try to align one more token to lex[pos]
+		if(pos==0)
+		{
+			// the 0th position in MWEs can only have prefix orules
+			if(!is_type_only_oedge(ctx->e, or_prefix))return 0;
+		}
+		else if(pos < (lex->stemlen - 1))
+		{
+			// the inner positions in MWEs can't have any orules
+			char	stemcmp[1024];
+			snprintf(stemcmp, 1023, "\"%s\"", tok->string);
+			if(strcasecmp(lex->stem[pos]->name, stemcmp))return 0;
+		}
+		for(i=0;i<mwe_lat_e->to->nfollowers;i++)
+			nles += mwe_lex_handler(lex, mwe_lat_e->to->followers[i], pos+1, ctx);
+		return nles;
+	}
+	else
+	{
+		int	noroutes = 0;
+		struct oroute	*oroutes = NULL;
+
+		// the end position in MWEs can only have suffix orules
+		// see if there's a hypothesized form that can be reached just by suffixes
+		// and that matches the MWE's stem form
+		for(i=0;i<tok->oc->nedges;i++)
+		{
+			struct ochart_edge	*e2 = tok->oc->edges[i];
+			char	stemcmp[1024];
+			snprintf(stemcmp, 1023, "\"%s\"", e2->form);
+			if(strcasecmp(lex->stem[pos]->name, stemcmp))continue;
+			if(is_type_only_oedge(e2, or_suffix))
+			{
+				// yes, 'e2' represents a plausible analysis of
+				//   this token as the last part of this MWE
+				break;
+			}
+		}
+		if(i==tok->oc->nedges)return 0;	// nope.
+
+		// we have a full alignment of lex onto the token chart,
+		// specifically lex[k] => mwe_trace[k]
+		struct edge	*le = lexical_edge(lex, ctx->lat_e->from->id, mwe_lat_e->to->id - ctx->lat_e->from->id, 0);
+		// go through the analyses of the last token again and record all the possible oroutes
+		for(i=0;i<tok->oc->nedges;i++)
+		{
+			struct ochart_edge	*e2 = tok->oc->edges[i];
+			char	stemcmp[1024];
+			snprintf(stemcmp, 1023, "\"%s\"", e2->form);
+			if(strcasecmp(lex->stem[pos]->name, stemcmp))continue;
+			if(is_type_only_oedge(e2, or_suffix))
+			{
+				// yes, 'e2' represents a plausible analysis of
+				//   this token as the last part of this MWE
+				add_mwe_routes(le, ctx->e, e2);
+			}
+		}
+		if(install_tokens_in_le(le, ctx->mwe_trace) != 0)return 0;
+		ctx->edge_handler(le, ctx->mwe_trace, ctx->edge_handler_ctx);
+		return 1;
+	}
+}
+
+int lex_handler(struct lexeme *lex, struct lex_handler_ctx	*ctx)
+{
+	int k;
+	struct edge			*le = 0;
+	if(disable_signs && strstr(disable_signs, lex->word))return 0;
+	if(lex->stemlen!=1)
+		return mwe_lex_handler(lex, ctx->lat_e, 0, ctx);
+	else
+	{
+		le = lexical_edge(lex, ctx->lat_e->from->id, ctx->lat_e->to->id - ctx->lat_e->from->id, 0);
+		le->north_routes = ctx->e->north_routes;
+		le->orth_routes = ctx->e->orth_routes;
+		if(install_tokens_in_le(le, &ctx->t) != 0)return 0;
+		extern int form_to_relation;
+		if(form_to_relation)
+			show_form_to_relation(le, &ctx->t);
+		ctx->edge_handler(le, &ctx->t, ctx->edge_handler_ctx);
+		return 1;
+	}
+}
+
 int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, struct token	**tokens, void *ctx), void *ctx)
 {
 	int				i, j, k;
@@ -201,98 +302,10 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 		for(j=0;j<oc->nedges;j++)
 		{
 			struct ochart_edge *e = oc->edges[j];
-			struct token	*mwe_trace[10];
-
-			int	mwe_lex_handler(struct lexeme	*lex, struct lattice_edge	*mwe_lat_e, int	pos)
-			{
-				struct token	*tok = mwe_lat_e->token;
-				int	nles = 0, i;
-				mwe_trace[pos] = tok;
-				if(pos < lex->stemlen-1)
-				{
-					// try to align one more token to lex[pos]
-					if(pos==0)
-					{
-						// the 0th position in MWEs can only have prefix orules
-						if(!is_type_only_oedge(e, or_prefix))return 0;
-					}
-					else if(pos < (lex->stemlen - 1))
-					{
-						// the inner positions in MWEs can't have any orules
-						char	stemcmp[1024];
-						snprintf(stemcmp, 1023, "\"%s\"", tok->string);
-						if(strcasecmp(lex->stem[pos]->name, stemcmp))return 0;
-					}
-					for(i=0;i<mwe_lat_e->to->nfollowers;i++)
-						nles += mwe_lex_handler(lex, mwe_lat_e->to->followers[i], pos+1);
-					return nles;
-				}
-				else
-				{
-					int	noroutes = 0;
-					struct oroute	*oroutes = NULL;
-
-					// the end position in MWEs can only have suffix orules
-					// see if there's a hypothesized form that can be reached just by suffixes
-					// and that matches the MWE's stem form
-					for(i=0;i<tok->oc->nedges;i++)
-					{
-						struct ochart_edge	*e2 = tok->oc->edges[i];
-						char	stemcmp[1024];
-						snprintf(stemcmp, 1023, "\"%s\"", e2->form);
-						if(strcasecmp(lex->stem[pos]->name, stemcmp))continue;
-						if(is_type_only_oedge(e2, or_suffix))
-						{
-							// yes, 'e2' represents a plausible analysis of
-							//   this token as the last part of this MWE
-							break;
-						}
-					}
-					if(i==tok->oc->nedges)return 0;	// nope.
-
-					// we have a full alignment of lex onto the token chart,
-					// specifically lex[k] => mwe_trace[k]
-					struct edge	*le = lexical_edge(lex, lat_e->from->id, mwe_lat_e->to->id - lat_e->from->id, 0);
-					// go through the analyses of the last token again and record all the possible oroutes
-					for(i=0;i<tok->oc->nedges;i++)
-					{
-						struct ochart_edge	*e2 = tok->oc->edges[i];
-						char	stemcmp[1024];
-						snprintf(stemcmp, 1023, "\"%s\"", e2->form);
-						if(strcasecmp(lex->stem[pos]->name, stemcmp))continue;
-						if(is_type_only_oedge(e2, or_suffix))
-						{
-							// yes, 'e2' represents a plausible analysis of
-							//   this token as the last part of this MWE
-							add_mwe_routes(le, e, e2);
-						}
-					}
-					if(install_tokens_in_le(le, mwe_trace) != 0)return 0;
-					edge_handler(le, mwe_trace, ctx);
-					return 1;
-				}
-			}
-			int lex_handler(struct lexeme *lex)
-			{
-				int k;
-				struct edge			*le = 0;
-				if(disable_signs && strstr(disable_signs, lex->word))return 0;
-				if(lex->stemlen!=1)
-					return mwe_lex_handler(lex, lat_e, 0);
-				else
-				{
-					le = lexical_edge(lex, lat_e->from->id, lat_e->to->id-lat_e->from->id, 0);
-					le->north_routes = e->north_routes;
-					le->orth_routes = e->orth_routes;
-					if(install_tokens_in_le(le, &t) != 0)return 0;
-					extern int form_to_relation;
-					if(form_to_relation)
-						show_form_to_relation(le, &t);
-					edge_handler(le, &t, ctx);
-					return 1;
-				}
-			}
-			visit_lexicon(e->form, lex_handler);
+			//struct token	*mwe_trace[10];
+			struct lex_handler_ctx	lhctx =
+				{.lat_e = lat_e, .t = t, .e = e, .edge_handler = edge_handler, .edge_handler_ctx = ctx};
+			visit_lexicon_r(e->form, (int(*)(struct lexeme*,void*))lex_handler, &lhctx);
 		}
 /*#ifdef	USE_GENERICS
 		char	*carg = get_token_carg(t);

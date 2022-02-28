@@ -150,7 +150,7 @@ int	mbswcscasecmp(char	*mbs, wchar_t	*wcs)
 	return r;
 }
 
-int	visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex))
+int	visit_lexicon_r(char	*stem, int (*visitor)(struct lexeme *lex, void *ctx), void *ctx)
 {
 	int		num=0;
 	wchar_t		stemcmp[1024];
@@ -169,9 +169,9 @@ int	visit_lexicon(char	*stem, int (*visitor)(struct lexeme *lex))
 	{
 		i=k;
 		for(i=k;i<nlexemes && !mbswcscasecmp(lexemes[i]->stem[0]->name, stemcmp);i++)
-			num += visitor(lexemes[i]);
+			num += visitor(lexemes[i], ctx);
 		for(i=k-1;i>=0 && !mbswcscasecmp(lexemes[i]->stem[0]->name, stemcmp);i--)
-			num += visitor(lexemes[i]);
+			num += visitor(lexemes[i], ctx);
 	}
 	return num;
 }
