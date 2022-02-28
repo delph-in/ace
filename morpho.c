@@ -1152,31 +1152,32 @@ int	load_lrules()
 	return 0;
 }
 
+char	*irreg_dir = NULL;
+int	irreg_hits = 0;
+
+int load_irregulars_table(char	*path)
+{
+	char	*mypath = malloc(strlen(irreg_dir) + strlen(path) + 8);
+	sprintf(mypath, "%s/%s", irreg_dir, path);
+	//printf("real path to irregulars file: %s\n", mypath);
+	show_task_name("reading irregular forms");
+	printf("from %s\n", path);
+	if(load_irregulars(mypath))
+	{
+		fprintf(stderr, "inflr: unable to load irregulars table `%s'.\n", path);
+		exit(-1);
+	}
+	free(mypath);
+	irreg_hits++;
+	return 0;
+}
+
 load_all_irregulars()
 {
-	int	hits = 0;
-	char	*dir;
-	if(get_conf("irregular-forms"))dir = get_conf_parent_dir("irregular-forms");
-	else dir = get_conf_parent_dir("grammar-top");
-	int callback(char	*path)
-	{
-		char	*mypath = malloc(strlen(dir) + strlen(path) + 8);
-		sprintf(mypath, "%s/%s", dir, path);
-		//printf("real path to irregulars file: %s\n", mypath);
-		show_task_name("reading irregular forms");
-		printf("from %s\n", path);
-		if(load_irregulars(mypath))
-		{
-			fprintf(stderr, "inflr: unable to load irregulars table `%s'.\n", path);
-			exit(-1);
-		}
-		free(mypath);
-		hits++;
-		return 0;
-	}
-	iterate_conf_list("irregular-forms", callback);
-	if(!hits) callback("../irregs.tab");
-	free(dir);
+	if(get_conf("irregular-forms"))irreg_dir = get_conf_parent_dir("irregular-forms");
+	else irreg_dir = get_conf_parent_dir("grammar-top");
+	iterate_conf_list("irregular-forms", load_irregulars_table);
+	if(!irreg_hits) load_irregulars_table("../irregs.tab");
 	return 0;
 }
 

@@ -87,13 +87,6 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl_unused, struct sco
 	char	hkey[512];
 	int	space = 511;
 
-	void visitor(struct maxent_feature *feat)
-	{
-		int	i;
-		//nmaxent_visits++;
-		ret += feat->score;
-	}
-
 	//nmaxent_requests++;
 
 	//return (double)rand()/RAND_MAX - 0.5;
@@ -107,7 +100,6 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl_unused, struct sco
 		//if(ngp) hkp += safe_snprintf(hkp, 511 - (hkp-hkey), ":%s", anc->parent_types[ngp-1]);
 		if(ngp) hkp += safe_snprintf(hkp, 511 - (hkp-hkey), ":%s", rules[anc->gprnum[ngp-1]]->name);
 		MAXENT_NOISE("scoring key = %s\n", hkey);
-		//hash_visit_key(mem, hkey, (void(*)(void*))visitor);
 		struct maxent_feature	*feat = hash_find(mem, hkey);
 		if(feat)ret += feat->score;
 		//nmaxent_lookups++;
@@ -116,7 +108,6 @@ float	maxent_score(char *lhs, char *rhs1, char *rhs2, int rtl_unused, struct sco
 	{
 		hkp += safe_snprintf(hkp, 511 - (hkp-hkey), ":^");
 		MAXENT_NOISE("scoring key = %s\n", hkey);
-		//hash_visit_key(mem, hkey, (void(*)(void*))visitor);
 		struct maxent_feature	*feat = hash_find(mem, hkey);
 		if(feat)ret += feat->score;
 		//nmaxent_lookups++;
