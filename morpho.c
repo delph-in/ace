@@ -578,6 +578,20 @@ void	add_ochart_edge(struct ochart_edge	*parent, struct ochart *chart, char *for
 	add_oparent(edge, parent, rule);
 }
 
+struct visit_irreg_stem_ctx
+{
+	struct ochart_edge	*edge;
+	struct ochart		*chart;
+	struct orule		*or;
+	int					depth;
+};
+
+void visit_irreg_stem(struct visit_irreg_stem_ctx	*ctx, char	*stem)
+{
+	//printf("irregular: %s -> %s\n", ctx->edge->form, stem);
+	add_ochart_edge(ctx->edge, ctx->chart, stem, ctx->or, ctx->depth+1);
+}
+
 void	expand_ochart_edge(struct ochart_edge	*edge, struct ochart *chart)
 {
 	int i, j;
@@ -604,12 +618,8 @@ void	expand_ochart_edge(struct ochart_edge	*edge, struct ochart *chart)
 			// of one base form AND the regular spelling of a DIFFERENT base form.
 			// continue;
 		}*/
-		void visit_irreg_stem(char	*stem)
-		{
-			//printf("irregular: %s -> %s\n", form, stem);
-			add_ochart_edge(edge, chart, stem, or, depth+1);
-		}
-		hash_visit_key(or->irregs_form_to_stem, form, (void(*)(void*))visit_irreg_stem);
+		struct visit_irreg_stem_ctx	vis_ctx = {.edge = edge, .chart = chart, .or = or, .depth = depth};
+		hash_visit_key_r(or->irregs_form_to_stem, form, &vis_ctx, (void(*)(void*,void*))visit_irreg_stem);
 
 		for(j=or->nsub-1;j>=0;j--)
 		{
