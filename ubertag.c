@@ -24,6 +24,8 @@
 
 int	enable_ubertagging = 0;
 
+struct ubertagger	*the_ubertagger;
+
 void	ut_normalize_emission(char	*em_mbs)
 {
 	wchar_t	*em_wcs = towide(em_mbs);
@@ -122,16 +124,16 @@ void *my_bsearch_r(const void *key, const void *base, size_t nel, size_t width, 
 	{
 		int mid = (low+high)/2;
 		int result = compar(thunk, key, base + width*mid);
-		if(result == 0)return base + width*mid;
+		if(result == 0)return (void*)(base + width*mid);
 		if(result < 0)
 		{
-			// key is less
-			low = mid+1;
+			// key comes before mid
+			high = mid;
 		}
 		else
 		{
-			// key is more
-			high = mid;
+			// key comes after mid
+			low = mid+1;
 		}
 	}
 	return NULL;
@@ -146,6 +148,19 @@ double	ut_score_ex(struct ubertagger	*ut, int	tag, char	*emission, int	classcase
 	struct ut_score_ex_ecmp_ctx ctx = {ut, emission};
 	struct ut_emission	EM = {-1,tag,classcase,0};
 	struct ut_emission	*em = my_bsearch_r(&EM, ut->emission_tagscores, ut->nemissions, sizeof(struct ut_emission), &ctx, (int(*)(void*,const void*,const void*))ut_score_ex_ecmp);
+	int	ecmp(const struct ut_emission	*a, const struct ut_emission	*b)
+	{
+		char	*sa = ut->emissions + a->offset;
+		char	*sb = ut->emissions + b->offset;
+		if(a->offset==-1)sa = emission;
+		if(b->offset==-1)sb = emission;
+		int	s = strcmp(sa, sb);
+		if(s)return s;
+		s = ((int)a->classcase) - (int)b->classcase;
+		if(s)return s;
+		s = ((int)a->tag) - (int)b->tag;
+		return s;
+	}
 	if(em)return em->score;
 	else return SMOOTH_EMISSION;
 }
@@ -162,9 +177,9 @@ void ut_visit_emission(struct ut_visit_emission_ctx *ctx, struct ut_emission	*e)
 	if(e->tag==ctx->tagid && e->classcase == ctx->classcase)*ctx->result=e;
 }
 
-int	ut_epcmp(struct ubertagger	*ut, const struct ut_emission	**a, const struct ut_emission	**b)
+int	ut_epcmp(const struct ut_emission	**a, const struct ut_emission	**b)
 {
-	int	s = strcmp(ut->emissions + (*a)->offset, ut->emissions + (*b)->offset);
+	int	s = strcmp(the_ubertagger->emissions + (*a)->offset, the_ubertagger->emissions + (*b)->offset);
 	if(s)return s;
 	s = ((int)(*a)->classcase) - (int)(*b)->classcase;
 	if(s)return s;
@@ -248,7 +263,7 @@ ut_load_ex(struct ubertagger	*ut, char	*expath)
 	else fclose(f);
 	//printf("loaded %d emissions\n", ut->nemissions);
 
-	qsort_r(eptrs, ut->nemissions, sizeof(void*), ut, (int(*)(void*,const void*,const void*))ut_epcmp);
+	qsort(eptrs, ut->nemissions, sizeof(void*), (int(*)(const void*,const void*))ut_epcmp);
 
 	ut->emission_tagscores = malloc(sizeof(struct ut_emission) * ut->nemissions);
 	int i;
@@ -448,6 +463,7 @@ ut_load_gm(struct ubertagger	*ut, char	*genmappath)
 struct ubertagger	*load_ubertagger(char	*expath, char	*txpath, char	*genmappath)
 {
 	struct ubertagger	*ut = calloc(sizeof(struct ubertagger),1);
+	the_ubertagger = ut;
 	ut->tag_hash = hash_new("ut-tags");
 	ut->start_tag = ut_lookup_tag(ut, "<S>", 1);
 	ut->end_tag = ut_lookup_tag(ut, "<E>", 1);
@@ -489,8 +505,6 @@ void load_hashlist(struct hash	*h, char	*path)
 	}
 	fclose(f);
 }
-
-struct ubertagger	*the_ubertagger;
 
 int	load_ubertagging()
 {
