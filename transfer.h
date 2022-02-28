@@ -73,7 +73,7 @@ int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callbac
 struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg, struct dg	*output_override);
 
 int	study_trigger_rule(char	*name, struct dg	*main_dg, struct dg	*output_override);
-void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct dg	*cons));
+void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct dg	*cons, void	*ctx), void	*ctx);
 
 extern char	*non_idiom_root;
 int	study_idiom_rule(char	*name, struct dg	*main_dg, struct dg	*output_override);

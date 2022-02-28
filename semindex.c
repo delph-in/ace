@@ -731,6 +731,59 @@ void	check_triggers(int	nx, char	**x, int	ny, char	**y)
 	fflush(logf);
 }
 
+struct triggerlist
+{
+	int			ntriggers;
+	char		**triggers;
+	struct dg	**trigcons;
+};
+
+void	add_vac(char	*lexid, struct dg	*cons, struct triggerlist	*trigs)
+{
+	//printf("trigger %s %p\n", lexid, cons);
+	int	i, packed = 0;
+	for(i=0;i<trigs->ntriggers;i++)
+		if(!strcmp(lexid, trigs->triggers[i]))
+		{
+			if(!cons)
+			{
+				// specificied with no constraint
+				// automatically subsumes all other triggerings of this lexid
+				trigs->trigcons[i] = NULL;
+				packed = 1;
+				continue;
+			}
+			if(!trigs->trigcons[i])
+			{
+				// a previous rule triggered this same lexid with no constraint;
+				// we don't need a constrained version.
+				return;
+			}
+			int res = equivalent_dg(trigs->trigcons[i], cons,1,1,0);
+			if(res == 2 || res == 1)
+			{
+				// a previous rule triggered a more general constraint.
+				return;
+			}
+			if(res == -1)
+			{
+				// a previous rule triggered a less general constraint
+				if(!packed)
+					trigs->trigcons[i] = cons;
+				else trigs->trigcons[i] = NULL;
+				packed = 1;
+				continue;
+			}
+		}
+	if(packed)return;
+	trigs->ntriggers++;
+	trigs->triggers = realloc(trigs->triggers, sizeof(char*)*trigs->ntriggers);
+	trigs->triggers[trigs->ntriggers-1] = strdup(lexid);
+	trigs->trigcons = realloc(trigs->trigcons, sizeof(struct dg*)*trigs->ntriggers);
+	trigs->trigcons[trigs->ntriggers-1] = cons;
+	//printf("trigger %s with constraint %p\n", lexid, cons);
+}
+
 // driver
 
 void semantic_lookup(struct mrs	*mrs)
@@ -775,83 +828,15 @@ void semantic_lookup(struct mrs	*mrs)
 		count += instantiate_alignment(awalk);
 
 	// finally, add vacuous entities
-	int	ntriggers = 0;
-	char	**triggers = NULL;
-	struct dg	**trigcons = NULL;
-	void	add_vac(char	*lexid, struct dg	*cons)
-	{
-		//printf("trigger %s %p\n", lexid, cons);
-		int	i, packed = 0;
-		for(i=0;i<ntriggers;i++)
-			if(!strcmp(lexid, triggers[i]))
-			{
-				if(!cons)
-				{
-					// specificied with no constraint
-					// automatically subsumes all other triggerings of this lexid
-					trigcons[i] = NULL;
-					packed = 1;
-					continue;
-				}
-				if(!trigcons[i])
-				{
-					// a previous rule triggered this same lexid with no constraint;
-					// we don't need a constrained version.
-					return;
-				}
-				int res = equivalent_dg(trigcons[i], cons,1,1,0);
-				if(res == 2 || res == 1)
-				{
-					// a previous rule triggered a more general constraint.
-					return;
-				}
-				if(res == -1)
-				{
-					// a previous rule triggered a less general constraint
-					if(!packed)
-						trigcons[i] = cons;
-					else trigcons[i] = NULL;
-					packed = 1;
-					continue;
-				}
-			}
-		if(packed)return;
-		ntriggers++;
-		triggers = realloc(triggers, sizeof(char*)*ntriggers);
-		triggers[ntriggers-1] = strdup(lexid);
-		trigcons = realloc(trigcons, sizeof(struct dg*)*ntriggers);
-		trigcons[ntriggers-1] = cons;
-		//printf("trigger %s with constraint %p\n", lexid, cons);
-	}
-	activate_trigger_rules(mrs, add_vac);
+	struct triggerlist	trigs = {.ntriggers = 0, .triggers = NULL, .trigcons = NULL};
+	activate_trigger_rules(mrs, (void(*)(char*,struct dg*,void*))add_vac, &trigs);
 	//printf("triggered %d vacuous lexemes\n", ntriggers);
-	//check_triggers(ntriggers, triggers, mrs->ntriggers, mrs->triggers);
-	count += evacuate(ntriggers, triggers, trigcons);
+	count += evacuate(trigs.ntriggers, trigs.triggers, trigs.trigcons);
 	//count += evacuate(mrs->ntriggers, mrs->triggers);
-	if(0)
-	{
-		int	j;
-		for(i=0;i<mrs->ntriggers;i++)
-		{
-			for(j=0;j<ntriggers;j++)
-				if(!strcmp(triggers[j], mrs->triggers[i]))break;
-			if(j==ntriggers)
-			{
-				//fprintf(stderr, "TRIGGER_DEBUG: '%s' missing\n", mrs->triggers[i]);
-			}
-		}
-		for(i=0;i<ntriggers;i++)
-		{
-			for(j=0;j<mrs->ntriggers;j++)
-				if(!strcmp(triggers[i], mrs->triggers[j]))break;
-			if(j==mrs->ntriggers)
-			{
-				//fprintf(stderr, "TRIGGER_DEBUG: '%s' extra\n", triggers[i]);
-			}
-		}
-	}
-	for(i=0;i<ntriggers;i++)free(triggers[i]);
-	if(triggers)free(triggers);
+	if(0)check_triggers(trigs.ntriggers, trigs.triggers, mrs->ntriggers, mrs->triggers);
+	for(i=0;i<trigs.ntriggers;i++)free(trigs.triggers[i]);
+	if(trigs.triggers)free(trigs.triggers);
+	if(trigs.trigcons)free(trigs.trigcons);
 
 	if(debug_level)printf("added %d grammar entities\n", count);
 }

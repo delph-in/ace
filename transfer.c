@@ -1090,7 +1090,7 @@ int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callbac
 	return align_transfer_rule0(tr, mrs, 0, tr->input.neps + tr->context.neps, alignment, 0, tr->input.nhcons + tr->context.nhcons, hcalignment, callback, 0);
 }
 
-void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct dg	*cons))
+void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct dg	*cons, void	*ctx), void	*ctx)
 {
 	int	i;
 	/*printf("input MRS var DGs:\n");
@@ -1140,7 +1140,7 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 					//printf("triggering '%s' via '%s', and TRIGGER-CONSTRAINT is:\n", lexid, trigger_rules[i]->name);
 					//print_dg(dg);printf("\n");
 				}
-				trigger(lexid, trigcons);
+				trigger(lexid, trigcons, ctx);
 			}
 			if(trigcons)return 0;	// might find more alignments with different constraints
 			else return 1;	// don't care to hear about more alignments; it's triggered.
