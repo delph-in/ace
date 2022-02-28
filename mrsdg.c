@@ -324,6 +324,7 @@ void	dg_to_mrs_ic(struct dg *dg, struct mrs_vlist *vlist, struct mrs_icons	*ic)
 	ic->right = dg_to_mrs_var(dg_hop(dg, icons_right_feature), vlist);
 }
 
+/*
 #define	DO_DIFFLIST(dlist, args, code) do { void lambda(args) {code} do_difflist(dlist, lambda); } while(0)
 
 #define	DO_LIST(dlist, args, code) do { void lambda(args) {code} do_list(dlist, lambda); } while(0)
@@ -341,6 +342,22 @@ void do_difflist(struct dg *dlist, void (*process)(struct dg *item))
 	struct dg *list = dg_hop(dlist, lookup_fname("LIST"));
 	do_list(list, process);
 }
+*/
+
+#define	DO_LIST(dlist, args, code) do { \
+	struct dg *item, *list = dlist; \
+	if(list) for(item=dg_hop(list,1);list && item;list=dg_hop(list,2),item=dg_hop(list,1)) { \
+		args = item; \
+		code \
+	} } while(0)
+
+#define	DO_DIFFLIST(dlist, args, code) do { \
+	struct dg *item, *difflist = dlist; \
+	struct dg *list = dg_hop(dlist, lookup_fname("LIST")); \
+	if(list) for(item=dg_hop(list,1);list && item;list=dg_hop(list,2),item=dg_hop(list,1)) { \
+		args = item; \
+		code \
+	} } while(0)
 
 struct profiler	*mrs_profiler, *mrs_rels_profiler, *mrs_hcons_profiler;
 
