@@ -720,7 +720,7 @@ again:
 	if(hyp->dg == (void*)1)
 	{
 		DEBUG("checkup failed for edge #%d hypothesis: ", hyp->eid);
-		//print_hypothesis(hyp, printf, 0); printf("\n");
+		//print_hypothesis(hyp, ctxprintf, NULL, 0); printf("\n");
 		goto again;
 	}
 
@@ -1085,7 +1085,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 					//printf("when combining edges #%d and #%d under rule %s\n",
 					//	h->edge->id, h->rhslist[i]->edge->id, h->edge->rule->name);
 					//unify_backtrace();
-					//print_hypothesis(h, printf, 0); printf("\n\n");
+					//print_hypothesis(h, ctxprintf, NULL, 0); printf("\n\n");
 					forget_tmp();
 					h->dg = (void*)1;
 					/*if(!(h->dec->checked & (1<<i)))
@@ -1277,7 +1277,8 @@ struct lexeme	*get_leaf_lex(struct hypothesis	*hyp)
 struct phf_pt0_ctx
 {
 	int	labelled;
-	int (*print)(const char *fmt,...);
+	int (*print)(void	*ctx, const char *fmt,...);
+	void	*printctx;
 };
 
 void	phf_print_tree0(struct hypothesis *hyp, int from, char	**genwordforms, struct phf_pt0_ctx	*ctx)
@@ -1322,9 +1323,9 @@ void	phf_print_tree0(struct hypothesis *hyp, int from, char	**genwordforms, stru
 		}
 	}
 	if(!ctx->labelled)
-		ctx->print(" (%d %s%s%s %f %d %d", hyp->eid, sign, udx_at, udx_type,
+		ctx->print(ctx->printctx, " (%d %s%s%s %f %d %d", hyp->eid, sign, udx_at, udx_type,
 						hyp->score, from, from+hyp->toklen);
-	else ctx->print(" (\"%s\"", label_dag(hyp->dg, "?"));
+	else ctx->print(ctx->printctx, " (\"%s\"", label_dag(hyp->dg, "?"));
 	if(e->have)
 	{
 		for(i=0;i<e->have;i++)
@@ -1343,15 +1344,15 @@ void	phf_print_tree0(struct hypothesis *hyp, int from, char	**genwordforms, stru
 				tokens[i] = (struct token*)e->daughters[i];
 			else tokens[i] = gen_extract_one_token(hyp, i, genwordforms[i]);
 		}
-		ctx->print(" (\"");
+		ctx->print(ctx->printctx, " (\"");
 		for(i=0;i<ntokens;i++)
 		{
 			struct token	*tok = tokens[i];
 			char	*form = tok->string;
-			if(i>0)ctx->print(" ");
-			ctx->print("%s", slab_escape(form));
+			if(i>0)ctx->print(ctx->printctx, " ");
+			ctx->print(ctx->printctx, "%s", slab_escape(form));
 		}
-		ctx->print("\"");
+		ctx->print(ctx->printctx, "\"");
 
 		if(enable_token_avms)
 		{
@@ -1373,16 +1374,16 @@ void	phf_print_tree0(struct hypothesis *hyp, int from, char	**genwordforms, stru
 						tokstr = slab_escape(token_str);
 						dstr_save((void*)tok, from, tokstr);
 					}
-					ctx->print(" %d \"%s\"", id, tokstr);
+					ctx->print(ctx->printctx, " %d \"%s\"", id, tokstr);
 				}
 			}
 		}
-		ctx->print(")");
+		ctx->print(ctx->printctx, ")");
 	}
-	ctx->print(")");
+	ctx->print(ctx->printctx, ")");
 }
 
-void print_hypothesis_from(struct hypothesis *hyp, int (*print)(const char *fmt,...), int	labelled, int	_from)
+void print_hypothesis_from(struct hypothesis *hyp, int (*print)(void *ctx, const char *fmt,...), void *printctx, int	labelled, int	_from)
 {
 	static int timer = -1;
 	if(timer==-1)timer = new_timer("derivation printing");
@@ -1398,45 +1399,61 @@ void print_hypothesis_from(struct hypothesis *hyp, int (*print)(const char *fmt,
 		if(enable_dublin && !root)
 			root = "CSAW_ROBUST";
 		assert(root != NULL);
-		print(" (%s", root);
+		print(printctx, " (%s", root);
 	}
-	struct phf_pt0_ctx	ctx = {.labelled = labelled, .print = print};
+	struct phf_pt0_ctx	ctx = {.labelled = labelled, .print = print, .printctx = printctx};
 	phf_print_tree0(hyp, _from, NULL, &ctx);
-	if(derivations_include_roots)print(")");
+	if(derivations_include_roots)print(printctx, ")");
 	//set_slabstate(&st);
 	stop_timer(timer, 1);
 }
 
-void print_hypothesis(struct hypothesis *hyp, int (*print)(const char *fmt,...), int	labelled)
+int ctxprintf(void *ctx, char *fmt, ...)
 {
-	print_hypothesis_from(hyp, print, labelled, 0);
+	va_list	v;
+	va_start(v, fmt);
+	int	l = vprintf(fmt, v);
+	va_end(v);
+	return l;
+}
+
+void print_hypothesis(struct hypothesis *hyp, int (*print)(void*ctx, const char *fmt,...), void	*printctx, int	labelled)
+{
+	print_hypothesis_from(hyp, print, printctx, labelled, 0);
+}
+
+struct dprintf_ctx
+{
+	char	*derivation;
+	int		dalen, dlen;
+};
+
+int	dprintf_wctx(struct dprintf_ctx	*ctx, const char	*fmt, ...)
+{
+	va_list	v;
+	va_start(v, fmt);
+	int	l = vsnprintf(ctx->derivation+ctx->dlen, ctx->dalen-ctx->dlen, fmt, v);
+	va_end(v);
+	if(l >= ctx->dalen-ctx->dlen)
+	{
+		va_list v2;
+		va_start(v2, fmt);
+		ctx->dalen += l + 10240 ;
+		ctx->derivation = realloc(ctx->derivation, ctx->dalen);
+		l = vsnprintf(ctx->derivation+ctx->dlen, ctx->dalen-ctx->dlen, fmt, v2);
+		va_end(v2);
+	}
+	ctx->dlen += l;
+	return l;
 }
 
 char	*hypothesis_to_dstring_from(struct hypothesis	*h, int	_from)
 {
-	char	*derivation = malloc(10240);
-	int		dalen = 10240, dlen = 0;
-	*derivation = 0;
-	int	dprintf(const char	*fmt, ...)
-	{
-		va_list	v;
-		va_start(v, fmt);
-		int	l = vsnprintf(derivation+dlen, dalen-dlen, fmt, v);
-		va_end(v);
-		if(l >= dalen-dlen)
-		{
-			va_list v2;
-			va_start(v2, fmt);
-			dalen += l + 10240 ;
-			derivation = realloc(derivation, dalen);
-			l = vsnprintf(derivation+dlen, dalen-dlen, fmt, v2);
-			va_end(v2);
-		}
-		dlen += l;
-		return l;
-	}
-	print_hypothesis_from(h, dprintf, 0, _from);
-	return derivation;
+	struct dprintf_ctx ctx = {.derivation = malloc(10240), .dalen = 10240, .dlen = 0};
+	ctx.derivation[0] = 0;
+
+	print_hypothesis_from(h, (int(*)(void*,const char*,...))dprintf_wctx, &ctx, 0, _from);
+	return ctx.derivation;
 }
 
 char	*hypothesis_to_dstring(struct hypothesis	*h)
@@ -1446,29 +1463,11 @@ char	*hypothesis_to_dstring(struct hypothesis	*h)
 
 char	*hypothesis_to_labelled_tree_string(struct hypothesis	*h)
 {
-	char	*lt = malloc(10240);
-	int		dalen = 10240, dlen = 0;
-	*lt = 0;
-	int	dprintf(const char	*fmt, ...)
-	{
-		va_list	v;
-		va_start(v, fmt);
-		int	l = vsnprintf(lt+dlen, dalen-dlen, fmt, v);
-		va_end(v);
-		if(l >= dalen-dlen)
-		{
-			va_list v2;
-			va_start(v2, fmt);
-			dalen += l + 10240 ;
-			lt = realloc(lt, dalen);
-			l = vsnprintf(lt+dlen, dalen-dlen, fmt, v2);
-			va_end(v2);
-		}
-		dlen += l;
-		return l;
-	}
-	print_hypothesis(h, dprintf, 1);
-	return lt;
+	struct dprintf_ctx ctx = {.derivation = malloc(10240), .dalen = 10240, .dlen = 0};
+	ctx.derivation[0] = 0;
+
+	print_hypothesis(h, (int(*)(void*,const char*,...))dprintf_wctx, &ctx, 1);
+	return ctx.derivation;
 }
 
 /*void	install_orth(struct dg	*dg, int	nforms, char	**forms)
@@ -1836,7 +1835,7 @@ extern int do_itsdb;
 				if(idiomatic || (g_mode == GENERATING))
 				{
 					//printf("hyp = %p\n", hyp);
-					//printf("\n"); print_hypothesis(hyp, printf, 0); printf("\n");
+					//printf("\n"); print_hypothesis(hyp, ctxprintf, NULL, 0); printf("\n");
 					if(g_mode == GENERATING)
 						fixup_generator_string(hyp);
 					double	probability = exp((double)hyp->score) / Z;
