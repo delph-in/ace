@@ -839,7 +839,7 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 	int	count = 0;
 
 	lui_initialize();
-	int iter(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
+	int iter(struct hypothesis	*hyp, struct mrs	*mrs, double	prob, void *ctx)
 	{
 		if(!require_mrs || mrs_subsumes(require_mrs, mrs))
 		{
@@ -852,7 +852,7 @@ int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs
 		}
 		else return 0;
 	}
-	count = iterate_cell_root_hypotheses(c, iter, best_only);
+	count = iterate_cell_root_hypotheses(c, iter, best_only, NULL);
 	//printf("got %d results\n", count);
 	fprintf(lui_write, "group %d \"%s\"\n", count, slab_escape(sent));
 

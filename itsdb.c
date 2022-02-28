@@ -672,7 +672,7 @@ int capi_print_chart(struct lattice	*tokens, struct lattice	*lexical_chart, int	
 
 static int cpt_id;
 
-int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
+int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs, double	prob, void *ctx)
 {
 	tsdb_nanalyses++;
 	if(tsdb_nderivations >= tsdb_maxderivations && !(do_itsdb_stdout && tsdb_maxderivations==0))return 1;
@@ -698,7 +698,7 @@ int	capi_print_derivations()
 	tsdb_nanalyses = 0;
 	cpt_id = 0;
 	itsdb_start_results();
-	int	n = iterate_cell_root_hypotheses(&cells[chart_size-1], capi_print_tree, best_only);
+	int	n = iterate_cell_root_hypotheses(&cells[chart_size-1], capi_print_tree, best_only, NULL);
 	itsdb_end_results();
 	return n;
 }

@@ -311,6 +311,89 @@ int	get_nth_realization(int	idx, char	**s, struct hypothesis	**h, struct mrs	**m
 	return 0;
 }
 
+struct realization_list
+{
+	struct realization	*realizations;
+	int			arealizations, nrealizations;
+};
+
+int gen_show_result(struct hypothesis	*hyp, struct mrs	*mrs_res, double	prob, struct realization_list	*RL)
+{
+	// LKB compares *internal* MRSes, by going through the VPM *twice* "to get defaults".
+	// see comment in lkb/mrs/generate.lisp near line 765.
+	// Note that "x subsumes y" does not technically imply "vpm(x) subsumes vpm(y)"
+	// (for either forward or backwards vpm), *but* for sane vpm's it *should*.
+	// VPM is a lossy map.
+	// What is really false is that "vpm(x) subsumes vpm(y)" implies "x subsumes y".
+	// So, testing whether (input) subsumes vpm(result) *should* be
+	// *stricter* than testing whether (ivpm(input) subsumes ivpm(vpm(result))).
+	// ACE is going to try doing that stricter test and see what happens...
+	// Note that other processors may not have this option, due to not loading the SEMI signature.
+	//if(!mrs_subsumes(mrs, mrs_res))
+	//if(!mrs_subsumes(hax_ref, hax_res))
+#ifdef	SEMI_SIDE_SUBSUMPTION_TEST
+	extern struct type_hierarchy	*main_th, *semi_th;
+	set_default_type_hierarchy(semi_th);
+	int	sst_result = (disable_subsumption_test==0) && !mrs_subsumes(current_input_mrs, mrs_res);
+	set_default_type_hierarchy(main_th);
+	if(sst_result)	// totally SEMI-side comparison
+#else
+	struct mrs	*hax_res = external_to_internal_mrs(mrs_res);
+	if((disable_subsumption_test==0) && !mrs_subsumes(current_internal_input_mrs, hax_res))	// grammar-side comparison
+#endif
+	{
+		if(trace)
+		{
+			printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
+#ifdef	SEMI_SIDE_SUBSUMPTION_TEST
+			print_mrs(mrs_res); printf("\n");
+#else
+			print_mrs(hax_res); printf("\n");
+#endif
+		}
+		//print_mrs(mrs_res); printf("\n");
+		free_mrs(mrs_res);
+		return 0;
+	}
+	if((RL->nrealizations+1) > RL->arealizations)
+	{
+		RL->arealizations = (RL->arealizations+2)*2;
+		RL->realizations = realloc(RL->realizations, sizeof(struct realization)*RL->arealizations);
+	}
+	struct realization	*R = &RL->realizations[RL->nrealizations++];
+	R->surface = hyp->string;
+	R->hyp = hyp;
+	R->mrs = mrs_res;
+	if(debug_level)printf("probability = %f:\n", prob);
+	if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->edge->id);
+	if(trace>1){print_dg(hyp->dg); printf("\n");}
+	if(master_addr)printf("SURFACE = %s\n", hyp->string);
+	else if(!inhibit_results && !do_itsdb)printf("%s\n", hyp->string);
+	if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, RL->nrealizations-1);
+	//if(trace>0){ print_mrs(mrs_res); printf("\n"); }
+	if(trace>0)
+	{
+		//print_mrs(hax_res);
+		print_mrs(mrs_res);
+		printf("\n");
+		char	*dstr = hypothesis_to_dstring(hyp);
+		puts(dstr);
+	}
+	if(show_realization_trees && !do_itsdb)
+	{
+		char	*dstr = hypothesis_to_dstring(hyp);
+		printf("DTREE = %s\n", dstr);
+	}
+	if(show_realization_mrses && !do_itsdb)
+	{
+		printf("MRS = ");
+		print_mrs(mrs_res);
+	}
+	free_mrs(mrs_res);
+	if(master_addr)printf("END RESULT\n");
+	return 1;
+}
+
 // driver
 
 int	generate(struct mrs	*mrs)
@@ -455,8 +538,7 @@ int	generate(struct mrs	*mrs)
 		printf("\n");
 	}*/
 
-	struct realization	*realizations=NULL;
-	int	nrealizations=0, arealizations = 0;
+	struct realization_list	reallist = {.realizations = NULL, .nrealizations = 0, .arealizations = 0};
 
 #define SEMI_SIDE_SUBSUMPTION_TEST
 //#define POST_FIXUP_SUBSUMPTION_TEST
@@ -471,104 +553,28 @@ int	generate(struct mrs	*mrs)
 	current_input_mrs = internal_to_external_mrs(current_internal_input_mrs);
 #endif
 
-	int show_result(struct hypothesis	*hyp, struct mrs	*mrs_res, double	prob)
-	{
-		// LKB compares *internal* MRSes, by going through the VPM *twice* "to get defaults".
-		// see comment in lkb/mrs/generate.lisp near line 765.
-		// Note that "x subsumes y" does not technically imply "vpm(x) subsumes vpm(y)"
-		// (for either forward or backwards vpm), *but* for sane vpm's it *should*.
-		// VPM is a lossy map.
-		// What is really false is that "vpm(x) subsumes vpm(y)" implies "x subsumes y".
-		// So, testing whether (input) subsumes vpm(result) *should* be
-		// *stricter* than testing whether (ivpm(input) subsumes ivpm(vpm(result))).
-		// ACE is going to try doing that stricter test and see what happens...
-		// Note that other processors may not have this option, due to not loading the SEMI signature.
-		//if(!mrs_subsumes(mrs, mrs_res))
-		//if(!mrs_subsumes(hax_ref, hax_res))
-#ifdef	SEMI_SIDE_SUBSUMPTION_TEST
-		extern struct type_hierarchy	*main_th, *semi_th;
-		set_default_type_hierarchy(semi_th);
-		int	sst_result = (disable_subsumption_test==0) && !mrs_subsumes(current_input_mrs, mrs_res);
-		set_default_type_hierarchy(main_th);
-		if(sst_result)	// totally SEMI-side comparison
-#else
-		struct mrs	*hax_res = external_to_internal_mrs(mrs_res);
-		if((disable_subsumption_test==0) && !mrs_subsumes(current_internal_input_mrs, hax_res))	// grammar-side comparison
-#endif
-		{
-			if(trace)
-			{
-				printf("NICE TRY! `%s' has incompatible semantics:\n", hyp->string);
-#ifdef	SEMI_SIDE_SUBSUMPTION_TEST
-				print_mrs(mrs_res); printf("\n");
-#else
-				print_mrs(hax_res); printf("\n");
-#endif
-			}
-			//print_mrs(mrs_res); printf("\n");
-			free_mrs(mrs_res);
-			return 0;
-		}
-		if((nrealizations+1) > arealizations)
-		{
-			arealizations = (arealizations+2)*2;
-			realizations = realloc(realizations, sizeof(struct realization)*arealizations);
-		}
-		struct realization	*R = &realizations[nrealizations++];
-		R->surface = hyp->string;
-		R->hyp = hyp;
-		R->mrs = mrs_res;
-		if(debug_level)printf("probability = %f:\n", prob);
-		if(trace>0)printf("edge #%d has a correct unpacking\n", hyp->edge->id);
-		if(trace>1){print_dg(hyp->dg); printf("\n");}
-		if(master_addr)printf("SURFACE = %s\n", hyp->string);
-		else if(!inhibit_results && !do_itsdb)printf("%s\n", hyp->string);
-		if(do_itsdb)itsdb_report_genresult(hyp, mrs_res, count);
-		count++;
-		//if(trace>0){ print_mrs(mrs_res); printf("\n"); }
-		if(trace>0)
-		{
-			//print_mrs(hax_res);
-			print_mrs(mrs_res);
-			printf("\n");
-			char	*dstr = hypothesis_to_dstring(hyp);
-			puts(dstr);
-		}
-		if(show_realization_trees && !do_itsdb)
-		{
-			char	*dstr = hypothesis_to_dstring(hyp);
-			printf("DTREE = %s\n", dstr);
-		}
-		if(show_realization_mrses && !do_itsdb)
-		{
-			printf("MRS = ");
-			print_mrs(mrs_res);
-		}
-		free_mrs(mrs_res);
-		if(master_addr)printf("END RESULT\n");
-		return 1;
-	}
 	if(do_itsdb)itsdb_start_results();
 	if(master_addr)printf("SENT: mrs\n");
 	if(g_profiling)start_and_alloc_profiler(&unpacking_profiler, "unpacking", generation_profiler, NULL);
-	iterate_cell_root_hypotheses(cells, show_result, best_only);
+	iterate_cell_root_hypotheses(cells, (int (*)(struct hypothesis *, struct mrs *, double,  void *))gen_show_result, best_only, &reallist);
 	if(g_profiling)stop_profiler(unpacking_profiler, 1);
 	if(do_itsdb)itsdb_end_results();
+	count = reallist.nrealizations;
 	if(do_itsdb)itsdb_report_gen(count, fixup_time);
 	if(debug_level)printf("unpacked %.4f\n", timer());
 
 	if(lui_mode)
 	{
-		if(nrealizations == 0)lui_text("No realization results.");
+		if(reallist.nrealizations == 0)lui_text("No realization results.");
 		else
 		{
 			int i;
-			lui_begin_gen_results(nrealizations);
-			for(i=0;i<nrealizations;i++)
-				lui_gen_result(i, realizations[i].surface);
+			lui_begin_gen_results(reallist.nrealizations);
+			for(i=0;i<reallist.nrealizations;i++)
+				lui_gen_result(i, reallist.realizations[i].surface);
 			lui_end_gen_results();
-			saved_realizations = realizations;
-			saved_nrealizations = nrealizations;
+			saved_realizations = reallist.realizations;
+			saved_nrealizations = reallist.nrealizations;
 		}
 		if(show_gen_chart)
 			lui_gen_chart(fixed_up_mrs);

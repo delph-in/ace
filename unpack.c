@@ -1666,7 +1666,7 @@ void	fixup_generator_string(struct hypothesis	*h)
 
 int want_mrs = 1;
 
-int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs, double	probability), int nbest)
+int iterate_cell_root_hypotheses(struct chart_cell *cell, int (*process)(struct hypothesis *hyp, struct mrs *mrs, double	probability, void *ctx), int nbest, void *ctx)
 {
 	int	i, j;
 	volatile int count = 0, nhyp = 0, ninsthyps = 0;	// volatile so that they are usable after longjmp()'ing out of an OOM condition
@@ -1839,7 +1839,7 @@ extern int do_itsdb;
 					if(g_mode == GENERATING)
 						fixup_generator_string(hyp);
 					double	probability = exp((double)hyp->score) / Z;
-					count += process(hyp, m, probability);
+					count += process(hyp, m, probability, ctx);
 				}
 			}
 			else DEBUG("... wasn't root after unpacking\n");
@@ -1875,7 +1875,7 @@ resume_after_oom:;
 				}
 	#define	LAST_DITCH_PROBABILITY	1E-10
 				fprintf(stderr, "NOTE: using dublin tree as last ditch offering\n");
-				process(last_ditch_h, m, LAST_DITCH_PROBABILITY);
+				process(last_ditch_h, m, LAST_DITCH_PROBABILITY, ctx);
 				count++;
 			}
 			else fprintf(stderr, "NOTE: couldn't instantiate dublin hypothesis\n");

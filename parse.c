@@ -384,7 +384,7 @@ int	prepare_parse_chart(struct lattice	*token_chart, struct lattice	*lexical_cha
 void	(*parse_callback)(struct hypothesis	*hyp, struct mrs	*mrs) = NULL;
 
 // show analyses
-int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
+int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs, double	prob, void *ctx)
 {
 	struct dg	*root = hyp->dg, *sem;
 	extern char	*mrs_end;
@@ -615,7 +615,7 @@ extern int	enable_ubertagging;
 	{
 		didsent = 0;
 		if(chart_size>0)
-			num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], parse_show_result, best_only);
+			num_parses = iterate_cell_root_hypotheses(&cells[chart_size-1], parse_show_result, best_only, NULL);
 		else num_parses = 0;
 
 		fprintf(stderr, "NOTE: %d readings, added %d / %d edges to chart (%d fully instantiated, %d actives used, %d passives used)\t",
