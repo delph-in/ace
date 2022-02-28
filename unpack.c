@@ -50,6 +50,8 @@ int	total_hyps;
 
 //struct profiler	*gec_profiler;
 //struct profiler	*score_profiler;
+//struct profiler	*instantiate_unify_profiler;
+//struct profiler	*instantiate_copy_profiler;
 
 struct context_unpack_info	*get_edge_cui(struct edge	*e, struct scoring_ancestry	ancestry);
 struct scoring_ancestry	compute_sub_ancestry(struct scoring_ancestry	panc, struct edge	*edge);
@@ -1076,6 +1078,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 			{
 				robustness_licensed = 1;
 			}
+			//start_and_alloc_profiler(&instantiate_unify_profiler, "instantiate-unify", unpacking_profiler, NULL);
 			for(i=0;i<arity;i++)
 				if(unify_dg_tmp(h->rhslist[i]->dg, rdg, i))
 				{
@@ -1119,6 +1122,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 					}*/
 					break;
 				}
+			//stop_profiler(instantiate_unify_profiler, (i<arity)?(i+1):arity);
 			if(i<arity)
 			{
 				if(robustness_used)disable_robust_unification();
@@ -1134,6 +1138,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 					else if(robustness_licensed)goto try_with_robustness;
 					return -1;
 				}
+			//start_and_alloc_profiler(&instantiate_copy_profiler, "instantiate-copy", unpacking_profiler, NULL);
 			if(g_mode == GENERATING)
 			{
 				int cant_share = 0;
@@ -1145,6 +1150,7 @@ int instantiate_hypothesis(struct hypothesis *h)
 				else h->dg = finalize_tmp(rdg, 1);
 			}
 			else h->dg = finalize_tmp(rdg, 1);
+			//stop_profiler(instantiate_copy_profiler, 1);
 			if(robustness_used)
 			{
 				disable_robust_unification();

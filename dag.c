@@ -480,7 +480,12 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		}
 		if(!local_ss)
 		{
-			/*if(1)//a->narcs==0 && b->narcs==0)
+			//if(a->narcs==0 && b->narcs==0)
+			//static struct type *index_type = NULL;
+			//if(!index_type)index_type = lookup_type("index");
+			//if(descendent_of(a->xtype->tnum, index_type) && descendent_of(b->xtype->tnum, index_type) || (a->narcs==0 && b->narcs==0))
+			if(0)
+			//if(1)
 			{
 				// this code is for generalizing to a type more general than either a or b,
 				// in controlled conditions.  it finds some interesting ideas,
@@ -499,11 +504,11 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 					ut1 = a->xtype;
 					ut2 = b->xtype;
 					ss_backtrace(a, b, "tentatively extra-generalized");
-					printf("generalized %s and %s to %s\n", a->xtype->name, b->xtype->name, upper->name);
+					//printf("generalized %s and %s to %s\n", a->xtype->name, b->xtype->name, upper->name);
 				}
 				else gsubsume_backward = gsubsume_forward = 0;
 			}
-			else */gsubsume_backward = gsubsume_forward = 0;
+			else gsubsume_backward = gsubsume_forward = 0;
 		}
 		else
 		{
