@@ -288,6 +288,15 @@ extern unsigned long long unify_attempts_total, unify_attempts_pass_rf, unify_at
 
 /* measured jul-25-2011 erg-trunk on 'octopus' */
 const double	k_glb = 0 /* not measured this time */, k_unify = 0.000005, k_hop = 0.0000016 / 45;
+	
+static int	qclexcmp(const struct qc_path	*a, const struct qc_path	*b)
+{
+	int i;
+	for(i=0;i<a->path.count && i<b->path.count;i++)
+		if(a->path.fnums[i] != b->path.fnums[i])
+			return a->path.fnums[i] - b->path.fnums[i];
+	return a->path.count - b->path.count;
+}
 
 void	gqc_treeify(int	count, int *hops)
 {
@@ -295,15 +304,7 @@ void	gqc_treeify(int	count, int *hops)
 	int				i;
 
 	memcpy(pth, paths, sizeof(struct qc_path)*count);
-	int	lexcmp(const struct qc_path	*a, const struct qc_path	*b)
-	{
-		int i;
-		for(i=0;i<a->path.count && i<b->path.count;i++)
-			if(a->path.fnums[i] != b->path.fnums[i])
-				return a->path.fnums[i] - b->path.fnums[i];
-		return a->path.count - b->path.count;
-	}
-	qsort(pth, count, sizeof(struct qc_path), (int(*)(const void*,const void*))lexcmp);
+	qsort(pth, count, sizeof(struct qc_path), (int(*)(const void*,const void*))qclexcmp);
 
 	if(hops)
 	{
@@ -342,12 +343,13 @@ void	gqc_treeify(int	count, int *hops)
 	}
 }
 
+static int	qcpcmp(const struct qc_path	*a, const struct qc_path	*b) { return b->failures - a->failures; }
+
 void	gqc_result()
 {
 	int i, nhops[npaths], cnh = 0, cheapest = 0;
 	unsigned long long total = 0, cum = 0;
 	double	filtration[npaths], least_cost;
-	int	qcpcmp(const struct qc_path	*a, const struct qc_path	*b) { return b->failures - a->failures; }
 	qsort(paths, npaths, sizeof(struct qc_path), (int(*)(const void*,const void*))qcpcmp);
 
 	for(i=0;i<npaths;i++)

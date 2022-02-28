@@ -79,6 +79,17 @@ void	recompute_descendents(struct type	*t)
 	t->descendents = realloc(list, sizeof(unsigned short) * n);
 }
 
+static void recompute_tnums_tsort(struct type_hierarchy	*th, struct type	*t, char *have, int *Idx)
+{
+	if(have[t->tnum])return;
+	int i;
+	for(i=0;i<t->ndaughters;i++)
+		recompute_tnums_tsort(th, t->daughters[i], have, Idx);
+	have[t->tnum] = 1;
+	assert(*Idx >= 0);
+	th->types[(*Idx)--] = t;
+}
+
 void	recompute_tnums(struct type_hierarchy	*th)
 {
 	int	i,j;
@@ -91,17 +102,7 @@ void	recompute_tnums(struct type_hierarchy	*th)
 	// storing the result in the types[] array, back to front.
 	char	*have = calloc(1, th->ntypes);
 	int idx = th->ntypes-1;
-	void tsort(struct type	*t)
-	{
-		if(have[t->tnum])return;
-		int i;
-		for(i=0;i<t->ndaughters;i++)
-			tsort(t->daughters[i]);
-		have[t->tnum] = 1;
-		assert(idx >= 0);
-		th->types[idx--] = t;
-	}
-	tsort(th->top);
+	recompute_tnums_tsort(th, th->top, have, &idx);
 	assert(idx == -1);
 	assert(th->types[0] == th->top);
 
