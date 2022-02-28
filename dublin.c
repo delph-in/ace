@@ -74,7 +74,7 @@ extern char	*csaw_grammar_path;
 
 static struct tree	*dublin_tree;
 static struct edge	*dublin_root;
-static struct lexical_chart *dublin_lexical_chart;
+static struct lattice *dublin_lexical_chart;
 
 static void dublin_got_edge(struct tree	*tx, struct dg	*d)
 {

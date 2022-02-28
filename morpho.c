@@ -138,7 +138,7 @@ char	*mbsdowncase(char	*mbsin)
 	return mbsout;
 }
 
-int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, struct token	**tokens))
+int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, struct token	**tokens, void *ctx), void *ctx)
 {
 	int				i, j, k;
 
@@ -268,7 +268,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 						}
 					}
 					if(install_tokens_in_le(le, mwe_trace) != 0)return 0;
-					edge_handler(le, mwe_trace);
+					edge_handler(le, mwe_trace, ctx);
 					return 1;
 				}
 			}
@@ -288,7 +288,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 					extern int form_to_relation;
 					if(form_to_relation)
 						show_form_to_relation(le, &t);
-					edge_handler(le, &t);
+					edge_handler(le, &t, ctx);
 					return 1;
 				}
 			}
@@ -314,7 +314,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 				le->orth_routes = carg_e->orth_routes;
 				if(install_tokens_in_le(le, &t) != 0)continue;
 				//fprintf(stderr, "for carg '%s' and pos '%s', issued generic '%s'\n", carg, t->postag, le->lex->word);
-				edge_handler(le, &t);
+				edge_handler(le, &t, ctx);
 			}
 		}
 #endif*/
@@ -345,7 +345,7 @@ int	lexical_lookup(struct lattice	*tc, void	(*edge_handler)(struct edge	*e, stru
 				extern int form_to_relation;
 				if(form_to_relation)
 					show_form_to_relation(le, &t);
-				edge_handler(le, &t);
+				edge_handler(le, &t, ctx);
 			}
 		}
 #endif

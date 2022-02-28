@@ -32,6 +32,13 @@ void	add_new_lexical_edge(struct lattice	*lc, struct edge	*e)
 	add_lattice_edge(lc, lat_e);
 }
 
+void	llic_edge_handler(struct edge	*le, struct token	**tokens, struct lattice	*lc)
+{
+	extern int debug_level;
+	if(debug_level)printf(" lexical lookup found lexeme '%s'\n", le->lex->word);
+	add_new_lexical_edge(lc, le);
+}
+
 struct lattice	*lexical_lookup_into_chart(struct lattice	*token_chart)
 {
 	struct lattice	*lc = slab_alloc(sizeof(*lc));
@@ -54,14 +61,7 @@ struct lattice	*lexical_lookup_into_chart(struct lattice	*token_chart)
 	lc->start = lc->vertices[token_chart->start->id];
 	lc->end = lc->vertices[token_chart->end->id];
 
-	void	edge_handler(struct edge	*le, struct token	**tokens)
-	{
-		extern int debug_level;
-		if(debug_level)printf(" lexical lookup found lexeme '%s'\n", le->lex->word);
-		add_new_lexical_edge(lc, le);
-	}
-
-	int res = lexical_lookup(token_chart, edge_handler);
+	int res = lexical_lookup(token_chart, (void(*)(struct edge*, struct token**, void*))llic_edge_handler, lc);
 	if(res!=0)
 	{
 		//fprintf(stderr, "NOTE: lexical coverage gap\n");

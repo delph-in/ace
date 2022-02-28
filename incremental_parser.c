@@ -80,19 +80,20 @@ struct move
 
 extern int	question, exhaustive, lui_mode, inhibit_pack, inhibit_results, do_itsdb, best_only;
 
+void	ppi_lex_edge_adder(struct edge	*le, struct parser_input *in)
+{
+	in->nlexical_edges++;
+	in->lexical_edges = realloc(in->lexical_edges, sizeof(struct edge*)*in->nlexical_edges);
+	in->lexical_edges[in->nlexical_edges-1] = le;
+}
+
 struct parser_input	prepare_parser_input(int	nwords, char	**lemmas, char	**forms, char	*sentence)
 {
 	struct parser_input	in = {.nwords = nwords, .lemmas = lemmas, .forms = forms, .sentence = sentence};
 	in.nlexical_edges = 0;
 	in.lexical_edges = NULL;
 
-	void	lex_edge_adder(struct edge	*le)
-	{
-		in.nlexical_edges++;
-		in.lexical_edges = realloc(in.lexical_edges, sizeof(struct edge*)*in.nlexical_edges);
-		in.lexical_edges[in.nlexical_edges-1] = le;
-	}
-	lexical_lookup(nwords, lemmas, forms, lex_edge_adder);
+	lexical_lookup(nwords, lemmas, forms, (void(*)(struct edge*, struct token**, void*))ppi_lex_edge_adder, &in);
 
 	return in;
 }
@@ -415,101 +416,4 @@ struct situation	*parser_move(struct situation	*sit, struct move	*m)
 	ns->score = m->score;
 	ns->moves_from_start = sit->moves_from_start + 1;
 	return ns;
-}
-
-int	old_i_parse(int	nwords, char	**lemmas, char	**forms, char	*sentence)
-{
-srand(time(0));
-	int	noisy = !inhibit_results;
-	total_possible_moves = moveable_situations = 0;
-
-	int					nhistory = 0;
-	struct situation	**history = NULL;
-	struct situation	*sit;
-
-	struct parser_input	in = {.nwords = nwords, .lemmas = lemmas, .forms = forms, .sentence = sentence};
-	in.nlexical_edges = 0;
-	in.lexical_edges = NULL;
-
-	void	lex_edge_adder(struct edge	*le)
-	{
-		in.nlexical_edges++;
-		in.lexical_edges = realloc(in.lexical_edges, sizeof(struct edge*)*in.nlexical_edges);
-		in.lexical_edges[in.nlexical_edges-1] = le;
-	}
-	lexical_lookup(nwords, lemmas, forms, lex_edge_adder);
-
-	nhistory = 0;
-	history = NULL;
-	sit = calloc(sizeof(struct situation),1);
-	parsing_step = nhistory;
-	rank_moves(sit, &in);
-
-	int	n_moves = 0;
-
-	while(!situation_is_root_analysis(sit, &in))
-	{
-		if(noisy)print_situation(sit, &in);
-		struct move	*m = best_move(sit);
-		if(!m)
-		{
-			// not finished parsing and no valid moves... uh-oh.
-			if(nhistory == 0)
-			{
-				if(noisy)
-					printf("ran out of places to backtrack to.\n");
-				return 0;
-			}
-			// time to back-track.  go to the previous move in our history with the crummiest best_move_score
-			int	i, worsti = 0;
-			/*double	worst = 1E99;
-			for(i=0;i<nhistory;i++)
-				if(history[i]->best_move_score < worst)
-					{ worst = history[i]->best_move_score; worsti = i; }*/
-			worsti = nhistory-1;
-			sit = history[worsti];
-			nhistory = worsti;
-			if(noisy)
-				printf("backtracked; nhistory = %d\n", nhistory);
-			continue;
-		}
-		// save where we were before making a move
-		nhistory++;
-		history = realloc(history, sizeof(void*)*nhistory);
-		history[nhistory-1] = sit;
-
-		// make the move
-		if(noisy)print_move(m);
-		parsing_step = nhistory;
-		sit = parser_move(sit, m);
-		rank_moves(sit, &in);
-		n_moves++;
-		if(nhistory > 200)
-		{
-			fprintf(stderr, "HUMPH we weren't supposed to get here.\n");
-			return 0;
-		}
-	}
-
-	struct dg	*dg = sit->stack[0]->dg;
-	struct mrs	*m = extract_mrs(dg);
-
-	printf("found a complete parse.  explored %d situations; actually needed %d moves.\n", n_moves, nhistory);
-	printf("  %d situations had at least one move; of those, avg # moves = %.1f\n", moveable_situations, (float)total_possible_moves / moveable_situations);
-	/*int i;
-	for(i=0;i<nhistory;i++)
-	{
-		printf("move %d at word %d\n", i, history[i]->word);
-		history[i]->nmoves = 0;
-		history[i]->moves = NULL;
-		rank_moves(history[i], &in);
-		print_moves(history[i]->moves, 1);
-	}
-	printf("\n");*/
-	if(!inhibit_results)
-	{
-		print_mrs(m);
-		printf("\n");
-	}
-	return 1;
 }
