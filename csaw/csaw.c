@@ -244,11 +244,14 @@ struct tree	*csaw_parse_lattice(struct lattice	*lexical_chart)
 
 	// parse and unpack best 1 tree
 	struct tree	*found_tree = NULL;
-	clear_mrs();
-	csaw_denormalize_tree(found_tree);
-	csaw_repair_spans(found_tree, lexical_chart->nvertices, vtx_id_map);
 
 	csaw_parse_these_tokens(1, (void(*)(struct tree*,void*))csawvisitor, &found_tree);
+	if(found_tree)
+	{
+		clear_mrs();
+		csaw_denormalize_tree(found_tree);
+		csaw_repair_spans(found_tree, lexical_chart->nvertices, vtx_id_map);
+	}
 	csaw_free_chart();
 	return found_tree;
 }
