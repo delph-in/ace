@@ -52,15 +52,16 @@ double	stop_profiler(struct profiler	*prof, int	nevents)
 	return dt;
 }
 
+static int profilercmp(const struct profiler	**a, const struct profiler	**b)
+{
+	if((*a)->elapsed > (*b)->elapsed)return -1;
+	if((*a)->elapsed < (*b)->elapsed)return +1;
+	return 0;
+}
+
 void	sort_profiler(struct profiler	*prof)
 {
-	int pcmp(const struct profiler	**a, const struct profiler	**b)
-	{
-		if((*a)->elapsed > (*b)->elapsed)return -1;
-		if((*a)->elapsed < (*b)->elapsed)return +1;
-		return 0;
-	}
-	qsort(prof->sub, prof->nsub, sizeof(struct profiler*), (int(*)(const void*,const void*))pcmp);
+	qsort(prof->sub, prof->nsub, sizeof(struct profiler*), (int(*)(const void*,const void*))profilercmp);
 }
 
 void	freport_profiler_indent(FILE	*fout, struct profiler	*prof, int	ind)
