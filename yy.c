@@ -150,17 +150,18 @@ struct token	yy_read_token(char	**yy, int	*vfrom, int	*vto)
 	return T;
 }
 
+struct lattice_vertex	*parse_yy_get_vtx(int	id, struct lattice *tc)
+{
+	while(id >= tc->nvertices)
+		new_lattice_vertex(tc);
+	return tc->vertices[id];
+}
+
 int	parse_yy(char	*yy)
 {
 	clock_t	start = clock();
 	struct lattice	*tc = slab_alloc(sizeof(*tc));
 	bzero(tc, sizeof(*tc));
-	struct lattice_vertex	*get_vtx(int	id)
-	{
-		while(id >= tc->nvertices)
-			new_lattice_vertex(tc);
-		return tc->vertices[id];
-	}
 	while(peek(&yy) == '(')
 	{
 		struct lattice_edge	*e = slab_alloc(sizeof(*e));
@@ -170,8 +171,8 @@ int	parse_yy(char	*yy)
 		bzero(e->token, sizeof(struct token));
 		*e->token = yy_read_token(&yy, &vfrom, &vto);
 		e->token->eid = next_eid();
-		e->from = get_vtx(vfrom);
-		e->to = get_vtx(vto);
+		e->from = parse_yy_get_vtx(vfrom, tc);
+		e->to = parse_yy_get_vtx(vto, tc);
 		add_lattice_edge(tc, e);
 	}
 	int i, j;
