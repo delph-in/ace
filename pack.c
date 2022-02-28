@@ -67,6 +67,13 @@ struct dg	*restrict_copy_dg(struct dg	*dg, int for_generation)
 	return copy;
 }
 
+int orth_route_cmp(const struct orth_route *ra, const struct orth_route *rb)
+{
+	int i;
+	if(ra->len != rb->len)return ra->len-rb->len;
+	return memcmp(ra->rules, rb->rules, sizeof(int)*ra->len);
+}
+
 int identical_orth_routes(struct edge *a, struct edge *b)
 {
 	struct orth_route *ra, *rb;
@@ -74,12 +81,6 @@ int identical_orth_routes(struct edge *a, struct edge *b)
 
 	if(a->north_routes != b->north_routes)return 0;
 	if(a->north_routes == -1)return 1;
-	int orth_route_cmp(const struct orth_route *ra, const struct orth_route *rb)
-	{
-		int i;
-		if(ra->len != rb->len)return ra->len-rb->len;
-		return memcmp(ra->rules, rb->rules, sizeof(int)*ra->len);
-	}
 	// XXX should keep these sorted ahead of time
 	qsort(a->orth_routes, n, sizeof(struct orth_route), (int(*)(const void*, const void*))orth_route_cmp);
 	qsort(b->orth_routes, n, sizeof(struct orth_route), (int(*)(const void*, const void*))orth_route_cmp);
@@ -380,15 +381,6 @@ int	pack_edge(struct edge	*edge)
 	static struct edge	**generalization_candidates = NULL;
 	static int			ageneralization_candidates = 0;
 	int ngeneralization_candidates = 0;
-	void save_generalization_candidate(struct edge	*c)
-	{
-		if(ngeneralization_candidates + 1 > ageneralization_candidates)
-		{
-			ageneralization_candidates = 5 + 1.5*ageneralization_candidates;
-			generalization_candidates = realloc(generalization_candidates, sizeof(struct edge*)*ageneralization_candidates);
-		}
-		generalization_candidates[ngeneralization_candidates++] = c;
-	}
 
 	try_more:
 	candidates = (edge->have==edge->need)?c->p_edges:(edge->rule->rtl?c->ar_edges:c->al_edges);
@@ -437,7 +429,15 @@ int	pack_edge(struct edge	*edge)
 
 			if(!fw && !bk)
 			{
-				if(gz && !h->frozen && !(g_mode==PARSING && h->neps==-1))save_generalization_candidate(h);
+				if(gz && !h->frozen && !(g_mode==PARSING && h->neps==-1))
+				{
+					if(ngeneralization_candidates + 1 > ageneralization_candidates)
+					{
+						ageneralization_candidates = 5 + 1.5*ageneralization_candidates;
+						generalization_candidates = realloc(generalization_candidates, sizeof(struct edge*)*ageneralization_candidates);
+					}
+					generalization_candidates[ngeneralization_candidates++] = h;
+				}
 				continue;
 			}
 
