@@ -1676,6 +1676,12 @@ int	load_quickcheck()
 	}
 }
 
+int do_load_mem()
+{
+	load_mem(get_conf_file_path("maxent-model"));
+	return 0;
+}
+
 int load_grammar(char	*path)
 {
 	extern int g_mode;
@@ -1720,7 +1726,6 @@ int load_grammar(char	*path)
 
 		load_parser_vpm(get_conf_file_path("variable-property-mapping"));
 
-		int do_load_mem() { load_mem(get_conf_file_path("maxent-model")); return 0; }
 		run_task("loading maxent model", do_load_mem);
 
 		// XXX this won't be necessary if we can convince people to use a tdl-status for their parse-node-labels files...

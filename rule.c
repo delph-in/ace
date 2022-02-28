@@ -367,20 +367,21 @@ int	study_lrule(char	*name, struct dg	*dg, struct tdl_line	*tdl)
 	return 0;
 }
 
+int	rule_does_not_exist(char	*name)
+{
+	int	i;
+	for(i=0;i<nrules;i++)
+		if(!strcmp(rules[i]->name, name))return 0;
+	fprintf(stderr, "warning: config refers to nonexistant rule '%s'\n", name);
+	return 0;
+}
+
 int	load_rules()
 {
 	if(process_tdl_dgs_status("rule", study_rule))
 	{
 		fprintf(stderr, "rules: unable to load rules, bailing out.\n");
 		exit(-1);
-	}
-	int	rule_does_not_exist(char	*name)
-	{
-		int	i;
-		for(i=0;i<nrules;i++)
-			if(!strcmp(rules[i]->name, name))return 0;
-		fprintf(stderr, "warning: config refers to nonexistant rule '%s'\n", name);
-		return 0;
 	}
 	iterate_conf_list("spanning-only-rules", rule_does_not_exist);
 	iterate_conf_list("fragment-only-rules", rule_does_not_exist);
@@ -732,92 +733,94 @@ char	*type_filter_rule(struct rule	*r, int arg, struct qc **typeqc)
 	return table;
 }
 
+int build_rule_filter_transitive_closure()
+{
+	int i;
+
+	rf_tc = malloc(sizeof(char*) * nrules);
+	rl_tc = malloc(sizeof(char*) * nrules);
+	for(i=0;i<nrules;i++)
+	{
+		rf_tc[i] = compute_rxtc(i, 0);
+		rl_tc[i] = compute_rxtc(i, 1);
+	}
+	return 0;
+}
+
+char **type_rf_t, **type_rl_t;
+
+int build_type_rule_filter()
+{
+	struct type_hierarchy	*th = default_type_hierarchy();
+	int i, j;
+	struct qc *tqc[th->ntypes];
+
+	type_rf = malloc(sizeof(char*) * nrules);
+	type_rl = malloc(sizeof(char*) * nrules);
+	type_rf_t = malloc(sizeof(char*) * th->ntypes);
+	type_rl_t = malloc(sizeof(char*) * th->ntypes);
+	for(i=0;i<th->ntypes;i++)
+		tqc[i] = th->types[i]->dg?extract_qc(th->types[i]->dg):0;
+	for(i=0;i<nrules;i++)
+	{
+		type_rf[i] = type_filter_rule(rules[i], 0, tqc);
+		type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1, tqc);
+	}
+	for(i=0;i<th->ntypes;i++)
+	{
+		type_rf_t[i] = malloc(nrules);
+		for(j=0;j<nrules;j++)type_rf_t[i][j] = type_rf[j][i];
+		type_rl_t[i] = malloc(nrules);
+		for(j=0;j<nrules;j++)type_rl_t[i][j] = type_rl[j][i];
+	}
+	return 0;
+}
+
+int compose_type_rule_closured_filter()
+{
+	int	i, j, k;
+
+	type_rftc = malloc(sizeof(char*) * nrules);
+	type_rltc = malloc(sizeof(char*) * nrules);
+	struct type_hierarchy	*th = default_type_hierarchy();
+	for(i=0;i<nrules;i++)
+	{
+		type_rftc[i] = calloc(sizeof(char), th->ntypes);
+		type_rltc[i] = calloc(sizeof(char), th->ntypes);
+		for(j=0;j<th->ntypes;j++)
+		{
+			char *fit_rule_f = type_rf_t[j];
+			char *fit_rule_l = type_rl_t[j];
+			char *accept_rule_f = rf_tc[i];
+			char *accept_rule_l = rl_tc[i];
+
+			if(type_rf[i][j])type_rftc[i][j] = 1;
+			else for(k=0;k<nrules;k++)
+				if(accept_rule_f[k] && fit_rule_f[k])
+				{
+					type_rftc[i][j] = 1;
+					break;
+				}
+			if(type_rl[i][j])type_rltc[i][j] = 1;
+			else for(k=0;k<nrules;k++)
+				if(accept_rule_l[k] && fit_rule_l[k])
+				{
+					type_rltc[i][j] = 1;
+					break;
+				}
+		}
+	}
+	return 0;
+}
+
 void	lex_filter_rules()
 {
-	char **type_rf_t, **type_rl_t;
-
 	if(gen_qc)return;
-
-	int build_rule_filter_transitive_closure()
-	{
-		int i;
-
-		rf_tc = malloc(sizeof(char*) * nrules);
-		rl_tc = malloc(sizeof(char*) * nrules);
-		for(i=0;i<nrules;i++)
-		{
-			rf_tc[i] = compute_rxtc(i, 0);
-			rl_tc[i] = compute_rxtc(i, 1);
-		}
-		return 0;
-	}
 	run_task("rf-transitive closure...", build_rule_filter_transitive_closure);
 
-	struct type_hierarchy	*th = default_type_hierarchy();
-
-	int build_type_rule_filter()
-	{
-		int i, j;
-		struct qc *tqc[th->ntypes];
-
-		type_rf = malloc(sizeof(char*) * nrules);
-		type_rl = malloc(sizeof(char*) * nrules);
-		type_rf_t = malloc(sizeof(char*) * th->ntypes);
-		type_rl_t = malloc(sizeof(char*) * th->ntypes);
-		for(i=0;i<th->ntypes;i++)
-			tqc[i] = th->types[i]->dg?extract_qc(th->types[i]->dg):0;
-		for(i=0;i<nrules;i++)
-		{
-			type_rf[i] = type_filter_rule(rules[i], 0, tqc);
-			type_rl[i] = type_filter_rule(rules[i], rules[i]->ndaughters-1, tqc);
-		}
-		for(i=0;i<th->ntypes;i++)
-		{
-			type_rf_t[i] = malloc(nrules);
-			for(j=0;j<nrules;j++)type_rf_t[i][j] = type_rf[j][i];
-			type_rl_t[i] = malloc(nrules);
-			for(j=0;j<nrules;j++)type_rl_t[i][j] = type_rl[j][i];
-		}
-		return 0;
-	}
 	//printf("there are %d rules and %d types\n", nrules, th->ntypes);
 	//run_task("type-rule filter...", build_type_rule_filter);
 
-	int compose_type_rule_closured_filter()
-	{
-		int	i, j, k;
-
-		type_rftc = malloc(sizeof(char*) * nrules);
-		type_rltc = malloc(sizeof(char*) * nrules);
-		for(i=0;i<nrules;i++)
-		{
-			type_rftc[i] = calloc(sizeof(char), th->ntypes);
-			type_rltc[i] = calloc(sizeof(char), th->ntypes);
-			for(j=0;j<th->ntypes;j++)
-			{
-				char *fit_rule_f = type_rf_t[j];
-				char *fit_rule_l = type_rl_t[j];
-				char *accept_rule_f = rf_tc[i];
-				char *accept_rule_l = rl_tc[i];
-
-				if(type_rf[i][j])type_rftc[i][j] = 1;
-				else for(k=0;k<nrules;k++)
-					if(accept_rule_f[k] && fit_rule_f[k])
-					{
-						type_rftc[i][j] = 1;
-						break;
-					}
-				if(type_rl[i][j])type_rltc[i][j] = 1;
-				else for(k=0;k<nrules;k++)
-					if(accept_rule_l[k] && fit_rule_l[k])
-					{
-						type_rltc[i][j] = 1;
-						break;
-					}
-			}
-		}
-		return 0;
-	}
 	//run_task("type-rule-closed filter...", compose_type_rule_closured_filter);
 }
 
