@@ -1274,109 +1274,116 @@ struct lexeme	*get_leaf_lex(struct hypothesis	*hyp)
 	return hyp->edge->lex;
 }
 
-void print_hypothesis_from(struct hypothesis *hyp, int (*print)(const char *fmt,...), int	labelled, int	_from)
+struct phf_pt0_ctx
 {
-	void	print_tree0(struct hypothesis *hyp, int from, char	**genwordforms)
+	int	labelled;
+	int (*print)(const char *fmt,...);
+};
+
+void	phf_print_tree0(struct hypothesis *hyp, int from, char	**genwordforms, struct phf_pt0_ctx	*ctx)
+{
+	int i;
+	struct edge *e = hyp->edge;
+
+	if(e->lex && g_mode == GENERATING)
 	{
-		int i;
-		struct edge *e = hyp->edge;
+		if(!genwordforms)
+		{
+			struct lexeme	*l = get_leaf_lex(hyp);
+			int				nforms = l->stemlen;
+			char	*forms[nforms];
+			for(i=0;i<nforms;i++)
+				forms[i] = type_to_string(l->stem[i]);
+			inflect_mwe_chain(nforms, forms, hyp);
+			phf_print_tree0(hyp, from, forms, ctx);
+			return;
+		}
+	}
 
-		if(e->lex && g_mode == GENERATING)
+	// print out the edge, with span information
+	char	*sign = "no-sign";
+	char	*udx_type = "", *udx_at = "";
+	if(e->rule)
+	{
+		sign = e->rule->name;
+		if(format_udx>1)
 		{
-			if(!genwordforms)
-			{
-				struct lexeme	*l = get_leaf_lex(hyp);
-				int				nforms = l->stemlen;
-				char	*forms[nforms];
-				for(i=0;i<nforms;i++)
-					forms[i] = type_to_string(l->stem[i]);
-				inflect_mwe_chain(nforms, forms, hyp);
-				print_tree0(hyp, from, forms);
-				return;
-			}
+			udx_at = "@";
+			udx_type = e->rule->dg->xtype->name;
 		}
+	}
+	else if(e->lex)
+	{
+		sign = e->lex->word;
+		if(format_udx>0)
+		{
+			udx_at = "@";
+			udx_type = e->lex->lextype->name;
+		}
+	}
+	if(!ctx->labelled)
+		ctx->print(" (%d %s%s%s %f %d %d", hyp->eid, sign, udx_at, udx_type,
+						hyp->score, from, from+hyp->toklen);
+	else ctx->print(" (\"%s\"", label_dag(hyp->dg, "?"));
+	if(e->have)
+	{
+		for(i=0;i<e->have;i++)
+		{
+			phf_print_tree0(hyp->rhslist[i], from, genwordforms, ctx);
+			from += hyp->rhslist[i]->toklen;
+		}
+	}
+	else if(e->lex)
+	{
+		int	ntokens = e->lex->stemlen;
+		struct token	*tokens[ntokens];
+		for(i=0;i<ntokens;i++)
+		{
+			if(g_mode == PARSING)
+				tokens[i] = (struct token*)e->daughters[i];
+			else tokens[i] = gen_extract_one_token(hyp, i, genwordforms[i]);
+		}
+		ctx->print(" (\"");
+		for(i=0;i<ntokens;i++)
+		{
+			struct token	*tok = tokens[i];
+			char	*form = tok->string;
+			if(i>0)ctx->print(" ");
+			ctx->print("%s", slab_escape(form));
+		}
+		ctx->print("\"");
 
-		// print out the edge, with span information
-		char	*sign = "no-sign";
-		char	*udx_type = "", *udx_at = "";
-		if(e->rule)
+		if(enable_token_avms)
 		{
-			sign = e->rule->name;
-			if(format_udx>1)
+			if(!ctx->labelled)
 			{
-				udx_at = "@";
-				udx_type = e->rule->dg->xtype->name;
-			}
-		}
-		else if(e->lex)
-		{
-			sign = e->lex->word;
-			if(format_udx>0)
-			{
-				udx_at = "@";
-				udx_type = e->lex->lextype->name;
-			}
-		}
-		if(!labelled)
-			print(" (%d %s%s%s %f %d %d", hyp->eid, sign, udx_at, udx_type,
-							hyp->score, from, from+hyp->toklen);
-		else print(" (\"%s\"", label_dag(hyp->dg, "?"));
-		if(e->have)
-		{
-			for(i=0;i<e->have;i++)
-			{
-				print_tree0(hyp->rhslist[i], from, genwordforms);
-				from += hyp->rhslist[i]->toklen;
-			}
-		}
-		else if(e->lex)
-		{
-			int	ntokens = e->lex->stemlen;
-			struct token	*tokens[ntokens];
-			for(i=0;i<ntokens;i++)
-			{
-				if(g_mode == PARSING)
-					tokens[i] = (struct token*)e->daughters[i];
-				else tokens[i] = gen_extract_one_token(hyp, i, genwordforms[i]);
-			}
-			print(" (\"");
-			for(i=0;i<ntokens;i++)
-			{
-				struct token	*tok = tokens[i];
-				char	*form = tok->string;
-				if(i>0)print(" ");
-				print("%s", slab_escape(form));
-			}
-			print("\"");
-
-			if(enable_token_avms)
-			{
-				if(!labelled)
+				for(i=0;i<ntokens;i++)
 				{
-					for(i=0;i<ntokens;i++)
+					struct token	*tok = tokens[i];
+					int	id = tok->eid;
+					char	*tokstr = dstr_lookup((void*)tok, from);
+					if(!tokstr)
 					{
-						struct token	*tok = tokens[i];
-						int	id = tok->eid;
-						char	*tokstr = dstr_lookup((void*)tok, from);
-						if(!tokstr)
-						{
-							char	token_str[10240];
-							extern int dag_print_style;
-							dag_print_style = 1;
-							snprint_dg(token_str, 10239, tok->dg);
-							// *token_str = 0;
-							dag_print_style = 0;
-							tokstr = slab_escape(token_str);
-							dstr_save((void*)tok, from, tokstr);
-						}
-						print(" %d \"%s\"", id, tokstr);
+						char	token_str[10240];
+						extern int dag_print_style;
+						dag_print_style = 1;
+						snprint_dg(token_str, 10239, tok->dg);
+						// *token_str = 0;
+						dag_print_style = 0;
+						tokstr = slab_escape(token_str);
+						dstr_save((void*)tok, from, tokstr);
 					}
+					ctx->print(" %d \"%s\"", id, tokstr);
 				}
 			}
-			print(")");
 		}
-		print(")");
+		ctx->print(")");
 	}
+	ctx->print(")");
+}
+
+void print_hypothesis_from(struct hypothesis *hyp, int (*print)(const char *fmt,...), int	labelled, int	_from)
+{
 	static int timer = -1;
 	if(timer==-1)timer = new_timer("derivation printing");
 	start_timer(timer);
@@ -1393,7 +1400,8 @@ void print_hypothesis_from(struct hypothesis *hyp, int (*print)(const char *fmt,
 		assert(root != NULL);
 		print(" (%s", root);
 	}
-	print_tree0(hyp, _from, NULL);
+	struct phf_pt0_ctx	ctx = {.labelled = labelled, .print = print};
+	phf_print_tree0(hyp, _from, NULL, &ctx);
 	if(derivations_include_roots)print(")");
 	//set_slabstate(&st);
 	stop_timer(timer, 1);
