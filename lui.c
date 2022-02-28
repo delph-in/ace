@@ -223,6 +223,54 @@ int lui_initialize()
 	}
 }
 
+struct lpce_ctx
+{
+	struct lattice	*token_lattice;
+};
+
+void	lui_print_chart_edge(struct edge	*e, struct lpce_ctx	*ctx)
+{
+	if(e->unpack)return;
+	e->unpack = (void*)0x1;
+	if(e->rule)
+	{
+		struct dg *rn = feature_exists("RNAME")?
+			dg_hop(e->rule->dg, lookup_fname("RNAME")):NULL;
+		char *symb = strdup(rn?rn->xtype->name:e->rule->name);
+		if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
+		fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, symb, e->rule->name);
+		int l;
+		for(l=0;l<e->have;l++)
+			fprintf(lui_write, " %d", e->daughters[l]->id);
+		fprintf(lui_write, "]");
+	}
+	else if(e->lex)
+	{
+		fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, e->lex->word, e->lex->word);
+		int k;
+		for(k=0;k<e->lex->stemlen;k++)
+		{
+			struct token	*t = (struct token*)e->daughters[k];
+			int j;
+			for(j=0;j<ctx->token_lattice->nedges;j++)
+				if(ctx->token_lattice->edges[j]->token == t)
+					break;
+			assert(j < ctx->token_lattice->nedges);
+			fprintf(lui_write, " %d", -(j+1));
+		}
+		fprintf(lui_write, "]");
+	}
+	int i;
+	for(i=0;i<e->have;i++)
+		lui_print_chart_edge(e->daughters[i], ctx);
+	if(e->lex)
+	{
+		// show all lexical edges, including packed ones
+		for(i=0;i<e->npack;i++)
+			lui_print_chart_edge(e->pack[i], ctx);
+	}
+}
+
 void	output_lui_chart(struct lattice	*token_lattice)
 {
 	int	i, j, k;
@@ -254,48 +302,8 @@ void	output_lui_chart(struct lattice	*token_lattice)
 	if(g_mode == GENERATING)
 		chart_size--;
 
-	void	lui_print_chart_edge(struct edge	*e)
-	{
-		if(e->unpack)return;
-		e->unpack = (void*)0x1;
-		if(e->rule)
-		{
-			struct dg *rn = feature_exists("RNAME")?
-				dg_hop(e->rule->dg, lookup_fname("RNAME")):NULL;
-			char *symb = strdup(rn?rn->xtype->name:e->rule->name);
-			if(rn && *symb=='"') { symb++; if(strchr(symb, '"'))*strchr(symb, '"') = 0; }
-			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, symb, e->rule->name);
-			int l;
-			for(l=0;l<e->have;l++)
-				fprintf(lui_write, " %d", e->daughters[l]->id);
-			fprintf(lui_write, "]");
-		}
-		else if(e->lex)
-		{
-			fprintf(lui_write, " #E[%d %d %d %d %s %s []", lui_register_edge(e), e->id, e->from, e->to, e->lex->word, e->lex->word);
-			int k;
-			for(k=0;k<e->lex->stemlen;k++)
-			{
-				struct token	*t = (struct token*)e->daughters[k];
-				int j;
-				for(j=0;j<token_lattice->nedges;j++)
-					if(token_lattice->edges[j]->token == t)
-						break;
-				assert(j < token_lattice->nedges);
-				fprintf(lui_write, " %d", -(j+1));
-			}
-			fprintf(lui_write, "]");
-		}
-		int i;
-		for(i=0;i<e->have;i++)
-			lui_print_chart_edge(e->daughters[i]);
-		if(e->lex)
-		{
-			// show all lexical edges, including packed ones
-			for(i=0;i<e->npack;i++)
-				lui_print_chart_edge(e->pack[i]);
-		}
-	}
+
+	struct lpce_ctx	lpcectx = {.token_lattice = token_lattice};
 
 	reset_unpacking();
 	for(i=0;i<chart_size;i++)
@@ -303,7 +311,7 @@ void	output_lui_chart(struct lattice	*token_lattice)
 			for(k=0;k<cells[j*chart_size + i].p_nedges;k++)
 			{
 				e = cells[j*chart_size + i].p_edges[k];
-				lui_print_chart_edge(e);
+				lui_print_chart_edge(e, &lpcectx);
 			}
 	reset_unpacking();
 
@@ -596,6 +604,45 @@ void lui_format_tree(struct hypothesis *h, char *surf)
 	fprintf(lui_write, "]");
 }
 
+void	output_lui_mrs_var(struct mrs_var	*v)
+{
+	if(!v->is_const)
+	{
+		fprintf(lui_write, "<%d>=#D[%s", v->vnum, v->type);
+		int k;
+		for(k=0;k<v->nprops;k++)
+		{
+			fprintf(lui_write, " %s: \"%s\"", v->props[k].name, v->props[k].value);
+		}
+		fprintf(lui_write, "]");
+	}
+	else
+	{
+		char	*esc = slab_escape(v->name);
+		fprintf(lui_write, "\"%s\"", esc);
+	}
+}
+
+void imrs_var(struct mrs_var	*v, char	*gave_props)
+{
+	if(v->is_const)
+		fprintf(lui_write, " \"%s\"", slab_escape(v->name));
+	else
+	{
+		fprintf(lui_write, " #X[%d \"%s%d\"]", v->vnum, v->type, v->vnum);
+		if(!gave_props[v->vnum])
+		{
+			gave_props[v->vnum] = 1;
+			if(!v->nprops)return;
+			fprintf(lui_write, " \" (");
+			int i;
+			for(i=0;i<v->nprops;i++)
+				fprintf(lui_write, "%s%s", i?", ":"", v->props[i].value);
+			fprintf(lui_write, ")\"");
+		}
+	}
+}
+
 void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 {
 	struct mrs	*m = extract_mrs(h->dg);
@@ -606,25 +653,6 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 		int i, j, k;
 
 		make_reliable_vnums(m);
-
-		void	output_lui_mrs_var(struct mrs_var	*v)
-		{
-			if(!v->is_const)
-			{
-				fprintf(lui_write, "<%d>=#D[%s", v->vnum, v->type);
-				int k;
-				for(k=0;k<v->nprops;k++)
-				{
-					fprintf(lui_write, " %s: \"%s\"", v->props[k].name, v->props[k].value);
-				}
-				fprintf(lui_write, "]");
-			}
-			else
-			{
-				char	*esc = slab_escape(v->name);
-				fprintf(lui_write, "\"%s\"", esc);
-			}
-		}
 
 		fprintf(lui_write, " TOP: ");
 		output_lui_mrs_var(m->ltop);
@@ -690,35 +718,16 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 	{
 		char	gave_props[m->vlist.nvars];
 		bzero(gave_props, sizeof(gave_props));
-		void imrs_var(struct mrs_var	*v)
-		{
-			if(v->is_const)
-				fprintf(lui_write, " \"%s\"", slab_escape(v->name));
-			else
-			{
-				fprintf(lui_write, " #X[%d \"%s%d\"]", v->vnum, v->type, v->vnum);
-				if(!gave_props[v->vnum])
-				{
-					gave_props[v->vnum] = 1;
-					if(!v->nprops)return;
-					fprintf(lui_write, " \" (");
-					int i;
-					for(i=0;i<v->nprops;i++)
-						fprintf(lui_write, "%s%s", i?", ":"", v->props[i].value);
-					fprintf(lui_write, ")\"");
-				}
-			}
-		}
 		fprintf(lui_write, "text %d #X[\"TOP: \"", ++xtext_id_gen);
-		imrs_var(m->ltop);
+		imrs_var(m->ltop, gave_props);
 		fprintf(lui_write, " newline \"INDEX: \"");
-		imrs_var(m->index);
+		imrs_var(m->index, gave_props);
 		fprintf(lui_write, " newline newline");
 		int i, j, k;
 		for(i=0;i<m->nrels;i++)
 		{
 			struct mrs_ep	*e = &m->rels[i];
-			imrs_var(e->lbl);
+			imrs_var(e->lbl, gave_props);
 			if(e->pred[0]!='"')
 				fprintf(lui_write, " \":%s\"", slab_escape(e->pred));
 			else fprintf(lui_write, " \":\" %s", e->pred);
@@ -726,7 +735,7 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 			for(j=0;j<e->nargs;j++)
 			{
 				if(j)fprintf(lui_write, " \", \"");
-				imrs_var(e->args[j].value);
+				imrs_var(e->args[j].value, gave_props);
 			}
 			fprintf(lui_write, "\")\" newline\n");
 		}
@@ -734,9 +743,9 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 		for(i=0;i<m->nhcons;i++)
 		{
 			fprintf(lui_write, " \"%s\"", i?", ":"");
-			imrs_var(m->hcons[i].hi);
+			imrs_var(m->hcons[i].hi, gave_props);
 			fprintf(lui_write, " \" %s \"", (m->hcons[i].type==hcons_qeq)?"qeq":((m->hcons[i].type==hcons_leq)?"leq":((m->hcons[i].type==hcons_geq)?"geq":"???")));
-			imrs_var(m->hcons[i].lo);
+			imrs_var(m->hcons[i].lo, gave_props);
 		}
 		fprintf(lui_write, " newline\n");
 		if(mrs_enable_icons)
@@ -745,9 +754,9 @@ void	output_lui_edge_mrs(struct hypothesis	*h, char	*type)
 			for(i=0;i<m->nicons;i++)
 			{
 				fprintf(lui_write, " \"%s\"", i?", ":"");
-				imrs_var(m->icons[i].left);
+				imrs_var(m->icons[i].left, gave_props);
 				fprintf(lui_write, " \" %s \"", m->icons[i].type);
-				imrs_var(m->icons[i].right);
+				imrs_var(m->icons[i].right, gave_props);
 			}
 			fprintf(lui_write, " newline\n");
 		}
@@ -832,48 +841,53 @@ void	browse_lui(int eid, char *what, char	*what2)
 	}
 }
 
-int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs)
+struct oltiter_ctx
 {
-	struct hypothesis	**hyps = NULL;
-	struct mrs			**mrss = NULL;
-	int	count = 0;
+	struct hypothesis	**hyps;
+	struct mrs			**mrss;
+	struct mrs			*require_mrs;
+	int					count;
+};
 
-	lui_initialize();
-	int iter(struct hypothesis	*hyp, struct mrs	*mrs, double	prob, void *ctx)
+static int oltiter(struct hypothesis	*hyp, struct mrs	*mrs, double	prob, struct oltiter_ctx *ctx)
+{
+	if(!ctx->require_mrs || mrs_subsumes(ctx->require_mrs, mrs))
 	{
-		if(!require_mrs || mrs_subsumes(require_mrs, mrs))
-		{
-			count++;
-			hyps = realloc(hyps, sizeof(struct hypothesis*) * count);
-			mrss = realloc(mrss, sizeof(struct mrs*) * count);
-			hyps[count-1] = hyp;
-			mrss[count-1] = mrs;
-			return 1;
-		}
-		else return 0;
-	}
-	count = iterate_cell_root_hypotheses(c, iter, best_only, NULL);
-	//printf("got %d results\n", count);
-	fprintf(lui_write, "group %d \"%s\"\n", count, slab_escape(sent));
-
-	int show_tree(struct hypothesis	*hyp, struct mrs	*mrs)
-	{
-		if(require_mrs && !mrs_subsumes(require_mrs, mrs))return 0;
-		fprintf(lui_write, "tree %d", chart_id);
-		lui_format_tree(hyp, NULL);
-		fprintf(lui_write, " \"%s\"\n", slab_escape(sent));
-		//printf("lui wrote a tree\n");
+		ctx->count++;
+		ctx->hyps = realloc(ctx->hyps, sizeof(struct hypothesis*) * ctx->count);
+		ctx->mrss = realloc(ctx->mrss, sizeof(struct mrs*) * ctx->count);
+		ctx->hyps[ctx->count-1] = hyp;
+		ctx->mrss[ctx->count-1] = mrs;
 		return 1;
 	}
+	else return 0;
+}
+
+int	output_lui_trees(struct chart_cell	*c, char *sent, int best_only, struct mrs	*require_mrs)
+{
+	struct oltiter_ctx	ctx;
+	bzero(&ctx,sizeof(ctx));
+	ctx.require_mrs = require_mrs;
+
+	lui_initialize();
+	iterate_cell_root_hypotheses(c, (int (*)(struct hypothesis *, struct mrs *, double,  void *))oltiter, best_only, &ctx);
+	//printf("got %d results\n", count);
+	fprintf(lui_write, "group %d \"%s\"\n", ctx.count, slab_escape(sent));
 
 	chart_id++;
 	int i;
-	for(i=0;i<count;i++)
-		show_tree(hyps[i], mrss[i]);
+	for(i=0;i<ctx.count;i++)
+	{
+		if(require_mrs && !mrs_subsumes(require_mrs, ctx.mrss[i]))return 0;
+		fprintf(lui_write, "tree %d", chart_id);
+		lui_format_tree(ctx.hyps[i], NULL);
+		fprintf(lui_write, " \"%s\"\n", slab_escape(sent));
+		//printf("lui wrote a tree\n");
+	}
 
 	fflush(lui_write);
 
-	return count;
+	return ctx.count;
 }
 
 int	ngenresults = 0;
