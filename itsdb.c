@@ -670,32 +670,33 @@ int capi_print_chart(struct lattice	*tokens, struct lattice	*lexical_chart, int	
 	}
 }
 
+static int cpt_id;
+
+int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
+{
+	tsdb_nanalyses++;
+	if(tsdb_nderivations >= tsdb_maxderivations && !(do_itsdb_stdout && tsdb_maxderivations==0))return 1;
+	tsdb_nderivations++;
+
+	capi_printf("((:result-id . %d)", cpt_id++);
+
+	tsdb_report_derivation(hyp);
+
+	if(itsdb_wants_mrs)
+		tsdb_report_mrs(mrs);
+	if(report_labels)
+		tsdb_report_labels(hyp);
+
+	//capi_printf(" (:score .%f))", hyp->score);
+	capi_printf(" (:flags ((:ascore . %f) (:probability . %f))))", hyp->score, prob);
+	return 1;
+}
+
 int	capi_print_derivations()
 {
-	int id;
-
 	tsdb_nderivations = 0;
 	tsdb_nanalyses = 0;
-	id = 0;
-	int capi_print_tree(struct hypothesis	*hyp, struct mrs	*mrs, double	prob)
-	{
-		tsdb_nanalyses++;
-		if(tsdb_nderivations >= tsdb_maxderivations && !(do_itsdb_stdout && tsdb_maxderivations==0))return 1;
-		tsdb_nderivations++;
-
-		capi_printf("((:result-id . %d)", id++);
-
-		tsdb_report_derivation(hyp);
-
-		if(itsdb_wants_mrs)
-			tsdb_report_mrs(mrs);
-		if(report_labels)
-			tsdb_report_labels(hyp);
-
-		//capi_printf(" (:score .%f))", hyp->score);
-		capi_printf(" (:flags ((:ascore . %f) (:probability . %f))))", hyp->score, prob);
-		return 1;
-	}
+	cpt_id = 0;
 	itsdb_start_results();
 	int	n = iterate_cell_root_hypotheses(&cells[chart_size-1], capi_print_tree, best_only);
 	itsdb_end_results();

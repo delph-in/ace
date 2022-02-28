@@ -597,34 +597,34 @@ int	lexcomp(const void	*a, const void	*b)
 	else return strcmp(la->word, lb->word);*/
 }
 
-int	load_lexicon()
+int load_lexicon1()
 {
 	extern int	lexify_tdl_line(struct tdl_line	*line, void	*ref);
 	struct timeval tv1, tv2;
-
-	int load_lexicon()
+	//gettimeofday(&tv1, 0);
+	if(process_tdl_status("lex-entry", lexify_tdl_line, 0))
 	{
-		//gettimeofday(&tv1, 0);
-		if(process_tdl_status("lex-entry", lexify_tdl_line, 0))
-		{
-			fprintf(stderr, "lexicon: unable to load, bailing out.\n");
-			exit(-1);
-		}
-		//gettimeofday(&tv2, 0);
-		//show_task_name("loading lexicon...");
-		//printf("%.1f secs\n",
-			//(tv2.tv_sec - tv1.tv_sec) + 0.000001*(tv2.tv_usec-tv1.tv_usec));
-		qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
-
-		//show_task_name("generic lexemes");
-		if(process_tdl_dgs_status("generic-lex-entry", study_generic_le))
-		{
-			fprintf(stderr, "lexicon: unable to load generics, bailing out.\n");
-			exit(-1);
-		}
-		return 0;
+		fprintf(stderr, "lexicon: unable to load, bailing out.\n");
+		exit(-1);
 	}
-	run_task("processing lexicon...", load_lexicon);
+	//gettimeofday(&tv2, 0);
+	//show_task_name("loading lexicon...");
+	//printf("%.1f secs\n",
+		//(tv2.tv_sec - tv1.tv_sec) + 0.000001*(tv2.tv_usec-tv1.tv_usec));
+	qsort(lexemes, nlexemes, sizeof(struct lexeme*), lexcomp);
+
+	//show_task_name("generic lexemes");
+	if(process_tdl_dgs_status("generic-lex-entry", study_generic_le))
+	{
+		fprintf(stderr, "lexicon: unable to load generics, bailing out.\n");
+		exit(-1);
+	}
+	return 0;
+}
+
+int	load_lexicon()
+{
+	run_task("processing lexicon...", load_lexicon1);
 
 	show_task_name("simple lexemes");
 	printf("%d / %d = %.2f%%\n", nsimpleform, nlexemes, 100*(float)nsimpleform / nlexemes);
