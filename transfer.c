@@ -747,6 +747,19 @@ int	transfer_missing_roles(struct mrs_ep_desc	*rule, struct mrs_ep	*ep)
 	return 0;
 }
 
+int tta_unify_vars(struct mrs_var	*vin, struct mrs_var	*vrule)
+{
+	extern int allow_unify_swapping;
+	if(!vin || !vin->dg || !vrule || !vrule->dg)return 0;
+	if(0 != unify_dg_tmp(vrule->dg, vin->dg, -1))
+	{
+		forget_tmp();
+		allow_unify_swapping = 1;
+		return -1;
+	}
+	return 0;
+}
+
 int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count, int	*align, int	total, int	hccount, int	*hcalignment, int	hctotal, int is_filter)
 {
 	int	i;
@@ -857,25 +870,14 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 		nsuccessful_transfer_unifies++;
 	}
 	// also unify the input MRS's LTOP and INDEX into the INPUT and CONTEXT mrs descriptions' HOOKs.
-	int unify_vars(struct mrs_var	*vin, struct mrs_var	*vrule)
-	{
-		if(!vin || !vin->dg || !vrule || !vrule->dg)return 0;
-		if(0 != unify_dg_tmp(vrule->dg, vin->dg, -1))
-		{
-			forget_tmp();
-			allow_unify_swapping = 1;
-			return -1;
-		}
-		return 0;
-	}
 	/*printf("trying to unify hooks\n");
 	printf("input ltop = ");if(mrs->ltop)print_within_generation(mrs->ltop->dg);printf("\n");
 	printf("rule input ltop = ");if(tr->input.mrs->ltop)print_within_generation(tr->input.mrs->ltop->dg);printf("\n");
 	printf("rule context ltop = ");if(tr->context.mrs->ltop)print_within_generation(tr->context.mrs->ltop->dg);printf("\n");*/
-	if(unify_vars(mrs->ltop, tr->input.mrs->ltop))return -1;
-	if(unify_vars(mrs->ltop, tr->context.mrs->ltop))return -1;
-	if(unify_vars(mrs->index, tr->input.mrs->index))return -1;
-	if(unify_vars(mrs->index, tr->context.mrs->index))return -1;
+	if(tta_unify_vars(mrs->ltop, tr->input.mrs->ltop))return -1;
+	if(tta_unify_vars(mrs->ltop, tr->context.mrs->ltop))return -1;
+	if(tta_unify_vars(mrs->index, tr->input.mrs->index))return -1;
+	if(tta_unify_vars(mrs->index, tr->context.mrs->index))return -1;
 	/*printf("after unifying hooks:\n");
 	printf("input ltop = ");if(mrs->ltop)print_within_generation(mrs->ltop->dg);printf("\n");
 	printf("rule input ltop = ");if(tr->input.mrs->ltop)print_within_generation(tr->input.mrs->ltop->dg);printf("\n");
@@ -887,8 +889,8 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 		struct mrs_hcons	hin = mrs->hcons[hcalignment[i]];
 		//if(!unifiable_hcons(hrule, hin))return -1;
 		if(hrule.type != hin.type) { allow_unify_swapping = 1; return -1; }
-		if(unify_vars(hin.hi, hrule.hi))return -1;
-		if(unify_vars(hin.lo, hrule.lo))return -1;
+		if(tta_unify_vars(hin.hi, hrule.hi))return -1;
+		if(tta_unify_vars(hin.lo, hrule.lo))return -1;
 	}
 	allow_unify_swapping = 1;
 
