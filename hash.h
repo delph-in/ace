@@ -22,6 +22,7 @@ struct hash	*freeze_string_hash(struct hash	*h);
 void		hash_add(struct hash	*ht, char	*key, void	*value);
 void		*hash_find(struct hash	*ht, char	*key);
 void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitor)(void *value));
+void		hash_visit_key_r(struct hash	*ht, char	*key, void	*ctx, void	(*visitor)(void *ctx, void *value));
 void		hash_free(struct hash	*ht);
 
 #endif

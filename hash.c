@@ -119,6 +119,19 @@ void		hash_add(struct hash	*ht, char	*key, void	*value)
 	hash_add_bucket(ht, bucket);
 }
 
+void		hash_visit_key_r(struct hash	*ht, char	*key, void	*ctx, void	(*visitor)(void *ctx, void *value))
+{
+	unsigned h = hash_code(ht, key);
+	struct hash_bucket	*bucket;
+	
+	assert(!ht->has_flk);
+	for(bucket=ht->buckets[h];bucket;bucket=bucket->next)
+	{
+		//printf(" visit `%s' found `%s'\n", key, bucket->key);
+		if(!strcmp(bucket->key, key))visitor(ctx, bucket->value);
+	}
+}
+
 void		hash_visit_key(struct hash	*ht, char	*key, void	(*visitor)(void *value))
 {
 	unsigned h = hash_code(ht, key);
@@ -236,18 +249,18 @@ size_t	hash_memory_usage(struct hash	*ht)
 	return len;
 }
 
+char	*afreeze_string(char	*S, void*	(*alloc)(size_t	len))
+{
+	char	*c = alloc(strlen(S)+1);
+	strcpy(c, S);
+	return c;
+}
+
 struct hash	*hash_copy(struct hash	*ht, void*	(*alloc)(size_t	len))
 {
 	struct hash	*nh = alloc(sizeof(struct hash));
 	struct hash_bucket	*buck, **Bp, *walk;
 	int				i;
-
-	char	*freeze_string(char	*S)
-	{
-		char	*c = alloc(strlen(S)+1);
-		strcpy(c, S);
-		return c;
-	}
 
 	*nh = *ht;
 	nh->buckets = alloc(sizeof(struct hash_bucket*) * nh->size);
@@ -259,14 +272,14 @@ struct hash	*hash_copy(struct hash	*ht, void*	(*alloc)(size_t	len))
 		{
 			*Bp = buck;
 			Bp = &buck->next;
-			buck->key = freeze_string(walk->key);
+			buck->key = afreeze_string(walk->key, alloc);
 			buck->value = walk->value;
 			buck++;
 		}
 		*Bp = 0;
 	}
 	//printf("freezing hash %s bucket pointers at %p\n", ht->name, nh->buckets);
-	nh->name = freeze_string(ht->name);
+	nh->name = afreeze_string(ht->name, alloc);
 
 	return nh;
 }
