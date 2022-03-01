@@ -1526,6 +1526,28 @@ int	tr_quickcheck(struct transfer_rule	*tr, struct mrs	*min)
 	return 1;
 }
 
+struct tfa_ctx
+{
+	struct transfer_rule	*tr;
+	struct mrs				*min;
+	struct transfer_mrs_set	*ts;
+	int		pack_start;
+	struct hash	*preds_seen;
+	int	*Nalignments, *Nfires;
+	int	first_route_only;
+};
+
+int	transfer_found_alignment(int	*alignment, int *hcalignment, void *ctx)
+{
+	struct tfa_ctx	*myctx = ctx;
+	if(0 != process_one_transfer_result(myctx->tr, alignment, hcalignment, myctx->min, myctx->ts, myctx->pack_start, myctx->preds_seen))
+		return 0;
+
+	(*myctx->Nalignments)++;
+	(*myctx->Nfires)++;
+	return myctx->first_route_only;
+}
+
 int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int first_route_only, struct hash	*preds_seen)
 {
 	DEBUG("rule %s -- optional %d\n", tr->name, tr->optional);
@@ -1559,17 +1581,9 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 		}
 
 		int	nalignments = 0;
-		int	found_alignment(int	*alignment, int *hcalignment, void *ctx)
-		{
-			if(0 != process_one_transfer_result(tr, alignment, hcalignment, min, ts, pack_start, preds_seen))
-				return 0;
-
-			nalignments++;
-			nfires++;
-			return first_route_only;
-		}
+		struct tfa_ctx ctx = {.tr = tr, .ts = ts, .first_route_only = first_route_only, .preds_seen = preds_seen, .pack_start = pack_start, .Nalignments = &nalignments, .Nfires = &nfires, .min = min};
 		if(tr_quickcheck(tr, min))
-			align_transfer_rule(tr, min, found_alignment, NULL);
+			align_transfer_rule(tr, min, transfer_found_alignment, &ctx);
 		//else printf("quickly rejected for one candidate only: %s\n", tr->name);
 		if(nalignments == 0 || tr->optional)
 		{
