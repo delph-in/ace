@@ -1169,9 +1169,31 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 	}
 }
 
+struct drotr_ctx
+{
+	struct transfer_rule	*R;
+	struct mrs	*m;
+};
+
+int	drotr_found_alignment(int	*alignment, int	*hcalignment, void *ctx)
+{
+	struct drotr_ctx	*myctx = ctx;
+	struct dg	*flags = dg_hop(myctx->R->dg, lookup_fname("FLAGS"));
+	struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
+	char	lexid[256];
+	sprintf(lexid, "%.*s", (int)strlen(trig->xtype->name)-2, trig->xtype->name+1);
+	printf("rule %s matches EPs:", myctx->R->name);
+	int j;
+	for(j=0;j<myctx->R->input.neps + myctx->R->context.neps;j++)
+		printf(" %s", myctx->m->rels[alignment[j]].pred);
+	printf("    -> %s\n", lexid);
+	if(temporary_expedient(lexid))
+		printf("  but that's on the temporary expedient, so skipping!\n");
+}
+
 void debug_run_one_trigger_rule(struct mrs	*m, char	*rname, int detail)
 {
-	int i, j;
+	int i;
 	for(i=0;i<ntrigger_rules;i++)
 		if(!strcasecmp(trigger_rules[i]->name, rname))break;
 	if(i==ntrigger_rules)
@@ -1181,21 +1203,9 @@ void debug_run_one_trigger_rule(struct mrs	*m, char	*rname, int detail)
 	}
 	struct transfer_rule	*R = trigger_rules[i];
 
-	int	found_alignment(int	*alignment, int	*hcalignment, void *ctx)
-	{
-		struct dg	*flags = dg_hop(R->dg, lookup_fname("FLAGS"));
-		struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
-		char	lexid[256];
-		sprintf(lexid, "%.*s", (int)strlen(trig->xtype->name)-2, trig->xtype->name+1);
-		printf("rule %s matches EPs:", R->name);
-		for(j=0;j<R->input.neps + R->context.neps;j++)
-			printf(" %s", m->rels[alignment[j]].pred);
-		printf("    -> %s\n", lexid);
-		if(temporary_expedient(lexid))
-			printf("  but that's on the temporary expedient, so skipping!\n");
-	}
 	debug_transfer = detail;
-	align_transfer_rule(R, m, found_alignment, NULL);
+	struct drotr_ctx ctx = {.R = R, .m = m};
+	align_transfer_rule(R, m, drotr_found_alignment, &ctx);
 	debug_transfer = 0;
 }
 
