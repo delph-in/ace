@@ -22,6 +22,30 @@
 
 extern int inhibit_vpm;
 
+struct map_variable_ctx
+{
+	struct mrs		*min;
+	struct mrs_var	**new_var_map;
+	char			*input_variable_is_carried;
+	int				*Ncarried_input_variables;
+};
+
+struct mrs_var	*tresult_map_variable(struct mrs_var	*vin, struct map_variable_ctx	*ctx)
+{
+	if(!vin)return NULL;
+	assert(vin->vnum >= 0 && vin->vnum < ctx->min->vlist.nvars);
+	assert(ctx->min->vlist.vars[vin->vnum] == vin);
+	struct mrs_var	*corresponding_new_var = ctx->new_var_map[vin->vnum];
+	if(corresponding_new_var)
+		return corresponding_new_var;
+	if(!ctx->input_variable_is_carried[vin->vnum])
+	{
+		ctx->input_variable_is_carried[vin->vnum] = 1;
+		(*ctx->Ncarried_input_variables)++;
+	}
+	return vin;
+}
+
 void	compute_variable_mapping(struct mrs	*min, struct mrs_vlist	*new_vars, struct dg	**old_var_dg, struct mrs_var	**new_var_map)
 {
 	// see if any of the new variables are old variables in disguise.
@@ -163,7 +187,7 @@ void	transfer_result_dg_to_mrs(struct transfer_rule	*tr, struct mrs_vlist	*new_v
 	inhibit_vpm = 0;
 }
 
-void	transfer_top_level_variables(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, struct mrs_var	*(*map_variable)(struct mrs_var	*vin))
+void	transfer_top_level_variables(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, struct map_variable_ctx	*mvctx)
 {
 /*
 	// XXX shouldn't this be looking at tr->output.mrs->ltop etc?
@@ -175,7 +199,7 @@ void	transfer_top_level_variables(struct transfer_rule	*tr, struct mrs	*min, str
 */
 }
 
-void	transfer_hcons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, int	*hcalignment, struct mrs_var	**copy_hc_hi_v, struct mrs_var	**copy_hc_lo_v, struct mrs_var	*(*map_variable)(struct mrs_var	*vin))
+void	transfer_hcons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, int	*hcalignment, struct mrs_var	**copy_hc_hi_v, struct mrs_var	**copy_hc_lo_v, struct map_variable_ctx	*mvctx)
 {
 	int	expected_hcons = min->nhcons - tr->input.nhcons + tr->output.nhcons;
 	int	i;
@@ -191,8 +215,8 @@ void	transfer_hcons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs
 			struct mrs_hcons	*hcin = min->hcons+i;
 			struct mrs_hcons	*hcout = mout->hcons+mout->nhcons++;
 			hcout->type = hcin->type;
-			hcout->hi = map_variable(hcin->hi);
-			hcout->lo = map_variable(hcin->lo);
+			hcout->hi = tresult_map_variable(hcin->hi, mvctx);
+			hcout->lo = tresult_map_variable(hcin->lo, mvctx);
 		}
 	for(i=0;i<tr->output.nhcons;i++)
 	{
@@ -205,7 +229,7 @@ void	transfer_hcons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs
 	assert(mout->nhcons == expected_hcons);
 }
 
-void	transfer_icons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, struct mrs_var	*(*map_variable)(struct mrs_var	*vin))
+void	transfer_icons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, struct map_variable_ctx	*mvctx)
 {
 	int	i;
 	mout->nicons = min->nicons;
@@ -215,12 +239,12 @@ void	transfer_icons_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs
 		struct mrs_icons	*icin = min->icons+i;
 		struct mrs_icons	*icout = mout->icons+i;
 		icout->type = icin->type;
-		icout->left = map_variable(icin->left);
-		icout->right = map_variable(icin->right);
+		icout->left = tresult_map_variable(icin->left, mvctx);
+		icout->right = tresult_map_variable(icin->right, mvctx);
 	}
 }
 
-void	transfer_ep_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, int	*alignment, struct mrs_ep	*new_eps, struct mrs_var	*(*map_variable)(struct mrs_var	*vin))
+void	transfer_ep_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, int	*alignment, struct mrs_ep	*new_eps, struct map_variable_ctx	*mvctx)
 {
 	int	expected_rels = min->nrels - tr->input.neps + tr->output.neps;
 	int	i;
@@ -240,11 +264,11 @@ void	transfer_ep_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*m
 			epout->args = slab_alloc(sizeof(struct mrs_ep_role)*epin->nargs);
 			int k, anydiff = 1;
 			char	diffarg[epin->nargs];
-			epout->lbl = map_variable(epin->lbl);
+			epout->lbl = tresult_map_variable(epin->lbl, mvctx);
 			for(k=0;k<epin->nargs;k++)
 			{
 				epout->args[k].name = epin->args[k].name;
-				epout->args[k].value = map_variable(epin->args[k].value);
+				epout->args[k].value = tresult_map_variable(epin->args[k].value, mvctx);
 				if(epout->args[k].value != epin->args[k].value)
 				{
 					anydiff = 1;
@@ -301,7 +325,7 @@ void	transfer_ep_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*m
 	assert(expected_rels == mout->nrels);
 }
 
-void	transfer_vlist_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, struct mrs_vlist	*new_vars, int	ncarried_input_variables, char	*input_variable_is_carried, struct mrs_var	*(*map_variable)(struct mrs_var	*vin))
+void	transfer_vlist_result(struct transfer_rule	*tr, struct mrs	*min, struct mrs	*mout, struct mrs_vlist	*new_vars, int	ncarried_input_variables, char	*input_variable_is_carried, struct map_variable_ctx	*mvctx)
 {
 	// the new vlist should have the old variables that were returned by map_variable(), union the new variables
 	int	i, expected_vars = ncarried_input_variables + new_vars->nvars;
@@ -375,6 +399,17 @@ void	prune_unmatched_parts(struct dg	*dg)
 	}
 }
 
+static struct dg	*find_copied(struct dg	*rule_dg, int	must_exist)
+{
+	extern unsigned int generation;
+	rule_dg = dereference_dg(rule_dg);	// see where it moved during unification
+	if(rule_dg->gen != generation)rule_dg = NULL;
+	else rule_dg = rule_dg->copy;	// see where it moved during copying -- might not have been copied
+	assert(rule_dg || !must_exist);
+	if(rule_dg)assert(rule_dg->xtype);
+	return rule_dg;
+}
+
 struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*hcalignment, struct mrs	*min)
 {
 	//printf("finding result of transfer rule '%s'\n", tr->name);
@@ -422,17 +457,6 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 
 	// prune parts of the result that came from matching variables that didn't exist in the input
 	prune_unmatched_parts(full_tr_copy);
-
-	struct dg	*find_copied(struct dg	*rule_dg, int	must_exist)
-	{
-		extern unsigned int generation;
-		rule_dg = dereference_dg(rule_dg);	// see where it moved during unification
-		if(rule_dg->gen != generation)rule_dg = NULL;
-		else rule_dg = rule_dg->copy;	// see where it moved during copying -- might not have been copied
-		assert(rule_dg || !must_exist);
-		if(rule_dg)assert(rule_dg->xtype);
-		return rule_dg;
-	}
 
 	// make copies of all the output EPs and HCONSes -- and the input EPs too when we are working with a +copy+
 	struct dg	*copy_ep_out_dgs[tr->output.neps];
@@ -490,27 +514,13 @@ struct mrs	*transfer_mrs_result(struct transfer_rule	*tr, int	*alignment, int	*h
 	char	input_variable_is_carried[1024];//min->vlist.nvars];
 	bzero(input_variable_is_carried, sizeof(input_variable_is_carried));
 	make_reliable_vnums(min);
-	struct mrs_var	*map_variable(struct mrs_var	*vin)
-	{
-		if(!vin)return NULL;
-		assert(vin->vnum >= 0 && vin->vnum < min->vlist.nvars);
-		assert(min->vlist.vars[vin->vnum] == vin);
-		struct mrs_var	*corresponding_new_var = new_var_map[vin->vnum];
-		if(corresponding_new_var)
-			return corresponding_new_var;
-		if(!input_variable_is_carried[vin->vnum])
-		{
-			input_variable_is_carried[vin->vnum] = 1;
-			ncarried_input_variables++;
-		}
-		return vin;
-	}
+	struct map_variable_ctx	ctx = {.min = min, .new_var_map = new_var_map, .input_variable_is_carried = input_variable_is_carried, .Ncarried_input_variables = &ncarried_input_variables};
 
-	transfer_top_level_variables(tr, min, mout, map_variable);
-	transfer_ep_result(tr, min, mout, alignment, new_eps, map_variable);
-	transfer_hcons_result(tr, min, mout, hcalignment, copy_hc_hi_v, copy_hc_lo_v, map_variable);
-	transfer_icons_result(tr, min, mout, map_variable);
-	transfer_vlist_result(tr, min, mout, &new_vars, ncarried_input_variables, input_variable_is_carried, map_variable);
+	transfer_top_level_variables(tr, min, mout, &ctx);
+	transfer_ep_result(tr, min, mout, alignment, new_eps, &ctx);
+	transfer_hcons_result(tr, min, mout, hcalignment, copy_hc_hi_v, copy_hc_lo_v, &ctx);
+	transfer_icons_result(tr, min, mout, &ctx);
+	transfer_vlist_result(tr, min, mout, &new_vars, ncarried_input_variables, input_variable_is_carried, &ctx);
 
 	setup_tmp();	// make sure subsequent forget_tmp() calls don't delete our saved EP dags or MRS structure
 
