@@ -520,6 +520,55 @@ struct type	*new_glb_type()
 
 static struct profiler	*ancestor_profiler, *decendant_profiler, *lineage_profiler;
 
+void iglbt_add_anc(struct type	*t, unsigned long long	*v, int	*Nanc, struct code_record **Anc, int bcsize)
+{
+	int	i, is_in = 0;
+	int	di = -1;
+	int nanc = *Nanc;
+	struct code_record *anc = *Anc;
+	//printf("add_anc %s\n", t->name);
+	for(i=0;i<nanc;i++)
+	{
+		struct type	*at = anc[i].t;
+		unsigned long long	*av = anc[i].code;
+		if(!at){di = i;continue;}	// deleted ancestor
+		if(at == t)return;
+		if(bitvec_subsume(v, av, bcsize))return;
+		if(bitvec_subsume(av, v, bcsize))
+		{
+			// type we're trying to add is subsumed by current ancestor type
+			if(!is_in)
+			{
+				anc[i].t = t;
+				anc[i].code = v;
+				is_in = 1;
+			}
+			else
+			{
+				anc[i].t = NULL;
+				anc[i].code = NULL;
+			}
+		}
+	}
+	if(!is_in)
+	{
+		if(di != -1)
+		{
+			anc[di].t = t;
+			anc[di].code = v;
+		}
+		else
+		{
+			nanc++;
+			anc = realloc(anc, sizeof(struct code_record)*nanc);
+			anc[nanc-1].t = t;
+			anc[nanc-1].code = v;
+			*Nanc = nanc;
+			*Anc = anc;
+		}
+	}
+}
+
 // same algorithm as LKB function of similar name
 insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct code_record	*cr, int	bcsize)
 {
@@ -531,64 +580,20 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 	// no need to add an ancestor that subsumes another already-present ancestor
 	// if we find a parent that is subsumed by several existing parents,
 	// replace one and delete the rest.
-	void add_anc(struct type	*t, unsigned long long	*v)
-	{
-		int	i, is_in = 0;
-		int	di = -1;
-		//printf("add_anc %s\n", t->name);
-		for(i=0;i<nanc;i++)
-		{
-			struct type	*at = anc[i].t;
-			unsigned long long	*av = anc[i].code;
-			if(!at){di = i;continue;}	// deleted ancestor
-			if(at == t)return;
-			if(bitvec_subsume(v, av, bcsize))return;
-			if(bitvec_subsume(av, v, bcsize))
-			{
-				// type we're trying to add is subsumed by current ancestor type
-				if(!is_in)
-				{
-					anc[i].t = t;
-					anc[i].code = v;
-					is_in = 1;
-				}
-				else
-				{
-					anc[i].t = NULL;
-					anc[i].code = NULL;
-				}
-			}
-		}
-		if(!is_in)
-		{
-			if(di != -1)
-			{
-				anc[di].t = t;
-				anc[di].code = v;
-			}
-			else
-			{
-				nanc++;
-				anc = realloc(anc, sizeof(struct code_record)*nanc);
-				anc[nanc-1].t = t;
-				anc[nanc-1].code = v;
-			}
-		}
-	}
 
 	start_and_alloc_profiler(&ancestor_profiler, "GLB ancestors", insert_profiler, NULL);
 	// see what authored types subsume 'cr'
 	for(i=0;i<part->psize;i++)
 	{
 		unsigned long long	*v = vectors[i];
-		if(bitvec_subsume(v, cr->code, bcsize))add_anc(part->part[i], v);
+		if(bitvec_subsume(v, cr->code, bcsize))iglbt_add_anc(part->part[i], v, &nanc, &anc, bcsize);
 	}
 	// see what new glb types subsume 'cr'
 	for(i=0;i<nglbtypes;i++)
 	{
 		unsigned long long	*v = glbtypes[i]->code;
 		if(glbtypes[i] == cr)continue;
-		if(bitvec_subsume(v, cr->code, bcsize))add_anc(glbtypes[i]->t, v);
+		if(bitvec_subsume(v, cr->code, bcsize))iglbt_add_anc(glbtypes[i]->t, v, &nanc, &anc, bcsize);
 	}
 
 	// collapse deleted slots
