@@ -1098,6 +1098,50 @@ int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callbac
 	return align_transfer_rule0(tr, mrs, 0, tr->input.neps + tr->context.neps, alignment, 0, tr->input.nhcons + tr->context.nhcons, hcalignment, callback, 0, cbctx);
 }
 
+struct trigger_found_alignment_ctx
+{
+	struct transfer_rule	*rule;
+	void	(*trigger)(char	*lexid, struct dg	*cons, void	*ctx);
+	void	*ctx;
+	struct mrs	*mrsin;
+	int	use_trigger_constraints;
+};
+
+static int	trigger_found_alignment(int	*alignment, int	*hcalignment, void *ctx)
+{
+	struct trigger_found_alignment_ctx	*myctx = ctx;
+	struct dg	*flags = dg_hop(myctx->rule->dg, lookup_fname("FLAGS"));
+	struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
+	struct dg	*trigcons = NULL;
+	if(myctx->use_trigger_constraints)
+		trigcons = dg_hop(flags, lookup_fname("TRIGGER-CONSTRAINT"));
+	char	lexid[256];
+	sprintf(lexid, "%.*s", (int)strlen(trig->xtype->name)-2, trig->xtype->name+1);
+	if(temporary_expedient(lexid))
+	{
+		//printf("not triggering '%s' via '%s' because it is disabled for generation\n", lexid, myctx->rule->name);
+		//return;
+	}
+	else
+	{
+		char	*aligned_on = "<none>";
+		if(myctx->rule->input.neps + myctx->rule->context.neps > 0)
+			aligned_on = myctx->mrsin->rels[alignment[0]].pred;
+		//printf("triggering '%s' via '%s', aligned on %s\n", lexid, myctx->rule->name, aligned_on);
+		if(trigcons)
+		{
+			struct dg	*dg = copy_dg_with_comp_arcs(trigcons);
+			setup_tmp();	// prevent it from being forgotten when we return
+			trigcons = dg;
+			//printf("triggering '%s' via '%s', and TRIGGER-CONSTRAINT is:\n", lexid, myctx->rule->name);
+			//print_dg(dg);printf("\n");
+		}
+		myctx->trigger(lexid, trigcons, myctx->ctx);
+	}
+	if(trigcons)return 0;	// might find more alignments with different constraints
+	else return 1;	// don't care to hear about more alignments; it's triggered.
+}
+
 void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct dg	*cons, void	*ctx), void	*ctx)
 {
 	int	i;
@@ -1120,40 +1164,8 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 
 	for(i=0;i<ntrigger_rules;i++)
 	{
-		int	found_alignment(int	*alignment, int	*hcalignment, void *ctx)
-		{
-			struct dg	*flags = dg_hop(trigger_rules[i]->dg, lookup_fname("FLAGS"));
-			struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
-			struct dg	*trigcons = NULL;
-			if(use_trigger_constraints)
-				trigcons = dg_hop(flags, lookup_fname("TRIGGER-CONSTRAINT"));
-			char	lexid[256];
-			sprintf(lexid, "%.*s", (int)strlen(trig->xtype->name)-2, trig->xtype->name+1);
-			if(temporary_expedient(lexid))
-			{
-				//printf("not triggering '%s' via '%s' because it is disabled for generation\n", lexid, trigger_rules[i]->name);
-				//return;
-			}
-			else
-			{
-				char	*aligned_on = "<none>";
-				if(trigger_rules[i]->input.neps + trigger_rules[i]->context.neps > 0)
-					aligned_on = mrsin->rels[alignment[0]].pred;
-				//printf("triggering '%s' via '%s', aligned on %s\n", lexid, trigger_rules[i]->name, aligned_on);
-				if(trigcons)
-				{
-					struct dg	*dg = copy_dg_with_comp_arcs(trigcons);
-					setup_tmp();	// prevent it from being forgotten when we return
-					trigcons = dg;
-					//printf("triggering '%s' via '%s', and TRIGGER-CONSTRAINT is:\n", lexid, trigger_rules[i]->name);
-					//print_dg(dg);printf("\n");
-				}
-				trigger(lexid, trigcons, ctx);
-			}
-			if(trigcons)return 0;	// might find more alignments with different constraints
-			else return 1;	// don't care to hear about more alignments; it's triggered.
-		}
-		align_transfer_rule(trigger_rules[i], mrsin, found_alignment, NULL);
+		struct trigger_found_alignment_ctx tfactx = {.trigger = trigger, .ctx = ctx, .rule = trigger_rules[i], .use_trigger_constraints = use_trigger_constraints, .mrsin = mrsin};
+		align_transfer_rule(trigger_rules[i], mrsin, trigger_found_alignment, &tfactx);
 	}
 }
 
