@@ -583,16 +583,17 @@ void	report_stats(struct job_stats	stats)
 	//show_me();
 }
 
+int	logonserverdone = 0;
+void quitlogonserver(int sig) { logonserverdone = 1; }
+
 void	logon_generation_server(char	*langcode)
 {
-	int	done = 0;
-	void quitme(int sig) { done = 1; }
 	char	path[10240];
 	// LKB pretty much explicitly uses ~/tmp/
 	sprintf(path, "%s/tmp/.transfer.%s.%s", getenv("HOME"), getlogin(), langcode);
 	fprintf(stderr, "NOTE: generation server watching path: %s\n", path);
-	signal(SIGINT, quitme);
-	while(!done)
+	signal(SIGINT, quitlogonserver);
+	while(!logonserverdone)
 	{
 		// this "protocol" is pretty hokey...
 		FILE	*f = fopen(path, "r");

@@ -1,9 +1,8 @@
-CC=gcc
 CFLAGS=-O3 -g -fPIC
 #CFLAGS=-g
 OBJS = train.o words.o tags.o hmm.o
 
-#include ../MacOSX.config
+include ../MacOSX.config
 
 # compilation flags:
 

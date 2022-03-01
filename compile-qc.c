@@ -76,7 +76,7 @@ int	compile_qc(char	*qccode_path)
 
 	char	command[10240];
 #ifdef	MACOSX_GCC
-	sprintf(command, "gcc -x c -dynamic -dynamiclib -undefined suppress -flat_namespace -m64 -fPIC -DPIC - -o '%s'", target_path);
+	sprintf(command, "clang -x c -dynamic -dynamiclib -undefined suppress -flat_namespace -m64 -fPIC -DPIC - -o '%s'", target_path);
 #else
 	sprintf(command, "gcc -x c -shared -fPIC -DPIC - -o '%s'", target_path);
 #endif

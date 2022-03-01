@@ -148,19 +148,6 @@ double	ut_score_ex(struct ubertagger	*ut, int	tag, char	*emission, int	classcase
 	struct ut_score_ex_ecmp_ctx ctx = {ut, emission};
 	struct ut_emission	EM = {-1,tag,classcase,0};
 	struct ut_emission	*em = my_bsearch_r(&EM, ut->emission_tagscores, ut->nemissions, sizeof(struct ut_emission), &ctx, (int(*)(void*,const void*,const void*))ut_score_ex_ecmp);
-	int	ecmp(const struct ut_emission	*a, const struct ut_emission	*b)
-	{
-		char	*sa = ut->emissions + a->offset;
-		char	*sb = ut->emissions + b->offset;
-		if(a->offset==-1)sa = emission;
-		if(b->offset==-1)sb = emission;
-		int	s = strcmp(sa, sb);
-		if(s)return s;
-		s = ((int)a->classcase) - (int)b->classcase;
-		if(s)return s;
-		s = ((int)a->tag) - (int)b->tag;
-		return s;
-	}
 	if(em)return em->score;
 	else return SMOOTH_EMISSION;
 }

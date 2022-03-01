@@ -90,7 +90,7 @@ lui_process_request(char	*line)
 	int	len;
 	lp = line; while(*lp==' ' || *lp=='\n' || *lp=='\r' || *lp=='' || *lp=='\t')lp++;
 	len = strlen(lp);
-	while(len && lp[len-1]=='\n' || lp[len-1]=='' || lp[len-1]==' ')len--;
+	while(len && (lp[len-1]=='\n' || lp[len-1]=='' || lp[len-1]==' '))len--;
 	lp[len] = 0;
 	if(!strncmp(lp, "browse ", 7))
 	{
