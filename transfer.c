@@ -992,7 +992,7 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	return 0;
 }
 
-int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, int	total, int	*alignment, int	hcplace, int	hctotal, int	*hcalignment, int	(*callback)(int	*alignment, int	*hcalignment), int	is_filter)
+int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, int	total, int	*alignment, int	hcplace, int	hctotal, int	*hcalignment, int	(*callback)(int	*alignment, int	*hcalignment, void	*ctx), int	is_filter, void *cbctx)
 {
 	int	i;
 	if(place == total && hcplace == hctotal && !is_filter)
@@ -1007,8 +1007,8 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 			// see if we can match the filter portion... uh oh!
 			forget_tmp();
 			int	did_filter = 0;
-			int	filtercb(int	*filtalign, int *filthcalign) { did_filter = 1; return 1; }	// return of 1 indicates we don't care about more alignments; one is enough to say it was filtered.
-			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, hcplace, tr->input.nhcons + tr->context.nhcons + tr->filter.nhcons, hcalignment, filtercb, 1);
+			int	filtercb(int	*filtalign, int *filthcalign, int *Did_filter) { *Did_filter = 1; return 1; }	// return of 1 indicates we don't care about more alignments; one is enough to say it was filtered.
+			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, hcplace, tr->input.nhcons + tr->context.nhcons + tr->filter.nhcons, hcalignment, (int(*)(int*,int*,void*))filtercb, 1, &did_filter);
 			forget_tmp();
 			if(did_filter)
 			{
@@ -1026,14 +1026,14 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 			*/
 			assert(0 == test_transfer_alignment(tr, mrs, place, alignment, total, hcplace, hcalignment, hctotal, is_filter));
 		}
-		int rv = callback(alignment, hcalignment);
+		int rv = callback(alignment, hcalignment, cbctx);
 		forget_tmp();
 		return rv;
 	}
 	else if(place == total && hcplace == hctotal)
 	{
 		// FILTER callback
-		int rv = callback(alignment, hcalignment);
+		int rv = callback(alignment, hcalignment, cbctx);
 		forget_tmp();
 		return rv;
 	}
@@ -1050,7 +1050,7 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 				continue;
 			DEBUG("passed test.\n");
 			mrs->rels[i].active = 1;
-			int rv = align_transfer_rule0(tr, mrs, place+1, total, alignment, hcplace, hctotal, hcalignment, callback, is_filter);
+			int rv = align_transfer_rule0(tr, mrs, place+1, total, alignment, hcplace, hctotal, hcalignment, callback, is_filter, cbctx);
 			mrs->rels[i].active = 0;
 			if(rv != 0)return rv;
 		}
@@ -1068,7 +1068,7 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 				continue;
 			DEBUG("passed test.\n");
 			mrs->hcons[i].active = 1;
-			int rv = align_transfer_rule0(tr, mrs, place, total, alignment, hcplace+1, hctotal, hcalignment, callback, is_filter);
+			int rv = align_transfer_rule0(tr, mrs, place, total, alignment, hcplace+1, hctotal, hcalignment, callback, is_filter, cbctx);
 			mrs->hcons[i].active = 0;
 			if(rv != 0)return rv;
 		}
@@ -1076,7 +1076,7 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 	}
 }
 
-int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callback)(int	*alignment, int	*hcalignment))
+int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callback)(int	*alignment, int	*hcalignment, void	*cbctx), void	*cbctx)
 {
 	int	i;
 	for(i=0;i<mrs->nrels;i++)
@@ -1089,7 +1089,7 @@ int	align_transfer_rule(struct transfer_rule	*tr, struct mrs	*mrs, int	(*callbac
 	int	alignment[nplaces];
 	int	nhcplaces = tr->input.nhcons + tr->context.nhcons + tr->filter.nhcons;
 	int	hcalignment[nhcplaces];
-	return align_transfer_rule0(tr, mrs, 0, tr->input.neps + tr->context.neps, alignment, 0, tr->input.nhcons + tr->context.nhcons, hcalignment, callback, 0);
+	return align_transfer_rule0(tr, mrs, 0, tr->input.neps + tr->context.neps, alignment, 0, tr->input.nhcons + tr->context.nhcons, hcalignment, callback, 0, cbctx);
 }
 
 void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct dg	*cons, void	*ctx), void	*ctx)
@@ -1114,7 +1114,7 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 
 	for(i=0;i<ntrigger_rules;i++)
 	{
-		int	found_alignment(int	*alignment, int	*hcalignment)
+		int	found_alignment(int	*alignment, int	*hcalignment, void *ctx)
 		{
 			struct dg	*flags = dg_hop(trigger_rules[i]->dg, lookup_fname("FLAGS"));
 			struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
@@ -1147,7 +1147,7 @@ void	activate_trigger_rules(struct mrs	*mrsin, void	trigger(char	*lexid, struct 
 			if(trigcons)return 0;	// might find more alignments with different constraints
 			else return 1;	// don't care to hear about more alignments; it's triggered.
 		}
-		align_transfer_rule(trigger_rules[i], mrsin, found_alignment);
+		align_transfer_rule(trigger_rules[i], mrsin, found_alignment, NULL);
 	}
 }
 
@@ -1163,7 +1163,7 @@ void debug_run_one_trigger_rule(struct mrs	*m, char	*rname, int detail)
 	}
 	struct transfer_rule	*R = trigger_rules[i];
 
-	int	found_alignment(int	*alignment, int	*hcalignment)
+	int	found_alignment(int	*alignment, int	*hcalignment, void *ctx)
 	{
 		struct dg	*flags = dg_hop(R->dg, lookup_fname("FLAGS"));
 		struct dg	*trig = dg_hop(flags, lookup_fname("TRIGGER"));
@@ -1177,7 +1177,7 @@ void debug_run_one_trigger_rule(struct mrs	*m, char	*rname, int detail)
 			printf("  but that's on the temporary expedient, so skipping!\n");
 	}
 	debug_transfer = detail;
-	align_transfer_rule(R, m, found_alignment);
+	align_transfer_rule(R, m, found_alignment, NULL);
 	debug_transfer = 0;
 }
 
@@ -1531,7 +1531,7 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 		}
 
 		int	nalignments = 0;
-		int	found_alignment(int	*alignment, int *hcalignment)
+		int	found_alignment(int	*alignment, int *hcalignment, void *ctx)
 		{
 			if(0 != process_one_transfer_result(tr, alignment, hcalignment, min, ts, pack_start, preds_seen))
 				return 0;
@@ -1541,7 +1541,7 @@ int	transfer_mrs1(struct transfer_rule	*tr, struct transfer_mrs_set	*ts, int fir
 			return first_route_only;
 		}
 		if(tr_quickcheck(tr, min))
-			align_transfer_rule(tr, min, found_alignment);
+			align_transfer_rule(tr, min, found_alignment, NULL);
 		//else printf("quickly rejected for one candidate only: %s\n", tr->name);
 		if(nalignments == 0 || tr->optional)
 		{
