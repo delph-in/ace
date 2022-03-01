@@ -992,6 +992,13 @@ int	test_transfer_alignment(struct transfer_rule	*tr, struct mrs	*mrs, int	count
 	return 0;
 }
 
+int	atr0_filtercb(int	*filtalign, int *filthcalign, int *Did_filter)
+{
+	*Did_filter = 1;
+	// return of 1 indicates we don't care about more alignments; one is enough to say it was filtered.
+	return 1;
+}
+
 int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, int	total, int	*alignment, int	hcplace, int	hctotal, int	*hcalignment, int	(*callback)(int	*alignment, int	*hcalignment, void	*ctx), int	is_filter, void *cbctx)
 {
 	int	i;
@@ -1007,8 +1014,7 @@ int	align_transfer_rule0(struct transfer_rule	*tr, struct mrs	*mrs, int	place, i
 			// see if we can match the filter portion... uh oh!
 			forget_tmp();
 			int	did_filter = 0;
-			int	filtercb(int	*filtalign, int *filthcalign, int *Did_filter) { *Did_filter = 1; return 1; }	// return of 1 indicates we don't care about more alignments; one is enough to say it was filtered.
-			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, hcplace, tr->input.nhcons + tr->context.nhcons + tr->filter.nhcons, hcalignment, (int(*)(int*,int*,void*))filtercb, 1, &did_filter);
+			align_transfer_rule0(tr, mrs, place, tr->input.neps + tr->context.neps + tr->filter.neps, alignment, hcplace, tr->input.nhcons + tr->context.nhcons + tr->filter.nhcons, hcalignment, (int(*)(int*,int*,void*))atr0_filtercb, 1, &did_filter);
 			forget_tmp();
 			if(did_filter)
 			{
