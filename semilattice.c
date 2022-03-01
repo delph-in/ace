@@ -569,6 +569,60 @@ void iglbt_add_anc(struct type	*t, unsigned long long	*v, int	*Nanc, struct code
 	}
 }
 
+void iglbt_add_dec(struct type	*t, unsigned long long	*v, int	*Ndec, struct code_record	**Dec, int	*Adec, int	*Add_dec_calls, int	bcsize)
+{
+	int	i, is_in = 0;
+	int	di = -1;
+	//if(do_print)printf("add_dec %s\n", t->name);
+	(*Add_dec_calls)++;
+	int	ndec = *Ndec;
+	struct code_record *dec = *Dec;
+	for(i=0;i<ndec;i++)
+	{
+		struct type	*dt = dec[i].t;
+		unsigned long long	*dv = dec[i].code;
+		if(!dt){di = i;continue;}	// deleted slot
+		if(dt == t)return;
+		if(bitvec_subsume(dv, v, bcsize))return;
+		if(bitvec_subsume(v, dv, bcsize))
+		{
+			// type we're trying to add subsumes current daughter type
+			if(!is_in)
+			{
+				dec[i].t = t;
+				dec[i].code = v;
+				is_in = 1;
+			}
+			else
+			{
+				dec[i].t = NULL;
+				dec[i].code = NULL;
+			}
+		}
+	}
+	if(!is_in)
+	{
+		if(di != -1)
+		{
+			dec[di].t = t;
+			dec[di].code = v;
+		}
+		else
+		{
+			ndec++;
+			*Ndec = ndec;
+			if(ndec>(*Adec))
+			{
+				(*Adec) = ndec*2;
+				dec = realloc(dec, sizeof(struct code_record)*(*Adec));
+				*Dec = dec;
+			}
+			dec[ndec-1].t = t;
+			dec[ndec-1].code = v;
+		}
+	}
+}
+
 // same algorithm as LKB function of similar name
 insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct code_record	*cr, int	bcsize)
 {
@@ -628,55 +682,6 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 	// no need to add a descendent that is subsumed by another already-present daughter
 	// if we find a descendent that subsumes several existing daughters,
 	// replace one and delete the rest.
-	void add_dec(struct type	*t, unsigned long long	*v)
-	{
-		int	i, is_in = 0;
-		int	di = -1;
-		if(do_print)printf("add_dec %s\n", t->name);
-		add_dec_calls++;
-		for(i=0;i<ndec;i++)
-		{
-			struct type	*dt = dec[i].t;
-			unsigned long long	*dv = dec[i].code;
-			if(!dt){di = i;continue;}	// deleted slot
-			if(dt == t)return;
-			if(bitvec_subsume(dv, v, bcsize))return;
-			if(bitvec_subsume(v, dv, bcsize))
-			{
-				// type we're trying to add subsumes current daughter type
-				if(!is_in)
-				{
-					dec[i].t = t;
-					dec[i].code = v;
-					is_in = 1;
-				}
-				else
-				{
-					dec[i].t = NULL;
-					dec[i].code = NULL;
-				}
-			}
-		}
-		if(!is_in)
-		{
-			if(di != -1)
-			{
-				dec[di].t = t;
-				dec[di].code = v;
-			}
-			else
-			{
-				ndec++;
-				if(ndec>adec)
-				{
-					adec = ndec*2;
-					dec = realloc(dec, sizeof(struct code_record)*adec);
-				}
-				dec[ndec-1].t = t;
-				dec[ndec-1].code = v;
-			}
-		}
-	}
 
 	start_and_alloc_profiler(&decendant_profiler, "GLB decendants", insert_profiler, NULL);
 
@@ -687,14 +692,14 @@ insert_glb_type(struct partition	*part, unsigned long long	**vectors, struct cod
 		//int	subsumed = bitvec_subsume(cr->code, v, bcsize)?1:0;
 		int	subsumed2 = bitvec_test(cr->code, i)?1:0;
 		//assert(subsumed == subsumed2);
-		if(subsumed2)add_dec(part->part[i], v);
+		if(subsumed2)iglbt_add_dec(part->part[i], v, &ndec, &dec, &adec, &add_dec_calls, bcsize);
 	}
 	// see what new glb types 'cr' subsumes
 	for(i=0;i<nglbtypes;i++)
 	{
 		unsigned long long	*v = glbtypes[i]->code;
 		if(glbtypes[i] == cr)continue;
-		if(bitvec_subsume(cr->code, v, bcsize))add_dec(glbtypes[i]->t, v);
+		if(bitvec_subsume(cr->code, v, bcsize))iglbt_add_dec(glbtypes[i]->t, v, &ndec, &dec, &adec, &add_dec_calls, bcsize);
 	}
 
 	if(do_print)
