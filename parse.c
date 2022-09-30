@@ -423,7 +423,7 @@ int parse_show_result(struct hypothesis	*hyp, struct mrs	*mrs, double	prob, void
 	return 1;
 }
 
-static int chart_setup_timer = -1;
+int chart_setup_timer = -1;
 
 int	parse(int	nwords, char	**words, int	*cfrom, int	*cto, char	*sentence)
 {
@@ -622,6 +622,7 @@ extern int	enable_ubertagging;
 			num_parses, total_edges, real_edges, passive_edges, used_edges, pused_edges);
 		print_slab_stats();
 
+		//look_for_better_packing_opportunities();
 		//rule_profiler();	// XXX comment me out normally
 	}
 	else if(do_itsdb)

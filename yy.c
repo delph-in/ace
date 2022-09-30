@@ -10,6 +10,7 @@
 #include	"lattice-mapping.h"
 #include	"timer.h"
 
+extern int chart_setup_timer;
 extern int inhibit_results, do_itsdb_stdout;
 
 int	yy_rule_mode = 0;
@@ -159,6 +160,9 @@ struct lattice_vertex	*parse_yy_get_vtx(int	id, struct lattice *tc)
 
 int	parse_yy(char	*yy)
 {
+	if(chart_setup_timer == -1)chart_setup_timer = new_timer("chart setup");
+	start_timer(chart_setup_timer);
+
 	clock_t	start = clock();
 	struct lattice	*tc = slab_alloc(sizeof(*tc));
 	bzero(tc, sizeof(*tc));
