@@ -3,6 +3,7 @@
 #include	<stdlib.h>
 #include	<sys/time.h>
 #include	<wctype.h>
+#include	<ctype.h>
 
 #include	"unicode.h"
 #include	"hash.h"
@@ -94,12 +95,17 @@ void	th_add(struct type	*t)
 	hash_add(default_th->thash, t->name, t);
 }
 
-struct type	*th_look(struct type_hierarchy	*th, char	*name)
+struct type	*th_look(struct type_hierarchy	*th, unsigned char	*name)
 {
-	char	*p;
+	unsigned char	*p;
 	for(p=name;*p;p++)
-		if(isalpha(*p) && isupper(*p))
+	{
+		//printf("before check: %c = %d\n", *p, *p);
+		//printf("isalpha(195) = %d\n", isalpha(195));
+		if(isalpha(*p) && isupper(*p) && *p>0 && *p<128)	// amazing... OSX isalpha() tells lies for utf8 code bytes.
 			*p = tolower(*p);
+		//printf("after check: %c = %d\n", *p, *p);
+	}
 	return hash_find(th->thash, name);
 }
 
@@ -289,16 +295,16 @@ void	number_strings()
 	for(i=0;i<default_th->nstrings;i++)default_th->strings[i]->tnum = i;
 }
 
-int	add_type_only(char	*name, int	npar, struct type	**par, int	overwrite)
+int	add_type_only(unsigned char	*name, int	npar, struct type	**par, int	overwrite)
 {
 	struct type	*t;
 	int		i, pari, lexical = 0;
 
-	char	*c;
+	unsigned char	*c;
 	int	did_lower = 0;
 	for(c=name;*c;c++)
 	{
-		if(isalpha(*c) && isupper(*c))
+		if(isalpha(*c) && isupper(*c) && *c>0 && *c<128)	// OSX isalpha() tells lies...
 		{
 			/*if(!did_lower)
 			{
@@ -563,6 +569,12 @@ int	constrain_glbs_and_wellformedness()
 		descbytes += default_th->types[i]->ndescendents * sizeof(short);
 		//printf("after wellforming, final dag:\n");
 		//print_dg(default_th->types[i]->dg); printf("\n");
+		struct type *check_top_type = most_general_type_for_dg(default_th->types[i]->dg);
+		if(!check_top_type)
+		{
+			fprintf(stderr, "ERROR: features and type of `%s' cannot be reconciled\n", default_th->types[i]->name);
+			exit(-1);
+		}
 	}
 	int changes = end_wellforming_th();
 	if(changes)
