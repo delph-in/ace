@@ -10,6 +10,8 @@
 #include	"conf.h"
 //#include	<asm/mman.h>
 
+void	subsume_backtrace();
+
 #define	MAX_FEATURES	(256*256-1)
 
 extern int	debug_level;
@@ -280,9 +282,11 @@ int	subsume_forward, subsume_backward;
 
 int	gsubsume_forward, gsubsume_backward;
 
+int ssbt_upathl = 0;
+char *ssbt_message = NULL;
 //#define	GEN_SUBSUMPTION_QC
 #ifndef	GEN_SUBSUMPTION_QC
-#define	ss_backtrace(a,b,k)  do {} while(0)
+#define	ss_backtrace(a,b,k)  do { ssbt_upathl = upathl ; ssbt_message = k; } while(0)
 #else
 #define ss_backtrace	real_ss_backtrace
 #endif
@@ -351,7 +355,26 @@ int	subsume_same_dg(struct dg	*a)
 
 int	uindifflist = 0;
 
-static inline int	is_difflist(struct type	*t)
+static inline int dg_is_difflist(struct dg *d)
+{
+	int i;
+	static int difflist_f1 = -1;
+	if(difflist_f1 == -1)
+	{
+		struct type *difflist = lookup_type(g_diff_list_type);
+		assert(difflist != NULL);
+		assert(difflist->dg != NULL);
+		assert(difflist->dg->narcs > 0);
+		difflist_f1 = difflist->dg->label[0];
+		//printf("NOTE: grabbed difflist_f1 as %s\n", fnames[difflist_f1]);
+	}
+	if(d->narcs != 2)return 0;
+	for(i=0;i<d->narcs;i++)
+		if(d->label[i] == difflist_f1)return 1;
+	return 0;
+}
+
+/*static inline int	is_difflist(struct type	*t)
 {
 	static struct type	*difflist = NULL;
 	static struct type_hierarchy	*th;
@@ -372,7 +395,7 @@ static inline int	is_difflist(struct type	*t)
 	int	answer = type_difflist_cache[t->tnum] - 1;
 	//assert(answer == (descendent_of(t->tnum, difflist)?1:0));
 	return answer;
-}
+}*/
 
 // on input, assume a and b both have noncurrent generation
 // on output, 'copy' pointers are used, so don't try to copy them until next generation
@@ -480,35 +503,46 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 		}
 		if(!local_ss)
 		{
+//#define GENERALIZATION_CAN_GO_HIGHER
+#ifdef GENERALIZATION_CAN_GO_HIGHER
+			static struct type *xmod = NULL;
+			if(!xmod)xmod = lookup_type("xmod");
+			static struct type *degree_rel = NULL;
+			if(!degree_rel)degree_rel = lookup_type("degree_rel");
+			static struct type *booltype = NULL;
+			if(!booltype)booltype = lookup_type("bool");
 			//if(a->narcs==0 && b->narcs==0)
 			//static struct type *index_type = NULL;
 			//if(!index_type)index_type = lookup_type("index");
 			//if(descendent_of(a->xtype->tnum, index_type) && descendent_of(b->xtype->tnum, index_type) || (a->narcs==0 && b->narcs==0))
-			if(0)
-			//if(1)
+			// this code is for generalizing to a type more general than either a or b,
+			// in controlled conditions.  it finds some interesting ideas,
+			// but it seems that when you have to do this, other parts of the dag are
+			// overwhelmingly uncooperative and we just can't make
+			// the generalization edge very often.
+			// see if we can pick a type that tightly generalizes them
+			struct type	*upper = lub(a->xtype, b->xtype);
+			/*if(upper->ndaughters==2 &&
+				((a->xtype == upper->daughters[0] && b->xtype == upper->daughters[1])
+				|| (a->xtype == upper->daughters[1] && b->xtype == upper->daughters[0]))
+				&& a->narcs == b->narcs && a->narcs == upper->dg->narcs)*/
+			//if(upper == degree_rel)
+			//if(upper == booltype)
+			//if(a->narcs == 0 && b->narcs == 0 && strcmp(upper->name, "string") && upper != booltype)
+			//if(0)
+			if(upper == degree_rel || upper==xmod || descendent_of(upper->tnum, xmod))
 			{
-				// this code is for generalizing to a type more general than either a or b,
-				// in controlled conditions.  it finds some interesting ideas,
-				// but it seems that when you have to do this, other parts of the dag are
-				// overwhelmingly uncooperative and we just can't make
-				// the generalization edge very often.
-				// see if we can pick a type that tightly generalizes them
-				struct type	*upper = lub(a->xtype, b->xtype);
-				if(upper->ndaughters==2 &&
-					((a->xtype == upper->daughters[0] && b->xtype == upper->daughters[1])
-					|| (a->xtype == upper->daughters[1] && b->xtype == upper->daughters[0]))
-					&& a->narcs == b->narcs && a->narcs == upper->dg->narcs)
-				{
-					if(gsubsume_forward)a->type = upper;
-					if(gsubsume_backward)b->type = upper;
-					ut1 = a->xtype;
-					ut2 = b->xtype;
-					ss_backtrace(a, b, "tentatively extra-generalized");
-					//printf("generalized %s and %s to %s\n", a->xtype->name, b->xtype->name, upper->name);
-				}
-				else gsubsume_backward = gsubsume_forward = 0;
+				if(gsubsume_forward)a->type = upper;
+				if(gsubsume_backward)b->type = upper;
+				ut1 = a->xtype;
+				ut2 = b->xtype;
+				//ss_backtrace(a, b, "tentatively extra-generalized");
+				//printf("generalized %s and %s to %s\n", a->xtype->name, b->xtype->name, upper->name);
 			}
 			else gsubsume_backward = gsubsume_forward = 0;
+#else
+			gsubsume_backward = gsubsume_forward = 0;
+#endif
 		}
 		else
 		{
@@ -519,7 +553,7 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 			//fprintf(stderr, "generalized %p and %p to %s\n", a, b, upper->name);
 			ut1 = a->xtype;
 			ut2 = b->xtype;
-			ss_backtrace(a, b, "tentatively generalized");
+			//ss_backtrace(a, b, "tentatively generalized");
 		}
 
 		if(!subsume_forward && !subsume_backward)
@@ -585,7 +619,8 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	//printf("maybe %p [%s] <=> %p [%s]\n", a, a->xtype->name, b, b->xtype->name);
 
 	int	local_indifflist = 0;
-	if(is_difflist(a->xtype) || is_difflist(b->xtype))local_indifflist = 1;
+	//if(is_difflist(a->xtype) || is_difflist(b->xtype))local_indifflist = 1;
+	if(dg_is_difflist(a) || dg_is_difflist(b))local_indifflist = 1;
 	if(local_indifflist)uindifflist++;
 
 	// there are certain cases where we don't want to apply generalization packing with different arc sets, even if we could.
@@ -649,10 +684,15 @@ int	subsume_dg1(struct dg	*a, struct dg	*b)
 	{
 		subsume_forward = 0;
 		subsume_backward = 0;
+		ss_backtrace(a, b, "multi-dag: incompatible arc set");
+#ifdef GENERALIZATION_CAN_GO_HIGHER
+		if(gsubsume_forward == 0 && gsubsume_backward == 0)
+			return 0;
+#else
 		gsubsume_forward = 0;
 		gsubsume_backward = 0;
-		ss_backtrace(a, b, "multi-dag: incompatible arc set");
 		return 0;
+#endif
 	}
 	if(local_indifflist)uindifflist--;
 	return 1;
@@ -689,7 +729,8 @@ int	equivalent_dg(struct dg	*a, struct dg	*b, int Fw, int Bk, int	leave_marks)
 	}
 	upathl = 0;
 
-	//fprintf(stderr, "subs %p %p = %d %d %d\n", a, b, res, subsume_forward, subsume_backward);
+	//printf("subs %p %p = %d %d %d    %d %d\n", a, b, res, subsume_forward, subsume_backward, gsubsume_forward, gsubsume_backward);
+	//if(!gsubsume_forward && !gsubsume_backward)subsume_backtrace();
 
 	//if(res && subsume_forward && !subsume_backward)printf("would have subsumed forward\n");
 	//else if(res && subsume_backward && !subsume_forward)printf("would have subsumed backward\n");
@@ -867,11 +908,11 @@ void	subsume_backtrace()
 
 	fflush(stdout);
 	fprintf(stdout, "subsumption failed at path: ");
-	for(i=0;i<upathl;i++)fprintf(stdout, "%s ", fnames[upath[i]]);
+	for(i=0;i<ssbt_upathl;i++)fprintf(stdout, "%s ", fnames[upath[i]]);
 	fprintf(stdout, "\n");
 	fflush(stdout);
 	if(ut1 && ut2)
-		fprintf(stdout, "  types %s + %s\n", ut1->name, ut2->name);
+		fprintf(stdout, "  types %s + %s     ;   %s\n", ut1->name, ut2->name, ssbt_message);
 }
 
 struct path	unify_backtrace_path()

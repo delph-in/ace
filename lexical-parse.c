@@ -196,6 +196,7 @@ void	print_lexical_chart(struct lattice	*tc)
 	}
 }
 
+/* save
 int	reduce_lexical_lattice(struct lattice	*lat, struct lattice	*toklat)
 {
 	extern int debug_level;
@@ -260,6 +261,111 @@ int	reduce_lexical_lattice(struct lattice	*lat, struct lattice	*toklat)
 			}
 		}
 	}
+
+	if(g_profiling)stop_profiler(redprof, lat->nedges);
+
+	// check that lexemes cover the whole span;
+	// if not we have no chance of building a spanning analysis.
+	for(i=0;i<length;i++)
+		if(!cover[i])
+		{
+			//if(debug_level)fprintf(stderr, "NOTE: lexemes do not span position %d `%s'!\n", i, words[i]);
+			if(1)//if(debug_level)
+			{
+				char	*word = NULL;
+				int k;
+				for(k=0;k<toklat->nedges;k++)
+				{
+					struct lattice_edge	*te = toklat->edges[k];
+					if(te->from->id == i)
+					{
+						if(!word || strlen(word)>strlen(te->token->string))
+							word = te->token->string;
+					}
+				}
+				fprintf(stderr, "NOTE: lexemes do not span position %d `%s'!\n", i, word?:"?");
+				itsdb_error("post-reduction lexical gap");
+			}
+			return -1;
+		}
+
+	return 0;
+}
+*/
+
+int	reduce_lexical_lattice(struct lattice	*lat, struct lattice	*toklat)
+{
+	extern int debug_level;
+	char		cover[1024];
+
+	static struct profiler	*redprof = NULL;
+
+	int	length = lat->lattice_vertex_id_gen - 1;
+	//printf("reducer: length = %d\n", length);
+	if(length<=0)return 0;
+	assert(length < sizeof(cover));
+
+	if(g_profiling)start_and_alloc_profiler(&redprof, "chart reduction", lexical_parsing_profiler, NULL);
+
+	//sanity_check_agenda(length);
+	bzero(cover, length);
+	int	I, J, i;
+	struct dg **depsto = malloc(sizeof(struct dg*)*(lat->nedges*nchart_dependencies));
+	for(J=0;J<lat->nedges;J++)
+		for(i=0;i<nchart_dependencies;i++)
+			depsto[J*nchart_dependencies + i]
+				= dg_path(lat->edges[J]->edge->dg, chart_dependencies_to[i]);
+	for(I=0;I<lat->nedges;I++)
+	{
+		struct edge	*e1 = lat->edges[I]->edge;
+		assert(e1->lex);
+
+		for(i=0;i<nchart_dependencies;i++)
+		{
+			struct dg	*from = dg_path(e1->dg, chart_dependencies_from[i]);
+			//printf("edge #%d %s from = %s\n", e1->id, e1->lex->word, from?from->xtype->name:"NULL");
+			if(from)
+			{
+				int	satisfied = 0;
+				for(J=0;J<lat->nedges;J++)
+				{
+					struct edge	*e2 = lat->edges[J]->edge;
+					assert(e2->lex);
+					//struct dg	*to = dg_path(e2->dg, chart_dependencies_to[i]);
+					struct dg	*to = depsto[J*nchart_dependencies + i];
+					//if(to && descendent_of(to->xtype->tnum, from->xtype))satisfied = 1;
+					// glb seems more appropriate than descendent_of, and indeed explained a rather obscure difference vs pet...
+					if(to && glb(to->xtype, from->xtype))break;//satisfied = 1;
+				}
+				if(J==lat->nedges)break;
+				//if(!satisfied)break;
+				//printf("dep on `%s' satisfied\n", e1->lex->word);
+			}
+		}
+		if(i<nchart_dependencies)
+		{
+			// reduce
+			// don't mark as frozen; strange but true:
+			// an edge built on top of this one by lexical rules
+			// can survive chart reduction, and if we mark this one as frozen
+			// then the parent might not make it into the chart
+			//e1->frozen = 1;
+			//printf("reduce edge #%d %s dep %d\n", e1->id, e1->lex->word, i);
+			remove_lattice_edge(lat, lat->edges[I]);
+			memmove(depsto + nchart_dependencies*I, depsto + nchart_dependencies*(I+1), sizeof(struct dg*)*nchart_dependencies*(lat->nedges-I));
+			I--;
+		}
+		else	// keep
+		{
+			for(i=e1->from;i<e1->to;i++)
+			{
+				//printf("%s provides %d\n", e1->lex->word, i);
+				//printf("`%s' from %d to %d\n", e1->lex->word, e1->from, e1->to);
+				cover[i] = 1;
+			}
+		}
+	}
+	free(depsto);
 
 	if(g_profiling)stop_profiler(redprof, lat->nedges);
 

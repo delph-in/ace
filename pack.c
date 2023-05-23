@@ -411,7 +411,9 @@ int	pack_edge(struct edge	*edge)
 #endif
 			packqc++;
 
-			PACKBUG("would like to pack #%d `%s' and #%d `%s'!\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h));
+			PACKBUG("would like to pack #%d `%s' and #%d `%s'! fw=%d and bk=%d\n", edge->id, show_orth_leaves(edge), h->id, show_orth_leaves(h), fw, bk);
+			////ssd = equivalent_dg(h->dg, edge->dg, 1, 1, 0);
+			//if(!ssd)subsume_backtrace();
 			if(!identical_orth_routes(h, edge))continue;
 
 			if(!edge->dg)
@@ -457,7 +459,9 @@ int	pack_edge(struct edge	*edge)
 #endif
 
 			//ssd = equivalent_dg(h->dg, edge->dg, fw, bk, 0);
-			ssd = equivalent_dg(h->dg, edge->dg, 1, 1, 0);
+			if((fw == 0 || bk == 0) && equivalence_packing_only)
+				ssd = 0;
+			else ssd = equivalent_dg(h->dg, edge->dg, 1, 1, 0);
 			assert(!(ssd == -1 && !bk));
 			if(ssd == 3 || ssd == -3)
 			{
@@ -471,6 +475,7 @@ int	pack_edge(struct edge	*edge)
 			}
 
 			if(equivalence_packing_only && ssd != 2)ssd = 0;
+			//if(ssd != 2 && ssd != 1)ssd = 0;	//XXX hack to compare with metaedge forward-only packing
 			if(ssd)packss++;
 			if(ssd && h->lex && edge->lex)PACKBUG("packing lex `%s' and lex `%s'\n", edge->lex->word, h->lex->word);
 			PACKBUG("ssd = %d ; h->frozen = %d\n", ssd, h->frozen);
@@ -809,6 +814,71 @@ void	compact_generalization_edges()
 						e->daughters[k] = d->pack[0];
 					}
 				}
+			}
+		}
+	}
+}
+
+// why couldn't we have packed 'x' and 'y'?
+void lfbpo2(struct edge *x, struct edge *y)
+{
+	//printf("  better to pack #%d = %s and #%d = %s\n", x->id, x->rule?x->rule->name:x->lex->word, y->id, y->rule?y->rule->name:y->lex->word);
+	int ssd = equivalent_dg(x->dg, y->dg, 1, 1, 1);
+	if(ssd){}//printf("    could have; ssd = %d\n", ssd);
+	else
+	{
+		subsume_backtrace();
+		extern int ssbt_upathl;
+		extern int	upath[1024];
+		extern char *ssbt_message;
+		if(!strcmp(ssbt_message, "multi-dag: needed backward but failed") || !strcmp(ssbt_message, "multi-dag: needed forward but failed")) {
+			struct dg *xclash = x->dg, *yclash = y->dg;
+			int i;
+			for(i=0;i<ssbt_upathl;i++)
+			{
+				xclash = dg_hop(xclash, upath[i]);
+				yclash = dg_hop(yclash, upath[i]);
+			}
+			struct type *xsave = xclash->xtype, *ysave = yclash->xtype;
+			struct type *gen = lub(xsave, ysave);
+			if((!xsave->dg && !ysave->dg) || (xsave->dg->narcs == ysave->dg->narcs && xsave->dg->narcs == gen->dg->narcs))
+			{
+				xclash->xtype = gen;
+				yclash->xtype = gen;
+				ssd = equivalent_dg(x->dg, y->dg, 1, 1, 1);
+				printf("   after backing off to %s, ssd = %d\n", gen->name, ssd);
+				//else { printf("   after backing off to %s, ", gen->name); subsume_backtrace(); }
+				xclash->xtype = xsave;
+				yclash->xtype = ysave;
+			}
+		}
+	}
+}
+
+// might it have been possible to pack the lineage of 'x' and 'y' earlier?
+void lfbpo1(struct edge *x, struct edge *y)
+{
+	if(x->rule != y->rule || x->rule->ndaughters != 2)return;
+	//printf("actually packed #%d and #%d    %s\n", x->id, y->id, x->rule->name);
+	if(x->daughters[0] == y->daughters[0])
+		lfbpo2(x->daughters[1], y->daughters[1]);
+	if(x->daughters[1] == y->daughters[1])
+		lfbpo2(x->daughters[0], y->daughters[0]);
+}
+
+look_for_better_packing_opportunities()
+{
+	int from, to, k, p;
+	for(from=0;from<chart_size-1;from++)
+	{
+		for(to=from+2;to<chart_size;to++)
+		{
+			struct chart_cell *c = &cells[from*chart_size + to];
+			for(k=0;k<c->p_nedges;k++)
+			{
+				struct edge *e = c->p_edges[k];
+				for(p=0;p<e->npack;p++)
+					lfbpo1(e, e->pack[p]);
 			}
 		}
 	}

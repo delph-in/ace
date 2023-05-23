@@ -45,6 +45,22 @@ struct type	*dg_type(struct dg	*d)
 	return d->xtype;
 }
 
+struct type	*dg_type_unless_tnum(struct dg	*d, int tnum)
+{
+	extern unsigned int	generation;
+	// this is called on the results of dg_hop... safe to assume it is dereferenced.
+	if(d->gen == generation)
+	{
+		if(d->type->tnum == tnum)return NULL;
+		else return d->type;
+	}
+	else
+	{
+		if(d->xtype->tnum == tnum)return NULL;
+		else return d->xtype;
+	}
+}
+
 struct qc	*extract_qc(struct dg	*d)
 {
 	struct qc	*q;

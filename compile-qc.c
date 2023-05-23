@@ -76,9 +76,9 @@ int	compile_qc(char	*qccode_path)
 
 	char	command[10240];
 #ifdef	MACOSX_GCC
-	sprintf(command, "clang -x c -dynamic -dynamiclib -undefined suppress -flat_namespace -m64 -fPIC -DPIC - -o '%s'", target_path);
+	sprintf(command, "clang -O2 -x c -dynamic -dynamiclib -undefined suppress -flat_namespace -m64 -fPIC -DPIC - -o '%s'", target_path);
 #else
-	sprintf(command, "gcc -x c -shared -fPIC -DPIC - -o '%s'", target_path);
+	sprintf(command, "gcc -O2 -x c -shared -fPIC -DPIC - -o '%s'", target_path);
 #endif
 	FILE	*gcc = popen(command, "w");
 	if(!gcc) { perror("popen"); exit(-1); }
@@ -86,6 +86,7 @@ int	compile_qc(char	*qccode_path)
 	fprintf(gcc, "struct type; struct dg;\n");
 	fprintf(gcc, "struct dg *noninline_dg_hop(struct dg*, int);\n");
 	fprintf(gcc, "struct type *dg_type(struct dg*);\n");
+	fprintf(gcc, "struct type *dg_type_unless_tnum(struct dg*, int);\n");
 	fprintf(gcc, "#define	NULL	((void*)0L)\n");
 	fprintf(gcc, "void extractor(struct type	**entries, struct dg	*d)\n");
 	fprintf(gcc, "{\n");
@@ -96,7 +97,7 @@ int	compile_qc(char	*qccode_path)
 	char	line[10240];
 	int		lnum = 0, *qc_depth, depth = 0;
 	int		n_record = 0;
-	//char	*last_push = "/";
+	char	*last_push = "/";
 	while(NULL != fgets(line, 10239, qccode))
 	{
 		lnum++;
@@ -126,11 +127,12 @@ int	compile_qc(char	*qccode_path)
 					fprintf(stderr, "QUICKCHECK: code indicates to record element %d, in vector of length %d (max index %d)\n", x, qc_size, qc_size-1);
 					exit(-1);
 				}
-				fprintf(gcc, "	if(stack[sp]) entries[%d] = dg_type(stack[sp]);\n", x);
+				struct type	*T = strcmp(last_push, "/")?most_general_type_for_feat(default_type_hierarchy(), lookup_fname(last_push)):get_top();
+				//fprintf(gcc, "	if(stack[sp])entries[%d] = dg_type_unless_tnum(stack[sp], %d);\n", x, T->tnum);
+				fprintf(gcc, "	if(stack[sp])entries[%d] = dg_type(stack[sp]);\n", x);
 				fprintf(gcc, "	else entries[%d] = NULL;\n", x);
 				qc_depth[n_record] = depth;
 				n_record++;
-				//struct type	*T = strcmp(last_push, "/")?most_general_type_for_feat(default_type_hierarchy(), lookup_fname(last_push)):lookup_type("sign");
 				//fprintf(stderr, "QC[%d] feature=%s type=%s subtypes=%d\n", x, last_push, T->name, T->ndescendents);
 			}
 			else if(1 == sscanf(tok, "PUSH(%[^)])", feat))
@@ -138,7 +140,7 @@ int	compile_qc(char	*qccode_path)
 				int	l = lookup_fname(feat);
 				fprintf(gcc, "	if(stack[sp++])stack[sp] = noninline_dg_hop(stack[sp-1], %d);\n", l);
 				fprintf(gcc, "	else stack[sp] = NULL;");
-				//last_push = strdup(feat);
+				last_push = strdup(feat);
 				depth++;
 			}
 			else

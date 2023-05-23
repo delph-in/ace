@@ -8,6 +8,8 @@
 #include	<setjmp.h>
 #include	<math.h>
 
+#include	"csaw/csaw.h"
+
 #include "dag.h"
 #include "chart.h"
 #include "lexicon.h"
@@ -58,6 +60,8 @@ struct scoring_ancestry	compute_sub_ancestry(struct scoring_ancestry	panc, struc
 struct hypothesis	*get_cui_hypothesis(struct context_unpack_info	*cui, int	rank);
 void	set_cui_hypothesis(struct context_unpack_info	*cui, int	rank, struct hypothesis	*h);
 //int	cui_has_hypothesis(struct context_unpack_info	*cui, struct hypothesis	*hyp);
+void print_hypothesis(struct hypothesis *hyp, int (*print)(void*ctx, const char *fmt,...), void	*printctx, int	labelled);
+int ctxprintf(void *ctx, char *fmt, ...);
 
 static inline char* edge_sign(struct edge *e)
 {
@@ -178,6 +182,7 @@ void score_hypothesis(struct hypothesis *h)
 struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 {
 	int	n = 1, i, j, orign;
+	int	n2 = 1;
 	struct decomposition *dec, *d;
 
 	if(!edge->lex && !edge->daughters)
@@ -212,6 +217,7 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 			if(!(d->pack[j]->frozen && !d->pack[j]->frosted))
 				ngood++;
 		n *= ngood + 1;
+		n2 *= ngood;
 	}
 	// this has been known to exceed the slab segment size:
 	int	len = sizeof(struct decomposition) * n;
@@ -237,6 +243,7 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 		dec[i].failed = dec[i].checked = 0;
 	}
 
+	int nallocated = n;
 	n = 0;
 
 	int	arity = edge->have;
@@ -272,6 +279,14 @@ struct decomposition *decompose_edge(struct edge	*edge, int *Ndecompositions)
 			else break;
 		}
 		if(x==arity)break;
+	}
+	if(n>100 && 0)
+	{
+		if(n > n2)printf("WARNING used more than n2 decomps\n");
+		printf("[%d - %d] %s has %d decompositions ; allocated %d ; alt alloc size %d\n", edge->from, edge->to, edge->rule->name, n, nallocated, n2);
+		printf("    daughters[0]->npack = %d	%s\n", edge->daughters[0]->npack, edge->daughters[0]->rule?edge->daughters[0]->rule->name:"norule");
+		if(edge->rule->ndaughters>1)
+			printf("    daughters[1]->npack = %d	%s\n", edge->daughters[1]->npack, edge->daughters[1]->rule?edge->daughters[1]->rule->name:"norule");
 	}
 
 	*Ndecompositions = n;
@@ -1851,8 +1866,9 @@ extern int do_itsdb;
 resume_after_oom:;
 	if(!count)
 	{
-		struct edge	*dublin_last_ditch_root_edge();
+		//struct edge	*dublin_last_ditch_root_edge();
 		struct edge	*last_ditch = dublin_last_ditch_root_edge();
+		extern struct edge *dublin_root;
 		struct hypothesis	*last_ditch_h = last_ditch?cheap_hypothesis(last_ditch,0):NULL;
 		if(last_ditch_h)
 		{

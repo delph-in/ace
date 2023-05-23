@@ -44,6 +44,7 @@ void	ace_load_grammar(char	*path)
 	g_loaded = 1;
 }
 
+/*
 struct mrs	*ace_surface_to_mrs(char	*line)
 {
 	struct mrs	*first_mrs = NULL;
@@ -58,7 +59,7 @@ struct mrs	*ace_surface_to_mrs(char	*line)
 	parse_line(line);
 	parse_callback = NULL;
 	return first_mrs;
-}
+}*/
 
 void	linenoiseEnableRaw() {}
 void	linenoiseDisableRaw() {}

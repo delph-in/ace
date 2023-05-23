@@ -73,7 +73,7 @@ struct tree	*csaw_parse(char	*sentence);
 extern char	*csaw_grammar_path;
 
 static struct tree	*dublin_tree;
-static struct edge	*dublin_root;
+struct edge	*dublin_root;
 static struct lattice *dublin_lexical_chart;
 
 static void dublin_got_edge(struct tree	*tx, struct dg	*d)
@@ -210,4 +210,5 @@ int	dublin_tree_contains(char	*mother, int	from, int	to, char	*daughter, int	dfr
 struct edge	*dublin_last_ditch_root_edge()
 {
 	if(dublin_root)return dublin_root;
+	return NULL;
 }
