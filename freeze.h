@@ -12,7 +12,7 @@ struct dg	*freeze_dg(struct dg	*dg);
 extern long	loaded_freeze_size;
 
 //#define	FREEZER_MMAP_BASE	0x60000000
-#define	FREEZER_MMAP_BASE	0x6000000000L
-//#define	FREEZER_MMAP_BASE	0x7000000000L
+//#define	FREEZER_MMAP_BASE	0x6000000000L
+#define	FREEZER_MMAP_BASE	0x7000000000L
 
 #define	FROZEN(x)		((long)x>=FREEZER_MMAP_BASE && (long)x<(FREEZER_MMAP_BASE+loaded_freeze_size))
