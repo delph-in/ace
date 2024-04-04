@@ -36,6 +36,7 @@ struct lattice_rule_set	*token_mapping_rules = NULL;
 struct lattice_rule_set	*lexical_filtering_rules = NULL;
 struct lattice_rule_set	*post_generation_mapping_rules = NULL;
 
+extern int yy_mode;
 int	mapping_tokens = 0;
 int	noriginaltokens, nmappingtokens;
 
@@ -649,6 +650,25 @@ struct token	*extract_token_from_dg(struct dg	*dg)
 		t->postag[sl-1] = 0;
 	}
 	else t->postag = NULL;*/
+	if(yy_mode)
+	{
+		struct dg	*iddlist_dg = dg_path(dg, token_id_path);
+		struct dg	*idlist_dg = dg_hop(iddlist_dg, lookup_fname("LIST"));
+		struct dg	*idlast_dg = dg_hop(iddlist_dg, lookup_fname("LAST"));
+		while(idlist_dg != NULL && idlist_dg != idlast_dg)
+		{
+			struct dg	*idfirst_dg = dg_hop(idlist_dg, 1);	// FIRST
+			if(idfirst_dg && idfirst_dg->type->name[0]=='"')
+			{
+				int id = atoi(idfirst_dg->type->name+1);
+				idlist_dg = dg_hop(idlist_dg, 2);	// REST
+				t->nids++;
+				t->ids = slab_realloc(t->ids, sizeof(id)*(t->nids-1), sizeof(id)*t->nids);
+				t->ids[t->nids-1] = id;
+			}
+			else break;
+		}
+	}
 	t->oc = NULL;
 	return t;
 }
@@ -772,6 +792,18 @@ int	lattice_mapping_rule_output(struct lattice	*lat, struct lattice_rule	*r, str
 		if(mapping_tokens)
 		{
 			le[i].token = extract_token_from_dg(out_dg[i]);
+			if(yy_mode)
+			{
+				if(le[i].token->nids==1)
+				{
+					int j;
+					for(j=0;j<r->ninput;j++)
+						if(inputs[j]->token->nids == 1 && inputs[j]->token->ids[0] == le[i].token->ids[0])
+						{
+							le[i].token->oc = inputs[j]->token->oc;
+						}
+				}
+			}
 			DEBUG("O%d = `%s' [%d - %d] = %p\n", i+1, le[i].token->string, le[i].from->id, le[i].to->id, &le[i]);
 		}
 		else
