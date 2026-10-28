@@ -245,7 +245,7 @@ void	process_saved_tcopy(struct transfer_rule	*r, struct tcopy	*c)
 void warn_about_equals(struct transfer_rule	*tr)
 {
 	static int	eqpath[5]={-1};
-	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", 0);
+	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", NULL);
 	while(eql && dg_hop(eql, 1))
 	{
 		struct dg	*eq = dg_hop(eql, 1);
@@ -263,7 +263,7 @@ struct transfer_rule	*dg_to_transfer_rule(char	*name, struct dg	*dg, struct dg	*
 	struct transfer_rule	*tr = calloc(sizeof(struct transfer_rule), 1);
 	tr->name = strdup(name);
 	static int flagspath[5] = {-1,-1};
-	struct dg	*optdg = walk_dg(dg, flagspath, "FLAGS", "OPTIONAL", 0);
+	struct dg	*optdg = walk_dg(dg, flagspath, "FLAGS", "OPTIONAL", NULL);
 	tr->optional = optdg?(!strcmp(optdg->xtype->name, "+")):0;
 	tr->dg = dg;
 	tr->output_override = output_override;
@@ -458,8 +458,8 @@ int	freeze_transfer_rule_more(struct transfer_rule	*tr)
 	bzero(tr->ss, sizeof(struct dg*)*10);
 	tr->neq = tr->nss = 0;
 	static int	eqpath[5]={-1}, sspath[5]={-1};
-	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", 0);
-	struct dg	*ssl = walk_dg(tr->dg, sspath, "FLAGS", "SUBSUME", 0);
+	struct dg	*eql = walk_dg(tr->dg, eqpath, "FLAGS", "EQUAL", NULL);
+	struct dg	*ssl = walk_dg(tr->dg, sspath, "FLAGS", "SUBSUME", NULL);
 	//printf("eql = \n");
 	//print_dg(eql); printf("\n");
 	while(eql && dg_hop(eql, 1))
