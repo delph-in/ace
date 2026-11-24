@@ -506,7 +506,7 @@ void	replace_backrefs(struct dg	*d, struct dg	*rd, struct lattice_rule	*r, struc
 			else patchto = backref;
 			char	tmp[patchto-last + 5];
 			sprintf(tmp, "%.*s", (int)(patchto-last), last);
-			buildp += swprintf(buildp, 1023, L"%s", tmp);
+			buildp += swprintf(buildp, 1023 - (buildp - build), L"%s", tmp);
 			if(backref == NULL)break;
 			backref_end = strchr(backref, '}');
 			if(!backref_end)goto badsyntax;
