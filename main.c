@@ -37,6 +37,25 @@ char	*save_grammar_path = 0;
 char	*load_grammar_path = 0;
 char	*sentence_path = 0, *master_addr = 0;
 int	question = 0, exhaustive = 1, lui_mode = 0, inhibit_pack = 0, best_only = 0;
+
+// --per-item-disable: in parsing mode, an input line "#DISABLE <lexemes>" sets the list of
+// disabled lexemes (same format and matching as -L) for the items that follow it;
+// a bare "#DISABLE" line restores the -L value given on the command line.
+// Such lines are not parsed and produce no output.  Without the option, nothing changes.
+int	per_item_disable = 0;
+static char	*per_item_disable_value = 0, *per_item_disable_cmdline = 0;
+static int	per_item_disable_seen = 0;
+static void	set_per_item_disable(char	*arg)
+{
+	extern char	*disable_signs;
+	if(!per_item_disable_seen) { per_item_disable_cmdline = disable_signs; per_item_disable_seen = 1; }
+	while(*arg==' ' || *arg=='\t')arg++;
+	int	n = strlen(arg);
+	while(n > 0 && (arg[n-1]=='\n' || arg[n-1]=='\r' || arg[n-1]==' '))arg[--n] = 0;
+	if(per_item_disable_value) { free(per_item_disable_value); per_item_disable_value = 0; }
+	if(n > 0) { per_item_disable_value = strdup(arg); disable_signs = per_item_disable_value; }
+	else disable_signs = per_item_disable_cmdline;
+}
 int show_gen_chart = 0;
 int timeout_seconds = 0;
 extern int	enable_ubertagging;
@@ -150,6 +169,7 @@ void	parse_args(int	argc, char	*argv[])
 		{"yy-rules", 0, &yy_rule_mode, 1},
 		{"tsdb-notes", 0, &tsdb_notes, 1},
 		{"rooted-derivations", 0, &derivations_include_roots, 1},
+		{"per-item-disable", 0, &per_item_disable, 1},
 #define	MAX_UNPACK_MEGABYTES_OPTION	1000
 		{"max-unpack-megabytes", 1, NULL, MAX_UNPACK_MEGABYTES_OPTION},
 #define	MAX_CHART_MEGABYTES_OPTION	1001
@@ -437,7 +457,12 @@ struct job_stats	main_input_loop(FILE	*fin)
 			}
 			if(fin==stdin)stdin_time += timer();
 			//start_timer(tid);
-			if(lui_mode && lineptr[0]==':')
+			if(per_item_disable && !strncmp(lineptr, "#DISABLE", 8))
+			{
+				set_per_item_disable(lineptr + 8);
+				num_results = -2;
+			}
+			else if(lui_mode && lineptr[0]==':')
 			{
 				handle_lui_colon_command(lineptr);
 				num_results = -2;

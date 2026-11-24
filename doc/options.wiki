@@ -30,6 +30,7 @@ Complete Reference:
 || -q || Suppress printing the input sentence in cases of successful parsing. ||
 || -X || Stop when the first result is found, rather than generating the complete packed forest. Not recommended. ||
 || -L lexemes || Disable certain lexemes when parsing. ||
+|| --per-item-disable || Allow the set of disabled lexemes to change between inputs without restarting ACE: an input line of the form ''#DISABLE lexeme1 lexeme2 ...'' sets the lexemes disabled for the following inputs (same format and matching as ''-L''), and a bare ''#DISABLE'' line restores the ''-L'' setting.  Such lines are not parsed and produce no output. ||
 || -i || Perform a fine-grained timing profile of the operation requested (experimental). ||
 || -y || Enable YY input mode (experimental). ||
 || --show-realization-trees || Enables console output of trees when generating. ||
