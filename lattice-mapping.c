@@ -1111,7 +1111,13 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 	}
 	else
 	{
-		if(have)bump_generation();
+		// discard temporary unifications before trying candidates for the next spot.
+		// this must happen even when have==0: the possible_map tests
+		// (initialize_possible_map() and update_possible_map_add()) leave their
+		// last successful match unified into the rule, and a rule whose spots
+		// share structure would then spuriously fail on (and remember as failed)
+		// the first candidate for the first spot.
+		bump_generation();
 		// find next input candidate
 
 	//	for(i=0;i<lat->nvertices;i++)
