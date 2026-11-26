@@ -1,0 +1,42 @@
+# Build products
+/ace
+/ace.static
+/libace.so
+/libace.a
+/pic/
+/profile-data/
+
+# C
+*.o
+*.a
+*.so
+*.so.*
+*.d
+*.gch
+*.gcda
+*.gcno
+*.gcov
+gmon.out
+core
+core.[0-9]*
+vgcore.*
+*.dSYM/
+
+# Compiled grammar images
+*.dat
+
+# Emacs
+*~
+\#*\#
+.\#*
+*.elc
+.dir-locals-2.el
+auto-save-list/
+tramp
+TAGS
+GTAGS
+GRTAGS
+GPATH
+
+# OS
+.DS_Store
