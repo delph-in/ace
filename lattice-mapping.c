@@ -506,7 +506,7 @@ void	replace_backrefs(struct dg	*d, struct dg	*rd, struct lattice_rule	*r, struc
 			else patchto = backref;
 			char	tmp[patchto-last + 5];
 			sprintf(tmp, "%.*s", (int)(patchto-last), last);
-			buildp += swprintf(buildp, 1023, L"%s", tmp);
+			buildp += swprintf(buildp, 1023 - (buildp - build), L"%s", tmp);
 			if(backref == NULL)break;
 			backref_end = strchr(backref, '}');
 			if(!backref_end)goto badsyntax;
@@ -1111,7 +1111,13 @@ int	apply_lattice_rule1(struct lattice	*lat, struct lattice_rule	*r, struct latt
 	}
 	else
 	{
-		if(have)bump_generation();
+		// discard temporary unifications before trying candidates for the next spot.
+		// this must happen even when have==0: the possible_map tests
+		// (initialize_possible_map() and update_possible_map_add()) leave their
+		// last successful match unified into the rule, and a rule whose spots
+		// share structure would then spuriously fail on (and remember as failed)
+		// the first candidate for the first spot.
+		bump_generation();
 		// find next input candidate
 
 	//	for(i=0;i<lat->nvertices;i++)
